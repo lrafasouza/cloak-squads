@@ -24,4 +24,10 @@ pub enum CloakSquadsError {
     RevocationCollision,
     #[msg("Too many revocations - realloc required by caller")]
     RevocationCapacity,
+    #[msg("License is not yet expired")]
+    LicenseNotExpired,
+    #[msg("Signer is already present in the view-key distribution")]
+    SignerAlreadyExists,
+    #[msg("Signer not found in the view-key distribution")]
+    SignerNotFound,
 }

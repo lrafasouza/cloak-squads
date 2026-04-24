@@ -1,7 +1,21 @@
+pub mod add_signer_view;
+pub mod close_expired_license;
+pub mod emergency_close_license;
 pub mod execute_with_license;
 pub mod init_cofre;
+pub mod init_view_distribution;
 pub mod issue_license;
+pub mod remove_signer_view;
+pub mod revoke_audit;
+pub mod set_operator;
 
+pub use add_signer_view::AddSignerView;
+pub use close_expired_license::CloseExpiredLicense;
+pub use emergency_close_license::EmergencyCloseLicense;
 pub use execute_with_license::{ExecuteWithLicense, PayloadInvariants};
 pub use init_cofre::InitCofre;
+pub use init_view_distribution::InitViewDistribution;
 pub use issue_license::IssueLicense;
+pub use remove_signer_view::RemoveSignerView;
+pub use revoke_audit::RevokeAudit;
+pub use set_operator::SetOperator;
