@@ -2,6 +2,7 @@
 members = [
   "programs/cloak-gatekeeper",
   "programs/cloak-mock",
+  "programs/cloak-squads-test-harness",
 ]
 resolver = "2"
 

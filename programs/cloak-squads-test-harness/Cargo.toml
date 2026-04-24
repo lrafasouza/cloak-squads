@@ -1,0 +1,20 @@
+[package]
+name = "cloak-squads-test-harness"
+version = "0.1.0"
+description = "Test-only Squads PDA signer harness for cloak-gatekeeper bankrun tests"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "cloak_squads_test_harness"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+solana-program = "~1.18"

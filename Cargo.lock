@@ -669,6 +669,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cloak-squads-test-harness"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "solana-program 1.18.26",
+]
+
+[[package]]
 name = "cmov"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
