@@ -13,6 +13,8 @@ A **Squads v4 execution module** that adds *private execution via Cloak shielded
 
 **Target user (V1)**: startups and scale-ups using Squads as their corporate treasury vehicle. Payroll, contractor payments, vendor settlements, and token distribution — without the public ledger exposing salaries, vendor relationships, or treasury strategy.
 
+**Terminology note**: throughout this spec, *"operator"* refers to the single Solana account (pubkey) designated in `Cofre.operator` that holds the Cloak spend key and is authorized to invoke `execute_with_license`. Operator is a role, typically filled by the CFO or a shared HSM. The operator is distinct from Squads *signers*, who approve proposals but never hold the spend key.
+
 **Why this matters for the Cloak Track**: the Cloak team explicitly suggested multi-sig as a direction. Composing their shielded pool with Squads is an unsolved problem in the Solana ecosystem — no production product exists. This module makes privacy *load-bearing*: remove Cloak, and the product collapses back into the public-by-default Squads experience everyone already has.
 
 ---
@@ -168,7 +170,7 @@ Admin issues scoped viewing keys. Three scopes:
 
 **Implementation**: `deriveDiversifiedViewingKey(nk, diversifier)` where `diversifier = BLAKE3("cloak-audit-v1" || linkId || scope || startDate || endDate)`. Scope filters apply client-side when rendering.
 
-**Revocation**: admin adds `diversifier[0..16]` to `Cofre.revoked_audit: Vec<[u8; 16]>`. Auditor frontend checks revocation list on each load.
+**Revocation**: admin adds `diversifier[0..16]` (first 16 bytes of the 32-byte diversifier — collision-resistant for revocation lookup) to `Cofre.revoked_audit: Vec<[u8; 16]>`. Auditor frontend checks revocation list on each load.
 
 ### F3.5 — Audit Link (shareable, fragment-based URL)
 
@@ -213,7 +215,7 @@ pub struct Cofre {
     pub view_key_public:   [u8; 32],        // Cloak pvk, for lookup
     pub created_at:        i64,
     pub version:           u8,              // schema versioning
-    pub revoked_audit:     Vec<[u8; 16]>,   // truncated diversifiers; unbounded with realloc
+    pub revoked_audit:     Vec<[u8; 16]>,   // diversifier[0..16] (first 16 bytes); unbounded with realloc
     pub bump:              u8,
 }
 // Seeds: [b"cofre", multisig.as_ref()]
