@@ -587,9 +587,9 @@ cloak-squads/
 
 **Frontend**: Next.js 15 (App Router) + React 19 + TypeScript strict + Tailwind v4 + shadcn/ui + Framer Motion + `@solana/wallet-adapter-react` + Zustand + TanStack Query
 
-**On-chain**: Anchor 0.30.1 + Solana 2.x + Rust 1.80+
+**On-chain**: Anchor 0.30.1 + Solana/Agave 1.18.x + Rust 1.80+
 
-**SDKs**: `@cloak.dev/sdk ^0.1.4` + `@sqds/multisig` (v4, pin exact version on day 1) + `@solana/web3.js ^1.98` + `@solana/spl-token ^0.4.14` + `@coral-xyz/anchor ^0.32` + `@noble/hashes ^1.8` + `tweetnacl` + `ed25519-to-x25519`
+**SDKs**: `@cloak.dev/sdk ^0.1.4` + `@sqds/multisig` (v4, pin exact version on day 1) + `@solana/web3.js ^1.98` + `@solana/spl-token ^0.4.14` + `@coral-xyz/anchor 0.30.x` + `@noble/hashes ^1.8` + `tweetnacl` + `ed25519-to-x25519`
 
 **Backend**: Next.js API routes + Prisma + SQLite (dev) / Postgres (optional prod) + Pino + jose (JWT)
 
@@ -607,9 +607,9 @@ cloak-squads/
 
 | Day | Date | Deliverable |
 |---|---|---|
-| 1 | Thu Apr 24 | Scaffold monorepo; `anchor init` for `cloak-gatekeeper` and `cloak-mock` |
-| 2 | Fri Apr 25 | `cloak-mock` complete with all stub instructions; localnet CPI test gatekeeper → mock |
-| 3 | Sat Apr 26 | Squads v4 `vault_transaction_execute` → `issue_license` flow working on devnet with mock |
+| 1 | Fri Apr 24 | Scaffold monorepo; `anchor init` for `cloak-gatekeeper` and `cloak-mock` |
+| 2 | Sat Apr 25 | `cloak-mock` complete with all stub instructions; localnet CPI test gatekeeper → mock |
+| 3 | Sun Apr 26 | Squads v4 `vault_transaction_execute` → `issue_license` flow working on devnet with mock |
 
 **If spikes fail**: fallback to simplified "admin-only execution without Squads gating" for V1, document as limitation.
 
@@ -650,13 +650,13 @@ cloak-squads/
 | 19 | README + ARCHITECTURE + SECURITY + DEMO docs; setup tested by outsider |
 | 20 | **Morning**: video recording (< 5 min) + editing. **Afternoon**: submit to Superteam Earn + Colosseum Arena. **Buffer**: description polish. |
 
-**Day 21 (Thu May 14)**: announcement day. Already submitted Tuesday afternoon.
+**Day 21 (Thu May 14)**: deadline/announcement day. Already submitted Wednesday afternoon (May 13).
 
 ### Weekly checkpoints
 
-- **Sun Apr 27** — end of week 1. Phase 0 + Phase 1 started? If not: cut F4.
-- **Sun May 4** — end of week 2. Phase 2 complete? If not: reduce F2 cap to 3 recipients and eliminate F4.
-- **Sun May 11** — end of week 3. Phase 3 complete? If not: freeze, begin submission.
+- **Mon Apr 27** — first review checkpoint. Phase 0 complete + Phase 1 started? If not: cut F4.
+- **Mon May 4** — second review checkpoint. Phase 2 complete? If not: reduce F2 cap to 3 recipients and eliminate F4.
+- **Mon May 11** — final review checkpoint. Phase 3 complete? If not: freeze, begin submission.
 
 ### Priority cuts under time pressure
 

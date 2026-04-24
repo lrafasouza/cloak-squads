@@ -6,7 +6,7 @@
 
 **Architecture:** Monorepo (pnpm + Turborepo). Two Anchor programs: `cloak-gatekeeper` (production) + `cloak-mock` (dev/test stub). Next.js 15 frontend with browser-side snarkjs proving, Squads v4 SDK integration, and Cloak SDK for shielded pool operations. 2-transaction execution pattern (license + execute) to handle Merkle root staleness. Operator-gated V1 security model with deterministic view-key derivation + encrypted distribution.
 
-**Tech Stack:** pnpm 9, Turborepo 2, Next.js 15 (App Router), TypeScript strict, Tailwind v4, shadcn/ui, Framer Motion, `@solana/wallet-adapter-react`, Zustand, TanStack Query, Prisma + SQLite, Pino. Anchor 0.30.1, Rust 1.80, Solana 2.x. `@cloak.dev/sdk ^0.1.4`, `@sqds/multisig` (v4), `@solana/web3.js ^1.98`, `@coral-xyz/anchor ^0.32`, `@noble/hashes`, `tweetnacl`, `ed25519-to-x25519`. Vitest + `solana-bankrun`/LiteSVM. Biome linter.
+**Tech Stack:** pnpm 9, Turborepo 2, Next.js 15 (App Router), TypeScript strict, Tailwind v4, shadcn/ui, Framer Motion, `@solana/wallet-adapter-react`, Zustand, TanStack Query, Prisma + SQLite, Pino. Anchor 0.30.1, Rust 1.80, Solana/Agave 1.18.x for the Anchor program toolchain. `@cloak.dev/sdk ^0.1.4`, `@sqds/multisig` (v4), `@solana/web3.js ^1.98`, `@coral-xyz/anchor 0.30.x`, `@noble/hashes`, `tweetnacl`, `ed25519-to-x25519`. Vitest + `solana-bankrun`/LiteSVM. Biome linter.
 
 **Spec reference:** `docs/superpowers/specs/2026-04-24-squads-cloak-private-execution-design.md`
 
@@ -185,6 +185,7 @@ cloak-squads/                                    (root)
 - [ ] Does Squads v4 vault_transaction reach our gatekeeper with vault PDA as signer?
 - [ ] Does license+execute 2-tx pattern work end-to-end?
 - [ ] Is `@sqds/multisig` latest version stable? (pin exact version in root package.json)
+- [ ] Are Cloak SDK exports used by the plan (`generateCloakKeys`, `computeCommitment`, `deriveDiversifiedViewingKey`, `scanTransactions`, CSV helpers) verified against the installed SDK package before frontend work starts?
 
 ---
 
@@ -956,14 +957,23 @@ describe("SPIKE: gatekeeper → cloak-mock CPI", () => {
       systemProgram: SystemProgram.programId,
     }).rpc();
 
-    // TODO: init cofre via a test-only helper instruction (add to gatekeeper for spike), then issue_license, then execute_with_license
-    // Assert: license account status becomes Consumed, nullifier record exists in mock
-    expect(true).toBe(true);
+    // INTENTIONAL SCOPE LIMIT: this first spike validates bankrun + IDL loading + mock tx execution.
+    // It is NOT sufficient to clear the Phase 0 CPI-depth checkpoint by itself.
+    // Before marking Task 0.4 complete, extend this file with a minimal cofre fixture and call:
+    //   1. gatekeeper.issueLicense(payloadHash, nonce, ttlSecs)
+    //   2. gatekeeper.executeWithLicense(invariants, proofBytes, merkleRoot)
+    //   3. fetch License and assert status == Consumed
+    //   4. fetch mock NullifierRecord and assert it exists
+    // If minimal cofre setup is too heavy here, do not claim "CPI verified"; move that acceptance
+    // criterion explicitly to Task 1.4 and document the risk in docs/spike-findings.md.
+    expect(mock.programId).toBeDefined();
+    expect(gatekeeper.programId).toBeDefined();
+    expect(pool.toBase58()).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
   });
 });
 ```
 
-**Note:** this test is a scaffold — the spike proves the toolchain wires up. Full cofre init isn't implemented until Task 1.1. If spike clears tool integration (bankrun loads, IDLs parse, transactions run without error), the spike passes; full CPI e2e test lives in Task 1.4.
+**Note:** the initial test is only a scaffold. It is useful, but it does not prove CPI depth or license consumption. Task 0.4 is only complete when either (a) the minimal issue+execute CPI path is added here and passes, or (b) the plan explicitly records that CPI validation is deferred to Task 1.4 and the Phase 0 checkpoint remains open.
 
 - [ ] **Step 7: Run the spike**
 
@@ -974,7 +984,7 @@ Expected: PASS (or: fails with a clear reason that guides next step — e.g. "an
 
 Run: `git add -A && git commit -m "spike(cpi): verify gatekeeper→mock CPI toolchain"`
 
-**Acceptance criteria for Phase 0 spike:** bankrun runs the test, both programs load, CPI wiring compiles. Full e2e validation deferred to Task 1.4.
+**Acceptance criteria for Task 0.4:** bankrun runs, both programs load, mock pool initializes, and the worker either verifies minimal gatekeeper → mock CPI or records the deferral as an unresolved Phase 0 risk. Do not mark the CPI-depth review checkbox complete from scaffold-only assertions.
 
 ---
 
@@ -1011,16 +1021,36 @@ async function main() {
   const [multisigPda] = multisig.getMultisigPda({ createKey: createKey.publicKey });
   console.log("Multisig PDA:", multisigPda.toBase58());
 
-  // TODO: follow @sqds/multisig quickstart to:
-  // 1. multisigCreateV2
-  // 2. proposalCreate
-  // 3. vaultTransactionCreate with a dummy inner instruction (e.g. transfer SOL from vault to creator)
-  // 4. proposalApprove (x threshold)
-  // 5. vaultTransactionExecute
-  // Log each tx signature.
-  // Spike passes if execute succeeds AND the vault PDA is seen as signer in the inner ix.
+  // Reference: https://docs.squads.so/main/development/typescript/instructions/create-vault-transaction
+  // and https://v4-sdk-typedoc.vercel.app/. Implement the sequence as real code before committing;
+  // do not leave this script as comments-only pseudocode. Concrete steps:
+  //
+  // 1) multisig.rpc.multisigCreateV2({
+  //      connection, createKey, creator, multisigPda,
+  //      configAuthority: null, threshold: 2, members: [m1, m2, m3], timeLock: 0, rentCollector: null,
+  //    })
+  //
+  // 2) Build a dummy inner instruction — SystemProgram.transfer from vault PDA to creator for 0.001 SOL.
+  //    Derive vault PDA: multisig.getVaultPda({ multisigPda, index: 0 }).
+  //
+  // 3) multisig.instructions.vaultTransactionCreate(...) or multisig.rpc.vaultTransactionCreate({
+  //      connection, multisigPda, transactionIndex: newIdx, creator: creator.publicKey,
+  //      vaultIndex: 0, ephemeralSigners: 0,
+  //      transactionMessage: new TransactionMessage({ payerKey: vaultPda, recentBlockhash, instructions: [dummyTransferIx] }),
+  //      memo: "spike",
+  //    })
+  //
+  // 4) multisig.rpc.proposalCreate({ connection, multisigPda, transactionIndex: newIdx, creator: creator.publicKey })
+  //
+  // 5) multisig.rpc.proposalApprove({ connection, multisigPda, transactionIndex: newIdx, member: creator }) — repeat for threshold
+  //
+  // 6) multisig.rpc.vaultTransactionExecute({ connection, multisigPda, transactionIndex: newIdx, member: creator })
+  //
+  // Log each signature. Fetch the execution tx via connection.getTransaction(sig, { maxSupportedTransactionVersion: 0 })
+  // and inspect `meta.innerInstructions` — confirm vault PDA appears as signer in the inner SystemProgram::transfer.
+  // Spike passes if execute succeeds AND vault PDA is the signer of the inner ix.
 
-  console.log("Spike complete. Review tx logs for vault PDA signer usage.");
+  throw new Error("Spike incomplete: replace comments above with executable Squads SDK calls before committing");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
@@ -1149,11 +1179,13 @@ Pattern: each gated by Squads vault signer (except `close_expired_license` which
 For brevity, write each following the same pattern as `init_cofre`. Each:
 - Uses `verify_squads_vault_signer` for Squads-gated actions
 - Uses `require_keys_eq!(ctx.accounts.operator.key(), ctx.accounts.cofre.operator, CloakSquadsError::NotOperator)` for operator-gated
-- Uses `require!(ctx.accounts.license.expires_at < Clock::get()?.unix_timestamp, CloakSquadsError::LicenseExpired.inverse())` pattern for close_expired
+- Uses an explicit positive expiry check for close paths:
+  `require!(Clock::get()?.unix_timestamp > ctx.accounts.license.expires_at, CloakSquadsError::LicenseExpired);`
+  If the error message reads awkwardly for "not expired yet", add a dedicated `LicenseNotExpired` enum variant instead of inventing a non-existent helper.
 
 Specific requirements:
 - `revoke_audit`: takes `diversifier_trunc: [u8; 16]`, pushes to `cofre.revoked_audit`. Fail with `RevocationCapacity` if `len() >= Cofre::MAX_REVOKED`. Clients must realloc via a separate `resize_cofre` instruction (add if needed).
-- `close_expired_license`: `close = cofre.operator` constraint on License, only callable after `expires_at`.
+- `close_expired_license`: `close = operator` constraint on License, with `operator: SystemAccount<'info>` or `UncheckedAccount<'info>` matching `cofre.operator`; only callable after `expires_at`.
 - `emergency_close_license`: Squads-gated; closes regardless of expiry.
 
 - [ ] **Step 4: Wire all instructions in lib.rs**
@@ -1633,14 +1665,20 @@ export async function buildIssueLicenseProposal(params: {
     params.multisigPda,
   );
   const newTxIndex = BigInt(multisigInfo.transactionIndex.toString()) + 1n;
-  // Build TransactionMessage wrapping the issueLicenseIx
+  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: 0 });
+
+  // Build TransactionMessage wrapping the issueLicenseIx. Squads docs use the vault PDA as payer
+  // because the vault signs the inner transaction during vault_transaction_execute.
   const message = new TransactionMessage({
-    payerKey: params.creator,
+    payerKey: vaultPda,
     recentBlockhash: (await params.connection.getLatestBlockhash()).blockhash,
     instructions: [params.issueLicenseIx],
   });
-  // Use multisig.rpc.vaultTransactionCreate or transactionBuffer for >1232 byte payloads
-  // Return transactionIndex and derived PDA
+  void message;
+  // Use multisig.instructions.vaultTransactionCreate / multisig.rpc.vaultTransactionCreate
+  // or transactionBuffer for >1232 byte payloads. Do not return before constructing and sending
+  // the create instruction in the implementation.
+  // Return transactionIndex and derived PDA after creation succeeds.
   const [vaultTransactionPda] = multisig.getTransactionPda({
     multisigPda: params.multisigPda,
     index: newTxIndex,
@@ -1652,11 +1690,10 @@ export async function buildIssueLicenseProposal(params: {
 - [ ] **Step 2: Write `gatekeeper-client.ts`**
 
 ```ts
-import { Program, AnchorProvider, Idl } from "@coral-xyz/anchor";
+import { Program, AnchorProvider, Idl, BN } from "@coral-xyz/anchor";
 import { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import type { PayloadInvariants } from "./hashing";
 import { computePayloadHash } from "./hashing";
-import { u64ToLeBytes } from "./encoding";
 
 export function buildIssueLicenseIx(
   program: Program,
@@ -2028,16 +2065,16 @@ Run every item in spec's L5 checklist. File issues for any findings; fix P0/P1 b
 
 ## Weekly checkpoints (self-review)
 
-**Sun Apr 27 (end week 1):**
+**Mon Apr 27 (first review checkpoint):**
 - [ ] Phase 0 complete? Spikes resolved?
 - [ ] Phase 1 started?
 - [ ] **If NO**: cut F4 entirely; compress Phase 3 to 2 days.
 
-**Sun May 4 (end week 2):**
+**Mon May 4 (second review checkpoint):**
 - [ ] Phase 2 complete?
 - [ ] **If NO**: cap F2 at 3 recipients; eliminate F4.
 
-**Sun May 11 (end week 3):**
+**Mon May 11 (final review checkpoint):**
 - [ ] Phase 3 complete?
 - [ ] **If NO**: freeze development, begin submission track with what exists.
 
@@ -2067,7 +2104,7 @@ This plan covers every requirement in the spec:
 - **Timeline** (Section 11) — exactly mapped to Phases 0–4
 - **Submission** (Section 12) — Task 4.2, 4.3
 
-Placeholder scan: zero TBDs. Types consistent: `PayloadInvariants` struct referenced in core, gatekeeper, and frontend. Method signatures matched: `issue_license(payload_hash, nonce, ttl_secs)` identical in Rust, core client, and frontend caller.
+Placeholder scan: no unresolved placeholder tokens remain, but two implementation checkpoints are intentionally called out before committing their tasks: the Squads spike script must be converted from comments to executable SDK calls, and the Cloak SDK export names must be verified against the installed package. Types consistent: `PayloadInvariants` struct referenced in core, gatekeeper, and frontend. Method signatures matched: `issue_license(payload_hash, nonce, ttl_secs)` identical in Rust, core client, and frontend caller.
 
 Gaps acknowledged: Task 2.1 (batch proposal creation) and 2.2 (chained execution) are less atomic than Phase 1; this is deliberate — the engineer has established patterns by Phase 2 and can work from Task 1.6 + the spec. If granular guidance becomes needed mid-execution, the sub-agent workflow allows pausing for refinement.
 

@@ -1,0 +1,35 @@
+{
+  "name": "cloak-squads",
+  "version": "0.0.1",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:int": "vitest run tests/integration",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "turbo run typecheck",
+    "anchor:build": "cd programs/cloak-gatekeeper && anchor build && cd ../cloak-mock && anchor build",
+    "anchor:deploy:devnet": "tsx scripts/deploy-gatekeeper.ts --cluster devnet && tsx scripts/deploy-cloak-mock.ts --cluster devnet",
+    "anchor:deploy:mainnet": "tsx scripts/deploy-gatekeeper.ts --cluster mainnet",
+    "demo:setup": "tsx scripts/setup-demo-cofre.ts",
+    "demo:seed": "tsx scripts/seed-test-data.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@coral-xyz/anchor": "0.30.1",
+    "@solana/web3.js": "^1.98.4",
+    "anchor-bankrun": "^0.5.0",
+    "solana-bankrun": "^0.4.0",
+    "tsx": "^4.19.2",
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.5"
+  },
+  "dependencies": {
+    "@sqds/multisig": "^2.1.4"
+  }
+}
