@@ -4,25 +4,22 @@
   "private": true,
   "packageManager": "pnpm@9.12.0",
   "scripts": {
-    "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
-    "test:unit": "turbo run test:unit",
-    "test:int": "vitest run tests/integration",
+    "test:int": "node --experimental-strip-types tests/integration/spike-cpi.test.ts",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "turbo run typecheck",
-    "anchor:build": "cd programs/cloak-gatekeeper && anchor build && cd ../cloak-mock && anchor build",
-    "anchor:deploy:devnet": "tsx scripts/deploy-gatekeeper.ts --cluster devnet && tsx scripts/deploy-cloak-mock.ts --cluster devnet",
-    "anchor:deploy:mainnet": "tsx scripts/deploy-gatekeeper.ts --cluster mainnet",
-    "demo:setup": "tsx scripts/setup-demo-cofre.ts",
-    "demo:seed": "tsx scripts/seed-test-data.ts"
+    "anchor:build": "anchor build",
+    "spike:devnet": "tsx scripts/spike-squads-devnet.ts",
+    "spike:cloak": "tsx scripts/spike-cloak-devnet.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@coral-xyz/anchor": "0.30.1",
+    "@coral-xyz/anchor": "^0.31.1",
     "@solana/web3.js": "^1.98.4",
     "anchor-bankrun": "^0.5.0",
+    "bs58": "^6.0.0",
     "solana-bankrun": "^0.4.0",
     "tsx": "^4.19.2",
     "turbo": "^2.3.0",
@@ -30,6 +27,7 @@
     "vitest": "^4.1.5"
   },
   "dependencies": {
+    "@cloak.dev/sdk": "^0.1.5",
     "@sqds/multisig": "^2.1.4"
   }
 }

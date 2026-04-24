@@ -1,0 +1,21 @@
+[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+cloak_gatekeeper = "WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J"
+cloak_mock = "2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe"
+
+[programs.devnet]
+cloak_gatekeeper = "WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J"
+cloak_mock = "2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Devnet"
+wallet = "~/.config/solana/cloak-devnet.json"
+
+[scripts]
+test = "pnpm test:int"

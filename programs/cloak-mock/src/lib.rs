@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 pub mod state;
 use state::*;
 
-declare_id!("9oNHUEqLVcUBygReEgy26yxDSAPFUi48bb2MJ4UsqQJr");
+declare_id!("2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe");
 
 #[program]
 pub mod cloak_mock {

@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { createHash } from "node:crypto";
 import {
   Connection,
   Keypair,
@@ -8,20 +9,21 @@ import {
   PublicKey,
   SystemProgram,
   Transaction,
+  TransactionInstruction,
   TransactionMessage,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 
 const { Permission, Permissions } = multisig.types;
-const { Multisig } = multisig.accounts;
+const { Multisig, ProgramConfig } = multisig.accounts;
+
+const GATEKEEPER_PROGRAM_ID = new PublicKey("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J");
 
 function loadKeypair(filePath = path.join(os.homedir(), ".config/solana/id.json")) {
   if (!fs.existsSync(filePath)) {
-    console.warn(`Keypair not found at ${filePath}; using an ephemeral devnet keypair.`);
-    return Keypair.generate();
+    throw new Error(`Keypair not found at ${filePath}. Set SOLANA_KEYPAIR env var.`);
   }
-
   return Keypair.fromSecretKey(
     Uint8Array.from(JSON.parse(fs.readFileSync(filePath, "utf-8")) as number[]),
   );
@@ -32,22 +34,33 @@ async function confirm(connection: Connection, signature: string) {
   await connection.confirmTransaction({ signature, ...latest }, "confirmed");
 }
 
-async function requestAirdropWithRetry(connection: Connection, recipient: PublicKey, sol: number) {
-  let lastError: unknown;
-  const amounts = Array.from(new Set([sol, 1, 0.5, 0.25]));
+function ixDiscriminator(name: string) {
+  return createHash("sha256").update(`global:${name}`).digest().subarray(0, 8);
+}
 
-  for (const amount of amounts) {
-    try {
-      const signature = await connection.requestAirdrop(recipient, amount * LAMPORTS_PER_SOL);
-      await confirm(connection, signature);
-      return signature;
-    } catch (error) {
-      lastError = error;
-      console.warn(`Airdrop ${amount} SOL failed; trying smaller amount.`);
-    }
-  }
-
-  throw lastError;
+function buildInitCofreIx(opts: {
+  cofre: PublicKey;
+  vaultPda: PublicKey;
+  multisig: PublicKey;
+  operator: PublicKey;
+  viewKeyPublic: Uint8Array;
+}): TransactionInstruction {
+  const data = Buffer.concat([
+    ixDiscriminator("init_cofre"),
+    opts.multisig.toBuffer(),
+    opts.operator.toBuffer(),
+    Buffer.from(opts.viewKeyPublic),
+  ]);
+  return new TransactionInstruction({
+    programId: GATEKEEPER_PROGRAM_ID,
+    keys: [
+      { pubkey: opts.cofre, isSigner: false, isWritable: true },
+      { pubkey: opts.vaultPda, isSigner: true, isWritable: false },
+      { pubkey: opts.vaultPda, isSigner: true, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
 }
 
 async function main() {
@@ -56,23 +69,40 @@ async function main() {
   const memberTwo = Keypair.generate();
   const memberThree = Keypair.generate();
   const createKey = Keypair.generate();
+  const operator = Keypair.generate();
   const [multisigPda] = multisig.getMultisigPda({ createKey: createKey.publicKey });
   const [vaultPda] = multisig.getVaultPda({ multisigPda, index: 0 });
+  const [cofrePda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("cofre"), multisigPda.toBuffer()],
+    GATEKEEPER_PROGRAM_ID,
+  );
 
-  console.log("Creator:", creator.publicKey.toBase58());
-  console.log("Multisig PDA:", multisigPda.toBase58());
-  console.log("Vault PDA:", vaultPda.toBase58());
+  console.log("=== Cloak-Squads Phase 0 Spike (devnet) ===");
+  console.log("Creator:        ", creator.publicKey.toBase58());
+  console.log("Multisig PDA:   ", multisigPda.toBase58());
+  console.log("Vault PDA:      ", vaultPda.toBase58());
+  console.log("Cofre PDA:      ", cofrePda.toBase58());
+  console.log("Operator:       ", operator.publicKey.toBase58());
+  console.log("Gatekeeper:     ", GATEKEEPER_PROGRAM_ID.toBase58());
 
-  const airdrop = await requestAirdropWithRetry(connection, creator.publicKey, 1);
-  console.log("Airdrop:", airdrop);
+  const balance = await connection.getBalance(creator.publicKey);
+  console.log(`Creator balance: ${balance / LAMPORTS_PER_SOL} SOL`);
+  if (balance < 1 * LAMPORTS_PER_SOL) {
+    throw new Error("Creator needs at least 1 SOL for multisig+vault funding");
+  }
 
-  const treasury = PublicKey.default;
   const memberPermissions = Permissions.fromPermissions([
     Permission.Initiate,
     Permission.Vote,
     Permission.Execute,
   ]);
 
+  const [programConfigPda] = multisig.getProgramConfigPda({});
+  const programConfig = await ProgramConfig.fromAccountAddress(connection, programConfigPda);
+  const treasury = programConfig.treasury;
+  console.log("Treasury:       ", treasury.toBase58());
+
+  console.log("\n[1/6] multisigCreateV2...");
   const createSig = await multisig.rpc.multisigCreateV2({
     connection,
     treasury,
@@ -88,38 +118,46 @@ async function main() {
     ],
     timeLock: 0,
     rentCollector: null,
-    memo: "cloak-squads phase0 spike",
+    memo: "cloak-squads phase0",
   });
   await confirm(connection, createSig);
-  console.log("multisigCreateV2:", createSig);
+  console.log("  tx:", createSig);
 
+  console.log("\n[2/6] Fund vault (rent for Cofre init)...");
   const fundVaultSig = await sendAndConfirmTransaction(
     connection,
     new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: creator.publicKey,
         toPubkey: vaultPda,
-        lamports: 10_000_000,
+        lamports: 20_000_000,
       }),
     ),
     [creator],
     { commitment: "confirmed" },
   );
-  console.log("fundVault:", fundVaultSig);
+  console.log("  tx:", fundVaultSig);
 
   const multisigAccount = await Multisig.fromAccountAddress(connection, multisigPda);
   const transactionIndex = BigInt(multisigAccount.transactionIndex.toString()) + 1n;
-  const transferIx = SystemProgram.transfer({
-    fromPubkey: vaultPda,
-    toPubkey: creator.publicKey,
-    lamports: 1_000_000,
+
+  const viewKeyPublic = new Uint8Array(32);
+  viewKeyPublic.fill(0xcc);
+
+  const innerIx = buildInitCofreIx({
+    cofre: cofrePda,
+    vaultPda,
+    multisig: multisigPda,
+    operator: operator.publicKey,
+    viewKeyPublic,
   });
   const message = new TransactionMessage({
     payerKey: vaultPda,
     recentBlockhash: (await connection.getLatestBlockhash()).blockhash,
-    instructions: [transferIx],
+    instructions: [innerIx],
   });
 
+  console.log("\n[3/6] vaultTransactionCreate (inner ix = init_cofre)...");
   const createTxSig = await multisig.rpc.vaultTransactionCreate({
     connection,
     feePayer: creator,
@@ -129,11 +167,12 @@ async function main() {
     vaultIndex: 0,
     ephemeralSigners: 0,
     transactionMessage: message,
-    memo: "phase0 vault signer spike",
+    memo: "phase0 init_cofre via squads vault",
   });
   await confirm(connection, createTxSig);
-  console.log("vaultTransactionCreate:", createTxSig);
+  console.log("  tx:", createTxSig);
 
+  console.log("\n[4/6] proposalCreate...");
   const proposalSig = await multisig.rpc.proposalCreate({
     connection,
     feePayer: creator,
@@ -142,28 +181,30 @@ async function main() {
     transactionIndex,
   });
   await confirm(connection, proposalSig);
-  console.log("proposalCreate:", proposalSig);
+  console.log("  tx:", proposalSig);
 
-  const approveOneSig = await multisig.rpc.proposalApprove({
+  console.log("\n[5/6] Two approvals...");
+  const approveOne = await multisig.rpc.proposalApprove({
     connection,
     feePayer: creator,
     member: creator,
     multisigPda,
     transactionIndex,
   });
-  await confirm(connection, approveOneSig);
-  console.log("proposalApprove creator:", approveOneSig);
+  await confirm(connection, approveOne);
+  console.log("  approve(creator):", approveOne);
 
-  const approveTwoSig = await multisig.rpc.proposalApprove({
+  const approveTwo = await multisig.rpc.proposalApprove({
     connection,
     feePayer: creator,
     member: memberTwo,
     multisigPda,
     transactionIndex,
   });
-  await confirm(connection, approveTwoSig);
-  console.log("proposalApprove memberTwo:", approveTwoSig);
+  await confirm(connection, approveTwo);
+  console.log("  approve(memberTwo):", approveTwo);
 
+  console.log("\n[6/6] vaultTransactionExecute...");
   const executeSig = await multisig.rpc.vaultTransactionExecute({
     connection,
     feePayer: creator,
@@ -172,22 +213,49 @@ async function main() {
     member: creator.publicKey,
   });
   await confirm(connection, executeSig);
-  console.log("vaultTransactionExecute:", executeSig);
+  console.log("  tx:", executeSig);
 
-  const executed = await connection.getTransaction(executeSig, {
-    commitment: "confirmed",
-    maxSupportedTransactionVersion: 0,
-  });
+  console.log("\n=== Verifying Cofre on-chain ===");
+  const cofreAccount = await connection.getAccountInfo(cofrePda);
+  if (!cofreAccount) {
+    throw new Error(`FAIL: Cofre account ${cofrePda.toBase58()} not found on devnet`);
+  }
+  if (!cofreAccount.owner.equals(GATEKEEPER_PROGRAM_ID)) {
+    throw new Error(
+      `FAIL: Cofre owner mismatch. Expected ${GATEKEEPER_PROGRAM_ID.toBase58()}, got ${cofreAccount.owner.toBase58()}`,
+    );
+  }
+  const storedMultisig = new PublicKey(cofreAccount.data.subarray(8, 40));
+  if (!storedMultisig.equals(multisigPda)) {
+    throw new Error(
+      `FAIL: Cofre.multisig mismatch. Expected ${multisigPda.toBase58()}, got ${storedMultisig.toBase58()}`,
+    );
+  }
+  const storedOperator = new PublicKey(cofreAccount.data.subarray(40, 72));
+  if (!storedOperator.equals(operator.publicKey)) {
+    throw new Error(
+      `FAIL: Cofre.operator mismatch. Expected ${operator.publicKey.toBase58()}, got ${storedOperator.toBase58()}`,
+    );
+  }
+
+  console.log("\n✅ SPIKE PASSED");
   console.log(
     JSON.stringify(
       {
-        executeSig,
-        vaultPda: vaultPda.toBase58(),
-        innerInstructions: executed?.meta?.innerInstructions ?? [],
+        multisig: multisigPda.toBase58(),
+        vault: vaultPda.toBase58(),
+        cofre: cofrePda.toBase58(),
+        storedMultisig: storedMultisig.toBase58(),
+        storedOperator: storedOperator.toBase58(),
+        executeTx: executeSig,
+        explorer: `https://explorer.solana.com/tx/${executeSig}?cluster=devnet`,
       },
       null,
       2,
     ),
+  );
+  console.log(
+    "\nSquads vault PDA propagated as signer to cloak-gatekeeper::init_cofre — Phase 0 risk cleared.",
   );
 }
 

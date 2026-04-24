@@ -1,19 +1,25 @@
 use anchor_lang::prelude::*;
 
+use crate::instructions::{ExecuteWithLicense, InitCofre, IssueLicense, PayloadInvariants};
+
 pub mod errors;
 pub mod events;
 pub mod instructions;
 pub mod state;
 pub mod utils;
 
-declare_id!("2G3UEzSaWdqk6g2KPfeDWaQUcDqnpjynXX5wnWzw4YKE");
+pub(crate) use instructions::execute_with_license::__client_accounts_execute_with_license;
+pub(crate) use instructions::init_cofre::__client_accounts_init_cofre;
+pub(crate) use instructions::issue_license::__client_accounts_issue_license;
+
+declare_id!("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J");
 
 #[program]
 pub mod cloak_gatekeeper {
     use super::*;
 
     pub fn init_cofre(
-        ctx: Context<instructions::InitCofre>,
+        ctx: Context<InitCofre>,
         multisig: Pubkey,
         operator: Pubkey,
         view_key_public: [u8; 32],
@@ -22,7 +28,7 @@ pub mod cloak_gatekeeper {
     }
 
     pub fn issue_license(
-        ctx: Context<instructions::IssueLicense>,
+        ctx: Context<IssueLicense>,
         payload_hash: [u8; 32],
         nonce: [u8; 16],
         ttl_secs: i64,
@@ -31,8 +37,8 @@ pub mod cloak_gatekeeper {
     }
 
     pub fn execute_with_license(
-        ctx: Context<instructions::ExecuteWithLicense>,
-        invariants: instructions::PayloadInvariants,
+        ctx: Context<ExecuteWithLicense>,
+        invariants: PayloadInvariants,
         proof_bytes: [u8; 256],
         merkle_root: [u8; 32],
     ) -> Result<()> {
