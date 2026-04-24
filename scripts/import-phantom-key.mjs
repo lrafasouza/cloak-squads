@@ -1,9 +1,9 @@
-import { createInterface } from "node:readline";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
-import bs58 from "bs58";
+import { createInterface } from "node:readline";
 import { Keypair } from "@solana/web3.js";
+import bs58 from "bs58";
 
 const EXPECTED_PUBKEY = "QqibVKumHaJAC5bYii7q2QRWf3faYTEj8ff1d6gqST5";
 const OUT = path.join(homedir(), ".config/solana/cloak-devnet.json");
@@ -66,10 +66,10 @@ if (bytes.length === 64) {
 
 const actualPubkey = keypair.publicKey.toBase58();
 if (actualPubkey !== EXPECTED_PUBKEY) {
-  console.error(`ERRO: pubkey não bate.`);
+  console.error("ERRO: pubkey não bate.");
   console.error(`  Chave importada gera: ${actualPubkey}`);
   console.error(`  Esperado:            ${EXPECTED_PUBKEY}`);
-  console.error(`Não gravando arquivo. Confere se copiou a chave da wallet certa.`);
+  console.error("Não gravando arquivo. Confere se copiou a chave da wallet certa.");
   process.exit(1);
 }
 

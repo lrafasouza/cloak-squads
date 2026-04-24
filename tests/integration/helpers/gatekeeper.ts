@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
-  Keypair,
+  type Keypair,
   PublicKey,
   SystemProgram,
   Transaction,
-  TransactionInstruction,
+  type TransactionInstruction,
 } from "@solana/web3.js";
 
 export type AccountInfoBytes = {
@@ -31,12 +31,8 @@ export type BankrunContext = {
   setAccount(address: PublicKey, account: AccountInfoBytes): void;
 };
 
-export const GATEKEEPER_PROGRAM_ID = new PublicKey(
-  "WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J",
-);
-export const MOCK_PROGRAM_ID = new PublicKey(
-  "2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe",
-);
+export const GATEKEEPER_PROGRAM_ID = new PublicKey("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J");
+export const MOCK_PROGRAM_ID = new PublicKey("2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe");
 export const SQUADS_HARNESS_PROGRAM_ID = new PublicKey(
   "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf",
 );

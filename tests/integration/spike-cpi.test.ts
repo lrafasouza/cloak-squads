@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
 import {
   Keypair,
@@ -342,7 +341,10 @@ async function main() {
     }),
   );
 
-  const latestBlockhash = await context.banksClient.getLatestBlockhash();
+  const latestBlockhash = (await context.banksClient.getLatestBlockhash()) as
+    | [string, bigint]
+    | { blockhash: string }
+    | null;
   tx.feePayer = context.payer.publicKey;
   tx.recentBlockhash = Array.isArray(latestBlockhash)
     ? latestBlockhash[0]

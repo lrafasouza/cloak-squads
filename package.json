@@ -9,7 +9,8 @@
     "test:int": "node --experimental-strip-types tests/integration/spike-cpi.test.ts && node --experimental-strip-types tests/integration/gatekeeper-instructions.test.ts",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck:packages": "turbo run typecheck --filter='./packages/*'",
     "anchor:build": "anchor build",
     "spike:devnet": "tsx scripts/spike-squads-devnet.ts",
     "spike:cloak": "tsx scripts/spike-cloak-devnet.ts"
