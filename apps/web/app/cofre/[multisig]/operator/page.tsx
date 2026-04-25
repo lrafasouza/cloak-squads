@@ -1,9 +1,10 @@
 "use client";
 
+import { cofrePda } from "@cloak-squads/core/pda";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
 import Link from "next/link";
-import { type FormEvent, use, useMemo, useState } from "react";
+import { type FormEvent, useCallback, use, useEffect, useMemo, useState } from "react";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { loadProposalDraft } from "@/lib/session-cache";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
   const [signature, setSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadedDraft, setLoadedDraft] = useState<ProposalDraft | null>(null);
+  const [registeredOperator, setRegisteredOperator] = useState<string | null>(null);
 
   const multisigAddress = useMemo(() => {
     try {
@@ -43,6 +45,28 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
       return null;
     }
   }, [multisig]);
+
+  const fetchOperator = useCallback(async () => {
+    if (!multisigAddress) return;
+    try {
+      const cofre = cofrePda(multisigAddress)[0];
+      const account = await connection.getAccountInfo(cofre);
+      if (!account) return;
+      const operatorBytes = account.data.subarray(40, 72);
+      setRegisteredOperator(new PublicKey(operatorBytes).toBase58());
+    } catch {
+      // ignore
+    }
+  }, [connection, multisigAddress]);
+
+  useEffect(() => {
+    void fetchOperator();
+  }, [fetchOperator]);
+
+  const operatorMismatch = useMemo(() => {
+    if (!registeredOperator || !wallet.publicKey) return false;
+    return registeredOperator !== wallet.publicKey.toBase58();
+  }, [registeredOperator, wallet.publicKey]);
 
   function loadDraft() {
     if (!txIndex || !multisig) return;
@@ -154,6 +178,22 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
         </div>
 
         <div className="grid gap-4">
+          {registeredOperator ? (
+            <section className={`rounded-lg border p-4 ${operatorMismatch ? "border-amber-900 bg-amber-950" : "border-emerald-900 bg-emerald-950"}`}>
+              <dl className="grid gap-1 text-sm">
+                <div>
+                  <dt className="text-neutral-400">Registered operator</dt>
+                  <dd className="break-all font-mono text-neutral-100">{registeredOperator}</dd>
+                </div>
+                {operatorMismatch && wallet.publicKey ? (
+                  <p className="mt-2 text-amber-200">
+                    Connected wallet <span className="font-mono">{wallet.publicKey.toBase58()}</span> does not match the registered operator. Switch wallets.
+                  </p>
+                ) : null}
+              </dl>
+            </section>
+          ) : null}
+
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
             <h2 className="mb-4 text-base font-semibold text-neutral-50">Load proposal draft</h2>
             <div className="flex items-end gap-3">
@@ -211,11 +251,14 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
               Uses mock proof (256 zero bytes) and mock merkle root (32 zero bytes).
               Connect the operator wallet (different from the Squads member).
             </p>
-            <Button type="submit" disabled={pending || !loadedDraft || !wallet.publicKey}>
+            <Button type="submit" disabled={pending || !loadedDraft || !wallet.publicKey || operatorMismatch}>
               {pending ? "Executing..." : "Execute with license"}
             </Button>
             {!wallet.publicKey ? (
               <p className="mt-2 text-xs text-amber-300">Connect an operator wallet first.</p>
+            ) : null}
+            {operatorMismatch && wallet.publicKey ? (
+              <p className="mt-2 text-xs text-amber-300">Wrong wallet. Switch to the registered operator.</p>
             ) : null}
             {!loadedDraft ? (
               <p className="mt-2 text-xs text-amber-300">Load a proposal draft above.</p>
