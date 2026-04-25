@@ -1,11 +1,8 @@
 "use client";
 
-import {
-  type PayloadInvariants,
-  cofrePda,
-  computePayloadHash,
-  squadsVaultPda,
-} from "@cloak-squads/core";
+import { computePayloadHash } from "@cloak-squads/core/hashing";
+import { cofrePda, squadsVaultPda } from "@cloak-squads/core/pda";
+import type { PayloadInvariants } from "@cloak-squads/core/types";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { PublicKey, SystemProgram } from "@solana/web3.js";

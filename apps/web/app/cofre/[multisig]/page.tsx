@@ -1,6 +1,6 @@
 "use client";
 
-import { cofrePda, squadsVaultPda } from "@cloak-squads/core";
+import { cofrePda, squadsVaultPda } from "@cloak-squads/core/pda";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { PublicKey } from "@solana/web3.js";
