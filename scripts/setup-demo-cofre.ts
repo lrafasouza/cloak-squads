@@ -1,11 +1,9 @@
 /**
- * Sets up a 1-of-1 Squads multisig + Cloak gatekeeper Cofre on devnet for solo F1 testing.
+ * Creates a fresh 1-of-1 Squads multisig + Cofre on devnet with a specific operator.
  *
- * Difference vs spike-squads-devnet.ts:
- * - threshold = 1 (no second signer needed)
- * - members = [creator] (you can approve and execute alone in the frontend)
- * - persists multisig + cofre + operator + createKey to scripts/.demo-cofre.json
+ * Usage: npx tsx scripts/setup-demo-cofre.ts
  */
+
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -31,6 +29,8 @@ const GATEKEEPER_PROGRAM_ID = new PublicKey("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgAC
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const OUT_FILE = path.join(__dirname, ".demo-cofre.json");
+
+const OPERATOR_PUBKEY = new PublicKey("QqibVKumHaJAC5bYii7q2QRWf3faYTEj8ff1d6gqST5");
 
 function loadKeypair(filePath = path.join(os.homedir(), ".config/solana/id.json")) {
   if (!fs.existsSync(filePath)) {
@@ -79,7 +79,6 @@ async function main() {
   const connection = new Connection("https://api.devnet.solana.com", "confirmed");
   const creator = loadKeypair(process.env.SOLANA_KEYPAIR);
   const createKey = Keypair.generate();
-  const operator = Keypair.generate();
   const [multisigPda] = multisig.getMultisigPda({ createKey: createKey.publicKey });
   const [vaultPda] = multisig.getVaultPda({ multisigPda, index: 0 });
   const [cofrePda] = PublicKey.findProgramAddressSync(
@@ -92,7 +91,7 @@ async function main() {
   console.log("Multisig PDA:  ", multisigPda.toBase58());
   console.log("Vault PDA:     ", vaultPda.toBase58());
   console.log("Cofre PDA:     ", cofrePda.toBase58());
-  console.log("Operator:      ", operator.publicKey.toBase58());
+  console.log("Operator:      ", OPERATOR_PUBKEY.toBase58());
 
   const balance = await connection.getBalance(creator.publicKey);
   console.log(`Creator balance: ${balance / LAMPORTS_PER_SOL} SOL`);
@@ -153,7 +152,7 @@ async function main() {
     cofre: cofrePda,
     vaultPda,
     multisig: multisigPda,
-    operator: operator.publicKey,
+    operator: OPERATOR_PUBKEY,
     viewKeyPublic,
   });
   const message = new TransactionMessage({
@@ -206,6 +205,7 @@ async function main() {
     multisigPda,
     transactionIndex,
     member: creator.publicKey,
+    signers: [creator],
   });
   await confirm(connection, executeSig);
   console.log("  tx:", executeSig);
@@ -219,13 +219,18 @@ async function main() {
     );
   }
 
+  const onChainOperator = new PublicKey(cofreAccount.data.subarray(40, 72));
+  console.log(`On-chain operator: ${onChainOperator.toBase58()}`);
+  if (!onChainOperator.equals(OPERATOR_PUBKEY)) {
+    throw new Error(`Operator mismatch! Expected ${OPERATOR_PUBKEY.toBase58()}, got ${onChainOperator.toBase58()}`);
+  }
+
   const summary = {
     multisig: multisigPda.toBase58(),
     vault: vaultPda.toBase58(),
     cofre: cofrePda.toBase58(),
     creator: creator.publicKey.toBase58(),
-    operator: operator.publicKey.toBase58(),
-    operatorSecretKey: Array.from(operator.secretKey),
+    operator: OPERATOR_PUBKEY.toBase58(),
     createKey: Array.from(createKey.secretKey),
     threshold: 1,
     setupTx: executeSig,
@@ -236,8 +241,8 @@ async function main() {
   fs.writeFileSync(OUT_FILE, JSON.stringify(summary, null, 2));
 
   console.log("\n✅ DEMO COFRE READY (1-of-1)");
-  console.log(JSON.stringify({ ...summary, operatorSecretKey: "[redacted]", createKey: "[redacted]" }, null, 2));
-  console.log(`\nFull config (with secrets) saved to: ${OUT_FILE}`);
+  console.log(JSON.stringify({ ...summary, createKey: "[redacted]" }, null, 2));
+  console.log(`\nFull config saved to: ${OUT_FILE}`);
   console.log(`\nNext: open ${summary.sendUrl} in your browser.`);
 }
 
