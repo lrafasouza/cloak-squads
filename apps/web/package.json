@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "prisma": "prisma",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit"
   },
