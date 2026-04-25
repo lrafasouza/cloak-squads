@@ -2,10 +2,10 @@
 
 import { cofrePda, squadsVaultPda } from "@cloak-squads/core/pda";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { use, useMemo } from "react";
+import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 
 function truncateAddress(address: string) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -62,7 +62,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
           >
             Cloak Squads
           </Link>
-          <WalletMultiButton />
+          <ClientWalletButton />
         </div>
       </header>
 

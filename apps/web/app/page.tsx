@@ -3,8 +3,8 @@
 // biome-ignore lint/style/useNodejsImportProtocol: Client bundle uses the buffer package polyfill.
 import { Buffer } from "buffer";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { type Connection, PublicKey } from "@solana/web3.js";
+import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import * as multisig from "@sqds/multisig";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -94,7 +94,7 @@ export default function HomePage() {
           >
             Cloak Squads
           </Link>
-          <WalletMultiButton />
+          <ClientWalletButton />
         </div>
       </header>
 

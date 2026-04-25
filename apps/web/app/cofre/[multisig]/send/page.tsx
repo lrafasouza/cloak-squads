@@ -3,8 +3,8 @@
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, use, useMemo, useState } from "react";
@@ -159,7 +159,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
           <Link href={`/cofre/${multisigAddress.toBase58()}`} className="text-sm font-semibold text-neutral-100">
             Cofre
           </Link>
-          <WalletMultiButton />
+          <ClientWalletButton />
         </div>
       </header>
 
