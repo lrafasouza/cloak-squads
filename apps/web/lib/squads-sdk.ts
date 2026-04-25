@@ -159,6 +159,29 @@ export async function vaultTransactionExecute(params: {
   transactionIndex: bigint;
 }) {
   assertBrowserSquadsWallet(params.wallet);
+  console.log("[squads-sdk] vaultTransactionExecute start", {
+    multisig: params.multisigPda.toBase58(),
+    transactionIndex: params.transactionIndex.toString(),
+    member: params.wallet.publicKey.toBase58(),
+  });
+
+  const proposalPda = multisig.getProposalPda({
+    multisigPda: params.multisigPda,
+    transactionIndex: params.transactionIndex,
+  })[0];
+  try {
+    const proposal = await multisig.accounts.Proposal.fromAccountAddress(
+      params.connection,
+      proposalPda,
+    );
+    console.log("[squads-sdk] proposal status:", proposal.status, "approved:", proposal.approved.length);
+  } catch (err) {
+    console.error("[squads-sdk] could not load proposal — was it created?", err);
+    throw new Error(
+      "Proposal not found on-chain. Did you create + approve it before executing?",
+    );
+  }
+
   const { instruction, lookupTableAccounts } = await multisig.instructions.vaultTransactionExecute({
     connection: params.connection,
     multisigPda: params.multisigPda,
@@ -171,7 +194,38 @@ export async function vaultTransactionExecute(params: {
     recentBlockhash: latestBlockhash.blockhash,
     instructions: [instruction],
   }).compileToV0Message(lookupTableAccounts);
-  return params.wallet.sendTransaction(new VersionedTransaction(message), params.connection);
+  const versionedTx = new VersionedTransaction(message);
+
+  try {
+    const sim = await params.connection.simulateTransaction(versionedTx, {
+      sigVerify: false,
+      replaceRecentBlockhash: true,
+    });
+    console.log("[squads-sdk] execute simulate result:", sim);
+    if (sim.value.err) {
+      console.error("[squads-sdk] execute simulate error:", sim.value.err);
+      console.error("[squads-sdk] execute simulate logs:", sim.value.logs);
+      throw new Error(
+        `Execute simulation failed: ${JSON.stringify(sim.value.err)} | logs: ${(sim.value.logs ?? []).join(" || ")}`,
+      );
+    }
+  } catch (simErr) {
+    console.error("[squads-sdk] execute simulate threw:", simErr);
+    throw simErr;
+  }
+
+  try {
+    return await params.wallet.sendTransaction(versionedTx, params.connection);
+  } catch (sendErr) {
+    console.error("[squads-sdk] execute sendTransaction error:", sendErr);
+    if (sendErr && typeof sendErr === "object") {
+      const anyErr = sendErr as { logs?: unknown; cause?: unknown; message?: unknown };
+      console.error("[squads-sdk]   .logs:", anyErr.logs);
+      console.error("[squads-sdk]   .cause:", anyErr.cause);
+      console.error("[squads-sdk]   .message:", anyErr.message);
+    }
+    throw sendErr;
+  }
 }
 
 async function sendSingleInstruction(
