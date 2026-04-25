@@ -24,7 +24,8 @@ type ProposalStatusKind =
 
 function readProposalStatus(status: unknown): ProposalStatusKind {
   if (status && typeof status === "object") {
-    const key = Object.keys(status as Record<string, unknown>)[0]?.toLowerCase();
+    const kind = (status as { __kind?: unknown }).__kind;
+    const key = typeof kind === "string" ? kind.toLowerCase() : undefined;
     if (
       key === "draft" ||
       key === "active" ||
