@@ -20,7 +20,8 @@
     "build:web": "pnpm prebuild:web && pnpm -F web build",
     "anchor:build": "NO_DNA=1 anchor build",
     "spike:devnet": "tsx scripts/spike-squads-devnet.ts",
-    "spike:cloak": "tsx scripts/spike-cloak-devnet.ts"
+    "spike:cloak": "tsx scripts/spike-cloak-devnet.ts",
+    "demo:setup": "tsx scripts/setup-demo-cofre.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
