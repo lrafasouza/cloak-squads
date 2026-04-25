@@ -1,43 +1,69 @@
 # Cloak Squads Demo Runbook
 
-## F1 Private Send
+## F1 — Private Send (DONE)
 
-Goal: show a Squads vault approving a private execution license, then the operator executing the Cloak transfer through the gatekeeper.
+End-to-end flow: Squads vault approves a private execution license, then the operator executes the Cloak transfer through the gatekeeper. All on devnet with threshold 1.
 
-Prerequisites:
+### Prerequisites
+
 - Devnet wallet funded with SOL.
-- A Squads v4 multisig initialized on devnet with at least two signer wallets.
-- `cloak-gatekeeper` and `cloak-mock` deployed with the program IDs in `apps/web/.env.local`.
-- Prisma migration applied for the web app.
+- Squads v4 multisig on devnet (threshold 1, member = your wallet).
+- `cloak-gatekeeper` deployed at `WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J`.
+- `cloak-mock` deployed at `2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe`.
+- Program IDs configured in `apps/web/.env.local`.
 
-User-run commands:
+### Setup
 
 ```bash
+# From project root
+pnpm install
 pnpm prebuild:web
 pnpm -F web dev
 ```
 
-Flow:
+Optionally run the E2E script to verify the full on-chain flow:
 
-1. Open the web app and connect signer wallet A.
-2. Paste the Squads multisig PDA in the cofre picker.
-3. Open `Prepare send`.
-4. Enter a lamport amount, recipient stealth public key, and optional memo.
-5. Click `Create proposal`.
-6. Switch to signer wallet B and open `/cofre/<multisig>/proposals/<transactionIndex>`.
-7. Confirm the commitment check is green.
-8. Click `Approve`.
-9. Switch back to the operator wallet after Squads threshold is reached.
-10. Execute the Squads vault transaction so the license is issued.
-11. Run the operator execution path with fresh Cloak Merkle data and confirm the license is consumed.
+```bash
+npx tsx scripts/f1-e2e-devnet.ts
+```
 
-Expected capture:
-- Proposal creation signature.
-- Approval transaction signature.
-- Gatekeeper `LicenseIssued` event.
-- Gatekeeper `LicenseConsumed` event.
-- Explorer view showing the public transaction does not reveal the private recipient or amount beyond the approved payload commitment.
+### Demo Flow
 
-## Phase 2 Preview
+1. **Create proposal** — Open `http://localhost:3000`, connect your Squads member wallet, enter the multisig address, go to *Prepare send*, fill amount + recipient, click *Create proposal*.
+2. **Approve** — On the proposal page, click *Approve*. The on-chain status should update to `approved`.
+3. **Execute vault transaction** — Click *Execute vault transaction*. This issues the license on-chain.
+4. **Operator consumes license** — Go to *Operator* from the cofre dashboard. Enter the proposal # and click *Load*. Connect the operator wallet (can be the same wallet for threshold 1). Click *Execute with license*. The license is consumed.
 
-F2 payroll, F3 audit admin, and F3.5 public audit link will extend this runbook after the F1 path is stable on devnet.
+### Sandbox Multisig
+
+`4UyJQecmT5irKwbgWyW3WeARsGfz8vii2cxsXBz5PMt5` — cofre initialized, threshold 1, member `2ScUUMp8xiuhPXhGWYZytuf5rsgZBQ1AuD3iF3qcMVxp`.
+
+### Known Limitations (tech debt)
+
+- **Threshold 1 only** — all flows are 1-of-1. Threshold ≥ 2 requires multi-member approval UI.
+- **Mock proofs** — `execute_with_license` sends 256 zero bytes as proof and 32 zero bytes as merkle root.
+- **Commitment check** — Cloak SDK is not wired in the browser build; the commitment card shows "unavailable".
+- **sessionStorage only** — proposal drafts live in browser sessionStorage. The operator page reads from the same session.
+
+### Key Signatures
+
+| Step | Program | Event |
+|------|---------|-------|
+| Create proposal | Squads | `VaultTransactionCreate` + `ProposalCreate` |
+| Approve | Squads | `ProposalApprove` |
+| Execute vault tx | Squads → Gatekeeper | `issue_license` via CPI |
+| Operator execute | Gatekeeper → Mock | `execute_with_license` |
+
+---
+
+## F2 — Payroll (PENDING)
+
+Batch private sends via CSV upload. One Squads proposal contains N `issue_license` instructions. Page: `/cofre/[multisig]/payroll`.
+
+## F3 — Audit Admin (PENDING)
+
+Diversifier-based audit dashboard for cofre admins. Scope: full, amounts-only, time-ranged.
+
+## F3.5 — Public Audit Link (PENDING)
+
+Shareable link with view-only access to audit proofs for a specific diversifier.

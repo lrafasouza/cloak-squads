@@ -79,12 +79,20 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
             </p>
           </div>
 
-          <Link
-            href={`/cofre/${multisigAddress.toBase58()}/send`}
-            className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
-          >
-            Prepare send
-          </Link>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link
+              href={`/cofre/${multisigAddress.toBase58()}/send`}
+              className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+            >
+              Prepare send
+            </Link>
+            <Link
+              href={`/cofre/${multisigAddress.toBase58()}/operator`}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-neutral-700 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+            >
+              Operator
+            </Link>
+          </div>
         </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">

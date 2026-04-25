@@ -108,6 +108,15 @@ export async function createIssueLicenseProposal(params: {
     }
     throw sendErr;
   }
+
+  console.log("[squads-sdk] awaiting confirmation:", signature);
+  const { blockhash: confirmBh, lastValidBlockHeight } = await params.connection.getLatestBlockhash();
+  await params.connection.confirmTransaction(
+    { signature, blockhash: confirmBh, lastValidBlockHeight },
+    "confirmed",
+  );
+  console.log("[squads-sdk] confirmed:", signature);
+
   const [vaultTransactionPda] = multisig.getTransactionPda({
     multisigPda: params.multisigPda,
     index: transactionIndex,

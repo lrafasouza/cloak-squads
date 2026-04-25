@@ -91,6 +91,12 @@ export default function ProposalApprovalPage({
     void refreshStatus();
   }, [refreshStatus]);
 
+  useEffect(() => {
+    if (status !== "loading" && status !== "missing") return;
+    const interval = setInterval(() => void refreshStatus(), 3000);
+    return () => clearInterval(interval);
+  }, [status, refreshStatus]);
+
   const onVoteSubmitted = useCallback(
     (sig: string) => {
       setSignature(sig);
