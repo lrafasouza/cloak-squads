@@ -131,7 +131,7 @@ export async function proposalApprove(params: {
   };
   if (params.memo) approveParams.memo = params.memo;
   const ix = multisig.instructions.proposalApprove(approveParams);
-  return sendSingleInstruction(params.connection, params.wallet, ix);
+  return sendSingleInstruction(params.connection, params.wallet, ix, "proposalApprove");
 }
 
 export async function proposalReject(params: {
@@ -149,7 +149,7 @@ export async function proposalReject(params: {
   };
   if (params.memo) rejectParams.memo = params.memo;
   const ix = multisig.instructions.proposalReject(rejectParams);
-  return sendSingleInstruction(params.connection, params.wallet, ix);
+  return sendSingleInstruction(params.connection, params.wallet, ix, "proposalReject");
 }
 
 export async function vaultTransactionExecute(params: {
@@ -235,10 +235,38 @@ async function sendSingleInstruction(
     sendTransaction: NonNullable<BrowserSquadsWallet["sendTransaction"]>;
   },
   instruction: TransactionInstruction,
+  label = "sendSingleInstruction",
 ) {
   const latestBlockhash = await connection.getLatestBlockhash();
   const tx = new Transaction().add(instruction);
   tx.feePayer = wallet.publicKey;
   tx.recentBlockhash = latestBlockhash.blockhash;
-  return wallet.sendTransaction(tx, connection);
+
+  try {
+    const sim = await connection.simulateTransaction(tx, undefined, true);
+    console.log(`[squads-sdk] ${label} simulate result:`, sim);
+    if (sim.value.err) {
+      console.error(`[squads-sdk] ${label} simulate error:`, sim.value.err);
+      console.error(`[squads-sdk] ${label} simulate logs:`, sim.value.logs);
+      throw new Error(
+        `${label} simulation failed: ${JSON.stringify(sim.value.err)} | logs: ${(sim.value.logs ?? []).join(" || ")}`,
+      );
+    }
+  } catch (simErr) {
+    console.error(`[squads-sdk] ${label} simulate threw:`, simErr);
+    throw simErr;
+  }
+
+  try {
+    return await wallet.sendTransaction(tx, connection);
+  } catch (sendErr) {
+    console.error(`[squads-sdk] ${label} sendTransaction error:`, sendErr);
+    if (sendErr && typeof sendErr === "object") {
+      const anyErr = sendErr as { logs?: unknown; cause?: unknown; message?: unknown };
+      console.error(`[squads-sdk]   .logs:`, anyErr.logs);
+      console.error(`[squads-sdk]   .cause:`, anyErr.cause);
+      console.error(`[squads-sdk]   .message:`, anyErr.message);
+    }
+    throw sendErr;
+  }
 }
