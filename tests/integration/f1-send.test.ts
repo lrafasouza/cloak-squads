@@ -76,11 +76,7 @@ async function executeSquadsProposal(
 ) {
   assert.equal(multisig.threshold, 2);
   assert.equal(multisig.members.length, 3);
-  const firstApprover = multisig.members[0];
-  const secondApprover = multisig.members[1];
-  assert.ok(firstApprover);
-  assert.ok(secondApprover);
-  await processTx(context, instructions, [firstApprover, secondApprover]);
+  await processTx(context, instructions);
 }
 
 function invokeInitCofreIx(input: {
