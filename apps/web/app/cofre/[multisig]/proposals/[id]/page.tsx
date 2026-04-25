@@ -1,11 +1,12 @@
 "use client";
 
 import type { CommitmentClaim } from "@cloak-squads/core/commitment";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import Link from "next/link";
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { ApprovalButtons } from "@/components/proposal/ApprovalButtons";
-import { CommitmentCheck } from "@/components/proposal/CommitmentCheck";
+import { CommitmentCheck, type CommitmentCheckState } from "@/components/proposal/CommitmentCheck";
+import { ExecuteButton } from "@/components/proposal/ExecuteButton";
+import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { loadProposalDraft } from "@/lib/session-cache";
 
 type ProposalDraft = {
@@ -25,9 +26,17 @@ export default function ProposalApprovalPage({
   params: Promise<{ multisig: string; id: string }>;
 }) {
   const { multisig, id } = use(params);
-  const [valid, setValid] = useState(false);
+  const [commitmentState, setCommitmentState] = useState<CommitmentCheckState>("checking");
   const [signature, setSignature] = useState<string | null>(null);
-  const draft = useMemo(() => loadProposalDraft<ProposalDraft>(multisig, id), [multisig, id]);
+  const [executeSignature, setExecuteSignature] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ProposalDraft | null>(null);
+
+  useEffect(() => {
+    const loaded = loadProposalDraft<ProposalDraft>(multisig, id);
+    setDraft(loaded);
+  }, [multisig, id]);
+
+  const approveBlocked = Boolean(draft?.commitmentClaim) && commitmentState === "mismatch";
 
   return (
     <main className="min-h-screen">
@@ -36,7 +45,7 @@ export default function ProposalApprovalPage({
           <Link href={`/cofre/${multisig}`} className="text-sm font-semibold text-neutral-100">
             Cofre
           </Link>
-          <WalletMultiButton />
+          <ClientWalletButton />
         </div>
       </header>
 
@@ -81,7 +90,7 @@ export default function ProposalApprovalPage({
                 ...draft.commitmentClaim,
                 onChainCommitment: Uint8Array.from(draft.invariants.commitment),
               }}
-              onValidChange={setValid}
+              onStateChange={setCommitmentState}
             />
           ) : (
             <section className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
@@ -90,10 +99,19 @@ export default function ProposalApprovalPage({
           )}
 
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+            <h2 className="mb-4 text-base font-semibold text-neutral-50">Execute</h2>
+            <ExecuteButton multisig={multisig} transactionIndex={id} onSubmitted={setExecuteSignature} />
+            {executeSignature ? (
+              <p className="mt-3 break-all font-mono text-xs text-emerald-200">{executeSignature}</p>
+            ) : null}
+          </section>
+
+          <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+            <h2 className="mb-4 text-base font-semibold text-neutral-50">Vote</h2>
             <ApprovalButtons
               multisig={multisig}
               transactionIndex={id}
-              disabled={Boolean(draft?.commitmentClaim) && !valid}
+              disabled={approveBlocked}
               onSubmitted={setSignature}
             />
             {signature ? <p className="mt-3 break-all font-mono text-xs text-emerald-200">{signature}</p> : null}
