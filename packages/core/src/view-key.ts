@@ -15,7 +15,7 @@ export function encryptViewKeyForSigner(
 
   const ephemeral = nacl.box.keyPair();
   const nonce = nacl.randomBytes(24);
-  const ciphertext = nacl.box(viewKeyPrivate, nonce, signerSolanaPubkey, ephemeral.publicKey);
+  const ciphertext = nacl.box(viewKeyPrivate, nonce, signerSolanaPubkey, ephemeral.secretKey);
 
   return {
     signer: signerSolanaPubkey,
