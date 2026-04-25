@@ -67,7 +67,8 @@ export default function HomePage() {
       }
       return listWalletMultisigs(connection, wallet.publicKey);
     },
-    enabled: wallet.connected && Boolean(wallet.publicKey),
+    enabled: false,
+    staleTime: Infinity,
   });
 
   const canSubmitManual = useMemo(() => manualAddress.trim().length > 0, [manualAddress]);
@@ -159,13 +160,16 @@ export default function HomePage() {
 
           {!wallet.connected ? (
             <div className="p-4 text-sm text-neutral-300">
-              Connect your wallet to load Squads memberships.
+              Connect your wallet, then click "Scan memberships" to query devnet.
             </div>
-          ) : multisigsQuery.isLoading ? (
+          ) : multisigsQuery.isFetching ? (
             <div className="space-y-3 p-4" aria-busy="true">
               <div className="h-14 rounded-md bg-neutral-800" />
               <div className="h-14 rounded-md bg-neutral-800" />
               <div className="h-14 rounded-md bg-neutral-800" />
+              <p className="text-xs text-neutral-400">
+                Scanning the Squads program — this is a heavy public-RPC call and may take 30s+.
+              </p>
             </div>
           ) : multisigsQuery.isError ? (
             <div className="space-y-3 p-4">
@@ -176,6 +180,17 @@ export default function HomePage() {
                 className="min-h-10 rounded-md border border-neutral-700 px-3 py-2 text-sm font-medium text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
               >
                 Retry
+              </button>
+            </div>
+          ) : multisigsQuery.data === undefined ? (
+            <div className="space-y-3 p-4 text-sm text-neutral-300">
+              <p>Memberships are not auto-fetched on devnet (heavy RPC).</p>
+              <button
+                type="button"
+                onClick={() => multisigsQuery.refetch()}
+                className="min-h-10 rounded-md border border-neutral-700 px-3 py-2 text-sm font-medium text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+              >
+                Scan memberships
               </button>
             </div>
           ) : multisigsQuery.data?.length ? (
