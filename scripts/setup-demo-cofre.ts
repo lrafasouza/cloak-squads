@@ -30,7 +30,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const OUT_FILE = path.join(__dirname, ".demo-cofre.json");
 
-const OPERATOR_PUBKEY = new PublicKey("QqibVKumHaJAC5bYii7q2QRWf3faYTEj8ff1d6gqST5");
+const OPERATOR_PUBKEY = new PublicKey(process.argv[2] || "");
 
 function loadKeypair(filePath = path.join(os.homedir(), ".config/solana/id.json")) {
   if (!fs.existsSync(filePath)) {
