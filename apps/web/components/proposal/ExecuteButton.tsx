@@ -10,10 +10,12 @@ export function ExecuteButton({
   multisig,
   transactionIndex,
   onSubmitted,
+  disabled,
 }: {
   multisig: string;
   transactionIndex: string;
   onSubmitted?: (signature: string) => void;
+  disabled?: boolean;
 }) {
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -40,7 +42,7 @@ export function ExecuteButton({
 
   return (
     <div className="space-y-3">
-      <Button type="button" variant="secondary" disabled={pending} onClick={submit}>
+      <Button type="button" variant="secondary" disabled={pending || disabled} onClick={submit}>
         {pending ? "Executing..." : "Execute vault transaction"}
       </Button>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}

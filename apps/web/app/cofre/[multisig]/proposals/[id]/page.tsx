@@ -1,13 +1,44 @@
 "use client";
 
 import type { CommitmentClaim } from "@cloak-squads/core/commitment";
+import { useConnection } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import * as multisig from "@sqds/multisig";
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { ApprovalButtons } from "@/components/proposal/ApprovalButtons";
 import { CommitmentCheck, type CommitmentCheckState } from "@/components/proposal/CommitmentCheck";
 import { ExecuteButton } from "@/components/proposal/ExecuteButton";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { loadProposalDraft } from "@/lib/session-cache";
+
+type ProposalStatusKind =
+  | "draft"
+  | "active"
+  | "approved"
+  | "rejected"
+  | "executing"
+  | "executed"
+  | "cancelled"
+  | "unknown";
+
+function readProposalStatus(status: unknown): ProposalStatusKind {
+  if (status && typeof status === "object") {
+    const key = Object.keys(status as Record<string, unknown>)[0]?.toLowerCase();
+    if (
+      key === "draft" ||
+      key === "active" ||
+      key === "approved" ||
+      key === "rejected" ||
+      key === "executing" ||
+      key === "executed" ||
+      key === "cancelled"
+    ) {
+      return key;
+    }
+  }
+  return "unknown";
+}
 
 type ProposalDraft = {
   amount: string;
@@ -25,24 +56,65 @@ export default function ProposalApprovalPage({
 }: {
   params: Promise<{ multisig: string; id: string }>;
 }) {
-  const { multisig, id } = use(params);
+  const { multisig: multisigParam, id } = use(params);
+  const { connection } = useConnection();
   const [commitmentState, setCommitmentState] = useState<CommitmentCheckState>("checking");
   const [signature, setSignature] = useState<string | null>(null);
   const [executeSignature, setExecuteSignature] = useState<string | null>(null);
   const [draft, setDraft] = useState<ProposalDraft | null>(null);
+  const [status, setStatus] = useState<ProposalStatusKind | "loading" | "missing">("loading");
+  const [approvals, setApprovals] = useState<number>(0);
 
   useEffect(() => {
-    const loaded = loadProposalDraft<ProposalDraft>(multisig, id);
+    const loaded = loadProposalDraft<ProposalDraft>(multisigParam, id);
     setDraft(loaded);
-  }, [multisig, id]);
+  }, [multisigParam, id]);
 
-  const approveBlocked = Boolean(draft?.commitmentClaim) && commitmentState === "mismatch";
+  const refreshStatus = useCallback(async () => {
+    try {
+      const multisigPda = new PublicKey(multisigParam);
+      const [proposalPda] = multisig.getProposalPda({
+        multisigPda,
+        transactionIndex: BigInt(id),
+      });
+      const proposal = await multisig.accounts.Proposal.fromAccountAddress(connection, proposalPda);
+      setStatus(readProposalStatus(proposal.status));
+      setApprovals(proposal.approved.length);
+    } catch (err) {
+      console.warn("[proposals] could not load proposal status:", err);
+      setStatus("missing");
+    }
+  }, [connection, multisigParam, id]);
+
+  useEffect(() => {
+    void refreshStatus();
+  }, [refreshStatus]);
+
+  const onVoteSubmitted = useCallback(
+    (sig: string) => {
+      setSignature(sig);
+      setTimeout(() => void refreshStatus(), 1500);
+    },
+    [refreshStatus],
+  );
+  const onExecuteSubmitted = useCallback(
+    (sig: string) => {
+      setExecuteSignature(sig);
+      setTimeout(() => void refreshStatus(), 1500);
+    },
+    [refreshStatus],
+  );
+
+  const approveBlocked =
+    (Boolean(draft?.commitmentClaim) && commitmentState === "mismatch") ||
+    status !== "active";
+  const executeBlocked = status !== "approved";
 
   return (
     <main className="min-h-screen">
       <header className="border-b border-neutral-800 bg-neutral-950/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link href={`/cofre/${multisig}`} className="text-sm font-semibold text-neutral-100">
+          <Link href={`/cofre/${multisigParam}`} className="text-sm font-semibold text-neutral-100">
             Cofre
           </Link>
           <ClientWalletButton />
@@ -99,22 +171,57 @@ export default function ProposalApprovalPage({
           )}
 
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-            <h2 className="mb-4 text-base font-semibold text-neutral-50">Execute</h2>
-            <ExecuteButton multisig={multisig} transactionIndex={id} onSubmitted={setExecuteSignature} />
-            {executeSignature ? (
-              <p className="mt-3 break-all font-mono text-xs text-emerald-200">{executeSignature}</p>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-neutral-50">On-chain status</h2>
+              <span className="font-mono text-xs uppercase tracking-wide text-neutral-300">
+                {status === "loading"
+                  ? "loading…"
+                  : status === "missing"
+                    ? "not found"
+                    : `${status} (${approvals} approvals)`}
+              </span>
+            </div>
+            {status === "executed" || status === "cancelled" || status === "rejected" ? (
+              <p className="mt-3 text-sm text-amber-200">
+                This proposal is closed ({status}). Create a new one from the Send page to test
+                again.
+              </p>
+            ) : null}
+            {status === "missing" ? (
+              <p className="mt-3 text-sm text-amber-200">
+                No proposal account at this index. The vault transaction may not have been created
+                yet, or this transactionIndex is wrong.
+              </p>
             ) : null}
           </section>
 
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
             <h2 className="mb-4 text-base font-semibold text-neutral-50">Vote</h2>
             <ApprovalButtons
-              multisig={multisig}
+              multisig={multisigParam}
               transactionIndex={id}
               disabled={approveBlocked}
-              onSubmitted={setSignature}
+              onSubmitted={onVoteSubmitted}
             />
             {signature ? <p className="mt-3 break-all font-mono text-xs text-emerald-200">{signature}</p> : null}
+          </section>
+
+          <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+            <h2 className="mb-4 text-base font-semibold text-neutral-50">Execute</h2>
+            <ExecuteButton
+              multisig={multisigParam}
+              transactionIndex={id}
+              onSubmitted={onExecuteSubmitted}
+              disabled={executeBlocked}
+            />
+            {executeBlocked && status !== "loading" ? (
+              <p className="mt-2 text-xs text-neutral-400">
+                Execute requires status = approved. Current: {status}.
+              </p>
+            ) : null}
+            {executeSignature ? (
+              <p className="mt-3 break-all font-mono text-xs text-emerald-200">{executeSignature}</p>
+            ) : null}
           </section>
         </div>
       </section>
