@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AuditLink {
+  id           String   @id @default(uuid())
+  cofreAddress String
+  diversifier  Bytes
+  scope        String
+  scopeParams  String?
+  expiresAt    DateTime
+  issuedBy     String
+  signature    Bytes
+  createdAt    DateTime @default(now())
+
+  @@index([cofreAddress])
+}
+
+model StealthInvoice {
+  id                  String   @id @default(uuid())
+  cofreAddress        String
+  invoiceRef          String?
+  memo                String?
+  stealthPubkey       String
+  amountHintEncrypted Bytes?
+  status              String
+  expiresAt           DateTime
+  createdAt           DateTime @default(now())
+
+  @@index([cofreAddress])
+  @@index([stealthPubkey])
+}

@@ -5,6 +5,7 @@ dist/
 target/
 .turbo/
 *.log
+*.tsbuildinfo
 .env
 .env.local
 test-ledger/
