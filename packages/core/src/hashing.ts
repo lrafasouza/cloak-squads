@@ -2,22 +2,7 @@ import { sha256 } from "@noble/hashes/sha256";
 import { blake3 } from "@noble/hashes/blake3";
 import { PublicKey } from "@solana/web3.js";
 import { concatBytes, u64ToLeBytes, pubkeyToBytes, domainSeparator } from "./encoding";
-
-export type PayloadInvariants = {
-  nullifier: Uint8Array;
-  commitment: Uint8Array;
-  amount: bigint;
-  tokenMint: PublicKey;
-  recipientVkPub: Uint8Array;
-  nonce: Uint8Array;
-};
-
-export type AuditDiversifierInput = {
-  linkId: string;
-  scope: "full" | "amounts_only" | "time_ranged";
-  startDate: bigint;
-  endDate: bigint;
-};
+import type { PayloadInvariants, AuditDiversifierInput } from "./types";
 
 export function computePayloadHash(inv: PayloadInvariants): Uint8Array {
   if (inv.nullifier.length !== 32) {

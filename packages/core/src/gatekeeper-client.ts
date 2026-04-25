@@ -1,6 +1,6 @@
-import type { Program, BN } from "@coral-xyz/anchor";
-import type { Instruction, PublicKey } from "@solana/web3.js";
-import { computePayloadHash, u64ToLeBytes, encodeArray, encodePubkey } from "./encoding";
+import { BN, type Program } from "@coral-xyz/anchor";
+import type { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { computePayloadHash } from "./hashing";
 import type { PayloadInvariants } from "./types";
 
 export function buildIssueLicenseIx(
@@ -10,17 +10,19 @@ export function buildIssueLicenseIx(
   nonce: Uint8Array,
   ttlSecs: number,
   payer: PublicKey,
-): Instruction {
+): Promise<TransactionInstruction> {
   const payloadHash = computePayloadHash(invariants);
+  const issueLicense = program.methods.issueLicense;
+  if (!issueLicense) {
+    throw new Error("IDL is missing issueLicense");
+  }
 
-  return program.methods.issueLicense(
-    Array.from(payloadHash),
-    Array.from(nonce),
-    ttlSecs,
-  ).accountsPartial({
-    cofre,
-    payer,
-  }).instruction();
+  return issueLicense(Array.from(payloadHash), Array.from(nonce), ttlSecs)
+    .accountsPartial({
+      cofre,
+      payer,
+    })
+    .instruction();
 }
 
 export function buildExecuteWithLicenseIx(
@@ -34,8 +36,13 @@ export function buildExecuteWithLicenseIx(
   cloakProgram: PublicKey,
   pool: PublicKey,
   nullifierRecord: PublicKey,
-): Instruction {
-  return program.methods.executeWithLicense(
+): Promise<TransactionInstruction> {
+  const executeWithLicense = program.methods.executeWithLicense;
+  if (!executeWithLicense) {
+    throw new Error("IDL is missing executeWithLicense");
+  }
+
+  return executeWithLicense(
     {
       nullifier: Array.from(invariants.nullifier),
       commitment: Array.from(invariants.commitment),
@@ -46,12 +53,14 @@ export function buildExecuteWithLicenseIx(
     },
     Array.from(proofBytes),
     Array.from(merkleRoot),
-  ).accountsPartial({
-    cofre,
-    license,
-    operator,
-    cloakProgram,
-    pool,
-    nullifierRecord,
-  }).instruction();
+  )
+    .accountsPartial({
+      cofre,
+      license,
+      operator,
+      cloakProgram,
+      pool,
+      nullifierRecord,
+    })
+    .instruction();
 }

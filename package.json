@@ -3,13 +3,14 @@
   "version": "0.0.1",
   "private": true,
   "workspaces": [
+    "apps/*",
     "packages/*"
   ],
   "packageManager": "pnpm@9.12.0",
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
-    "test:int": "node --experimental-strip-types tests/integration/spike-cpi.test.ts && node --experimental-strip-types tests/integration/gatekeeper-instructions.test.ts",
+    "test:int": "node --experimental-strip-types tests/integration/spike-cpi.test.ts && node --experimental-strip-types tests/integration/gatekeeper-instructions.test.ts && node --experimental-strip-types tests/integration/f1-send.test.ts",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
