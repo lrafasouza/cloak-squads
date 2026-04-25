@@ -1,0 +1,26 @@
+{
+  "name": "@cloak-squads/core",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloak.dev/sdk": "^0.1.4",
+    "@noble/hashes": "^1.5.0",
+    "@noble/curves": "^1.2.1",
+    "@solana/web3.js": "^1.98.0",
+    "bs58": "^6.0.0",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "fast-check": "^3.23.0",
+    "vitest": "^2.1.0"
+  }
+}
