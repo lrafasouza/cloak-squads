@@ -6,6 +6,16 @@ function keyFor(multisig: string, label: string) {
   return `${PREFIX}:${multisig}:${label}`;
 }
 
+function getSessionStorage(): Storage | null {
+  // More robust check for browser environment
+  if (typeof window === "undefined" || typeof window.sessionStorage === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 function bytesToBase64(bytes: Uint8Array) {
   let binary = "";
   for (const byte of bytes) {
@@ -30,7 +40,9 @@ export type CachedViewKey = {
 };
 
 export function saveSignerViewKey(multisig: string, value: CachedViewKey) {
-  sessionStorage.setItem(
+  const storage = getSessionStorage();
+  if (!storage) return;
+  storage.setItem(
     keyFor(multisig, "signer-view-key"),
     JSON.stringify({
       publicKey: bytesToBase64(value.publicKey),
@@ -41,26 +53,42 @@ export function saveSignerViewKey(multisig: string, value: CachedViewKey) {
 }
 
 export function loadSignerViewKey(multisig: string): CachedViewKey | null {
-  const raw = sessionStorage.getItem(keyFor(multisig, "signer-view-key"));
-  if (!raw) return null;
+  const storage = getSessionStorage();
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(keyFor(multisig, "signer-view-key"));
+    if (!raw) return null;
 
-  const parsed = JSON.parse(raw) as { publicKey: string; secretKey: string; savedAt: number };
-  return {
-    publicKey: base64ToBytes(parsed.publicKey),
-    secretKey: base64ToBytes(parsed.secretKey),
-    savedAt: parsed.savedAt,
-  };
+    const parsed = JSON.parse(raw) as { publicKey: string; secretKey: string; savedAt: number };
+    return {
+      publicKey: base64ToBytes(parsed.publicKey),
+      secretKey: base64ToBytes(parsed.secretKey),
+      savedAt: parsed.savedAt,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function clearSignerViewKey(multisig: string) {
-  sessionStorage.removeItem(keyFor(multisig, "signer-view-key"));
+  const storage = getSessionStorage();
+  if (!storage) return;
+  storage.removeItem(keyFor(multisig, "signer-view-key"));
 }
 
 export function saveProposalDraft<T>(multisig: string, transactionIndex: string, draft: T) {
-  sessionStorage.setItem(keyFor(multisig, `proposal:${transactionIndex}`), JSON.stringify(draft));
+  const storage = getSessionStorage();
+  if (!storage) return;
+  storage.setItem(keyFor(multisig, `proposal:${transactionIndex}`), JSON.stringify(draft));
 }
 
 export function loadProposalDraft<T>(multisig: string, transactionIndex: string): T | null {
-  const raw = sessionStorage.getItem(keyFor(multisig, `proposal:${transactionIndex}`));
-  return raw ? (JSON.parse(raw) as T) : null;
+  const storage = getSessionStorage();
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(keyFor(multisig, `proposal:${transactionIndex}`));
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
 }
