@@ -1,6 +1,4 @@
-import type { CloakKeyPair, type NoteData } from "@cloak.dev/sdk";
-
-declare const CloakSDK = (window as any).CloakSDK;
+import type { NoteData } from "@cloak.dev/sdk";
 
 export type CommitmentClaim = {
   amount: number;
@@ -11,6 +9,21 @@ export type CommitmentClaim = {
   token_mint: string;
 };
 
+function getCloakSDK(): {
+  computeCommitment: (note: NoteData) => Promise<{ hex: () => Promise<ArrayLike<number>> }>;
+} {
+  if (typeof window === "undefined") {
+    throw new Error("Cloak SDK only available in the browser runtime");
+  }
+  const sdk = (window as unknown as { CloakSDK?: unknown }).CloakSDK;
+  if (!sdk || typeof (sdk as { computeCommitment?: unknown }).computeCommitment !== "function") {
+    throw new Error("Cloak SDK not available on window");
+  }
+  return sdk as {
+    computeCommitment: (note: NoteData) => Promise<{ hex: () => Promise<ArrayLike<number>> }>;
+  };
+}
+
 export async function recomputeCommitment(claim: CommitmentClaim): Promise<Uint8Array> {
   const note: NoteData = {
     amount: claim.amount,
@@ -18,9 +31,9 @@ export async function recomputeCommitment(claim: CommitmentClaim): Promise<Uint8
     sk_spend: claim.sk_spend,
     commitment: "",
   };
-
-  const result = await CloakSDK.computeCommitment(note);
-  return new Uint8Array(await (result as any).hex());
+  const sdk = getCloakSDK();
+  const result = await sdk.computeCommitment(note);
+  return new Uint8Array(await result.hex());
 }
 
 export function commitmentsEqual(a: Uint8Array, b: Uint8Array): boolean {

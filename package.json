@@ -15,6 +15,9 @@
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:packages": "tsc --noEmit",
+    "typecheck:all": "pnpm -r exec tsc --noEmit",
+    "prebuild:web": "pnpm -F @cloak-squads/core exec tsc --noEmit && pnpm -F web exec tsc --noEmit",
+    "build:web": "pnpm prebuild:web && pnpm -F web build",
     "anchor:build": "NO_DNA=1 anchor build",
     "spike:devnet": "tsx scripts/spike-squads-devnet.ts",
     "spike:cloak": "tsx scripts/spike-cloak-devnet.ts"

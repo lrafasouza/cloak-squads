@@ -28,7 +28,7 @@ export function domainSeparator(name: string): Uint8Array {
   const encoded = new TextEncoder().encode(name);
   const out = new Uint8Array(encoded.length + 1);
   out.set(encoded, 0);
-  out.set(0, encoded.length);
+  out[encoded.length] = 0;
   return out;
 }
 

@@ -12,3 +12,5 @@ test-ledger/
 .anchor/
 .vercel/
 prisma/dev.db*
+**/prisma/dev.db
+**/prisma/dev.db-journal

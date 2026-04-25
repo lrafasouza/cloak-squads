@@ -1,6 +1,5 @@
 import { sha256 } from "@noble/hashes/sha256";
 import { blake3 } from "@noble/hashes/blake3";
-import { PublicKey } from "@solana/web3.js";
 import { concatBytes, u64ToLeBytes, pubkeyToBytes, domainSeparator } from "./encoding";
 import type { PayloadInvariants, AuditDiversifierInput } from "./types";
 

@@ -1,13 +1,6 @@
 import nacl from "tweetnacl";
 import type { BoxKeyPair } from "./derivation";
-
-export type EncryptedViewKeyEntry = {
-  signer: Uint8Array;
-  ephemeralPk: Uint8Array;
-  nonce: Uint8Array;
-  ciphertext: Uint8Array;
-  addedAt: bigint;
-};
+import type { EncryptedViewKeyEntry } from "./types";
 
 export function encryptViewKeyForSigner(
   viewKeyPrivate: Uint8Array,
@@ -29,7 +22,7 @@ export function encryptViewKeyForSigner(
     ephemeralPk: ephemeral.publicKey,
     nonce,
     ciphertext,
-    addedAt: Date.now(),
+    addedAt: BigInt(Date.now()),
   };
 }
 

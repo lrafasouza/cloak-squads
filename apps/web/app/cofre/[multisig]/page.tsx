@@ -5,22 +5,23 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
-import { useMemo } from "react";
+import { use, useMemo } from "react";
 
 function truncateAddress(address: string) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
-export default function CofreDashboardPage({ params }: { params: { multisig: string } }) {
+export default function CofreDashboardPage({ params }: { params: Promise<{ multisig: string }> }) {
+  const { multisig } = use(params);
   const wallet = useWallet();
 
   const multisigAddress = useMemo(() => {
     try {
-      return new PublicKey(params.multisig);
+      return new PublicKey(multisig);
     } catch {
       return null;
     }
-  }, [params.multisig]);
+  }, [multisig]);
 
   const cofre = useMemo(() => {
     if (!multisigAddress) {

@@ -7,7 +7,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import Link from "next/link";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, use, useMemo, useState } from "react";
 
 function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
@@ -19,7 +19,8 @@ function toHex(bytes: Uint8Array) {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export default function SendPage({ params }: { params: { multisig: string } }) {
+export default function SendPage({ params }: { params: Promise<{ multisig: string }> }) {
+  const { multisig } = use(params);
   const wallet = useWallet();
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
@@ -29,11 +30,11 @@ export default function SendPage({ params }: { params: { multisig: string } }) {
 
   const multisigAddress = useMemo(() => {
     try {
-      return new PublicKey(params.multisig);
+      return new PublicKey(multisig);
     } catch {
       return null;
     }
-  }, [params.multisig]);
+  }, [multisig]);
 
   const cofre = useMemo(
     () => (multisigAddress ? cofrePda(multisigAddress)[0] : null),
