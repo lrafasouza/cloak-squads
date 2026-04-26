@@ -15,7 +15,6 @@ End-to-end flow: Squads vault approves a private execution license, then the ope
 ### Setup
 
 ```bash
-# From project root
 pnpm install
 pnpm prebuild:web
 pnpm -F web dev
@@ -24,25 +23,44 @@ pnpm -F web dev
 Optionally run the E2E script to verify the full on-chain flow:
 
 ```bash
-npx tsx scripts/f1-e2e-devnet.ts
+SOLANA_KEYPAIR=~/.config/solana/cloak-devnet.json npx tsx scripts/f1-e2e-devnet.ts
 ```
 
 ### Demo Flow
 
 1. **Create proposal** — Open `http://localhost:3000`, connect your Squads member wallet, enter the multisig address, go to *Prepare send*, fill amount + recipient, click *Create proposal*.
-2. **Approve** — On the proposal page, click *Approve*. The on-chain status should update to `approved`.
+2. **Approve** — On the proposal page, click *Approve*. The on-chain status shows `X/Y approvals` and updates to `approved` once threshold is met.
 3. **Execute vault transaction** — Click *Execute vault transaction*. This issues the license on-chain.
-4. **Operator consumes license** — Go to *Operator* from the cofre dashboard. Enter the proposal # and click *Load*. Connect the operator wallet (can be the same wallet for threshold 1). Click *Execute with license*. The license is consumed.
+4. **Operator consumes license** — Go to *Operator* from the cofre dashboard. The registered operator is displayed and checked against the connected wallet. Enter the proposal # and click *Load*. Click *Execute with license*. The license is consumed.
+
+### Data Persistence
+
+Proposal drafts are persisted in SQLite via Prisma. Three API endpoints serve the UI:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/proposals` | POST | Create a new proposal draft |
+| `/api/proposals/{multisig}` | GET | List drafts for a multisig (max 100) |
+| `/api/proposals/{multisig}/{index}` | GET | Get a specific draft |
+
+The dashboard lists recent drafts with links to the approval page.
+
+**Note:** `commitmentClaim` (containing secrets `r`, `sk_spend`) is stored in `sessionStorage` only — never sent to the server. The commitment check reads it from the proposer's browser session.
+
+### Commitment Check
+
+The commitment verification card uses `computeCommitment` from `@cloak.dev/sdk-devnet`, injected via dependency registration at app init (`apps/web/lib/init-commitment.ts`). It recomputes the commitment locally and compares against the on-chain value. If the SDK fails to load (e.g., WASM not available), the card shows "unavailable" — voting is still allowed.
 
 ### Sandbox Multisig
 
 `4UyJQecmT5irKwbgWyW3WeARsGfz8vii2cxsXBz5PMt5` — cofre initialized, threshold 1, member `2ScUUMp8xiuhPXhGWYZytuf5rsgZBQ1AuD3iF3qcMVxp`.
 
-### Known Limitations (tech debt)
+### Known Limitations
 
-- **Threshold 1 only** — all flows are 1-of-1. Threshold ≥ 2 requires multi-member approval UI.
-- **Mock proofs** — `execute_with_license` sends 256 zero bytes as proof and 32 zero bytes as merkle root.
-- **Commitment check** — Cloak SDK is not wired in the browser build; the commitment card shows "unavailable".
+- **Threshold 1 only** — UI handles multi-member display (X/Y) but requires each member to open the proposal URL manually. No notification system.
+- **Mock proofs** — `execute_with_license` sends 256 zero bytes as proof and 32 zero bytes as merkle root. Blocked by Cloak devnet SDK bug (see `docs/devnet-blocker.md`).
+- **Shielded balance not displayed** — Dashboard shows `-- SOL`. Requires Cloak scan integration (`scanTransactions`).
+- **No on-chain event indexing** — Activity feed on dashboard is placeholder.
 
 ### Key Signatures
 
