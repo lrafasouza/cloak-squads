@@ -21,6 +21,8 @@
     "anchor:build": "NO_DNA=1 anchor build",
     "spike:devnet": "tsx scripts/spike-squads-devnet.ts",
     "spike:cloak": "tsx scripts/spike-cloak-devnet.ts",
+    "probe:cloak": "tsx scripts/probe-cloak-devnet-pdas.ts",
+    "probe:deposit": "tsx scripts/probe-cloak-deposit-manual.ts",
     "demo:setup": "tsx scripts/setup-demo-cofre.ts"
   },
   "devDependencies": {
@@ -36,6 +38,7 @@
   },
   "dependencies": {
     "@cloak.dev/sdk": "^0.1.5",
+    "@cloak.dev/sdk-devnet": "0.1.5-devnet.0",
     "@sqds/multisig": "^2.1.4"
   }
 }

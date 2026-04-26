@@ -13,6 +13,7 @@
   "dependencies": {
     "@cloak-squads/core": "workspace:*",
     "@cloak.dev/sdk": "^0.1.5",
+    "@cloak.dev/sdk-devnet": "0.1.5-devnet.0",
     "@coral-xyz/anchor": "^0.31.1",
     "@prisma/client": "^5.22.0",
     "@solana/wallet-adapter-base": "^0.9.27",

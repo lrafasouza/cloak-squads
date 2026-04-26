@@ -1,7 +1,9 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { CloakSDK, MemoryStorageAdapter } from "@cloak.dev/sdk";
+// NOTE: kept on devnet SDK to demonstrate the upstream bug (see docs/devnet-blocker.md).
+// Switch back to "@cloak.dev/sdk" when running against mainnet for the final pre-prod smoke.
+import { CloakSDK, MemoryStorageAdapter, generateNote } from "@cloak.dev/sdk-devnet";
 import { Connection, Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 function loadKeypair(filePath = path.join(os.homedir(), ".config/solana/id.json")) {
@@ -18,7 +20,7 @@ async function main() {
   const payer = loadKeypair(process.env.SOLANA_KEYPAIR);
   const owner = payer.publicKey;
 
-  console.log("=== Cloak SDK Devnet Spike ===");
+  console.log("=== Cloak SDK Devnet Spike (unified transact path) ===");
   console.log("Owner:", owner.toBase58());
 
   const balanceStart = await connection.getBalance(owner);
@@ -31,32 +33,23 @@ async function main() {
     debug: true,
   });
 
-  console.log("[1/2] deposit 0.05 SOL...");
-  const depositAmount = 50_000_000;
-  const depositResult = await sdk.deposit(connection, depositAmount, {
-    onProgress: (status: unknown) => console.log(`  status: ${JSON.stringify(status)}`),
-  });
-  console.log("  deposit tx:", depositResult.signature ?? "(no signature in result)");
-  console.log("  full result:", JSON.stringify(depositResult, null, 2));
-  const note = depositResult.note;
-  if (!note) {
-    throw new Error("Deposit did not return a note");
-  }
+  const amount = 50_000_000;
 
-  const balanceAfterDeposit = await connection.getBalance(owner);
-  console.log(`  Balance after deposit: ${balanceAfterDeposit / LAMPORTS_PER_SOL} SOL`);
-  console.log(
-    `  Spent on deposit: ${(balanceStart - balanceAfterDeposit) / LAMPORTS_PER_SOL} SOL\n`,
+  console.log("[1/2] generating note (no on-chain deposit yet)...");
+  const note = await generateNote(amount, "devnet");
+  console.log("  commitment:", note.commitment);
+
+  console.log("\n[2/2] privateTransfer (deposit + withdraw to self in one flow)...");
+  const result = await sdk.privateTransfer(
+    connection,
+    note,
+    [{ recipient: owner, amount: amount - 100_000 }],
+    {
+      onProgress: (status: string) => console.log(`  status: ${status}`),
+      onProofProgress: (pct: number) => console.log(`  proof: ${pct}%`),
+    },
   );
-
-  console.log("[2/2] withdraw to same wallet...");
-  const logWithdrawStatus = (status: unknown) => console.log(`  status: ${JSON.stringify(status)}`);
-  const withdrawResult = await sdk.withdraw(connection, note, owner, {
-    withdrawAll: true,
-    onProgress: logWithdrawStatus,
-    onProofProgress: (pct: number) => console.log(`  proof: ${pct}%`),
-  } as never);
-  console.log("  withdraw result:", JSON.stringify(withdrawResult, null, 2));
+  console.log("  result:", JSON.stringify(result, null, 2));
 
   await new Promise((r) => setTimeout(r, 3000));
   const balanceEnd = await connection.getBalance(owner);
@@ -64,7 +57,6 @@ async function main() {
   console.log(`Net spent: ${(balanceStart - balanceEnd) / LAMPORTS_PER_SOL} SOL (fees + relay)`);
 
   console.log("\n✅ CLOAK SDK SPIKE PASSED");
-  console.log("End-to-end deposit + withdraw against Cloak devnet works.");
 }
 
 main().catch((error) => {

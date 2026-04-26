@@ -69,9 +69,21 @@ All planned imports confirmed present:
 
 Plan crypto wrappers in `@cloak-squads/core` (Task 1.3) can be written against this surface without redesign.
 
-### Cloak SDK end-to-end spike — BLOCKED on devnet
+### Cloak SDK end-to-end spike — BLOCKED on devnet (still, different reason)
 
-Cloak program `zh1eLd6rSphLejbFfJEneUwzHRfMKxgzrgkfwA6qRkW` is **mainnet-only** (verified 2026-04-24: `solana account ... --url devnet` returns AccountNotFound; same query on mainnet-beta returns executable BPF program). The SDK's `network: "devnet"` parameter does not switch program IDs — it only switches RPC URL, so any `transact()` call from devnet hits the same hardcoded program ID and fails with "Attempt to load a program that does not exist".
+**2026-04-24 finding:** Cloak program `zh1eLd6rSphLejbFfJEneUwzHRfMKxgzrgkfwA6qRkW` is mainnet-only.
+
+**2026-04-26 update:** Cloak shipped devnet at program `Zc1kHfp4rajSMeASFDwFFgkHRjv7dFQuLheJoQus27h`
+with a dedicated SDK package `@cloak.dev/sdk-devnet@0.1.5-devnet.0`. We unblocked it for ~10 minutes
+before discovering the SDK is itself broken: `sdk.deposit()` builds the legacy 4-account instruction
+(discriminator `1`) which the devnet program rejects (`0x1063`). All public deposit entry points
+(`deposit`, `privateTransfer`, `withdraw`) hit the same dead code path. The unified `transact`
+instruction (discriminator `0`) is accepted by the program but requires constructing UTXOs +
+Groth16 proof manually. See `docs/devnet-blocker.md` for the full diagnosis and Discord-ready
+repro.
+
+Decision: stay on `cloak-mock` for the hackathon. Swap to real Cloak after upstream SDK fix
+(or invest in a manual `transact()` integration if Cloak doesn't fix in time).
 
 `cloak-mock` is deployed on devnet at `2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe`
 and was verified on 2026-04-26. Earliest transaction currently returned by devnet history:
