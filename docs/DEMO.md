@@ -43,7 +43,6 @@ npx tsx scripts/f1-e2e-devnet.ts
 - **Threshold 1 only** — all flows are 1-of-1. Threshold ≥ 2 requires multi-member approval UI.
 - **Mock proofs** — `execute_with_license` sends 256 zero bytes as proof and 32 zero bytes as merkle root.
 - **Commitment check** — Cloak SDK is not wired in the browser build; the commitment card shows "unavailable".
-- **sessionStorage only** — proposal drafts live in browser sessionStorage. The operator page reads from the same session.
 
 ### Key Signatures
 

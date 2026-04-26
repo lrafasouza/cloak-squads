@@ -10,7 +10,6 @@ import { ApprovalButtons } from "@/components/proposal/ApprovalButtons";
 import { CommitmentCheck, type CommitmentCheckState } from "@/components/proposal/CommitmentCheck";
 import { ExecuteButton } from "@/components/proposal/ExecuteButton";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
-import { loadProposalDraft } from "@/lib/session-cache";
 
 type ProposalStatusKind =
   | "draft"
@@ -67,8 +66,24 @@ export default function ProposalApprovalPage({
   const [approvals, setApprovals] = useState<number>(0);
 
   useEffect(() => {
-    const loaded = loadProposalDraft<ProposalDraft>(multisigParam, id);
-    setDraft(loaded);
+    async function loadDraft() {
+      const response = await fetch(
+        `/api/proposals/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
+      );
+      if (response.status === 404) {
+        setDraft(null);
+        return;
+      }
+      if (!response.ok) {
+        throw new Error("Could not load proposal draft.");
+      }
+      setDraft((await response.json()) as ProposalDraft);
+    }
+
+    loadDraft().catch((error: unknown) => {
+      console.warn("[proposals] could not load draft:", error);
+      setDraft(null);
+    });
   }, [multisigParam, id]);
 
   const refreshStatus = useCallback(async () => {
@@ -158,7 +173,7 @@ export default function ProposalApprovalPage({
               </dl>
             ) : (
               <p className="mt-3 text-sm text-neutral-300">
-                No local proposal draft found in this browser session.
+                No persisted proposal draft found for this multisig and proposal index.
               </p>
             )}
           </section>
@@ -173,7 +188,7 @@ export default function ProposalApprovalPage({
             />
           ) : (
             <section className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
-              Commitment claim is not available in the local draft.
+              Commitment claim is not available in the persisted draft.
             </section>
           )}
 

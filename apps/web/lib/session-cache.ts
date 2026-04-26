@@ -75,20 +75,3 @@ export function clearSignerViewKey(multisig: string) {
   if (!storage) return;
   storage.removeItem(keyFor(multisig, "signer-view-key"));
 }
-
-export function saveProposalDraft<T>(multisig: string, transactionIndex: string, draft: T) {
-  const storage = getSessionStorage();
-  if (!storage) return;
-  storage.setItem(keyFor(multisig, `proposal:${transactionIndex}`), JSON.stringify(draft));
-}
-
-export function loadProposalDraft<T>(multisig: string, transactionIndex: string): T | null {
-  const storage = getSessionStorage();
-  if (!storage) return null;
-  try {
-    const raw = storage.getItem(keyFor(multisig, `proposal:${transactionIndex}`));
-    return raw ? (JSON.parse(raw) as T) : null;
-  } catch {
-    return null;
-  }
-}

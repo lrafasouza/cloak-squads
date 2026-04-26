@@ -7,7 +7,6 @@ import Link from "next/link";
 import { type FormEvent, useCallback, use, useEffect, useMemo, useState } from "react";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { publicEnv } from "@/lib/env";
-import { loadProposalDraft } from "@/lib/session-cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,14 +72,26 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
     return registeredOperator !== wallet.publicKey.toBase58();
   }, [registeredOperator, wallet.publicKey]);
 
-  function loadDraft() {
+  async function loadDraft() {
     if (!txIndex || !multisig) return;
-    const draft = loadProposalDraft<ProposalDraft>(multisig, txIndex);
-    setLoadedDraft(draft);
-    if (!draft) {
-      setError(`No draft found in sessionStorage for proposal #${txIndex}. Create it from the Send page first.`);
-    } else {
+    try {
+      const response = await fetch(
+        `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(txIndex)}`,
+      );
+      if (response.status === 404) {
+        setLoadedDraft(null);
+        setError(`No persisted draft found for proposal #${txIndex}. Create it from the Send page first.`);
+        return;
+      }
+      if (!response.ok) {
+        throw new Error("Could not load proposal draft.");
+      }
+      const draft = (await response.json()) as ProposalDraft;
+      setLoadedDraft(draft);
       setError(null);
+    } catch (caught) {
+      setLoadedDraft(null);
+      setError(caught instanceof Error ? caught.message : "Could not load proposal draft.");
     }
   }
 
@@ -215,7 +226,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
                   className="mt-1 font-mono"
                 />
               </div>
-              <Button type="button" variant="secondary" onClick={loadDraft} disabled={!txIndex}>
+              <Button type="button" variant="secondary" onClick={() => void loadDraft()} disabled={!txIndex}>
                 Load
               </Button>
             </div>

@@ -35,3 +35,20 @@ model StealthInvoice {
   @@index([cofreAddress])
   @@index([stealthPubkey])
 }
+
+model ProposalDraft {
+  id               String   @id @default(uuid())
+  cofreAddress     String
+  transactionIndex String
+  amount           String
+  recipient        String
+  memo             String?
+  payloadHash      Bytes
+  invariants       String
+  commitmentClaim  String?
+  signature        String?
+  createdAt        DateTime @default(now())
+
+  @@unique([cofreAddress, transactionIndex])
+  @@index([cofreAddress])
+}

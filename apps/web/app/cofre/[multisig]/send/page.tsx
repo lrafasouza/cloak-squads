@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
-import { saveProposalDraft } from "@/lib/session-cache";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
 
 function randomBytes(length: number) {
@@ -107,7 +106,10 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         memo: memo ? `issue license: ${memo}` : "issue license",
       });
 
-      saveProposalDraft(multisigAddress.toBase58(), result.transactionIndex.toString(), {
+      const transactionIndex = result.transactionIndex.toString();
+      const draft = {
+        cofreAddress: multisigAddress.toBase58(),
+        transactionIndex,
         amount,
         recipient: recipientPubkey.toBase58(),
         memo,
@@ -129,10 +131,19 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
           token_mint: SystemProgram.programId.toBase58(),
         },
         signature: result.signature,
+      };
+      const draftResponse = await fetch("/api/proposals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
       });
+      if (!draftResponse.ok) {
+        const body = (await draftResponse.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Could not persist proposal draft.");
+      }
 
       setPayloadHash(bytesToHex(hash));
-      router.push(`/cofre/${multisigAddress.toBase58()}/proposals/${result.transactionIndex.toString()}`);
+      router.push(`/cofre/${multisigAddress.toBase58()}/proposals/${transactionIndex}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not create proposal.");
     } finally {
