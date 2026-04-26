@@ -1,0 +1,1312 @@
+{
+  "address": "WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J",
+  "metadata": {
+    "name": "cloak_gatekeeper",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Squads-gated private execution module for Cloak shielded pool"
+  },
+  "instructions": [
+    {
+      "name": "add_signer_view",
+      "discriminator": [
+        219,
+        20,
+        84,
+        154,
+        12,
+        70,
+        97,
+        143
+      ],
+      "accounts": [
+        {
+          "name": "cofre",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  102,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre.multisig",
+                "account": "Cofre"
+              }
+            ]
+          }
+        },
+        {
+          "name": "squads_vault",
+          "signer": true
+        },
+        {
+          "name": "view_distribution",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  100,
+                  105,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "signer",
+          "type": "pubkey"
+        },
+        {
+          "name": "ephemeral_pk",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "nonce",
+          "type": {
+            "array": [
+              "u8",
+              24
+            ]
+          }
+        },
+        {
+          "name": "ciphertext",
+          "type": {
+            "array": [
+              "u8",
+              48
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "close_expired_license",
+      "discriminator": [
+        152,
+        66,
+        133,
+        12,
+        126,
+        164,
+        72,
+        224
+      ],
+      "accounts": [
+        {
+          "name": "cofre",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  102,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre.multisig",
+                "account": "Cofre"
+              }
+            ]
+          },
+          "relations": [
+            "license"
+          ]
+        },
+        {
+          "name": "license",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  99,
+                  101,
+                  110,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre"
+              },
+              {
+                "kind": "account",
+                "path": "license.payload_hash",
+                "account": "License"
+              }
+            ]
+          }
+        },
+        {
+          "name": "operator",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "docs": [
+            "Tx-fee payer. Anyone can submit, no constraint on identity."
+          ],
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "emergency_close_license",
+      "discriminator": [
+        79,
+        11,
+        159,
+        66,
+        182,
+        96,
+        226,
+        3
+      ],
+      "accounts": [
+        {
+          "name": "cofre",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  102,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre.multisig",
+                "account": "Cofre"
+              }
+            ]
+          },
+          "relations": [
+            "license"
+          ]
+        },
+        {
+          "name": "squads_vault",
+          "signer": true
+        },
+        {
+          "name": "license",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  99,
+                  101,
+                  110,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre"
+              },
+              {
+                "kind": "account",
+                "path": "license.payload_hash",
+                "account": "License"
+              }
+            ]
+          }
+        },
+        {
+          "name": "operator",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "docs": [
+            "Tx-fee payer."
+          ],
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "execute_with_license",
+      "discriminator": [
+        155,
+        154,
+        237,
+        135,
+        25,
+        140,
+        67,
+        54
+      ],
+      "accounts": [
+        {
+          "name": "cofre",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  102,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre.multisig",
+                "account": "Cofre"
+              }
+            ]
+          },
+          "relations": [
+            "license"
+          ]
+        },
+        {
+          "name": "license",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  99,
+                  101,
+                  110,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre"
+              },
+              {
+                "kind": "account",
+                "path": "license.payload_hash",
+                "account": "License"
+              }
+            ]
+          }
+        },
+        {
+          "name": "operator",
+          "signer": true
+        },
+        {
+          "name": "cloak_program"
+        },
+        {
+          "name": "cloak_pool",
+          "writable": true
+        },
+        {
+          "name": "nullifier_record",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "invariants",
+          "type": {
+            "defined": {
+              "name": "PayloadInvariants"
+            }
+          }
+        },
+        {
+          "name": "proof_bytes",
+          "type": {
+            "array": [
+              "u8",
+              256
+            ]
+          }
+        },
+        {
+          "name": "merkle_root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "init_cofre",
+      "discriminator": [
+        86,
+        234,
+        240,
+        211,
+        55,
+        64,
+        86,
+        176
+      ],
+      "accounts": [
+        {
+          "name": "cofre",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  102,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "multisig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "squads_vault",
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "multisig",
+          "type": "pubkey"
+        },
+        {
+          "name": "operator",
+          "type": "pubkey"
+        },
+        {
+          "name": "view_key_public",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "init_view_distribution",
+      "discriminator": [
+        227,
+        252,
+        147,
+        152,
+        110,
+        222,
+        69,
+        187
+      ],
+      "accounts": [
+        {
+          "name": "cofre",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  102,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre.multisig",
+                "account": "Cofre"
+              }
+            ]
+          }
+        },
+        {
+          "name": "squads_vault",
+          "signer": true
+        },
+        {
+          "name": "view_distribution",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  100,
+                  105,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "issue_license",
+      "discriminator": [
+        5,
+        103,
+        183,
+        220,
+        230,
+        209,
+        57,
+        154
+      ],
+      "accounts": [
+        {
+          "name": "cofre",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  102,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre.multisig",
+                "account": "Cofre"
+              }
+            ]
+          }
+        },
+        {
+          "name": "squads_vault",
+          "signer": true
+        },
+        {
+          "name": "license",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  99,
+                  101,
+                  110,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre"
+              },
+              {
+                "kind": "arg",
+                "path": "payload_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "payload_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "nonce",
+          "type": {
+            "array": [
+              "u8",
+              16
+            ]
+          }
+        },
+        {
+          "name": "ttl_secs",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "remove_signer_view",
+      "discriminator": [
+        202,
+        101,
+        123,
+        239,
+        146,
+        103,
+        197,
+        9
+      ],
+      "accounts": [
+        {
+          "name": "cofre",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  102,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre.multisig",
+                "account": "Cofre"
+              }
+            ]
+          }
+        },
+        {
+          "name": "squads_vault",
+          "signer": true
+        },
+        {
+          "name": "view_distribution",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  100,
+                  105,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "target",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "revoke_audit",
+      "discriminator": [
+        125,
+        176,
+        108,
+        91,
+        220,
+        87,
+        215,
+        58
+      ],
+      "accounts": [
+        {
+          "name": "cofre",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  102,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre.multisig",
+                "account": "Cofre"
+              }
+            ]
+          }
+        },
+        {
+          "name": "squads_vault",
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "diversifier_trunc",
+          "type": {
+            "array": [
+              "u8",
+              16
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_operator",
+      "discriminator": [
+        238,
+        153,
+        101,
+        169,
+        243,
+        131,
+        36,
+        1
+      ],
+      "accounts": [
+        {
+          "name": "cofre",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  102,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cofre.multisig",
+                "account": "Cofre"
+              }
+            ]
+          }
+        },
+        {
+          "name": "squads_vault",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_operator",
+          "type": "pubkey"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Cofre",
+      "discriminator": [
+        41,
+        87,
+        215,
+        100,
+        199,
+        10,
+        165,
+        235
+      ]
+    },
+    {
+      "name": "License",
+      "discriminator": [
+        248,
+        152,
+        195,
+        100,
+        185,
+        108,
+        176,
+        231
+      ]
+    },
+    {
+      "name": "ViewKeyDistribution",
+      "discriminator": [
+        182,
+        182,
+        75,
+        145,
+        210,
+        5,
+        111,
+        10
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "CofreInitialized",
+      "discriminator": [
+        114,
+        199,
+        0,
+        39,
+        227,
+        123,
+        116,
+        255
+      ]
+    },
+    {
+      "name": "LicenseConsumed",
+      "discriminator": [
+        207,
+        38,
+        229,
+        147,
+        122,
+        63,
+        141,
+        93
+      ]
+    },
+    {
+      "name": "LicenseIssued",
+      "discriminator": [
+        193,
+        166,
+        92,
+        209,
+        232,
+        70,
+        195,
+        168
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidSquadsSigner",
+      "msg": "Signer is not the Squads vault PDA for this cofre"
+    },
+    {
+      "code": 6001,
+      "name": "NotOperator",
+      "msg": "Caller is not the registered operator"
+    },
+    {
+      "code": 6002,
+      "name": "LicenseExpired",
+      "msg": "License has expired"
+    },
+    {
+      "code": 6003,
+      "name": "LicenseConsumed",
+      "msg": "License has already been consumed"
+    },
+    {
+      "code": 6004,
+      "name": "LicensePayloadMismatch",
+      "msg": "Payload invariants do not match license hash"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidNonce",
+      "msg": "Invalid payload nonce length"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidTtl",
+      "msg": "License TTL must be greater than zero"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidCpiTarget",
+      "msg": "CPI target is not the configured Cloak program"
+    },
+    {
+      "code": 6008,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6009,
+      "name": "RevocationCollision",
+      "msg": "Revoked audit diversifier collision detected"
+    },
+    {
+      "code": 6010,
+      "name": "RevocationCapacity",
+      "msg": "Too many revocations - realloc required by caller"
+    },
+    {
+      "code": 6011,
+      "name": "LicenseNotExpired",
+      "msg": "License is not yet expired"
+    },
+    {
+      "code": 6012,
+      "name": "SignerAlreadyExists",
+      "msg": "Signer is already present in the view-key distribution"
+    },
+    {
+      "code": 6013,
+      "name": "SignerNotFound",
+      "msg": "Signer not found in the view-key distribution"
+    }
+  ],
+  "types": [
+    {
+      "name": "Cofre",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "multisig",
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "view_key_public",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "revoked_audit",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  16
+                ]
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CofreInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cofre",
+            "type": "pubkey"
+          },
+          {
+            "name": "multisig",
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EncryptedViewKey",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "signer",
+            "type": "pubkey"
+          },
+          {
+            "name": "ephemeral_pk",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "nonce",
+            "type": {
+              "array": [
+                "u8",
+                24
+              ]
+            }
+          },
+          {
+            "name": "ciphertext",
+            "type": {
+              "array": [
+                "u8",
+                48
+              ]
+            }
+          },
+          {
+            "name": "added_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "License",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cofre",
+            "type": "pubkey"
+          },
+          {
+            "name": "payload_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "nonce",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "issued_at",
+            "type": "i64"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "LicenseStatus"
+              }
+            }
+          },
+          {
+            "name": "close_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LicenseConsumed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cofre",
+            "type": "pubkey"
+          },
+          {
+            "name": "payload_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "cloak_tx_signature_hint",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "LicenseIssued",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cofre",
+            "type": "pubkey"
+          },
+          {
+            "name": "payload_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LicenseStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Consumed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PayloadInvariants",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "nullifier",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient_vk_pub",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "nonce",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ViewKeyDistribution",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cofre",
+            "type": "pubkey"
+          },
+          {
+            "name": "entries",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "EncryptedViewKey"
+                }
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

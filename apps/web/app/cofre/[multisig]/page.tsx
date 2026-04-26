@@ -4,9 +4,18 @@ import { cofrePda, squadsVaultPda } from "@cloak-squads/core/pda";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
-import { use, useMemo } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
+
+type DraftSummary = {
+  id: string;
+  transactionIndex: string;
+  amount: string;
+  recipient: string;
+  memo: string;
+  createdAt: string;
+};
 
 function truncateAddress(address: string) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -33,18 +42,35 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
   }, [multisig]);
 
   const cofre = useMemo(() => {
-    if (!multisigAddress) {
-      return null;
-    }
+    if (!multisigAddress) return null;
     return cofrePda(multisigAddress, gatekeeperProgram)[0];
   }, [gatekeeperProgram, multisigAddress]);
 
   const vault = useMemo(() => {
-    if (!multisigAddress) {
-      return null;
-    }
+    if (!multisigAddress) return null;
     return squadsVaultPda(multisigAddress, squadsProgram)[0];
   }, [multisigAddress, squadsProgram]);
+
+  const [drafts, setDrafts] = useState<DraftSummary[]>([]);
+  const [draftsLoading, setDraftsLoading] = useState(true);
+
+  const loadDrafts = useCallback(async () => {
+    if (!multisigAddress) return;
+    try {
+      const response = await fetch(`/api/proposals/${encodeURIComponent(multisigAddress.toBase58())}`);
+      if (response.ok) {
+        setDrafts((await response.json()) as DraftSummary[]);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setDraftsLoading(false);
+    }
+  }, [multisigAddress]);
+
+  useEffect(() => {
+    void loadDrafts();
+  }, [loadDrafts]);
 
   if (!multisigAddress || !cofre || !vault) {
     return (
@@ -116,10 +142,12 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
           </section>
 
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-            <p className="text-sm text-neutral-400">Pending proposals</p>
-            <p className="mt-3 font-mono text-2xl font-semibold tabular-nums text-neutral-50">0</p>
+            <p className="text-sm text-neutral-400">Proposal drafts</p>
+            <p className="mt-3 font-mono text-2xl font-semibold tabular-nums text-neutral-50">
+              {draftsLoading ? "…" : drafts.length}
+            </p>
             <p className="mt-2 text-xs text-neutral-400">
-              Squads proposal indexing is not seeded yet.
+              {drafts.length > 0 ? "Recent drafts listed below." : "Create one from Prepare send."}
             </p>
           </section>
 
@@ -157,10 +185,39 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
 
           <section className="rounded-lg border border-neutral-800 bg-neutral-900">
             <div className="border-b border-neutral-800 p-4">
-              <h2 className="text-base font-semibold text-neutral-50">Activity</h2>
+              <h2 className="text-base font-semibold text-neutral-50">Recent proposals</h2>
             </div>
-            <div className="p-4 text-sm text-neutral-300">
-              No private execution activity indexed for this cofre yet.
+            <div className="p-4 text-sm">
+              {draftsLoading ? (
+                <p className="text-neutral-400">Loading…</p>
+              ) : drafts.length === 0 ? (
+                <p className="text-neutral-300">
+                  No proposal drafts yet. Create one from the Send page.
+                </p>
+              ) : (
+                <ul className="grid gap-3">
+                  {drafts.map((d) => (
+                    <li key={d.id}>
+                      <Link
+                        href={`/cofre/${multisigAddress.toBase58()}/proposals/${d.transactionIndex}`}
+                        className="flex items-center justify-between rounded-md border border-neutral-800 p-3 transition hover:border-neutral-700 hover:bg-neutral-800/50"
+                      >
+                        <div>
+                          <p className="font-mono text-sm text-neutral-100">
+                            #{d.transactionIndex}
+                          </p>
+                          <p className="mt-1 text-xs text-neutral-400">
+                            {Number(d.amount).toLocaleString()} lamports → {truncateAddress(d.recipient)}
+                          </p>
+                        </div>
+                        <span className="text-xs text-neutral-500">
+                          {new Date(d.createdAt).toLocaleDateString()}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </section>
         </div>

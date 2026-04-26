@@ -9,31 +9,31 @@ export type CommitmentClaim = {
   token_mint: string;
 };
 
-function getCloakSDK(): {
-  computeCommitment: (note: NoteData) => Promise<{ hex: () => Promise<ArrayLike<number>> }>;
-} {
-  if (typeof window === "undefined") {
-    throw new Error("Cloak SDK only available in the browser runtime");
-  }
-  const sdk = (window as unknown as { CloakSDK?: unknown }).CloakSDK;
-  if (!sdk || typeof (sdk as { computeCommitment?: unknown }).computeCommitment !== "function") {
-    throw new Error("Cloak SDK not available on window");
-  }
-  return sdk as {
-    computeCommitment: (note: NoteData) => Promise<{ hex: () => Promise<ArrayLike<number>> }>;
-  };
+export type ComputeCommitmentFn = (note: NoteData) => Promise<bigint>;
+
+let _computeCommitmentFn: ComputeCommitmentFn | null = null;
+
+export function registerComputeCommitmentFn(fn: ComputeCommitmentFn) {
+  _computeCommitmentFn = fn;
 }
 
 export async function recomputeCommitment(claim: CommitmentClaim): Promise<Uint8Array> {
+  if (!_computeCommitmentFn) {
+    throw new Error("computeCommitment not registered — call registerComputeCommitmentFn at app init");
+  }
   const note: NoteData = {
     amount: claim.amount,
     r: claim.r,
     sk_spend: claim.sk_spend,
     commitment: "",
   };
-  const sdk = getCloakSDK();
-  const result = await sdk.computeCommitment(note);
-  return new Uint8Array(await result.hex());
+  const result = await _computeCommitmentFn(note);
+  const hex = result.toString(16).padStart(64, "0");
+  const bytes = new Uint8Array(32);
+  for (let i = 0; i < 32; i++) {
+    bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
 }
 
 export function commitmentsEqual(a: Uint8Array, b: Uint8Array): boolean {

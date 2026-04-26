@@ -122,14 +122,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
           recipientVkPub: Array.from(invariants.recipientVkPub),
           nonce: Array.from(invariants.nonce),
         },
-        commitmentClaim: {
-          amount: Number(invariants.amount),
-          r: note.r,
-          sk_spend: note.sk_spend,
-          commitment: note.commitment,
-          recipient_vk: recipientPubkey.toBase58(),
-          token_mint: SystemProgram.programId.toBase58(),
-        },
         signature: result.signature,
       };
       const draftResponse = await fetch("/api/proposals", {
@@ -143,7 +135,25 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       }
 
       setPayloadHash(bytesToHex(hash));
-      router.push(`/cofre/${multisigAddress.toBase58()}/proposals/${transactionIndex}`);
+
+      const claim = {
+        amount: Number(invariants.amount),
+        r: note.r,
+        sk_spend: note.sk_spend,
+        commitment: note.commitment,
+        recipient_vk: recipientPubkey.toBase58(),
+        token_mint: SystemProgram.programId.toBase58(),
+      };
+      try {
+        sessionStorage.setItem(
+          `claim:${multisigAddress.toBase58()}:${transactionIndex}`,
+          JSON.stringify(claim),
+        );
+      } catch { /* sessionStorage full or unavailable */ }
+
+      router.push(
+        `/cofre/${multisigAddress.toBase58()}/proposals/${transactionIndex}`,
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not create proposal.");
     } finally {

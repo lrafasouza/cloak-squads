@@ -3,6 +3,7 @@
 import { commitmentsEqual, recomputeCommitment, type CommitmentClaim } from "@cloak-squads/core/commitment";
 import { PublicKey } from "@solana/web3.js";
 import { useEffect, useMemo, useState } from "react";
+import { ensureCommitmentFn } from "@/lib/init-commitment";
 import { cn } from "@/lib/utils";
 
 export type CommitmentCheckState = "checking" | "match" | "mismatch" | "unavailable";
@@ -26,6 +27,7 @@ export function CommitmentCheck({
     let cancelled = false;
     setError(null);
     setComputed(null);
+    ensureCommitmentFn();
     recomputeCommitment(claim)
       .then((value) => {
         if (!cancelled) setComputed(value);
@@ -85,9 +87,9 @@ export function CommitmentCheck({
       </dl>
       {state === "unavailable" ? (
         <p className="mt-4 text-sm text-amber-200">
-          Cloak SDK is not initialized in this build, so local recompute could not run. The on-chain
-          payload hash is enforced by the gatekeeper program — you can still vote, but commitment
-          verification is a defense-in-depth check that should be wired before production.
+          Local commitment recompute failed. The on-chain payload hash is enforced by the
+          gatekeeper program — you can still vote, but commitment verification is a
+          defense-in-depth check.
           {error ? (
             <span className="mt-1 block text-xs text-amber-300/80">Detail: {error}</span>
           ) : null}

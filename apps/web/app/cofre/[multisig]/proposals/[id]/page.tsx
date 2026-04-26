@@ -48,7 +48,6 @@ type ProposalDraft = {
   invariants: {
     commitment: number[];
   };
-  commitmentClaim?: CommitmentClaim;
 };
 
 export default function ProposalApprovalPage({
@@ -61,29 +60,44 @@ export default function ProposalApprovalPage({
   const [commitmentState, setCommitmentState] = useState<CommitmentCheckState>("checking");
   const [signature, setSignature] = useState<string | null>(null);
   const [executeSignature, setExecuteSignature] = useState<string | null>(null);
+  const [draftLoading, setDraftLoading] = useState(true);
   const [draft, setDraft] = useState<ProposalDraft | null>(null);
+  const [commitmentClaim, setCommitmentClaim] = useState<CommitmentClaim | null>(null);
   const [status, setStatus] = useState<ProposalStatusKind | "loading" | "missing">("loading");
   const [approvals, setApprovals] = useState<number>(0);
+  const [threshold, setThreshold] = useState<number | null>(null);
 
   useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(`claim:${multisigParam}:${id}`);
+      if (raw) setCommitmentClaim(JSON.parse(raw) as CommitmentClaim);
+    } catch { /* ignore */ }
+  }, [multisigParam, id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDraftLoading(true);
     async function loadDraft() {
       const response = await fetch(
         `/api/proposals/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
       );
       if (response.status === 404) {
-        setDraft(null);
+        if (!cancelled) setDraft(null);
         return;
       }
       if (!response.ok) {
         throw new Error("Could not load proposal draft.");
       }
-      setDraft((await response.json()) as ProposalDraft);
+      if (!cancelled) setDraft((await response.json()) as ProposalDraft);
     }
 
-    loadDraft().catch((error: unknown) => {
-      console.warn("[proposals] could not load draft:", error);
-      setDraft(null);
-    });
+    loadDraft()
+      .then(() => { if (!cancelled) setDraftLoading(false); })
+      .catch((error: unknown) => {
+        console.warn("[proposals] could not load draft:", error);
+        if (!cancelled) { setDraft(null); setDraftLoading(false); }
+      });
+    return () => { cancelled = true; };
   }, [multisigParam, id]);
 
   const refreshStatus = useCallback(async () => {
@@ -96,11 +110,20 @@ export default function ProposalApprovalPage({
       const proposal = await multisig.accounts.Proposal.fromAccountAddress(connection, proposalPda);
       setStatus(readProposalStatus(proposal.status));
       setApprovals(proposal.approved.length);
+
+      if (threshold === null) {
+        try {
+          const msAccount = await multisig.accounts.Multisig.fromAccountAddress(connection, multisigPda);
+          setThreshold(msAccount.threshold);
+        } catch {
+          // threshold unavailable — leave as null
+        }
+      }
     } catch (err) {
       console.warn("[proposals] could not load proposal status:", err);
       setStatus("missing");
     }
-  }, [connection, multisigParam, id]);
+  }, [connection, multisigParam, id, threshold]);
 
   useEffect(() => {
     void refreshStatus();
@@ -128,7 +151,7 @@ export default function ProposalApprovalPage({
   );
 
   const approveBlocked =
-    (Boolean(draft?.commitmentClaim) && commitmentState === "mismatch") ||
+    (commitmentClaim !== null && commitmentState === "mismatch") ||
     status !== "active";
   const executeBlocked = status !== "approved";
 
@@ -171,6 +194,8 @@ export default function ProposalApprovalPage({
                   <dd className="mt-1 text-neutral-100">{draft.memo || "None"}</dd>
                 </div>
               </dl>
+            ) : draftLoading ? (
+              <p className="mt-3 text-sm text-neutral-400">Loading proposal draft…</p>
             ) : (
               <p className="mt-3 text-sm text-neutral-300">
                 No persisted proposal draft found for this multisig and proposal index.
@@ -178,17 +203,17 @@ export default function ProposalApprovalPage({
             )}
           </section>
 
-          {draft?.commitmentClaim ? (
+          {commitmentClaim && draft ? (
             <CommitmentCheck
               claim={{
-                ...draft.commitmentClaim,
+                ...commitmentClaim,
                 onChainCommitment: Uint8Array.from(draft.invariants.commitment),
               }}
               onStateChange={setCommitmentState}
             />
           ) : (
             <section className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
-              Commitment claim is not available in the persisted draft.
+              Commitment claim is only available in the proposer's browser session.
             </section>
           )}
 
@@ -200,7 +225,9 @@ export default function ProposalApprovalPage({
                   ? "loading…"
                   : status === "missing"
                     ? "not found"
-                    : `${status} (${approvals} approvals)`}
+                    : threshold !== null
+                      ? `${status} (${approvals}/${threshold} approvals)`
+                      : `${status} (${approvals} approvals)`}
               </span>
             </div>
             {status === "executed" || status === "cancelled" || status === "rejected" ? (
@@ -238,7 +265,9 @@ export default function ProposalApprovalPage({
             />
             {executeBlocked && status !== "loading" ? (
               <p className="mt-2 text-xs text-neutral-400">
-                Execute requires status = approved. Current: {status}.
+                {status === "active" && threshold !== null
+                  ? `Need ${Math.max(0, threshold - approvals)} more approval(s) before executing.`
+                  : `Execute requires status = approved. Current: ${status}.`}
               </p>
             ) : null}
             {executeSignature ? (

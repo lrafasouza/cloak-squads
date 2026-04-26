@@ -2,7 +2,9 @@
 
 import { cofrePda } from "@cloak-squads/core/pda";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { PublicKey, ComputeBudgetProgram, Transaction } from "@solana/web3.js";
+import { Idl, BorshAccountsCoder } from "@coral-xyz/anchor";
+import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import Link from "next/link";
 import { type FormEvent, useCallback, use, useEffect, useMemo, useState } from "react";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
@@ -54,10 +56,13 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
     if (!multisigAddress) return;
     try {
       const cofre = cofrePda(multisigAddress, gatekeeperProgram)[0];
-      const account = await connection.getAccountInfo(cofre);
-      if (!account) return;
-      const operatorBytes = account.data.subarray(40, 72);
-      setRegisteredOperator(new PublicKey(operatorBytes).toBase58());
+      const accountInfo = await connection.getAccountInfo(cofre);
+      if (!accountInfo) return;
+      const coder = new BorshAccountsCoder(IDL as Idl);
+      const decoded = coder.decode<any>("cofre", accountInfo.data);
+      if (decoded?.operator) {
+        setRegisteredOperator(new PublicKey(decoded.operator).toBase58());
+      }
     } catch {
       // ignore
     }
@@ -136,7 +141,11 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
         nullifierRecord,
       });
 
-      const tx = new Transaction().add(ix);
+      const tx = new Transaction().add(
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1000 }),
+        ix,
+      );
       tx.feePayer = wallet.publicKey;
       tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
