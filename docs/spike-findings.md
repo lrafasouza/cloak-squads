@@ -73,6 +73,10 @@ Plan crypto wrappers in `@cloak-squads/core` (Task 1.3) can be written against t
 
 Cloak program `zh1eLd6rSphLejbFfJEneUwzHRfMKxgzrgkfwA6qRkW` is **mainnet-only** (verified 2026-04-24: `solana account ... --url devnet` returns AccountNotFound; same query on mainnet-beta returns executable BPF program). The SDK's `network: "devnet"` parameter does not switch program IDs — it only switches RPC URL, so any `transact()` call from devnet hits the same hardcoded program ID and fails with "Attempt to load a program that does not exist".
 
+`cloak-mock` is deployed on devnet at `2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe`
+and was verified on 2026-04-26. Earliest transaction currently returned by devnet history:
+`3M3We9A7Fdg7RJcTb8QUfdoAvaSEKUfDdfRhtkVaeEXyUuE4sCB9sk6BoQZHaDG54nFbhBM4EjgPpEhv9qC4pXZp`.
+
 Implications:
 - Our `cloak-gatekeeper` program runs on devnet with `cloak-mock` standing in for the real Cloak. The CPI shape is validated by `tests/integration/spike-cpi.test.ts` (bankrun).
 - Real Cloak end-to-end can only be validated against mainnet. Cost for a smoke test (`deposit 0.01 SOL` + `withdraw`): ~0.015 SOL real (~$2-3).
@@ -99,7 +103,6 @@ SOLANA_KEYPAIR=~/.config/solana/mainnet.json \
 - `CLOAK_MOCK_PROGRAM_ID` hard-coded in `execute_with_license.rs`. Make configurable before mainnet cut.
 - Both program crates: drop direct `solana-program` dep, use `anchor_lang::solana_program`. Cosmetic.
 - `anchor-bankrun 0.5.0` peer-deps `@coral-xyz/anchor ^0.30.0`; we use `0.31.1`. Working in practice.
-- `cloak-mock` is not deployed on devnet. CPI integration testing stays in bankrun until/unless we deploy it.
 
 ### Balances
 

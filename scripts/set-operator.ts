@@ -4,7 +4,7 @@
  * The set_operator instruction requires squads_vault as signer,
  * so it must go through a Squads vault transaction (create → approve → execute).
  *
- * Usage: npx tsx scripts/set-operator.ts
+ * Usage: npx tsx scripts/set-operator.ts <multisig> <new-operator>
  */
 
 import * as fs from "node:fs";
@@ -69,8 +69,13 @@ async function main() {
   const connection = new Connection("https://api.devnet.solana.com", "confirmed");
   const payer = loadKeypair(process.env.SOLANA_KEYPAIR);
 
-  const MULTISIG = new PublicKey("4UyJQecmT5irKwbgWyW3WeARsGfz8vii2cxsXBz5PMt5");
-  const NEW_OPERATOR = new PublicKey("QqibVKumHaJAC5bYii7q2QRWf3faYTEj8ff1d6gqST5");
+  const [multisigArg, newOperatorArg] = process.argv.slice(2);
+  if (!multisigArg || !newOperatorArg) {
+    throw new Error("Usage: npx tsx scripts/set-operator.ts <multisig> <new-operator>");
+  }
+
+  const MULTISIG = new PublicKey(multisigArg);
+  const NEW_OPERATOR = new PublicKey(newOperatorArg);
 
   const [vaultPda] = multisig.getVaultPda({ multisigPda: MULTISIG, index: 0 });
   const [cofrePda] = PublicKey.findProgramAddressSync(

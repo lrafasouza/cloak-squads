@@ -10,7 +10,6 @@ cloak_squads_test_harness = "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf"
 [programs.devnet]
 cloak_gatekeeper = "WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J"
 cloak_mock = "2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe"
-cloak_squads_test_harness = "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf"
 
 [registry]
 url = "https://api.apr.dev"

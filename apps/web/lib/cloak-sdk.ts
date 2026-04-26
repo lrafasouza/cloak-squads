@@ -16,7 +16,7 @@ import {
   scanTransactions,
   setCircuitsPath,
   verifyAllCircuits,
-} from "@cloak.dev/sdk";
+} from "@cloak.dev/sdk-devnet";
 import { PublicKey, type Connection, type Transaction } from "@solana/web3.js";
 import { publicEnv } from "./env";
 

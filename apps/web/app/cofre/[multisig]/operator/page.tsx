@@ -2,10 +2,11 @@
 
 import { cofrePda } from "@cloak-squads/core/pda";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
+import { PublicKey, Transaction } from "@solana/web3.js";
 import Link from "next/link";
 import { type FormEvent, useCallback, use, useEffect, useMemo, useState } from "react";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
+import { publicEnv } from "@/lib/env";
 import { loadProposalDraft } from "@/lib/session-cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,8 +99,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
       const recipientVkPub = Uint8Array.from(draft.invariants.recipientVkPub);
       const nonce = Uint8Array.from(draft.invariants.nonce);
 
-      const cloakProgram = new PublicKey(process.env.NEXT_PUBLIC_CLOAK_MOCK_PROGRAM_ID ?? "");
-      if (!cloakProgram.toBase58().length) throw new Error("NEXT_PUBLIC_CLOAK_MOCK_PROGRAM_ID not set.");
+      const cloakProgram = new PublicKey(publicEnv.NEXT_PUBLIC_CLOAK_MOCK_PROGRAM_ID);
 
       const [pool] = PublicKey.findProgramAddressSync(
         [Buffer.from("stub_pool"), tokenMint.toBuffer()],
