@@ -41,9 +41,10 @@ export async function buildIssueLicenseIxBrowser(params: {
   ttlSecs?: number;
 }) {
   const gatekeeperProgram = new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID);
-  const cofre = cofrePda(params.multisig)[0];
-  const vault = squadsVaultPda(params.multisig)[0];
-  const license = licensePda(cofre, params.payloadHash)[0];
+  const squadsProgram = new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID);
+  const cofre = cofrePda(params.multisig, gatekeeperProgram)[0];
+  const vault = squadsVaultPda(params.multisig, squadsProgram)[0];
+  const license = licensePda(cofre, params.payloadHash, gatekeeperProgram)[0];
   const discriminator = await anchorDiscriminator("issue_license");
   const data = concatBytes(
     discriminator,
@@ -81,7 +82,7 @@ export async function buildExecuteWithLicenseIxBrowser(params: {
   nullifierRecord: PublicKey;
 }) {
   const gatekeeperProgram = new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID);
-  const cofre = cofrePda(params.multisig)[0];
+  const cofre = cofrePda(params.multisig, gatekeeperProgram)[0];
   const payloadHash = await crypto.subtle.digest(
     "SHA-256",
     concatBytes(
@@ -94,7 +95,7 @@ export async function buildExecuteWithLicenseIxBrowser(params: {
       params.invariants.nonce,
     ),
   );
-  const license = licensePda(cofre, new Uint8Array(payloadHash))[0];
+  const license = licensePda(cofre, new Uint8Array(payloadHash), gatekeeperProgram)[0];
   const discriminator = await anchorDiscriminator("execute_with_license");
   const data = concatBytes(
     discriminator,

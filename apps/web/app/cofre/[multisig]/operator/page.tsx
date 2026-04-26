@@ -32,6 +32,10 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
   const { multisig } = use(params);
   const { connection } = useConnection();
   const wallet = useWallet();
+  const gatekeeperProgram = useMemo(
+    () => new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID),
+    [],
+  );
   const [txIndex, setTxIndex] = useState("");
   const [pending, setPending] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
@@ -50,7 +54,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
   const fetchOperator = useCallback(async () => {
     if (!multisigAddress) return;
     try {
-      const cofre = cofrePda(multisigAddress)[0];
+      const cofre = cofrePda(multisigAddress, gatekeeperProgram)[0];
       const account = await connection.getAccountInfo(cofre);
       if (!account) return;
       const operatorBytes = account.data.subarray(40, 72);
@@ -58,7 +62,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
     } catch {
       // ignore
     }
-  }, [connection, multisigAddress]);
+  }, [connection, gatekeeperProgram, multisigAddress]);
 
   useEffect(() => {
     void fetchOperator();

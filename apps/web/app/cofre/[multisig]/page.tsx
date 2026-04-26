@@ -6,6 +6,7 @@ import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { use, useMemo } from "react";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { publicEnv } from "@/lib/env";
 
 function truncateAddress(address: string) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -14,6 +15,14 @@ function truncateAddress(address: string) {
 export default function CofreDashboardPage({ params }: { params: Promise<{ multisig: string }> }) {
   const { multisig } = use(params);
   const wallet = useWallet();
+  const gatekeeperProgram = useMemo(
+    () => new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID),
+    [],
+  );
+  const squadsProgram = useMemo(
+    () => new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID),
+    [],
+  );
 
   const multisigAddress = useMemo(() => {
     try {
@@ -27,15 +36,15 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
     if (!multisigAddress) {
       return null;
     }
-    return cofrePda(multisigAddress)[0];
-  }, [multisigAddress]);
+    return cofrePda(multisigAddress, gatekeeperProgram)[0];
+  }, [gatekeeperProgram, multisigAddress]);
 
   const vault = useMemo(() => {
     if (!multisigAddress) {
       return null;
     }
-    return squadsVaultPda(multisigAddress)[0];
-  }, [multisigAddress]);
+    return squadsVaultPda(multisigAddress, squadsProgram)[0];
+  }, [multisigAddress, squadsProgram]);
 
   if (!multisigAddress || !cofre || !vault) {
     return (

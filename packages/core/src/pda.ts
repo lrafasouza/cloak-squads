@@ -1,25 +1,38 @@
 import { PublicKey } from "@solana/web3.js";
 
-const GATEKEEPER_PROGRAM_ID = new PublicKey("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J");
+const DEFAULT_GATEKEEPER_PROGRAM_ID = new PublicKey("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J");
+const DEFAULT_SQUADS_PROGRAM_ID = new PublicKey("SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf");
 
-export function cofrePda(multisig: PublicKey): [PublicKey, number] {
+function programIdFromEnv(name: string, fallback: PublicKey): PublicKey {
+  const value = typeof process !== "undefined" ? process.env?.[name] : undefined;
+  return value ? new PublicKey(value) : fallback;
+}
+
+function gatekeeperProgramId(programId?: PublicKey): PublicKey {
+  return programId ?? programIdFromEnv("NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID", DEFAULT_GATEKEEPER_PROGRAM_ID);
+}
+
+function squadsProgramId(programId?: PublicKey): PublicKey {
+  return programId ?? programIdFromEnv("NEXT_PUBLIC_SQUADS_PROGRAM_ID", DEFAULT_SQUADS_PROGRAM_ID);
+}
+
+export function cofrePda(multisig: PublicKey, programId?: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("cofre"), multisig.toBuffer()],
-    GATEKEEPER_PROGRAM_ID,
+    gatekeeperProgramId(programId),
   );
 }
 
-export function licensePda(cofre: PublicKey, payloadHash: Uint8Array): [PublicKey, number] {
+export function licensePda(cofre: PublicKey, payloadHash: Uint8Array, programId?: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("license"), cofre.toBuffer(), Buffer.from(payloadHash)],
-    GATEKEEPER_PROGRAM_ID,
+    gatekeeperProgramId(programId),
   );
 }
 
-export function squadsVaultPda(multisig: PublicKey): [PublicKey, number] {
-  const SQUADS_PROGRAM_ID = new PublicKey("SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf");
+export function squadsVaultPda(multisig: PublicKey, programId?: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("multisig"), multisig.toBuffer(), Buffer.from("vault"), Buffer.from([0])],
-    SQUADS_PROGRAM_ID,
+    squadsProgramId(programId),
   );
 }
