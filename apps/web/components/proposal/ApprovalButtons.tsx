@@ -15,7 +15,7 @@ export function ApprovalButtons({
   multisig: string;
   transactionIndex: string;
   disabled?: boolean;
-  onSubmitted?: (signature: string) => void;
+  onSubmitted?: (signature: string, kind: "approve" | "reject") => void;
 }) {
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -34,7 +34,7 @@ export function ApprovalButtons({
         memo: kind === "approve" ? "Cloak Squads F1 approved" : "Cloak Squads F1 rejected",
       };
       const signature = kind === "approve" ? await proposalApprove(params) : await proposalReject(params);
-      onSubmitted?.(signature);
+      onSubmitted?.(signature, kind);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not submit vote");
     } finally {
@@ -51,7 +51,7 @@ export function ApprovalButtons({
         <Button
           type="button"
           variant="outline"
-          disabled={pending !== null}
+          disabled={disabled || pending !== null}
           onClick={() => submit("reject")}
         >
           {pending === "reject" ? "Rejecting..." : "Reject"}

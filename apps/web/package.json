@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "prisma": "DATABASE_URL=file:/mnt/c/Users/rafae/Desktop/cloak-squads/apps/web/prisma/dev.db prisma",
+    "prisma": "DATABASE_URL=file:/home/rafazaum/cloak-squads/apps/web/prisma/dev.db prisma",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit"
   },

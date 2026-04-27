@@ -2,9 +2,9 @@
 
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
+import { computeCommitment } from "@cloak.dev/sdk-devnet";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { computeCommitment } from "@cloak.dev/sdk-devnet";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,18 +20,6 @@ function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
   crypto.getRandomValues(bytes);
   return bytes;
-}
-
-function hexToBytes(hex: string) {
-  const normalized = hex.startsWith("0x") ? hex.slice(2) : hex;
-  if (normalized.length % 2 !== 0) {
-    throw new Error("Invalid hex string");
-  }
-  const out = new Uint8Array(normalized.length / 2);
-  for (let i = 0; i < out.length; i++) {
-    out[i] = Number.parseInt(normalized.slice(i * 2, i * 2 + 2), 16);
-  }
-  return out;
 }
 
 function bytesToHex(bytes: Uint8Array) {
@@ -96,7 +84,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       };
       const invariants: PayloadInvariants = {
         nullifier: randomBytes(32),
-        commitment: hexToBytes(note.commitment),
+        commitment: hexToBytes(commitment),
         amount: BigInt(amount),
         tokenMint: SystemProgram.programId,
         recipientVkPub: recipientPubkey.toBytes(),
@@ -120,10 +108,10 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
 
       const transactionIndex = result.transactionIndex.toString();
       const claim = {
-        amount: Number(invariants.amount),
+        amount: invariants.amount.toString(),
         r: note.r,
         sk_spend: note.sk_spend,
-        commitment: note.commitment,
+        commitment: commitmentHex,
         recipient_vk: recipientPubkey.toBase58(),
         token_mint: SystemProgram.programId.toBase58(),
       };
