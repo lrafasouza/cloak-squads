@@ -96,21 +96,18 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
       // Sign message
       const signature = await wallet.signMessage(messageBytes);
 
-      const payload = {
-        cofreAddress: multisigAddress.toBase58(),
-        scope,
-        scopeParams: Object.keys(scopeParams).length > 0 ? scopeParams : undefined,
-        expiresAt,
-        issuedBy: wallet.publicKey.toBase58(),
-        signature: Buffer.from(signature).toString("base64"),
-      };
-      console.log("[Audit] Creating audit link with payload:", payload);
-
       // Create audit link
       const res = await fetch("/api/audit-links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          cofreAddress: multisigAddress.toBase58(),
+          scope,
+          scopeParams: Object.keys(scopeParams).length > 0 ? scopeParams : undefined,
+          expiresAt,
+          issuedBy: wallet.publicKey.toBase58(),
+          signature: Buffer.from(signature).toString("base64"),
+        }),
       });
 
       if (!res.ok) {

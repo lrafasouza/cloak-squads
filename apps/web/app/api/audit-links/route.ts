@@ -10,7 +10,9 @@ const auditLinkCreateSchema = z.object({
   cofreAddress: z.string().refine(
     (val) => {
       try {
-        return PublicKey.isOnCurve(new PublicKey(val).toBytes());
+        // PDAs (multisig addresses) are valid but off-curve
+        new PublicKey(val);
+        return true;
       } catch {
         return false;
       }
@@ -28,7 +30,9 @@ const auditLinkCreateSchema = z.object({
   issuedBy: z.string().refine(
     (val) => {
       try {
-        return PublicKey.isOnCurve(new PublicKey(val).toBytes());
+        // Wallet addresses may be PDAs (off-curve but valid)
+        new PublicKey(val);
+        return true;
       } catch {
         return false;
       }
@@ -55,7 +59,6 @@ export async function POST(request: Request) {
 
   const parsed = auditLinkCreateSchema.safeParse(body);
   if (!parsed.success) {
-    console.error("[api/audit-links] validation failed:", parsed.error.flatten());
     return NextResponse.json(
       { error: "Invalid audit link request.", details: parsed.error.flatten() },
       { status: 400 },
