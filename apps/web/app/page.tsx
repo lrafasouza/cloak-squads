@@ -22,34 +22,85 @@ function truncateAddress(address: string) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
-async function listWalletMultisigs(connection: Connection, owner: PublicKey) {
-  const programAccounts = await connection.getProgramAccounts(multisig.PROGRAM_ID);
+async function listWalletMultisigs(connection: Connection, owner: PublicKey): Promise<CofreOption[]> {
+  try {
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+    
+    const programAccounts = await connection.getProgramAccounts(
+      multisig.PROGRAM_ID,
+      {
+        commitment: "confirmed",
+        encoding: "base64",
+      }
+    );
+    
+    clearTimeout(timeoutId);
 
-  return programAccounts
-    .flatMap(({ pubkey, account }) => {
+    console.log(`[listWalletMultisigs] Found ${programAccounts.length} total accounts`);
+
+    const results: CofreOption[] = [];
+    
+    // Process in chunks to avoid blocking UI
+    for (let i = 0; i < Math.min(programAccounts.length, 500); i++) {
+      const { pubkey, account } = programAccounts[i];
       try {
-        const [decoded] = multisig.accounts.Multisig.fromAccountInfo({
-          ...account,
-          data: Buffer.from(account.data),
-        });
-        const isMember = decoded.members.some((member) => member.key.equals(owner));
-        if (!isMember) {
-          return [];
+        // Validate account data exists
+        if (!account.data || account.data.length === 0) {
+          continue;
         }
 
-        return [
-          {
-            address: pubkey.toBase58(),
-            threshold: decoded.threshold,
-            members: decoded.members.length,
-            transactionIndex: decoded.transactionIndex.toString(),
-          },
-        ];
-      } catch {
-        return [];
+        const data = Buffer.from(account.data);
+        const [decoded] = multisig.accounts.Multisig.fromAccountInfo({
+          ...account,
+          data,
+        });
+        
+        // Validate decoded data
+        if (!decoded?.members || !Array.isArray(decoded.members)) {
+          continue;
+        }
+
+        const isMember = decoded.members.some((member) => 
+          member?.key?.equals?.(owner)
+        );
+        
+        if (!isMember) {
+          continue;
+        }
+
+        results.push({
+          address: pubkey.toBase58(),
+          threshold: decoded.threshold ?? 0,
+          members: decoded.members.length,
+          transactionIndex: decoded.transactionIndex?.toString?.() ?? "0",
+        });
+
+        // Limit to 12 results
+        if (results.length >= 12) {
+          break;
+        }
+      } catch (err) {
+        // Silently skip accounts that can't be decoded
+        continue;
       }
-    })
-    .slice(0, 12);
+    }
+
+    console.log(`[listWalletMultisigs] Found ${results.length} memberships`);
+    return results;
+  } catch (error) {
+    console.error("[listWalletMultisigs] Failed to fetch program accounts:", error);
+    if (error instanceof Error) {
+      if (error.message?.includes("429")) {
+        throw new Error("RPC rate limit exceeded. Please wait a moment and try again.");
+      }
+      if (error.message?.includes("timeout") || error.message?.includes("abort")) {
+        throw new Error("Request timed out. The RPC is taking too long to respond.");
+      }
+    }
+    throw new Error("Failed to scan Squads memberships. The RPC may be rate-limited or unavailable.");
+  }
 }
 
 export default function HomePage() {
@@ -61,14 +112,15 @@ export default function HomePage() {
 
   const multisigsQuery = useQuery({
     queryKey: ["wallet-multisigs", wallet.publicKey?.toBase58()],
-    queryFn: () => {
+    queryFn: async () => {
       if (!wallet.publicKey) {
-        return Promise.resolve<CofreOption[]>([]);
+        return [];
       }
       return listWalletMultisigs(connection, wallet.publicKey);
     },
     enabled: false,
     staleTime: Infinity,
+    retry: 1,
   });
 
   const canSubmitManual = useMemo(() => manualAddress.trim().length > 0, [manualAddress]);
@@ -173,7 +225,11 @@ export default function HomePage() {
             </div>
           ) : multisigsQuery.isError ? (
             <div className="space-y-3 p-4">
-              <p className="text-sm text-red-300">Could not load Squads accounts from RPC.</p>
+              <p className="text-sm text-red-300">
+                {multisigsQuery.error instanceof Error 
+                  ? multisigsQuery.error.message 
+                  : "Could not load Squads accounts from RPC."}
+              </p>
               <button
                 type="button"
                 onClick={() => multisigsQuery.refetch()}
