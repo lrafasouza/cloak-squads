@@ -52,3 +52,36 @@ model ProposalDraft {
   @@unique([cofreAddress, transactionIndex])
   @@index([cofreAddress])
 }
+
+model PayrollDraft {
+  id               String   @id @default(uuid())
+  cofreAddress     String
+  transactionIndex String
+  memo             String?
+  totalAmount      String
+  recipientCount   Int
+  createdAt        DateTime @default(now())
+
+  recipients PayrollRecipient[]
+
+  @@unique([cofreAddress, transactionIndex])
+  @@index([cofreAddress])
+}
+
+model PayrollRecipient {
+  id              String @id @default(uuid())
+  payrollDraftId  String
+  name            String
+  wallet          String
+  amount          String
+  memo            String?
+  payloadHash     Bytes
+  invariants      String
+  commitmentClaim String?
+  signature       String?
+  createdAt       DateTime @default(now())
+
+  payrollDraft PayrollDraft @relation(fields: [payrollDraftId], references: [id], onDelete: Cascade)
+
+  @@index([payrollDraftId])
+}

@@ -73,9 +73,18 @@ The commitment verification card uses `computeCommitment` from `@cloak.dev/sdk-d
 
 ---
 
-## F2 — Payroll (PENDING)
+## F2 — Payroll
 
 Batch private sends via CSV upload. One Squads proposal contains N `issue_license` instructions. Page: `/cofre/[multisig]/payroll`.
+
+1. Navigate to `/cofre/[multisig]/payroll`
+2. Upload a CSV with columns: `name,wallet,amount,memo` (max 10 recipients in V1)
+3. Review the preview table with total amount and fee estimate
+4. Click "Create payroll proposal" — builds a Squads vault transaction with N `issue_license` instructions
+5. Signers approve as usual on the proposal page (shows batch table with all recipients)
+6. Once approved, execute the vault transaction — all licenses are issued in one go
+7. Operator loads the proposal on `/cofre/[multisig]/operator` and executes chained `execute_with_license` for each recipient
+8. Progress bar shows execution status; on failure, "Retry" button resumes from failed step
 
 ## F3 — Audit Admin (PENDING)
 

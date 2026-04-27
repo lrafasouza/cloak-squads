@@ -15,6 +15,9 @@ type DraftSummary = {
   recipient: string;
   memo: string;
   createdAt: string;
+  type: "single" | "payroll";
+  recipientCount?: number;
+  totalAmount?: string;
 };
 
 function truncateAddress(address: string) {
@@ -57,10 +60,30 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
   const loadDrafts = useCallback(async () => {
     if (!multisigAddress) return;
     try {
-      const response = await fetch(`/api/proposals/${encodeURIComponent(multisigAddress.toBase58())}`);
-      if (response.ok) {
-        setDrafts((await response.json()) as DraftSummary[]);
-      }
+      const [singleRes, payrollRes] = await Promise.all([
+        fetch(`/api/proposals/${encodeURIComponent(multisigAddress.toBase58())}`),
+        fetch(`/api/payrolls/${encodeURIComponent(multisigAddress.toBase58())}`),
+      ]);
+
+      const singleDrafts: DraftSummary[] = singleRes.ok
+        ? ((await singleRes.json()) as DraftSummary[]).map((d) => ({ ...d, type: "single" as const }))
+        : [];
+      const payrollDrafts: DraftSummary[] = payrollRes.ok
+        ? ((await payrollRes.json()) as DraftSummary[]).map((d) =>
+            ({
+              ...d,
+              type: "payroll" as const,
+              recipientCount: d.recipientCount ?? 0,
+              totalAmount: d.totalAmount ?? "0",
+              amount: d.totalAmount ?? "0",
+              recipient: `${d.recipientCount ?? 0} recipients`,
+            }))
+        : [];
+
+      const all = [...singleDrafts, ...payrollDrafts].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+      setDrafts(all);
     } catch {
       // ignore
     } finally {
@@ -120,6 +143,12 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
               className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
             >
               Prepare send
+            </Link>
+            <Link
+              href={`/cofre/${multisigAddress.toBase58()}/payroll`}
+              className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+            >
+              Payroll
             </Link>
             <Link
               href={`/cofre/${multisigAddress.toBase58()}/operator`}
@@ -202,17 +231,24 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                         href={`/cofre/${multisigAddress.toBase58()}/proposals/${d.transactionIndex}`}
                         className="flex items-center justify-between rounded-md border border-neutral-800 p-3 transition hover:border-neutral-700 hover:bg-neutral-800/50"
                       >
-                        <div>
-                          <p className="font-mono text-sm text-neutral-100">
-                            #{d.transactionIndex}
-                          </p>
-                          <p className="mt-1 text-xs text-neutral-400">
-                            {Number(d.amount).toLocaleString()} lamports → {truncateAddress(d.recipient)}
-                          </p>
-                        </div>
-                        <span className="text-xs text-neutral-500">
-                          {new Date(d.createdAt).toLocaleDateString()}
-                        </span>
+                         <div>
+                           <p className="font-mono text-sm text-neutral-100">
+                             #{d.transactionIndex}
+                             {d.type === "payroll" && (
+                               <span className="ml-2 rounded bg-emerald-900 px-1.5 py-0.5 text-xs text-emerald-200">
+                                 payroll
+                               </span>
+                             )}
+                           </p>
+                           <p className="mt-1 text-xs text-neutral-400">
+                             {d.type === "payroll"
+                               ? `${d.recipientCount} recipients, ${Number(d.totalAmount ?? d.amount).toLocaleString()} lamports total`
+                               : `${Number(d.amount).toLocaleString()} lamports → ${truncateAddress(d.recipient)}`}
+                           </p>
+                         </div>
+                         <span className="text-xs text-neutral-500">
+                           {new Date(d.createdAt).toLocaleDateString()}
+                         </span>
                       </Link>
                     </li>
                   ))}

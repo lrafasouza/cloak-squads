@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 
-type ProposalDraft = {
+type SingleDraft = {
   amount: string;
   recipient: string;
   memo: string;
@@ -29,6 +29,36 @@ type ProposalDraft = {
   };
 };
 
+type PayrollRecipient = {
+  id: string;
+  name: string;
+  wallet: string;
+  amount: string;
+  memo?: string;
+  payloadHash: number[];
+  invariants: {
+    nullifier: number[];
+    commitment: number[];
+    amount: string;
+    tokenMint: string;
+    recipientVkPub: number[];
+    nonce: number[];
+  };
+};
+
+type PayrollDraft = {
+  totalAmount: string;
+  recipientCount: number;
+  recipients: PayrollRecipient[];
+};
+
+type ExecutionStep = {
+  index: number;
+  status: "pending" | "running" | "success" | "error";
+  signature?: string | undefined;
+  error?: string | undefined;
+};
+
 export default function OperatorPage({ params }: { params: Promise<{ multisig: string }> }) {
   const { multisig } = use(params);
   const { connection } = useConnection();
@@ -41,8 +71,11 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
   const [pending, setPending] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loadedDraft, setLoadedDraft] = useState<ProposalDraft | null>(null);
+  const [loadedDraft, setLoadedDraft] = useState<SingleDraft | null>(null);
+  const [payrollDraft, setPayrollDraft] = useState<PayrollDraft | null>(null);
   const [registeredOperator, setRegisteredOperator] = useState<string | null>(null);
+  const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
+  const [executing, setExecuting] = useState(false);
 
   const multisigAddress = useMemo(() => {
     try {
@@ -79,25 +112,95 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
 
   async function loadDraft() {
     if (!txIndex || !multisig) return;
+    setLoadedDraft(null);
+    setPayrollDraft(null);
+    setError(null);
+    setSignature(null);
+    setExecutionSteps([]);
+
     try {
-      const response = await fetch(
+      // Try single draft first
+      const singleResponse = await fetch(
         `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(txIndex)}`,
       );
-      if (response.status === 404) {
-        setLoadedDraft(null);
-        setError(`No persisted draft found for proposal #${txIndex}. Create it from the Send page first.`);
+      if (singleResponse.ok) {
+        const draft = (await singleResponse.json()) as SingleDraft;
+        setLoadedDraft(draft);
         return;
       }
-      if (!response.ok) {
-        throw new Error("Could not load proposal draft.");
+
+      // Try payroll draft
+      const payrollResponse = await fetch(
+        `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(txIndex)}`,
+      );
+      if (payrollResponse.ok) {
+        const draft = (await payrollResponse.json()) as PayrollDraft;
+        setPayrollDraft(draft);
+        setExecutionSteps(
+          draft.recipients.map((_, i) => ({ index: i, status: "pending" })),
+        );
+        return;
       }
-      const draft = (await response.json()) as ProposalDraft;
-      setLoadedDraft(draft);
-      setError(null);
+
+      setError(`No persisted draft found for proposal #${txIndex}. Create it from the Send or Payroll page first.`);
     } catch (caught) {
-      setLoadedDraft(null);
       setError(caught instanceof Error ? caught.message : "Could not load proposal draft.");
     }
+  }
+
+  async function executeSingle(draft: SingleDraft) {
+    if (!wallet.publicKey || !multisigAddress) return;
+
+    const nullifier = Uint8Array.from(draft.invariants.nullifier);
+    const commitment = Uint8Array.from(draft.invariants.commitment);
+    const amount = BigInt(draft.invariants.amount);
+    const tokenMint = new PublicKey(draft.invariants.tokenMint);
+    const recipientVkPub = Uint8Array.from(draft.invariants.recipientVkPub);
+    const nonce = Uint8Array.from(draft.invariants.nonce);
+
+    const cloakProgram = new PublicKey(publicEnv.NEXT_PUBLIC_CLOAK_MOCK_PROGRAM_ID);
+
+    const [pool] = PublicKey.findProgramAddressSync(
+      [Buffer.from("stub_pool"), tokenMint.toBuffer()],
+      cloakProgram,
+    );
+    const [nullifierRecord] = PublicKey.findProgramAddressSync(
+      [Buffer.from("nullifier"), nullifier],
+      cloakProgram,
+    );
+
+    const ix = await buildExecuteWithLicenseIxBrowser({
+      multisig: multisigAddress,
+      operator: wallet.publicKey,
+      invariants: { nullifier, commitment, amount, tokenMint, recipientVkPub, nonce },
+      proofBytes: new Uint8Array(256).fill(0),
+      merkleRoot: new Uint8Array(32).fill(0),
+      cloakProgram,
+      pool,
+      nullifierRecord,
+    });
+
+    const tx = new Transaction().add(
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1000 }),
+      ix,
+    );
+    tx.feePayer = wallet.publicKey;
+    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+    const sim = await connection.simulateTransaction(tx, undefined, true);
+    if (sim.value.err) {
+      throw new Error(
+        `Simulation failed: ${JSON.stringify(sim.value.err)} | ${(sim.value.logs ?? []).join(" || ")}`,
+      );
+    }
+
+    const sig = await wallet.sendTransaction(tx, connection);
+
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+
+    return sig;
   }
 
   async function execute(event: FormEvent<HTMLFormElement>) {
@@ -109,66 +212,121 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
     try {
       if (!wallet.publicKey) throw new Error("Connect an operator wallet.");
       if (!multisigAddress) throw new Error("Invalid multisig address.");
-      if (!loadedDraft) throw new Error("Load a proposal draft first.");
 
-      const draft = loadedDraft;
-      const nullifier = Uint8Array.from(draft.invariants.nullifier);
-      const commitment = Uint8Array.from(draft.invariants.commitment);
-      const amount = BigInt(draft.invariants.amount);
-      const tokenMint = new PublicKey(draft.invariants.tokenMint);
-      const recipientVkPub = Uint8Array.from(draft.invariants.recipientVkPub);
-      const nonce = Uint8Array.from(draft.invariants.nonce);
-
-      const cloakProgram = new PublicKey(publicEnv.NEXT_PUBLIC_CLOAK_MOCK_PROGRAM_ID);
-
-      const [pool] = PublicKey.findProgramAddressSync(
-        [Buffer.from("stub_pool"), tokenMint.toBuffer()],
-        cloakProgram,
-      );
-      const [nullifierRecord] = PublicKey.findProgramAddressSync(
-        [Buffer.from("nullifier"), nullifier],
-        cloakProgram,
-      );
-
-      const ix = await buildExecuteWithLicenseIxBrowser({
-        multisig: multisigAddress,
-        operator: wallet.publicKey,
-        invariants: { nullifier, commitment, amount, tokenMint, recipientVkPub, nonce },
-        proofBytes: new Uint8Array(256).fill(0),
-        merkleRoot: new Uint8Array(32).fill(0),
-        cloakProgram,
-        pool,
-        nullifierRecord,
-      });
-
-      const tx = new Transaction().add(
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1000 }),
-        ix,
-      );
-      tx.feePayer = wallet.publicKey;
-      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
-      const sim = await connection.simulateTransaction(tx, undefined, true);
-      console.log("[operator] simulate:", sim);
-      if (sim.value.err) {
-        throw new Error(
-          `Simulation failed: ${JSON.stringify(sim.value.err)} | ${(sim.value.logs ?? []).join(" || ")}`,
-        );
+      if (loadedDraft) {
+        const sig = await executeSingle(loadedDraft);
+        setSignature(sig ?? null);
+      } else if (payrollDraft) {
+        // Chained execution
+        await executePayroll();
+      } else {
+        throw new Error("Load a proposal draft first.");
       }
-
-      const sig = await wallet.sendTransaction(tx, connection);
-
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-      await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
-
-      setSignature(sig);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not execute with license.");
     } finally {
       setPending(false);
+      setExecuting(false);
     }
   }
+
+  async function executePayroll() {
+    if (!payrollDraft || !wallet.publicKey || !multisigAddress) return;
+
+    setExecuting(true);
+    const steps = payrollDraft.recipients.map((_, i) => ({ index: i, status: "pending" as const }));
+    setExecutionSteps(steps);
+
+    for (let i = 0; i < payrollDraft.recipients.length; i++) {
+      // Update current step to running
+      setExecutionSteps((prev) =>
+        prev.map((s) => (s.index === i ? { ...s, status: "running" } : s)),
+      );
+
+      try {
+        const recipient = payrollDraft.recipients[i]!;
+        const sig = await executeSingle({
+          amount: recipient.amount,
+          recipient: recipient.wallet,
+          memo: recipient.memo ?? "",
+          payloadHash: recipient.payloadHash,
+          invariants: recipient.invariants,
+        });
+
+        setExecutionSteps((prev) =>
+          prev.map((s) =>
+            s.index === i ? { ...s, status: "success", signature: sig } : s,
+          ),
+        );
+      } catch (caught) {
+        const errorMsg = caught instanceof Error ? caught.message : "Execution failed";
+        setExecutionSteps((prev) =>
+          prev.map((s) =>
+            s.index === i ? { ...s, status: "error", error: errorMsg } : s,
+          ),
+        );
+        setError(`Execution failed at step ${i + 1}/${payrollDraft.recipients.length}: ${errorMsg}`);
+        break;
+      }
+    }
+  }
+
+  function retryFromStep(stepIndex: number) {
+    if (!payrollDraft) return;
+
+    // Reset steps from stepIndex onwards
+    setExecutionSteps((prev) =>
+      prev.map((s) =>
+        s.index >= stepIndex ? { ...s, status: "pending", signature: undefined, error: undefined } : s,
+      ),
+    );
+    setError(null);
+
+    // Re-run from stepIndex
+    setExecuting(true);
+    void runFromStep(stepIndex);
+  }
+
+  async function runFromStep(startIndex: number) {
+    if (!payrollDraft || !wallet.publicKey || !multisigAddress) return;
+
+    for (let i = startIndex; i < payrollDraft.recipients.length; i++) {
+      setExecutionSteps((prev) =>
+        prev.map((s) => (s.index === i ? { ...s, status: "running" } : s)),
+      );
+
+      try {
+        const recipient = payrollDraft.recipients[i]!;
+        const sig = await executeSingle({
+          amount: recipient.amount,
+          recipient: recipient.wallet,
+          memo: recipient.memo ?? "",
+          payloadHash: recipient.payloadHash,
+          invariants: recipient.invariants,
+        });
+
+        setExecutionSteps((prev) =>
+          prev.map((s) =>
+            s.index === i ? { ...s, status: "success", signature: sig } : s,
+          ),
+        );
+      } catch (caught) {
+        const errorMsg = caught instanceof Error ? caught.message : "Execution failed";
+        setExecutionSteps((prev) =>
+          prev.map((s) =>
+            s.index === i ? { ...s, status: "error", error: errorMsg } : s,
+          ),
+        );
+        setError(`Execution failed at step ${i + 1}/${payrollDraft.recipients.length}: ${errorMsg}`);
+        break;
+      }
+    }
+
+    setExecuting(false);
+  }
+
+  const successCount = executionSteps.filter((s) => s.status === "success").length;
+  const isPayroll = payrollDraft !== null;
 
   if (!multisigAddress) {
     return (
@@ -192,12 +350,12 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
 
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
-          <p className="text-sm font-medium text-emerald-300">F1 operator</p>
+          <p className="text-sm font-medium text-emerald-300">Operator</p>
           <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Execute with license</h1>
           <p className="mt-3 text-sm leading-6 text-neutral-300">
             The operator wallet consumes an approved+executed license, calling
             <code className="mx-1 text-emerald-300">execute_with_license</code> on the gatekeeper.
-            Load a proposal draft created from the Send page, then execute.
+            Load a proposal draft created from the Send or Payroll page, then execute.
           </p>
         </div>
 
@@ -269,14 +427,89 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
             </section>
           ) : null}
 
+          {isPayroll && payrollDraft ? (
+            <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+              <h2 className="mb-3 text-base font-semibold text-neutral-50">
+                Payroll batch — {payrollDraft.recipientCount} recipients
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-800 text-left">
+                      <th className="pb-2 pr-4 text-neutral-400">#</th>
+                      <th className="pb-2 pr-4 text-neutral-400">Name</th>
+                      <th className="pb-2 pr-4 text-neutral-400 text-right">Amount</th>
+                      <th className="pb-2 text-neutral-400">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-800">
+                    {payrollDraft.recipients.map((r, i) => {
+                      const step = executionSteps[i];
+                      return (
+                        <tr key={r.id}>
+                          <td className="py-2 pr-4 text-neutral-400">{i + 1}</td>
+                          <td className="py-2 pr-4 text-neutral-100">{r.name}</td>
+                          <td className="py-2 pr-4 text-right font-mono text-neutral-100">
+                            {Number(r.amount).toLocaleString()}
+                          </td>
+                          <td className="py-2">
+                            {!step || step.status === "pending" ? (
+                              <span className="text-neutral-400">Pending</span>
+                            ) : step.status === "running" ? (
+                              <span className="text-amber-300">Running…</span>
+                            ) : step.status === "success" ? (
+                              <span className="text-emerald-300">Done</span>
+                            ) : (
+                              <div>
+                                <span className="text-red-300">Failed</span>
+                                <button
+                                  type="button"
+                                  onClick={() => retryFromStep(i)}
+                                  disabled={executing}
+                                  className="ml-2 text-xs text-emerald-300 hover:text-emerald-200 disabled:text-neutral-500"
+                                >
+                                  Retry
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {executionSteps.length > 0 && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-xs text-neutral-400">
+                    <span>Progress</span>
+                    <span>{successCount}/{payrollDraft.recipientCount}</span>
+                  </div>
+                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-neutral-800">
+                    <div
+                      className="h-full bg-emerald-400 transition-all"
+                      style={{
+                        width: `${(successCount / payrollDraft.recipientCount) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
+          ) : null}
+
           <form onSubmit={execute} className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
             <h2 className="mb-4 text-base font-semibold text-neutral-50">Execute</h2>
             <p className="mb-4 text-xs text-neutral-400">
               Uses mock proof (256 zero bytes) and mock merkle root (32 zero bytes).
               Connect the operator wallet (different from the Squads member).
             </p>
-            <Button type="submit" disabled={pending || !loadedDraft || !wallet.publicKey || operatorMismatch}>
-              {pending ? "Executing..." : "Execute with license"}
+            <Button
+              type="submit"
+              disabled={pending || (!loadedDraft && !payrollDraft) || !wallet.publicKey || operatorMismatch}
+            >
+              {pending ? (isPayroll ? "Executing batch…" : "Executing…") : (isPayroll ? "Execute batch" : "Execute with license")}
             </Button>
             {!wallet.publicKey ? (
               <p className="mt-2 text-xs text-amber-300">Connect an operator wallet first.</p>
@@ -284,7 +517,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
             {operatorMismatch && wallet.publicKey ? (
               <p className="mt-2 text-xs text-amber-300">Wrong wallet. Switch to the registered operator.</p>
             ) : null}
-            {!loadedDraft ? (
+            {!loadedDraft && !payrollDraft ? (
               <p className="mt-2 text-xs text-amber-300">Load a proposal draft above.</p>
             ) : null}
           </form>
@@ -295,7 +528,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
             </section>
           ) : null}
 
-          {signature ? (
+          {signature && !isPayroll ? (
             <section className="rounded-md border border-emerald-900 bg-emerald-950 p-3">
               <p className="text-sm font-medium text-emerald-200">License consumed</p>
               <p className="mt-2 break-all font-mono text-xs text-emerald-100">{signature}</p>
