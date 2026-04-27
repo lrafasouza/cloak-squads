@@ -1,7 +1,9 @@
 import { Prisma } from "@prisma/client";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { serializeDraft } from "@/lib/serialize-proposal-draft";
 
 const byteArraySchema = z.array(z.number().int().min(0).max(255));
@@ -26,6 +28,12 @@ const proposalDraftSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const hdrs = await headers();
+  const ip = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
