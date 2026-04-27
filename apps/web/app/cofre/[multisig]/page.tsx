@@ -157,6 +157,12 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
               Audit
             </Link>
             <Link
+              href={`/cofre/${multisigAddress.toBase58()}/invoice`}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-neutral-700 bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+            >
+              Invoice
+            </Link>
+            <Link
               href={`/cofre/${multisigAddress.toBase58()}/operator`}
               className="inline-flex min-h-10 items-center justify-center rounded-md border border-neutral-700 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
             >

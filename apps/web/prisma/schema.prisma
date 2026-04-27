@@ -24,6 +24,7 @@ model AuditLink {
 model StealthInvoice {
   id                  String   @id @default(uuid())
   cofreAddress        String
+  recipientWallet     String
   invoiceRef          String?
   memo                String?
   stealthPubkey       String
