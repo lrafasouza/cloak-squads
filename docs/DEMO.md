@@ -86,10 +86,24 @@ Batch private sends via CSV upload. One Squads proposal contains N `issue_licens
 7. Operator loads the proposal on `/cofre/[multisig]/operator` and executes chained `execute_with_license` for each recipient
 8. Progress bar shows execution status; on failure, "Retry" button resumes from failed step
 
-## F3 — Audit Admin (PENDING)
+## F3 — Audit Admin
 
-Diversifier-based audit dashboard for cofre admins. Scope: full, amounts-only, time-ranged.
+1. Navigate to `/cofre/[multisig]/audit`
+2. Connect wallet (must be a cofre member)
+3. Select scope:
+   - **Full**: all transaction details including amounts and addresses
+   - **Amounts Only**: transaction amounts only (addresses redacted)
+   - **Time Ranged**: filter by date range
+4. Set expiration (1-365 days)
+5. Sign message to authorize
+6. Link is generated and displayed
 
-## F3.5 — Public Audit Link (PENDING)
+## F3.5 — Public Audit Link
 
-Shareable link with view-only access to audit proofs for a specific diversifier.
+Shareable URL format: `/audit/{linkId}#{secret}`
+
+- Anyone with the link can view scoped audit data
+- No wallet or authentication required
+- Secret in URL fragment decrypts the diversifier client-side
+- Link expires automatically after the set duration
+- Admins can revoke links from the Audit Admin dashboard
