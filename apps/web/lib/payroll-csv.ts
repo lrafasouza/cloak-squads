@@ -1,9 +1,32 @@
+import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
+
+const MAX_U64 = "18446744073709551615";
+
+function isValidSolanaAddress(address: string): boolean {
+  try {
+    const pk = new PublicKey(address);
+    return PublicKey.isOnCurve(pk.toBytes());
+  } catch {
+    return false;
+  }
+}
 
 export const payrollRecipientSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
-  wallet: z.string().min(32, "Invalid wallet address").max(44),
-  amount: z.string().regex(/^\d+$/, "Amount must be a positive integer in lamports"),
+  wallet: z.string().refine(isValidSolanaAddress, {
+    message: "Invalid Solana wallet address",
+  }),
+  amount: z.string().regex(/^\d+$/, "Amount must be a positive integer in lamports").refine(
+    (val) => {
+      try {
+        return BigInt(val) <= BigInt(MAX_U64) && BigInt(val) > 0n;
+      } catch {
+        return false;
+      }
+    },
+    { message: "Amount must be between 1 and " + MAX_U64 },
+  ),
   memo: z.string().max(200).optional(),
 });
 
@@ -67,6 +90,20 @@ export function parsePayrollCsv(csvText: string): { data: PayrollRecipientInput[
     return { data: null, errors };
   }
 
+  // Check for duplicate wallets
+  const walletSet = new Set<string>();
+  const duplicates: string[] = [];
+  for (const r of recipients) {
+    if (walletSet.has(r.wallet)) {
+      duplicates.push(r.wallet);
+    } else {
+      walletSet.add(r.wallet);
+    }
+  }
+  if (duplicates.length > 0) {
+    errors.push(`Duplicate wallets found: ${[...new Set(duplicates)].join(", ")}`);
+  }
+
   if (recipients.length > 10) {
     errors.push(`Maximum 10 recipients allowed in V1. Found ${recipients.length}. Only the first 10 will be used.`);
     return { data: recipients.slice(0, 10), errors };
@@ -76,5 +113,5 @@ export function parsePayrollCsv(csvText: string): { data: PayrollRecipientInput[
 }
 
 export function formatPayrollCsvTemplate(): string {
-  return "name,wallet,amount,memo\nAlice,7nY7H...abc,1000000,Monthly salary\nBob,8oZ8I...def,2000000,Bonus";
+  return "name,wallet,amount,memo\nAlice,7SrukWUsDNwpqqtN2p8zAeQe9A689jVYFUi9gSfseWir,1000000,Monthly salary\nBob,BsPyL4w7vR8DsFxVK6RM4oDjzdNJt7eDfC9BnMRzLop3,2000000,Bonus";
 }

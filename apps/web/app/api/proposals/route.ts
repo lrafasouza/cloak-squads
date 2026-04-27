@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { headers } from "next/headers";
+import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -8,23 +9,69 @@ import { serializeDraft } from "@/lib/serialize-proposal-draft";
 
 const byteArraySchema = z.array(z.number().int().min(0).max(255));
 
+const commitmentClaimSchema = z.object({
+  amount: z.number().int().positive(),
+  r: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  sk_spend: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  commitment: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  recipient_vk: z.string().min(32).max(44),
+  token_mint: z.string().min(32).max(44),
+});
+
 const proposalDraftSchema = z.object({
-  cofreAddress: z.string().min(32),
+  cofreAddress: z.string().refine(
+    (val) => {
+      try {
+        return PublicKey.isOnCurve(new PublicKey(val).toBytes());
+      } catch {
+        return false;
+      }
+    },
+    { message: "Invalid cofre address" },
+  ),
   transactionIndex: z.string().regex(/^\d+$/),
-  amount: z.string().regex(/^\d+$/),
-  recipient: z.string().min(32),
-  memo: z.string().optional(),
+  amount: z.string().regex(/^\d+$/).refine(
+    (val) => {
+      try {
+        const n = BigInt(val);
+        return n > 0n && n <= BigInt("18446744073709551615");
+      } catch {
+        return false;
+      }
+    },
+    { message: "Amount out of valid range" },
+  ),
+  recipient: z.string().refine(
+    (val) => {
+      try {
+        return PublicKey.isOnCurve(new PublicKey(val).toBytes());
+      } catch {
+        return false;
+      }
+    },
+    { message: "Invalid recipient address" },
+  ),
+  memo: z.string().max(200).optional(),
   payloadHash: byteArraySchema.length(32),
   invariants: z.object({
     nullifier: byteArraySchema.length(32),
     commitment: byteArraySchema.length(32),
     amount: z.string().regex(/^\d+$/),
-    tokenMint: z.string().min(32),
+    tokenMint: z.string().refine(
+      (val) => {
+        try {
+          return PublicKey.isOnCurve(new PublicKey(val).toBytes());
+        } catch {
+          return false;
+        }
+      },
+      { message: "Invalid token mint" },
+    ),
     recipientVkPub: byteArraySchema.length(32),
     nonce: byteArraySchema.length(16),
   }),
-  commitmentClaim: z.unknown().optional(),
-  signature: z.string().optional(),
+  commitmentClaim: commitmentClaimSchema.optional(),
+  signature: z.string().min(32).max(128).optional(),
 });
 
 export async function POST(request: Request) {

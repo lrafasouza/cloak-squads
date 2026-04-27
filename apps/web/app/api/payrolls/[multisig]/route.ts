@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { PublicKey } from "@solana/web3.js";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
@@ -8,10 +9,17 @@ export async function GET(
   const { multisig } = await params;
 
   try {
+    // Validate multisig address
+    new PublicKey(multisig);
+  } catch {
+    return NextResponse.json({ error: "Invalid multisig address." }, { status: 400 });
+  }
+
+  try {
     const drafts = await prisma.payrollDraft.findMany({
       where: { cofreAddress: multisig },
-      include: { recipients: true },
       orderBy: { createdAt: "desc" },
+      take: 100, // Limit to prevent abuse
     });
 
     return NextResponse.json(
