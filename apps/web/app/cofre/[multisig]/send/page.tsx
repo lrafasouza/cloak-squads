@@ -1,6 +1,5 @@
 "use client";
 
-import { commitmentBigintToBytes } from "@cloak-squads/core/commitment";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import { computeCommitment } from "@cloak.dev/sdk-devnet";
@@ -67,21 +66,25 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       const recipientPubkey = new PublicKey(recipient.trim());
       setProofStep("generate-witness");
 
-      const note = {
-        r: bytesToHex(randomBytes(32)),
-        sk_spend: bytesToHex(randomBytes(32)),
-      };
-      const commitment = commitmentBigintToBytes(
-        await computeCommitment(
-          BigInt(amount),
-          BigInt(`0x${note.r}`),
-          BigInt(`0x${note.sk_spend}`),
-        ),
+      const r = bytesToHex(randomBytes(32));
+      const sk_spend = bytesToHex(randomBytes(32));
+      
+      // Compute commitment using SDK (deterministic from r and sk_spend)
+      const commitmentBigInt = await computeCommitment(
+        BigInt(amount),
+        BigInt("0x" + r),
+        BigInt("0x" + sk_spend),
       );
-      const commitmentHex = bytesToHex(commitment);
+      const commitment = commitmentBigInt.toString(16).padStart(64, "0");
+      
+      const note = {
+        commitment,
+        r,
+        sk_spend,
+      };
       const invariants: PayloadInvariants = {
         nullifier: randomBytes(32),
-        commitment,
+        commitment: hexToBytes(commitment),
         amount: BigInt(amount),
         tokenMint: SystemProgram.programId,
         recipientVkPub: recipientPubkey.toBytes(),
