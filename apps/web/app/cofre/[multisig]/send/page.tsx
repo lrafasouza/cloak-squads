@@ -107,6 +107,14 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       });
 
       const transactionIndex = result.transactionIndex.toString();
+      const claim = {
+        amount: Number(invariants.amount),
+        r: note.r,
+        sk_spend: note.sk_spend,
+        commitment: note.commitment,
+        recipient_vk: recipientPubkey.toBase58(),
+        token_mint: SystemProgram.programId.toBase58(),
+      };
       const draft = {
         cofreAddress: multisigAddress.toBase58(),
         transactionIndex,
@@ -122,6 +130,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
           recipientVkPub: Array.from(invariants.recipientVkPub),
           nonce: Array.from(invariants.nonce),
         },
+        commitmentClaim: claim,
         signature: result.signature,
       };
       const draftResponse = await fetch("/api/proposals", {
@@ -136,14 +145,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
 
       setPayloadHash(bytesToHex(hash));
 
-      const claim = {
-        amount: Number(invariants.amount),
-        r: note.r,
-        sk_spend: note.sk_spend,
-        commitment: note.commitment,
-        recipient_vk: recipientPubkey.toBase58(),
-        token_mint: SystemProgram.programId.toBase58(),
-      };
       try {
         sessionStorage.setItem(
           `claim:${multisigAddress.toBase58()}:${transactionIndex}`,
