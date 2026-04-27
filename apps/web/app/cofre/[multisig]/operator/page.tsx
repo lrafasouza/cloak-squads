@@ -169,12 +169,17 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
       cloakProgram,
     );
 
+    // TODO: Replace mock proofs with real ZK proofs before mainnet.
+    // This is safe for devnet/testing only. Real implementation needs:
+    // 1. Generate proof from Cloak SDK (proveOwnership + proveTransfer)
+    // 2. Build merkle root from on-chain shielded pool state
+    // 3. Use actual circuit artifacts (Groth16)
     const ix = await buildExecuteWithLicenseIxBrowser({
       multisig: multisigAddress,
       operator: wallet.publicKey,
       invariants: { nullifier, commitment, amount, tokenMint, recipientVkPub, nonce },
-      proofBytes: new Uint8Array(256).fill(0),
-      merkleRoot: new Uint8Array(32).fill(0),
+      proofBytes: new Uint8Array(256).fill(0), // MOCK — replace with real proof
+      merkleRoot: new Uint8Array(32).fill(0),  // MOCK — replace with real merkle root
       cloakProgram,
       pool,
       nullifierRecord,

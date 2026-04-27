@@ -5,6 +5,16 @@ import type { Connection, PublicKey, SendOptions, Signer, TransactionInstruction
 import { Transaction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 
+const IS_DEV = process.env.NODE_ENV === "development";
+
+function log(...args: unknown[]) {
+  if (IS_DEV) console.log(...args);
+}
+
+function logError(...args: unknown[]) {
+  if (IS_DEV) console.error(...args);
+}
+
 export type BrowserSquadsWallet = {
   publicKey: PublicKey | null;
   sendTransaction?: (
@@ -82,16 +92,16 @@ export async function createIssueLicenseProposal(params: {
 
   try {
     const sim = await params.connection.simulateTransaction(tx, undefined, true);
-    console.log("[squads-sdk] simulate result:", sim);
+    log("[squads-sdk] simulate result:", sim);
     if (sim.value.err) {
-      console.error("[squads-sdk] simulate error:", sim.value.err);
-      console.error("[squads-sdk] simulate logs:", sim.value.logs);
+      logError("[squads-sdk] simulate error:", sim.value.err);
+      logError("[squads-sdk] simulate logs:", sim.value.logs);
       throw new Error(
         `Simulation failed: ${JSON.stringify(sim.value.err)} | logs: ${(sim.value.logs ?? []).join(" || ")}`,
       );
     }
   } catch (simErr) {
-    console.error("[squads-sdk] simulate threw:", simErr);
+    logError("[squads-sdk] simulate threw:", simErr);
     throw simErr;
   }
 
@@ -99,23 +109,23 @@ export async function createIssueLicenseProposal(params: {
   try {
     signature = await params.wallet.sendTransaction(tx, params.connection);
   } catch (sendErr) {
-    console.error("[squads-sdk] sendTransaction error:", sendErr);
+    logError("[squads-sdk] sendTransaction error:", sendErr);
     if (sendErr && typeof sendErr === "object") {
       const anyErr = sendErr as { logs?: unknown; cause?: unknown; message?: unknown };
-      console.error("[squads-sdk]   .logs:", anyErr.logs);
-      console.error("[squads-sdk]   .cause:", anyErr.cause);
-      console.error("[squads-sdk]   .message:", anyErr.message);
+      logError("[squads-sdk]   .logs:", anyErr.logs);
+      logError("[squads-sdk]   .cause:", anyErr.cause);
+      logError("[squads-sdk]   .message:", anyErr.message);
     }
     throw sendErr;
   }
 
-  console.log("[squads-sdk] awaiting confirmation:", signature);
+  log("[squads-sdk] awaiting confirmation:", signature);
   const { blockhash: confirmBh, lastValidBlockHeight } = await params.connection.getLatestBlockhash();
   await params.connection.confirmTransaction(
     { signature, blockhash: confirmBh, lastValidBlockHeight },
     "confirmed",
   );
-  console.log("[squads-sdk] confirmed:", signature);
+  log("[squads-sdk] confirmed:", signature);
 
   const [vaultTransactionPda] = multisig.getTransactionPda({
     multisigPda: params.multisigPda,
@@ -165,16 +175,16 @@ export async function createBatchIssueLicenseProposal(params: {
 
   try {
     const sim = await params.connection.simulateTransaction(tx, undefined, true);
-    console.log("[squads-sdk] batch simulate result:", sim);
+    log("[squads-sdk] batch simulate result:", sim);
     if (sim.value.err) {
-      console.error("[squads-sdk] batch simulate error:", sim.value.err);
-      console.error("[squads-sdk] batch simulate logs:", sim.value.logs);
+      logError("[squads-sdk] batch simulate error:", sim.value.err);
+      logError("[squads-sdk] batch simulate logs:", sim.value.logs);
       throw new Error(
         `Batch simulation failed: ${JSON.stringify(sim.value.err)} | logs: ${(sim.value.logs ?? []).join(" || ")}`,
       );
     }
   } catch (simErr) {
-    console.error("[squads-sdk] batch simulate threw:", simErr);
+    logError("[squads-sdk] batch simulate threw:", simErr);
     throw simErr;
   }
 
@@ -182,17 +192,17 @@ export async function createBatchIssueLicenseProposal(params: {
   try {
     signature = await params.wallet.sendTransaction(tx, params.connection);
   } catch (sendErr) {
-    console.error("[squads-sdk] batch sendTransaction error:", sendErr);
+    logError("[squads-sdk] batch sendTransaction error:", sendErr);
     throw sendErr;
   }
 
-  console.log("[squads-sdk] batch awaiting confirmation:", signature);
+  log("[squads-sdk] batch awaiting confirmation:", signature);
   const { blockhash: confirmBh, lastValidBlockHeight } = await params.connection.getLatestBlockhash();
   await params.connection.confirmTransaction(
     { signature, blockhash: confirmBh, lastValidBlockHeight },
     "confirmed",
   );
-  console.log("[squads-sdk] batch confirmed:", signature);
+  log("[squads-sdk] batch confirmed:", signature);
 
   const [vaultTransactionPda] = multisig.getTransactionPda({
     multisigPda: params.multisigPda,
@@ -245,7 +255,7 @@ export async function vaultTransactionExecute(params: {
   transactionIndex: bigint;
 }) {
   assertBrowserSquadsWallet(params.wallet);
-  console.log("[squads-sdk] vaultTransactionExecute start", {
+  log("[squads-sdk] vaultTransactionExecute start", {
     multisig: params.multisigPda.toBase58(),
     transactionIndex: params.transactionIndex.toString(),
     member: params.wallet.publicKey.toBase58(),
@@ -260,9 +270,9 @@ export async function vaultTransactionExecute(params: {
       params.connection,
       proposalPda,
     );
-    console.log("[squads-sdk] proposal status:", proposal.status, "approved:", proposal.approved.length);
+    log("[squads-sdk] proposal status:", proposal.status, "approved:", proposal.approved.length);
   } catch (err) {
-    console.error("[squads-sdk] could not load proposal — was it created?", err);
+    logError("[squads-sdk] could not load proposal — was it created?", err);
     throw new Error(
       "Proposal not found on-chain. Did you create + approve it before executing?",
     );
@@ -287,28 +297,28 @@ export async function vaultTransactionExecute(params: {
       sigVerify: false,
       replaceRecentBlockhash: true,
     });
-    console.log("[squads-sdk] execute simulate result:", sim);
+    log("[squads-sdk] execute simulate result:", sim);
     if (sim.value.err) {
-      console.error("[squads-sdk] execute simulate error:", sim.value.err);
-      console.error("[squads-sdk] execute simulate logs:", sim.value.logs);
+      logError("[squads-sdk] execute simulate error:", sim.value.err);
+      logError("[squads-sdk] execute simulate logs:", sim.value.logs);
       throw new Error(
         `Execute simulation failed: ${JSON.stringify(sim.value.err)} | logs: ${(sim.value.logs ?? []).join(" || ")}`,
       );
     }
   } catch (simErr) {
-    console.error("[squads-sdk] execute simulate threw:", simErr);
+    logError("[squads-sdk] execute simulate threw:", simErr);
     throw simErr;
   }
 
   try {
     return await params.wallet.sendTransaction(versionedTx, params.connection);
   } catch (sendErr) {
-    console.error("[squads-sdk] execute sendTransaction error:", sendErr);
+    logError("[squads-sdk] execute sendTransaction error:", sendErr);
     if (sendErr && typeof sendErr === "object") {
       const anyErr = sendErr as { logs?: unknown; cause?: unknown; message?: unknown };
-      console.error("[squads-sdk]   .logs:", anyErr.logs);
-      console.error("[squads-sdk]   .cause:", anyErr.cause);
-      console.error("[squads-sdk]   .message:", anyErr.message);
+      logError("[squads-sdk]   .logs:", anyErr.logs);
+      logError("[squads-sdk]   .cause:", anyErr.cause);
+      logError("[squads-sdk]   .message:", anyErr.message);
     }
     throw sendErr;
   }
@@ -330,28 +340,28 @@ async function sendSingleInstruction(
 
   try {
     const sim = await connection.simulateTransaction(tx, undefined, true);
-    console.log(`[squads-sdk] ${label} simulate result:`, sim);
+    log(`[squads-sdk] ${label} simulate result:`, sim);
     if (sim.value.err) {
-      console.error(`[squads-sdk] ${label} simulate error:`, sim.value.err);
-      console.error(`[squads-sdk] ${label} simulate logs:`, sim.value.logs);
+      logError(`[squads-sdk] ${label} simulate error:`, sim.value.err);
+      logError(`[squads-sdk] ${label} simulate logs:`, sim.value.logs);
       throw new Error(
         `${label} simulation failed: ${JSON.stringify(sim.value.err)} | logs: ${(sim.value.logs ?? []).join(" || ")}`,
       );
     }
   } catch (simErr) {
-    console.error(`[squads-sdk] ${label} simulate threw:`, simErr);
+    logError(`[squads-sdk] ${label} simulate threw:`, simErr);
     throw simErr;
   }
 
   try {
     return await wallet.sendTransaction(tx, connection);
   } catch (sendErr) {
-    console.error(`[squads-sdk] ${label} sendTransaction error:`, sendErr);
+    logError(`[squads-sdk] ${label} sendTransaction error:`, sendErr);
     if (sendErr && typeof sendErr === "object") {
       const anyErr = sendErr as { logs?: unknown; cause?: unknown; message?: unknown };
-      console.error(`[squads-sdk]   .logs:`, anyErr.logs);
-      console.error(`[squads-sdk]   .cause:`, anyErr.cause);
-      console.error(`[squads-sdk]   .message:`, anyErr.message);
+      logError(`[squads-sdk]   .logs:`, anyErr.logs);
+      logError(`[squads-sdk]   .cause:`, anyErr.cause);
+      logError(`[squads-sdk]   .message:`, anyErr.message);
     }
     throw sendErr;
   }

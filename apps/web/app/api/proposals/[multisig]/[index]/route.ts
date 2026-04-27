@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { PublicKey } from "@solana/web3.js";
 import { prisma } from "@/lib/prisma";
 import { serializeDraft } from "@/lib/serialize-proposal-draft";
 
@@ -7,13 +8,26 @@ export async function GET(
   context: { params: Promise<{ multisig: string; index: string }> },
 ) {
   const { multisig, index } = await context.params;
-  const draft = await prisma.proposalDraft.findFirst({
-    where: { cofreAddress: multisig, transactionIndex: index },
-  });
 
-  if (!draft) {
-    return NextResponse.json({ error: "Proposal draft not found." }, { status: 404 });
+  try {
+    // Validate multisig address
+    new PublicKey(multisig);
+  } catch {
+    return NextResponse.json({ error: "Invalid multisig address." }, { status: 400 });
   }
 
-  return NextResponse.json(serializeDraft(draft));
+  try {
+    const draft = await prisma.proposalDraft.findUnique({
+      where: { cofreAddress_transactionIndex: { cofreAddress: multisig, transactionIndex: index } },
+    });
+
+    if (!draft) {
+      return NextResponse.json({ error: "Proposal draft not found." }, { status: 404 });
+    }
+
+    return NextResponse.json(serializeDraft(draft));
+  } catch (error) {
+    console.error("[api/proposals] get failed:", error);
+    return NextResponse.json({ error: "Could not load proposal draft." }, { status: 500 });
+  }
 }

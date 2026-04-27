@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { PublicKey } from "@solana/web3.js";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
@@ -8,10 +9,19 @@ export async function GET(
   const { multisig, index } = await params;
 
   try {
-    const draft = await prisma.payrollDraft.findFirst({
+    // Validate multisig address
+    new PublicKey(multisig);
+  } catch {
+    return NextResponse.json({ error: "Invalid multisig address." }, { status: 400 });
+  }
+
+  try {
+    const draft = await prisma.payrollDraft.findUnique({
       where: {
-        cofreAddress: multisig,
-        transactionIndex: index,
+        cofreAddress_transactionIndex: {
+          cofreAddress: multisig,
+          transactionIndex: index,
+        },
       },
       include: { recipients: true },
     });
@@ -27,17 +37,34 @@ export async function GET(
       memo: draft.memo ?? undefined,
       totalAmount: draft.totalAmount,
       recipientCount: draft.recipientCount,
-      recipients: draft.recipients.map((r) => ({
-        id: r.id,
-        name: r.name,
-        wallet: r.wallet,
-        amount: r.amount,
-        memo: r.memo ?? undefined,
-        payloadHash: Array.from(Buffer.from(r.payloadHash)),
-        invariants: JSON.parse(r.invariants),
-        commitmentClaim: r.commitmentClaim !== null ? JSON.parse(r.commitmentClaim) : undefined,
-        signature: r.signature ?? undefined,
-      })),
+      recipients: draft.recipients.map((r) => {
+        let invariants: unknown;
+        let commitmentClaim: unknown;
+        
+        try {
+          invariants = JSON.parse(r.invariants);
+        } catch {
+          invariants = null;
+        }
+        
+        try {
+          commitmentClaim = r.commitmentClaim !== null ? JSON.parse(r.commitmentClaim) : undefined;
+        } catch {
+          commitmentClaim = undefined;
+        }
+        
+        return {
+          id: r.id,
+          name: r.name,
+          wallet: r.wallet,
+          amount: r.amount,
+          memo: r.memo ?? undefined,
+          payloadHash: Array.from(Buffer.from(r.payloadHash)),
+          invariants,
+          commitmentClaim,
+          signature: r.signature ?? undefined,
+        };
+      }),
       createdAt: new Date(draft.createdAt).toISOString(),
     });
   } catch (error) {
