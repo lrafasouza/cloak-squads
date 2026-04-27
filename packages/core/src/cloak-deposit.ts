@@ -21,7 +21,7 @@ import {
   generateUtxoKeypair,
   transact,
 } from "@cloak.dev/sdk-devnet";
-import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import type { Connection, Keypair, PublicKey } from "@solana/web3.js";
 
 export type CloakDepositResult = {
   signature: string;

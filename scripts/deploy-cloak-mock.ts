@@ -50,7 +50,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.error(`[deploy-mock] Building cloak_mock`);
+  console.error("[deploy-mock] Building cloak_mock");
   const build = spawnSync("anchor", ["build", "-p", "cloak_mock"], {
     stdio: "inherit",
     env: { ...process.env, NO_DNA: "1" },
@@ -69,8 +69,7 @@ async function main() {
     process.exit(1);
   }
 
-  const rpc =
-    cluster === "devnet" ? "https://api.devnet.solana.com" : "http://127.0.0.1:8899";
+  const rpc = cluster === "devnet" ? "https://api.devnet.solana.com" : "http://127.0.0.1:8899";
   const connection = new Connection(rpc, "confirmed");
   const acct = await connection.getAccountInfo(CLOAK_MOCK_PROGRAM_ID);
   if (!acct || !acct.executable) {

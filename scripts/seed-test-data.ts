@@ -14,8 +14,8 @@ import { execSync } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { PrismaClient } from "@prisma/client";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -106,9 +106,27 @@ async function main() {
       recipientCount: 3,
       recipients: {
         create: [
-          { name: "Alice", wallet: Keypair.generate().publicKey.toBase58(), amount: "100000", payloadHash: Buffer.alloc(32, 2), invariants: "{}" },
-          { name: "Bob", wallet: Keypair.generate().publicKey.toBase58(), amount: "100000", payloadHash: Buffer.alloc(32, 3), invariants: "{}" },
-          { name: "Carol", wallet: Keypair.generate().publicKey.toBase58(), amount: "100000", payloadHash: Buffer.alloc(32, 4), invariants: "{}" },
+          {
+            name: "Alice",
+            wallet: Keypair.generate().publicKey.toBase58(),
+            amount: "100000",
+            payloadHash: Buffer.alloc(32, 2),
+            invariants: "{}",
+          },
+          {
+            name: "Bob",
+            wallet: Keypair.generate().publicKey.toBase58(),
+            amount: "100000",
+            payloadHash: Buffer.alloc(32, 3),
+            invariants: "{}",
+          },
+          {
+            name: "Carol",
+            wallet: Keypair.generate().publicKey.toBase58(),
+            amount: "100000",
+            payloadHash: Buffer.alloc(32, 4),
+            invariants: "{}",
+          },
         ],
       },
     },

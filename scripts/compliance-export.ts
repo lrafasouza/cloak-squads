@@ -6,13 +6,13 @@
  *   pnpm tsx scripts/compliance-export.ts <cofreAddress> --output report.csv
  */
 import { writeFileSync } from "node:fs";
-import { PrismaClient } from "@prisma/client";
 import {
   type AuditScope,
   type FilteredAuditTransaction,
   exportAuditToCSV,
   filterAuditData,
 } from "@cloak-squads/core";
+import { PrismaClient } from "@prisma/client";
 
 async function main() {
   const args = process.argv.slice(2);
