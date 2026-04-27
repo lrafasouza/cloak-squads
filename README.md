@@ -58,6 +58,17 @@ pnpm -F web dev
 
 Open `http://localhost:3000`, connect a devnet wallet, and enter a multisig address.
 
+## Database Setup
+
+The web app uses **Prisma + SQLite** for persistence. After cloning, recreate the local database:
+
+```bash
+cd apps/web
+pnpm prisma db push
+```
+
+> **Note:** The `dev.db` file is ignored by git (see `.gitignore`). Each developer maintains their own local SQLite instance. The schema is versioned in `prisma/schema.prisma`.
+
 ## Program IDs (Devnet)
 
 | Program | Address |
@@ -103,6 +114,7 @@ pnpm typecheck:all
 | F2 — Payroll (batch CSV) | **DONE** |
 | F3 — Audit Admin | **DONE** |
 | F3.5 — Public Audit Link | **DONE** |
+| F4 — Stealth Invoicing | **DONE** |
 
 ## Documentation
 
