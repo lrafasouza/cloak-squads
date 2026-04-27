@@ -1,9 +1,14 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-// NOTE: kept on devnet SDK to demonstrate the upstream bug (see docs/devnet-blocker.md).
-// Switch back to "@cloak.dev/sdk" when running against mainnet for the final pre-prod smoke.
-import { CloakSDK, MemoryStorageAdapter, generateNote } from "@cloak.dev/sdk-devnet";
+import {
+  CLOAK_PROGRAM_ID,
+  NATIVE_SOL_MINT,
+  createUtxo,
+  createZeroUtxo,
+  generateUtxoKeypair,
+  transact,
+} from "@cloak.dev/sdk-devnet";
 import { Connection, Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 function loadKeypair(filePath = path.join(os.homedir(), ".config/solana/id.json")) {
@@ -20,36 +25,43 @@ async function main() {
   const payer = loadKeypair(process.env.SOLANA_KEYPAIR);
   const owner = payer.publicKey;
 
-  console.log("=== Cloak SDK Devnet Spike (unified transact path) ===");
+  console.log("=== Cloak SDK Devnet Spike (transact workaround) ===");
   console.log("Owner:", owner.toBase58());
 
   const balanceStart = await connection.getBalance(owner);
   console.log(`Balance start: ${balanceStart / LAMPORTS_PER_SOL} SOL\n`);
 
-  const sdk = new CloakSDK({
-    keypairBytes: payer.secretKey,
-    network: "devnet",
-    storage: new MemoryStorageAdapter(),
-    debug: true,
-  });
+  const amount = 50_000_000n;
 
-  const amount = 50_000_000;
+  console.log("[1/3] building output UTXO...");
+  const outputKeypair = await generateUtxoKeypair();
+  const outputUtxo = await createUtxo(amount, outputKeypair, NATIVE_SOL_MINT);
 
-  console.log("[1/2] generating note (no on-chain deposit yet)...");
-  const note = await generateNote(amount, "devnet");
-  console.log("  commitment:", note.commitment);
+  console.log("[2/3] building zero-padding UTXOs...");
+  const zeroIn0 = await createZeroUtxo(NATIVE_SOL_MINT);
+  const zeroIn1 = await createZeroUtxo(NATIVE_SOL_MINT);
+  const zeroOut = await createZeroUtxo(NATIVE_SOL_MINT);
 
-  console.log("\n[2/2] privateTransfer (deposit + withdraw to self in one flow)...");
-  const result = await sdk.privateTransfer(
-    connection,
-    note,
-    [{ recipient: owner, amount: amount - 100_000 }],
+  console.log("[3/3] transact (deposit via disc-0)...");
+  const result = await transact(
     {
-      onProgress: (status: string) => console.log(`  status: ${status}`),
-      onProofProgress: (pct: number) => console.log(`  proof: ${pct}%`),
+      inputUtxos: [zeroIn0, zeroIn1],
+      outputUtxos: [outputUtxo, zeroOut],
+      externalAmount: amount,
+      depositor: owner,
+    },
+    {
+      connection,
+      programId: CLOAK_PROGRAM_ID,
+      relayUrl: "https://api.devnet.cloak.ag",
+      depositorKeypair: payer,
+      onProgress: (s: string) => console.log(`  status: ${s}`),
+      onProofProgress: (p: number) => console.log(`  proof: ${p}%`),
     },
   );
-  console.log("  result:", JSON.stringify(result, null, 2));
+  console.log("  signature:", result.signature);
+  console.log("  output commitment:", result.outputCommitments[0]!.toString(16));
+  console.log("  leaf index:", result.commitmentIndices[0]!);
 
   await new Promise((r) => setTimeout(r, 3000));
   const balanceEnd = await connection.getBalance(owner);

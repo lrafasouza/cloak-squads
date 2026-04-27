@@ -1,7 +1,7 @@
 /**
  * Creates a fresh 1-of-1 Squads multisig + Cofre on devnet with a specific operator.
  *
- * Usage: npx tsx scripts/setup-demo-cofre.ts
+ * Usage: npx tsx scripts/setup-demo-cofre.ts <operator-pubkey>
  */
 
 import { createHash } from "node:crypto";
@@ -30,7 +30,20 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const OUT_FILE = path.join(__dirname, ".demo-cofre.json");
 
-const OPERATOR_PUBKEY = new PublicKey(process.argv[2] || "");
+function readOperatorArg(): PublicKey {
+  const operatorArg = process.argv[2];
+  if (!operatorArg) {
+    throw new Error("Usage: npx tsx scripts/setup-demo-cofre.ts <operator-pubkey>");
+  }
+
+  try {
+    return new PublicKey(operatorArg);
+  } catch {
+    throw new Error(`Invalid operator pubkey: ${operatorArg}`);
+  }
+}
+
+const OPERATOR_PUBKEY = readOperatorArg();
 
 function loadKeypair(filePath = path.join(os.homedir(), ".config/solana/id.json")) {
   if (!fs.existsSync(filePath)) {
