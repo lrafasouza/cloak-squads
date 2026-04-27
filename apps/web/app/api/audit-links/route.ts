@@ -55,6 +55,7 @@ export async function POST(request: Request) {
 
   const parsed = auditLinkCreateSchema.safeParse(body);
   if (!parsed.success) {
+    console.error("[api/audit-links] validation failed:", parsed.error.flatten());
     return NextResponse.json(
       { error: "Invalid audit link request.", details: parsed.error.flatten() },
       { status: 400 },
