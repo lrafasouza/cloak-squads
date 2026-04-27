@@ -23,7 +23,7 @@ Esta spec NÃO altera essa tese — pega o estado atual (F1 single-tx, F2 batch 
 
 **Em escopo:**
 - **Bloco 2** — testes de integração (3 ficheiros novos) + teste unit (1 ficheiro novo) + testes devnet opcionais
-- **Bloco 3** — scripts de seed, compliance export, deploy wrappers (4 ficheiros novos)
+- **Bloco 3** — scripts de seed, compliance export, deploy wrappers (4 ficheiros novos) + wrapper `cloakDeposit()` em `packages/core/` (Bloco 3.5)
 - **Deploy Radar** — 3 docs novos (`DEVNET_DEMO_READY.md`, `CLOAK_MOCK_REMOVAL.md`, `TECH_DEBT.md`)
 
 **Fora de escopo:**
@@ -49,6 +49,7 @@ Antes de finalizar este design, validei contra:
 
 1. Cloak **não fornece infraestrutura de testes** (mock, testkit, fixtures, fork). Confirma split de teste em 3 camadas.
 2. Account layouts e instruction discriminators **não são publicamente documentados**. Confirma que CPI direto gatekeeper→Cloak (Option C do `cloak-real-integration-analysis.md`) é inviável; Option B é o único caminho para o Bloco 5 futuro.
+2.b. **Resposta oficial da Cloak team ao bug report `docs/cloak-discord-report.md`:** confirmaram que `sdk.deposit()` está broken (disc-1 retired, agora `TransactSwap`). Workaround endossado: chamar `transact()` diretamente. Forneceram snippet de referência baseado no código vivo de `devnet/web/hooks/use-cloak-sdk.ts:611` (a app em `devnet.cloak.ag`). Layout: 7 contas para SOL deposit, 12 para SPL. Este snippet vira `packages/core/src/cloak-deposit.ts` (Bloco 3.5).
 3. **Devnet é resetada periodicamente pela Solana Foundation.** UTXOs e PDAs não persistem indefinidamente.
 4. **Settlement delay**: depósito requer ~20s entre `transact()` e assertions on-chain.
 5. Sanctions screening está desabilitada em devnet, mas o **relay continua mandatório** (`https://api.devnet.cloak.ag`) porque o programa exige Ed25519 quote signed.
@@ -152,11 +153,14 @@ Teste integrador único, sequencial, F1→F2→F3:
 **Setup:** assume cofre demo já existe em devnet via `pnpm demo:setup` (D1 da brainstorming, decisão tomada).
 
 **Caso único:**
-1. Construir `transact()` call mínimo: deposit de 0.01 SOL (mínimo enforced pelo SDK em `index.cjs:6902`)
-2. Submit; capturar signature
-3. `await sleep(20_000)` — settlement delay per docs Cloak
-4. Assert tx confirmada na chain
-5. Assert nullifier PDA criada
+1. Importar `cloakDeposit` de `@cloak-squads/core` (Bloco 3.5)
+2. Chamar `cloakDeposit(connection, payer, 10_000_000n)` — 0.01 SOL (mínimo SDK)
+3. Assert `result.signature` é string base58 válida (≥64 chars)
+4. `await sleep(20_000)` — settlement delay per docs Cloak
+5. Assert tx confirmada via `connection.getSignatureStatus`
+6. Assert leaf index é número ≥ 0
+7. Assert spendKeyHex e blindingHex são hex de 64 chars
+8. (não chamar `sdk.deposit()` em nenhum momento — está broken até Cloak corrigir)
 
 **Test timeout:** 60s (default 5s não chega)
 
@@ -287,6 +291,34 @@ pnpm tsx scripts/deploy-gatekeeper.ts --cluster devnet
 }
 ```
 
+### Bloco 3.5 — `packages/core/src/cloak-deposit.ts` (wrapper `cloakDeposit()`)
+
+**Por que está aqui (e não no Bloco 5):** o snippet é endossado pela equipa Cloak e usa apenas funções já exportadas do SDK (`transact`, `createUtxo`, `createZeroUtxo`, `generateUtxoKeypair`, `CLOAK_PROGRAM_ID`, `NATIVE_SOL_MINT`). Adicioná-lo agora é zero-risco (não toca produto), e é necessário para `tests/devnet/cloak-deposit.devnet.test.ts` (Bloco 2.4).
+
+**Verificação prévia:** grep confirmou que `sdk.deposit()` NÃO é usado em código de produto (`apps/web/`, `packages/core/`). Único call site: `scripts/spike-cloak-devnet.ts:29` — script de research, sem dependentes. Adicionar o wrapper agora não desfaz nada.
+
+**Conteúdo:** transcrição literal do snippet fornecido pela Cloak team (com tipagem TS estrita, JSDoc, e tratamento de erro). Assina:
+
+```ts
+export async function cloakDeposit(
+  connection: Connection,
+  payer: Keypair,
+  amount: bigint,
+  mint?: PublicKey,  // default: NATIVE_SOL_MINT
+): Promise<{
+  signature: string;
+  leafIndex: number;
+  spendKeyHex: string;
+  blindingHex: string;
+  amount: bigint;
+  mint: PublicKey;
+}>
+```
+
+**Export via `packages/core/src/index.ts`:** adicionar `export { cloakDeposit } from "./cloak-deposit";`.
+
+**Não usar em produto agora.** Ficheiro existe para o Bloco 5 consumir e para o `tests/devnet/` validar contra Cloak real. Operator/send pages continuam a usar mock até o Bloco 5.
+
 ---
 
 ## Deploy Radar — 3 docs
@@ -310,6 +342,7 @@ Checklist operacional para garantir que a demo é estável em devnet. Não bloqu
 Runbook completo do **Bloco 5 futuro** (não executar agora). Conteúdo:
 
 - **Por quê:** mock é stub bookkeeping; não testa privacidade real do Cloak
+- **Mecanismo de deposit endossado pela Cloak team:** wrapper `cloakDeposit()` em `packages/core/src/cloak-deposit.ts` (Bloco 3.5). Snippet baseado no código vivo de `devnet.cloak.ag` (`devnet/web/hooks/use-cloak-sdk.ts:611`). Chamar `transact()` (disc-0) diretamente. **NÃO usar `sdk.deposit()` até Cloak corrigir o bug do disc-1.**
 - **Por quê Option B (não C):** account layouts e discriminators do Cloak real não são publicamente documentados (per `docs.cloak.ag/development/devnet`); `buildTransactInstruction` não é exportada no SDK; CPI direto gatekeeper→Cloak é inviável sem reverse-engineering
 - **Mudanças Rust** (`programs/cloak-gatekeeper/src/instructions/execute_with_license.rs`):
   - Remover const `CLOAK_PROGRAM_ID` + `#[cfg]`
@@ -348,7 +381,9 @@ Itens não-bloqueantes. Sem prioridade implícita; cada item tem `Severidade: lo
 **Refactors:**
 - `apps/web/lib/squads-sdk.ts:8` — `IS_DEV` flag pode ser removida
 - `scripts/spike-*.ts` e `probe-*.ts` — mover para `scripts/research/` (não são scripts de produto)
+- `scripts/spike-cloak-devnet.ts` — **deletar** (usa `sdk.deposit()` quebrado; substituído por `cloakDeposit()` wrapper. Manter histórico em git.)
 - `docs/devnet-blocker.md`, `docs/spike-findings.md` — consolidar em `docs/research/`
+- `docs/cloak-discord-report.md` — atualizar `Update log` com a resposta da Cloak team (snippet `cloakDeposit()` recebido, workaround endossado)
 
 **Observabilidade:**
 - Zero coverage report; adicionar `vitest --coverage` ou `c8`
@@ -372,15 +407,16 @@ Sequencial:
   2. Bloco 3.2 — scripts/compliance-export.ts
   3. Bloco 3.3 — scripts/deploy-gatekeeper.ts
   4. Bloco 3.4 — scripts/deploy-cloak-mock.ts
-  5. Bloco 2.1 — tests/unit/f4-stealth.test.ts
-  6. Bloco 2.2 — tests/integration/f3-audit.test.ts
-  7. Bloco 2.3 — tests/integration/e2e-full-flow.test.ts
-  8. Bloco 2.4 — tests/devnet/cloak-deposit.devnet.test.ts (opcional)
-  9. docs/DEVNET_DEMO_READY.md
- 10. docs/CLOAK_MOCK_REMOVAL.md
- 11. docs/TECH_DEBT.md
- 12. package.json scripts: test:unit, test:devnet, test:all, seed:demo, seed:reset, audit:export, deploy:gk, deploy:mock
- 13. Verificação final: pnpm test:all + pnpm typecheck:all + biome check
+  5. Bloco 3.5 — packages/core/src/cloak-deposit.ts (wrapper) + export em index.ts
+  6. Bloco 2.1 — tests/unit/f4-stealth.test.ts
+  7. Bloco 2.2 — tests/integration/f3-audit.test.ts
+  8. Bloco 2.3 — tests/integration/e2e-full-flow.test.ts
+  9. Bloco 2.4 — tests/devnet/cloak-deposit.devnet.test.ts (opcional, usa Bloco 3.5)
+ 10. docs/DEVNET_DEMO_READY.md
+ 11. docs/CLOAK_MOCK_REMOVAL.md
+ 12. docs/TECH_DEBT.md
+ 13. package.json scripts: test:unit, test:devnet, test:all, seed:demo, seed:reset, audit:export, deploy:gk, deploy:mock
+ 14. Verificação final: pnpm test:all + pnpm typecheck:all + biome check
 ```
 
 **Razão da ordem:**
@@ -401,6 +437,8 @@ Sequencial:
 - [ ] `pnpm deploy:mock --cluster mainnet` falha imediato com erro
 - [ ] 3 docs commitados em `docs/`
 - [ ] PR único contra `master` com title `feat: blocos 2-3 + deploy radar`
+- [ ] `packages/core/src/cloak-deposit.ts` exportado e testado em devnet (Bloco 3.5)
+- [ ] Nenhum call site de `sdk.deposit()` no código (verificado por grep — atualmente só `scripts/spike-cloak-devnet.ts`, que é deletado em TECH_DEBT)
 
 ## Dependências externas / premissas
 
