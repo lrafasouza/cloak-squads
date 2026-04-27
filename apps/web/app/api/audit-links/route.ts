@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { PublicKey } from "@solana/web3.js";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import nacl from "tweetnacl";
 import { z } from "zod";
 
 const auditLinkCreateSchema = z.object({
@@ -66,10 +67,19 @@ export async function POST(request: Request) {
   }
 
   try {
-    // TODO: Verify signature against message
-    // Message: "create-audit-link:${cofreAddress}:${scope}:${expiresAt}:${issuedBy}"
-
     const { cofreAddress, scope, scopeParams, expiresAt, issuedBy, signature } = parsed.data;
+
+    // Verify signature against message
+    // Message: "create-audit-link:${cofreAddress}:${scope}:${expiresAt}:${issuedBy}"
+    const message = `create-audit-link:${cofreAddress}:${scope}:${expiresAt}:${issuedBy}`;
+    const messageBytes = new TextEncoder().encode(message);
+    const signatureBytes = Buffer.from(signature, "base64");
+    const issuerPubkey = new PublicKey(issuedBy).toBytes();
+
+    const isValid = nacl.sign.detached.verify(messageBytes, signatureBytes, issuerPubkey);
+    if (!isValid) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
 
     // Compute diversifier using the same logic as core/hashing.ts
     const linkId = crypto.randomUUID();

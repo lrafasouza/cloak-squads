@@ -8,4 +8,4 @@ export * from "./audit";
 export * from "./squads-adapter";
 export * from "./gatekeeper-client";
 export * from "./pda";
-export * from "./proposal-vote";
+export * from "./cloak-deposit";
