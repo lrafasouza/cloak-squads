@@ -248,9 +248,14 @@ export function generateDeterministicMockData(
   const statuses: Array<"confirmed" | "pending"> = ["confirmed", "pending"];
   const now = Date.now();
 
+  function pickRandom<T>(arr: T[]): T {
+    const idx = Math.floor(rand() * arr.length);
+    return arr[idx]!;
+  }
+
   return Array.from({ length: count }, (_, i) => {
-    const type = types[Math.floor(rand() * types.length)];
-    const status = statuses[Math.floor(rand() * statuses.length)];
+    const type = pickRandom(types);
+    const status = pickRandom(statuses);
     const amount = String(Math.floor(rand() * 10_000_000_000) + 100_000);
     const daysAgo = Math.floor(rand() * 30);
     const hoursAgo = Math.floor(rand() * 24);
