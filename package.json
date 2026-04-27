@@ -23,7 +23,8 @@
     "spike:cloak": "tsx scripts/spike-cloak-devnet.ts",
     "probe:cloak": "tsx scripts/probe-cloak-devnet-pdas.ts",
     "probe:deposit": "tsx scripts/probe-cloak-deposit-manual.ts",
-    "demo:setup": "tsx scripts/setup-demo-cofre.ts"
+    "demo:setup": "tsx scripts/setup-demo-cofre.ts",
+    "probe:real-deposit": "tsx scripts/probe-cloak-real-deposit.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
