@@ -8,11 +8,13 @@
 
 ## Executive Summary
 
-**The standalone deposit workaround works.** The `transact()` function from the SDK correctly uses discriminator 0 with the right 7-account layout and generates valid Groth16 proofs. This was confirmed by code analysis of every function in the call chain.
+**The standalone deposit workaround works.** The `transact()` function from the SDK correctly uses discriminator 0 with the right 7-account layout and generates valid Groth16 proofs. This was confirmed by code analysis AND a live devnet test (tx `YMeL2tGFxfUDjRngT2okWfXKzxuexNTXy6WzRyKbg6g6repS3So1n11nvB1M74mjfGQzjbe6Mejj3GHxn9XKTNr`).
 
-**The gatekeeper CPI into real Cloak is hard.** The current CPI architecture (gatekeeper → mock) cannot be trivially pointed at the real Cloak program. The account layout changes from 4→7, the data format is completely different (anchor discriminator + fields vs. disc[0] + proof + public inputs), and proof generation uses an internal circuit (`transaction`) that is NOT exported by the SDK.
+**Commitment scheme migration is REQUIRED.** The app currently uses the legacy `computeCommitment(amount, r, sk_spend)` scheme. The real Cloak program uses the UTXO scheme `computeUtxoCommitment({ amount, keypair, blinding, mintAddress })`. They produce different values for the same inputs. The pre-computed commitment MATCHES the on-chain commitment — deterministic round-trip confirmed.
 
-**Recommended path:** Use `transact()` directly for the Cloak operation, keep the gatekeeper as the authorization layer (Squads governance → license → operator trigger).
+**The relay IS needed (not relay-free).** The on-chain program has `riskCheckEnabled = true` hardcoded (SDK line 6299). Deposits require a signed Ed25519 sanctions/risk quote from the relay's Range Oracle integration. Without it, the program rejects with `0x10b3`. The relay provides this via `${relayUrl}/range-quote`.
+
+**Recommended path:** Use `transact()` directly for the Cloak deposit, keep the gatekeeper as authorization layer (Squads governance → license → operator trigger). Migrate commitment scheme from legacy to UTXO.
 
 ---
 
@@ -303,3 +305,67 @@ import {
   type NoteData,
 } from "@cloak.dev/sdk-devnet";
 ```
+
+---
+
+## Appendix D: Live Devnet Probe Results (2026-04-27)
+
+### Test: `pnpm probe:real-deposit`
+
+**3/3 checks passed:**
+
+```
+Expected commitment (pre-compute): 2927d4441b8aa3754ef9a1e645bb373aad68318b0b3ff2760e78f49a908837bc
+Recomputed commitment:            2927d4441b8aa3754ef9a1e645bb373aad68318b0b3ff2760e78f49a908837bc
+Commitment match: ✅ YES
+
+✅ tx signature: YMeL2tGFxfUDjRngT2okWfXKzxuexNTXy6WzRyKbg6g6repS3So1n11nvB1M74mjfGQzjbe6Mejj3GHxn9XKTNr
+output commitments: [
+  '2927d4441b8aa3754ef9a1e645bb373aad68318b0b3ff2760e78f49a908837bc',
+  '16bd9974ee040732f1cbad615b436f115140b40cc885e2345a3a3c554a597d8a'
+]
+On-chain match pre-computed: ✅ YES
+leaf indices: [ 222, 223 ]
+```
+
+### Corrected config (relay required for risk quote)
+
+```typescript
+await transact(
+  { inputUtxos: [], outputUtxos: [outputUtxo, zero], externalAmount: amount, depositor: payer.publicKey },
+  {
+    connection,
+    programId: CLOAK_PROGRAM_ID,
+    relayUrl: "https://api.devnet.cloak.ag",   // REQUIRED — risk check is mandatory on devnet
+    enforceViewingKeyRegistration: false,        // safe to skip for testing
+    useChainRootForProof: true,                  // uses on-chain root, not relay merkle
+    depositorKeypair: payer,
+    onProgress: (s) => console.log(s),
+    onProofProgress: (p) => console.log(`proof: ${p}%`),
+  },
+);
+```
+
+### Why relay-free failed
+
+`riskCheckEnabled` is hardcoded `true` at SDK line 6299. The on-chain program requires an Ed25519-signed sanctions quote from Range Oracle at instruction index 0. Without the relay providing this via `${relayUrl}/range-quote`, the program rejects with `0x10b3` (4275). This is NOT configurable — it's a program-level enforcement.
+
+### Cost of real deposit
+
+- Deposit: 0.05 SOL
+- Protocol fee deducted: ~0.00515 SOL (5M fixed + 150K variable)
+- Priority fee: ~0.00001 SOL
+- ALT creation (one-time): ~0.0015 SOL
+- Total per deposit: ~0.055 SOL
+
+### Commitment scheme migration — confirmed required
+
+| | Legacy (current) | UTXO (required) |
+|---|---|---|
+| SDK export | `computeCommitment` (aliased from `computeCommitment$1`) | `computeUtxoCommitment` (aliased from `computeCommitment`) |
+| Inputs | `(amount, r, sk_spend)` | `({ amount, keypair, blinding, mintAddress })` |
+| Includes mint? | NO | YES |
+| Deterministic? | YES | YES (verified) |
+| Used by transact()? | NO | YES |
+
+The `init-commitment.ts` currently uses `computeCommitment(legacy)`. Must migrate to `computeUtxoCommitment` with `deriveUtxoKeypairFromSpendKey`. Pre-computed commitments from the propose path will match on-chain commitments from the deposit path — verified end-to-end.
