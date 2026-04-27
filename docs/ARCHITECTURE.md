@@ -20,7 +20,7 @@ The gatekeeper is an Anchor program with 10 instructions:
 |-------------|---------|
 | `init_cofre` | Initialize cofre account (multisig, operator, view key) |
 | `issue_license` | Create a time-limited execution license with payload hash |
-| `execute_with_license` | Operator consumes license, CPIs into Cloak/mock |
+| `execute_with_license` | Operator consumes license, CPIs into Cloak |
 | `init_view_distribution` | Set up encrypted view key distribution |
 | `add_signer_view` | Add a signer to the view distribution |
 | `remove_signer_view` | Remove a signer from the view distribution |
@@ -42,11 +42,15 @@ Squads vaultTransactionExecute
         └─▶ Creates License account with payload hash + TTL
 
 Operator wallet sends transaction:
+  ├─▶ cloakDeposit() — Real deposit into Cloak shield pool
+  │     ├─▶ Generate UTXO keypair + blinding
+  │     ├─▶ Call transact() with zero inputs (deposit)
+  │     └─▶ Store UTXO data for future claim
   └─▶ gatekeeper::execute_with_license
         ├─▶ Verify operator identity
         ├─▶ Verify license not expired / not consumed
         ├─▶ Verify payload hash matches license
-        └─▶ CPI into cloak_mock::stub_transact
+        └─▶ CPI into Cloak program (real proofs)
               ├─▶ Record nullifier
               └─▶ Update pool merkle root
 ```
@@ -65,10 +69,13 @@ apps/web/
 │   ├── page.tsx                          # Landing — enter multisig address
 │   ├── cofre/[multisig]/
 │   │   ├── page.tsx                      # Dashboard — drafts list, addresses, stats
-│   │   ├── send/page.tsx                 # Create proposal (amount, recipient, memo)
-│   │   ├── operator/page.tsx             # Execute with license
+│   │   ├── send/page.tsx                 # Create proposal with UTXO commitment
+│   │   ├── payroll/page.tsx              # Batch payroll with multiple recipients
+│   │   ├── operator/page.tsx             # Execute with license + cloakDeposit()
 │   │   └── proposals/[id]/page.tsx       # View/approve/execute proposal
-│   └── api/proposals/                    # REST API (Prisma + SQLite)
+│   ├── claim/[stealthId]/page.tsx        # Claim stealth invoice via fullWithdraw()
+│   ├── audit/[linkId]/page.tsx           # Public audit view with Cloak scan
+│   └── api/                              # REST API (Prisma + SQLite)
 ├── components/
 │   ├── proposal/                         # ApprovalButtons, ExecuteButton, CommitmentCheck
 │   ├── proof/                            # ProofGenerationState (visual stepper)
@@ -77,24 +84,26 @@ apps/web/
 ├── lib/
 │   ├── prisma.ts                         # Prisma client singleton
 │   ├── serialize-proposal-draft.ts       # Shared serializer
-│   ├── init-commitment.ts                # Registers computeCommitment from Cloak SDK
+│   ├── init-commitment.ts                # Registers computeUtxoCommitment from Cloak SDK
 │   ├── gatekeeper-instructions.ts        # Manual ix builders (bypasses Anchor Program)
 │   ├── squads-sdk.ts                     # Squads proposal creation helpers
+│   ├── payroll-csv.ts                    # CSV parsing for batch payroll
 │   ├── env.ts                            # Zod-validated env vars
 │   └── idl/cloak_gatekeeper.json         # Anchor IDL for account deserialization
 └── prisma/
-    └── schema.prisma                     # ProposalDraft, AuditLink, StealthInvoice
+    └── schema.prisma                     # ProposalDraft, PayrollDraft, AuditLink, StealthInvoice
 ```
 
 ### Data Flow — Create Proposal
 
 ```
-User fills form → generate random note secrets (r, sk_spend, commitment)
+User fills form → generate UTXO keypair + blinding via Cloak SDK
+  → computeUtxoCommitment(utxo) → commitment
   → computePayloadHash(SHA256 of invariants)
   → buildIssueLicenseIxBrowser (manual serialization)
   → createIssueLicenseProposal (Squads vaultTransactionCreate + proposalCreate)
   → POST /api/proposals (persist draft to SQLite, no secrets)
-  → sessionStorage.setItem(claim with r, sk_spend)
+  → sessionStorage.setItem(claim with keypair, blinding, tokenMint)
   → redirect to proposal page
 ```
 
@@ -125,9 +134,13 @@ Operator page loads:
 
 User clicks Execute:
   → Load draft from GET /api/proposals/{multisig}/{index}
-  → Build execute_with_license ix with mock proof (256 zero bytes)
+  → cloakDeposit() — Real deposit into Cloak shield pool
+        ├─▶ Generate UTXO keypair + blinding
+        ├─▶ Call transact() with zero inputs (deposit)
+        └─▶ Store UTXO data via PATCH /api/stealth/{id}/utxo
+  → Build execute_with_license ix with real proof from Cloak SDK
   → ComputeBudgetProgram.setComputeUnitLimit(1.4M CU) + priority fee
-  → sendTransaction → gatekeeper CPIs into cloak_mock
+  → sendTransaction → gatekeeper CPIs into Cloak program
 ```
 
 ## Shared Package (`@cloak-squads/core`)
@@ -145,15 +158,16 @@ User clicks Execute:
 
 ## Persistence
 
-SQLite via Prisma with three models:
+SQLite via Prisma with four models:
 
 | Model | Purpose | API Routes |
 |-------|---------|-----------|
-| `ProposalDraft` | Stores proposal metadata (amount, recipient, invariants, payload hash) | 3 routes (POST, GET list, GET single) |
-| `AuditLink` | Audit admin diversifier records | Not yet built (F3) |
-| `StealthInvoice` | Stealth invoice metadata | Not yet built (F4) |
+| `ProposalDraft` | Stores proposal metadata (amount, recipient, invariants, payload hash, commitment claim) | 3 routes (POST, GET list, GET single) |
+| `PayrollDraft` | Batch payroll with multiple recipients | 3 routes (POST, GET list, GET single) |
+| `AuditLink` | Audit admin diversifier records with signature verification | 2 routes (POST, GET) |
+| `StealthInvoice` | Stealth invoice metadata + UTXO data for claim | 3 routes (POST, GET list, PATCH UTXO, POST claim) |
 
-**Security note:** `commitmentClaim` (containing `r`, `sk_spend`, `commitment`) is stored in `sessionStorage` only — never sent to the server or persisted in the database.
+**Security note:** `commitmentClaim` secrets (keypair, blinding) are stored in `sessionStorage` only — never sent to the server. UTXO data for stealth invoices is stored server-side (required for `fullWithdraw` claim flow).
 
 ## Testing
 
@@ -164,8 +178,8 @@ SQLite via Prisma with three models:
 | `f1-send.test.ts` | Full F1 flow: cofre → license → execute → verify | anchor-bankrun |
 | `f1-e2e-devnet.ts` | Full F1 flow on devnet (real transactions) | tsx script |
 
-## Devnet Blocker
+## Devnet Integration
 
-The real Cloak devnet SDK (`@cloak.dev/sdk-devnet@0.1.5-devnet.0`) has a broken `deposit()` that builds a legacy instruction format rejected by the devnet program. All public entry points (`deposit`, `privateTransfer`, `withdraw`) are affected. See `docs/devnet-blocker.md` for full diagnosis.
+The Cloak devnet SDK (`@cloak.dev/sdk-devnet@0.1.5-devnet.0`) had a broken `deposit()` that built a legacy instruction format rejected by the devnet program. **This has been resolved** by calling `transact()` directly with zero inputs (pure deposit pattern), as endorsed by the Cloak team. See `packages/core/src/cloak-deposit.ts` for the implementation.
 
-**Workaround:** Use `cloak-mock` on devnet. Swap to real Cloak program on mainnet or after upstream SDK fix.
+**Status:** Real Cloak deposits and withdrawals are working on devnet via the `transact()` unified instruction (disc-0).

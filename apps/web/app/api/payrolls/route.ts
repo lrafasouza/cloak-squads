@@ -1,17 +1,38 @@
-import { Prisma } from "@prisma/client";
-import { headers } from "next/headers";
-import { PublicKey } from "@solana/web3.js";
-import { NextResponse } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { Prisma } from "@prisma/client";
+import { PublicKey } from "@solana/web3.js";
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
+import { z } from "zod";
 
 const byteArraySchema = z.array(z.number().int().min(0).max(255));
 
 const commitmentClaimSchema = z.object({
   amount: z.number().int().positive(),
-  r: z.string().regex(/^[0-9a-fA-F]{64}$/),
-  sk_spend: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  // Legacy fields (backward compat)
+  r: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/)
+    .optional(),
+  sk_spend: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/)
+    .optional(),
+  // UTXO fields (new Cloak scheme)
+  keypairPrivateKey: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/)
+    .optional(),
+  keypairPublicKey: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/)
+    .optional(),
+  blinding: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/)
+    .optional(),
+  tokenMint: z.string().min(32).max(44).optional(),
   commitment: z.string().regex(/^[0-9a-fA-F]{64}$/),
   recipient_vk: z.string().min(32).max(44),
   token_mint: z.string().min(32).max(44),
@@ -29,17 +50,20 @@ const payrollRecipientSchema = z.object({
     },
     { message: "Invalid Solana wallet address" },
   ),
-  amount: z.string().regex(/^\d+$/).refine(
-    (val) => {
-      try {
-        const n = BigInt(val);
-        return n > 0n && n <= BigInt("18446744073709551615");
-      } catch {
-        return false;
-      }
-    },
-    { message: "Amount out of valid range" },
-  ),
+  amount: z
+    .string()
+    .regex(/^\d+$/)
+    .refine(
+      (val) => {
+        try {
+          const n = BigInt(val);
+          return n > 0n && n <= BigInt("18446744073709551615");
+        } catch {
+          return false;
+        }
+      },
+      { message: "Amount out of valid range" },
+    ),
   memo: z.string().max(200).optional(),
   payloadHash: byteArraySchema.length(32),
   invariants: z.object({
@@ -76,17 +100,20 @@ const payrollDraftSchema = z.object({
   ),
   transactionIndex: z.string().regex(/^\d+$/),
   memo: z.string().max(200).optional(),
-  totalAmount: z.string().regex(/^\d+$/).refine(
-    (val) => {
-      try {
-        const n = BigInt(val);
-        return n > 0n && n <= BigInt("18446744073709551615");
-      } catch {
-        return false;
-      }
-    },
-    { message: "Total amount out of valid range" },
-  ),
+  totalAmount: z
+    .string()
+    .regex(/^\d+$/)
+    .refine(
+      (val) => {
+        try {
+          const n = BigInt(val);
+          return n > 0n && n <= BigInt("18446744073709551615");
+        } catch {
+          return false;
+        }
+      },
+      { message: "Total amount out of valid range" },
+    ),
   recipients: z.array(payrollRecipientSchema).min(1).max(10),
 });
 
@@ -129,7 +156,8 @@ export async function POST(request: Request) {
             memo: r.memo ?? null,
             payloadHash: Buffer.from(r.payloadHash),
             invariants: JSON.stringify(r.invariants),
-            commitmentClaim: r.commitmentClaim === undefined ? null : JSON.stringify(r.commitmentClaim),
+            commitmentClaim:
+              r.commitmentClaim === undefined ? null : JSON.stringify(r.commitmentClaim),
             signature: r.signature ?? null,
           })),
         },
@@ -161,10 +189,7 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json({ error: "Payroll draft already exists." }, { status: 409 });
     }
     console.error("[api/payrolls] create failed:", error);

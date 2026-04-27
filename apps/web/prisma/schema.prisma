@@ -32,6 +32,17 @@ model StealthInvoice {
   status              String
   expiresAt           DateTime
   createdAt           DateTime @default(now())
+  claimedAt           DateTime?
+  claimedBy           String?
+  
+  // Cloak UTXO data for claim
+  utxoAmount          String?
+  utxoPrivateKey      String?
+  utxoPublicKey       String?
+  utxoBlinding        String?
+  utxoMint            String?
+  utxoLeafIndex       Int?
+  utxoCommitment      String?
 
   @@index([cofreAddress])
   @@index([stealthPubkey])

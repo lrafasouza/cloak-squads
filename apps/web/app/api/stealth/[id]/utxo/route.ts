@@ -1,0 +1,39 @@
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const {
+      utxoAmount,
+      utxoPrivateKey,
+      utxoPublicKey,
+      utxoBlinding,
+      utxoMint,
+      utxoLeafIndex,
+      utxoCommitment,
+    } = body;
+
+    const invoice = await prisma.stealthInvoice.update({
+      where: { id },
+      data: {
+        utxoAmount,
+        utxoPrivateKey,
+        utxoPublicKey,
+        utxoBlinding,
+        utxoMint,
+        utxoLeafIndex,
+        utxoCommitment,
+      },
+    });
+
+    return NextResponse.json(invoice);
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "Could not update UTXO data";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

@@ -1,11 +1,18 @@
 "use client";
 
-import { useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
+import { Button } from "@/components/ui/button";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import {
+  CLOAK_PROGRAM_ID,
+  NATIVE_SOL_MINT,
+  createUtxo,
+  deriveUtxoKeypairFromSpendKey,
+  fullWithdraw,
+} from "@cloak.dev/sdk-devnet";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 
 type StealthInvoice = {
   id: string;
@@ -18,6 +25,14 @@ type StealthInvoice = {
   status: string;
   expiresAt: string;
   createdAt: string;
+  // UTXO data for claim
+  utxoAmount: string | null;
+  utxoPrivateKey: string | null;
+  utxoPublicKey: string | null;
+  utxoBlinding: string | null;
+  utxoMint: string | null;
+  utxoLeafIndex: number | null;
+  utxoCommitment: string | null;
 };
 
 type ClaimState = "loading" | "invalid" | "expired" | "claimed" | "voided" | "ready";
@@ -39,6 +54,7 @@ function base64urlDecode(str: string): Uint8Array {
 
 export default function ClaimPage({ params }: { params: Promise<{ stealthId: string }> }) {
   const { stealthId } = use(params);
+  const { connection } = useConnection();
   const wallet = useWallet();
 
   const [invoice, setInvoice] = useState<StealthInvoice | null>(null);
@@ -152,16 +168,58 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
     setError(null);
 
     try {
-      // TODO: Integrate with real fullWithdraw instruction
-      // For now, simulate the claim process
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Check if UTXO data is available for real claim
+      if (
+        invoice.utxoAmount &&
+        invoice.utxoPrivateKey &&
+        invoice.utxoBlinding &&
+        invoice.utxoMint &&
+        invoice.utxoCommitment
+      ) {
+        // Reconstruct UTXO for fullWithdraw
+        const spendKeyBytes = new Uint8Array(32);
+        const skHex = invoice.utxoPrivateKey.padStart(64, "0");
+        for (let i = 0; i < 32; i++) {
+          spendKeyBytes[i] = Number.parseInt(skHex.slice(i * 2, i * 2 + 2), 16);
+        }
 
-      // Mock: update status to claimed (in real implementation this would be done via on-chain tx)
-      console.log("Claiming invoice:", invoice.id, "with secret:", Buffer.from(secretKey!).toString("hex"));
-      console.log("Connected wallet:", wallet.publicKey.toBase58());
+        const keypair = await deriveUtxoKeypairFromSpendKey(spendKeyBytes);
+        const mint = new PublicKey(invoice.utxoMint);
+        const amount = BigInt(invoice.utxoAmount);
+        const utxo = await createUtxo(amount, keypair, mint);
+        utxo.blinding = BigInt(`0x${invoice.utxoBlinding}`);
+        if (invoice.utxoLeafIndex !== null) {
+          utxo.index = invoice.utxoLeafIndex;
+        }
 
-      // TODO: After successful on-chain claim, update status via API
-      // await fetch(`/api/stealth/${invoice.id}/claim`, { method: "POST" });
+        const result = await fullWithdraw(
+          [utxo],
+          wallet.publicKey,
+          {
+            connection,
+            programId: CLOAK_PROGRAM_ID,
+            relayUrl: "https://api.devnet.cloak.ag",
+            signTransaction: wallet.signTransaction,
+            depositorPublicKey: wallet.publicKey,
+            onProgress: (s: string) => console.error(`[cloak-claim] ${s}`),
+            onProofProgress: (p: number) => console.error(`[cloak-claim] proof ${p}%`),
+          } as Parameters<typeof fullWithdraw>[2],
+        );
+
+        console.log("Claim tx:", result.signature);
+      }
+
+      // Call API to mark invoice as claimed
+      const response = await fetch(`/api/stealth/${invoice.id}/claim`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claimedBy: wallet.publicKey.toBase58() }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Failed to claim invoice");
+      }
 
       setClaimState("claimed");
     } catch (caught) {
@@ -286,16 +344,20 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
               </span>
             </div>
             <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Claim Invoice</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-300">
-              {getStateMessage()}
-            </p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-300">{getStateMessage()}</p>
           </div>
 
           {invoice ? (
             <div className="flex flex-col gap-2 text-right">
-              <p className="text-sm text-neutral-500">Cofre: {truncateAddress(invoice.cofreAddress)}</p>
-              <p className="text-sm text-neutral-500">Created: {new Date(invoice.createdAt).toLocaleDateString()}</p>
-              <p className="text-sm text-neutral-500">Expires: {new Date(invoice.expiresAt).toLocaleDateString()}</p>
+              <p className="text-sm text-neutral-500">
+                Cofre: {truncateAddress(invoice.cofreAddress)}
+              </p>
+              <p className="text-sm text-neutral-500">
+                Created: {new Date(invoice.createdAt).toLocaleDateString()}
+              </p>
+              <p className="text-sm text-neutral-500">
+                Expires: {new Date(invoice.expiresAt).toLocaleDateString()}
+              </p>
             </div>
           ) : null}
         </div>
@@ -318,12 +380,16 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                 <div>
                   <dt className="text-xs text-neutral-500">Amount</dt>
                   <dd className="mt-1 font-mono text-sm text-neutral-300">
-                    {invoice.amountHint ? `${Number(invoice.amountHint).toLocaleString()} lamports` : "Hidden"}
+                    {invoice.amountHint
+                      ? `${Number(invoice.amountHint).toLocaleString()} lamports`
+                      : "Hidden"}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-neutral-500">Stealth Pubkey</dt>
-                  <dd className="mt-1 break-all font-mono text-xs text-neutral-300">{invoice.stealthPubkey}</dd>
+                  <dd className="mt-1 break-all font-mono text-xs text-neutral-300">
+                    {invoice.stealthPubkey}
+                  </dd>
                 </div>
                 {invoice.memo ? (
                   <div className="md:col-span-2">
@@ -338,12 +404,14 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
               <section className="mt-8 rounded-lg border border-neutral-800 bg-neutral-900 p-6">
                 <h3 className="font-semibold text-neutral-50">Claim Funds</h3>
                 <p className="mt-2 text-sm text-neutral-300">
-                  Connect your wallet and click the button below to claim the funds.
-                  This will execute a full withdrawal to your connected wallet.
+                  Connect your wallet and click the button below to claim the funds. This will
+                  execute a full withdrawal to your connected wallet.
                 </p>
 
                 {!wallet.publicKey ? (
-                  <p className="mt-4 text-sm text-amber-300">Please connect your wallet to continue.</p>
+                  <p className="mt-4 text-sm text-amber-300">
+                    Please connect your wallet to continue.
+                  </p>
                 ) : (
                   <div className="mt-4">
                     <p className="mb-3 text-sm text-neutral-400">
@@ -365,7 +433,9 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
               <section className="mt-8 rounded-lg border border-neutral-800 bg-neutral-900 p-6 text-center">
                 <p className={`text-lg font-medium ${getStateColor()}`}>{getStateMessage()}</p>
                 {claimState === "expired" ? (
-                  <p className="mt-2 text-sm text-neutral-400">This invoice expired on {new Date(invoice.expiresAt).toLocaleString()}.</p>
+                  <p className="mt-2 text-sm text-neutral-400">
+                    This invoice expired on {new Date(invoice.expiresAt).toLocaleString()}.
+                  </p>
                 ) : null}
                 <Link
                   href="/"

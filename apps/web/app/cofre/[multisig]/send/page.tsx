@@ -1,20 +1,25 @@
 "use client";
 
-import { computePayloadHash } from "@cloak-squads/core/hashing";
-import type { PayloadInvariants } from "@cloak-squads/core/types";
-import { computeCommitment } from "@cloak.dev/sdk-devnet";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { type FormEvent, use, useMemo, useState } from "react";
 import { ProofGenerationState, type ProofStepId } from "@/components/proof/ProofGenerationState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
+import { computePayloadHash } from "@cloak-squads/core/hashing";
+import type { PayloadInvariants } from "@cloak-squads/core/types";
+import {
+  NATIVE_SOL_MINT,
+  computeUtxoCommitment,
+  createUtxo,
+  generateUtxoKeypair,
+} from "@cloak.dev/sdk-devnet";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { type FormEvent, use, useMemo, useState } from "react";
 
 function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
@@ -66,27 +71,25 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       const recipientPubkey = new PublicKey(recipient.trim());
       setProofStep("generate-witness");
 
-      const r = bytesToHex(randomBytes(32));
-      const sk_spend = bytesToHex(randomBytes(32));
-      
-      // Compute commitment using SDK (deterministic from r and sk_spend)
-      const commitmentBigInt = await computeCommitment(
-        BigInt(amount),
-        BigInt("0x" + r),
-        BigInt("0x" + sk_spend),
-      );
+      // Generate real Cloak UTXO commitment
+      const keypair = await generateUtxoKeypair();
+      const mint = NATIVE_SOL_MINT;
+      const utxo = await createUtxo(BigInt(amount), keypair, mint);
+      const commitmentBigInt = await computeUtxoCommitment(utxo);
       const commitment = commitmentBigInt.toString(16).padStart(64, "0");
-      
+
       const note = {
         commitment,
-        r,
-        sk_spend,
+        keypairPrivateKey: keypair.privateKey.toString(16).padStart(64, "0"),
+        keypairPublicKey: keypair.publicKey.toString(16).padStart(64, "0"),
+        blinding: utxo.blinding.toString(16).padStart(64, "0"),
+        tokenMint: mint.toBase58(),
       };
       const invariants: PayloadInvariants = {
         nullifier: randomBytes(32),
         commitment: hexToBytes(commitment),
         amount: BigInt(amount),
-        tokenMint: SystemProgram.programId,
+        tokenMint: mint,
         recipientVkPub: recipientPubkey.toBytes(),
         nonce: randomBytes(16),
       };
@@ -109,11 +112,12 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       const transactionIndex = result.transactionIndex.toString();
       const claim = {
         amount: invariants.amount.toString(),
-        r: note.r,
-        sk_spend: note.sk_spend,
-        commitment: commitmentHex,
+        keypairPrivateKey: note.keypairPrivateKey,
+        keypairPublicKey: note.keypairPublicKey,
+        blinding: note.blinding,
+        commitment: commitment,
         recipient_vk: recipientPubkey.toBase58(),
-        token_mint: SystemProgram.programId.toBase58(),
+        token_mint: mint.toBase58(),
       };
       const draft = {
         cofreAddress: multisigAddress.toBase58(),
@@ -150,11 +154,11 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
           `claim:${multisigAddress.toBase58()}:${transactionIndex}`,
           JSON.stringify(claim),
         );
-      } catch { /* sessionStorage full or unavailable */ }
+      } catch {
+        /* sessionStorage full or unavailable */
+      }
 
-      router.push(
-        `/cofre/${multisigAddress.toBase58()}/proposals/${transactionIndex}`,
-      );
+      router.push(`/cofre/${multisigAddress.toBase58()}/proposals/${transactionIndex}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not create proposal.");
     } finally {
@@ -178,7 +182,10 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
     <main className="min-h-screen">
       <header className="border-b border-neutral-800 bg-neutral-950/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link href={`/cofre/${multisigAddress.toBase58()}`} className="text-sm font-semibold text-neutral-100">
+          <Link
+            href={`/cofre/${multisigAddress.toBase58()}`}
+            className="text-sm font-semibold text-neutral-100"
+          >
             Cofre
           </Link>
           <ClientWalletButton />
@@ -196,7 +203,10 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         </div>
 
         <div className="grid gap-4">
-          <form onSubmit={createProposal} className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 md:p-5">
+          <form
+            onSubmit={createProposal}
+            className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 md:p-5"
+          >
             <div className="grid gap-4">
               <div>
                 <Label htmlFor="amount">Amount in lamports</Label>
@@ -259,7 +269,11 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
             ) : null}
           </form>
 
-          <ProofGenerationState currentStep={proofStep} complete={Boolean(payloadHash)} error={error} />
+          <ProofGenerationState
+            currentStep={proofStep}
+            complete={Boolean(payloadHash)}
+            error={error}
+          />
         </div>
       </section>
     </main>

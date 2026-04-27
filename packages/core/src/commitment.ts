@@ -1,7 +1,13 @@
 export type CommitmentClaim = {
   amount: string | number;
-  r: string;
-  sk_spend: string;
+  // Legacy fields (kept for backward compat)
+  r?: string | undefined;
+  sk_spend?: string | undefined;
+  // UTXO fields (new Cloak scheme)
+  keypairPrivateKey?: string | undefined;
+  keypairPublicKey?: string | undefined;
+  blinding?: string | undefined;
+  tokenMint?: string | undefined;
   commitment: string;
   recipient_vk: string;
   token_mint: string;
@@ -9,8 +15,14 @@ export type CommitmentClaim = {
 
 export type CommitmentNote = {
   amount: string | number;
-  r: string;
-  sk_spend: string;
+  // Legacy fields
+  r?: string | undefined;
+  sk_spend?: string | undefined;
+  // UTXO fields
+  keypairPrivateKey?: string | undefined;
+  keypairPublicKey?: string | undefined;
+  blinding?: string | undefined;
+  tokenMint?: string | undefined;
   commitment: string;
 };
 
@@ -33,13 +45,19 @@ export function commitmentBigintToBytes(value: bigint): Uint8Array {
 
 export async function recomputeCommitment(claim: CommitmentClaim): Promise<Uint8Array> {
   if (!_computeCommitmentFn) {
-    throw new Error("computeCommitment not registered — call registerComputeCommitmentFn at app init");
+    throw new Error(
+      "computeCommitment not registered — call registerComputeCommitmentFn at app init",
+    );
   }
   const note: CommitmentNote = {
     amount: claim.amount,
+    commitment: "",
     r: claim.r,
     sk_spend: claim.sk_spend,
-    commitment: "",
+    keypairPrivateKey: claim.keypairPrivateKey,
+    keypairPublicKey: claim.keypairPublicKey,
+    blinding: claim.blinding,
+    tokenMint: claim.tokenMint,
   };
   const result = await _computeCommitmentFn(note);
   return commitmentBigintToBytes(result);

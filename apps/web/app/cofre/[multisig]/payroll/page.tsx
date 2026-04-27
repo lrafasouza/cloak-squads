@@ -1,20 +1,29 @@
 "use client";
 
-import { computePayloadHash } from "@cloak-squads/core/hashing";
-import type { PayloadInvariants } from "@cloak-squads/core/types";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { computeCommitment } from "@cloak.dev/sdk-devnet";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { type ChangeEvent, type FormEvent, use, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
+import {
+  type PayrollRecipientInput,
+  formatPayrollCsvTemplate,
+  parsePayrollCsv,
+} from "@/lib/payroll-csv";
 import { createBatchIssueLicenseProposal } from "@/lib/squads-sdk";
-import { parsePayrollCsv, formatPayrollCsvTemplate, type PayrollRecipientInput } from "@/lib/payroll-csv";
+import { computePayloadHash } from "@cloak-squads/core/hashing";
+import type { PayloadInvariants } from "@cloak-squads/core/types";
+import {
+  NATIVE_SOL_MINT,
+  computeUtxoCommitment,
+  createUtxo,
+  generateUtxoKeypair,
+} from "@cloak.dev/sdk-devnet";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { type ChangeEvent, type FormEvent, use, useMemo, useState } from "react";
 
 function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
@@ -45,16 +54,19 @@ type RecipientNote = {
   memo: string | undefined;
   note: {
     commitment: string;
-    r: string;
-    sk_spend: string;
+    keypairPrivateKey: string;
+    keypairPublicKey: string;
+    blinding: string;
+    tokenMint: string;
   };
   invariants: PayloadInvariants;
   hash: Uint8Array;
   instruction: Awaited<ReturnType<typeof buildIssueLicenseIxBrowser>>["instruction"];
   claim: {
     amount: number;
-    r: string;
-    sk_spend: string;
+    keypairPrivateKey: string;
+    keypairPublicKey: string;
+    blinding: string;
     commitment: string;
     recipient_vk: string;
     token_mint: string;
@@ -131,27 +143,26 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       const notes: RecipientNote[] = [];
       for (const recipient of recipients) {
         const recipientPubkey = new PublicKey(recipient.wallet);
-        const r = bytesToHex(randomBytes(32));
-        const sk_spend = bytesToHex(randomBytes(32));
-        
-        // Compute commitment using SDK (deterministic from r and sk_spend)
-        const commitmentBigInt = await computeCommitment(
-          BigInt(recipient.amount),
-          BigInt("0x" + r),
-          BigInt("0x" + sk_spend),
-        );
+
+        // Generate real Cloak UTXO commitment
+        const keypair = await generateUtxoKeypair();
+        const mint = NATIVE_SOL_MINT;
+        const utxo = await createUtxo(BigInt(recipient.amount), keypair, mint);
+        const commitmentBigInt = await computeUtxoCommitment(utxo);
         const commitment = commitmentBigInt.toString(16).padStart(64, "0");
-        
+
         const note = {
           commitment,
-          r,
-          sk_spend,
+          keypairPrivateKey: keypair.privateKey.toString(16).padStart(64, "0"),
+          keypairPublicKey: keypair.publicKey.toString(16).padStart(64, "0"),
+          blinding: utxo.blinding.toString(16).padStart(64, "0"),
+          tokenMint: mint.toBase58(),
         };
         const invariants: PayloadInvariants = {
           nullifier: randomBytes(32),
           commitment: hexToBytes(note.commitment),
           amount: BigInt(recipient.amount),
-          tokenMint: SystemProgram.programId,
+          tokenMint: mint,
           recipientVkPub: recipientPubkey.toBytes(),
           nonce: randomBytes(16),
         };
@@ -174,11 +185,12 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
           instruction,
           claim: {
             amount: Number(invariants.amount),
-            r: note.r,
-            sk_spend: note.sk_spend,
+            keypairPrivateKey: note.keypairPrivateKey,
+            keypairPublicKey: note.keypairPublicKey,
+            blinding: note.blinding,
             commitment: note.commitment,
             recipient_vk: recipientPubkey.toBase58(),
-            token_mint: SystemProgram.programId.toBase58(),
+            token_mint: mint.toBase58(),
           },
         });
       }
@@ -259,7 +271,9 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
             `claim:${multisigAddress.toBase58()}:${transactionIndex}:${i}`,
             JSON.stringify(n.claim),
           );
-        } catch { /* sessionStorage full or unavailable */ }
+        } catch {
+          /* sessionStorage full or unavailable */
+        }
       }
 
       router.push(`/cofre/${multisigAddress.toBase58()}/proposals/${transactionIndex}`);
@@ -284,7 +298,10 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     <main className="min-h-screen">
       <header className="border-b border-neutral-800 bg-neutral-950/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link href={`/cofre/${multisigAddress.toBase58()}`} className="text-sm font-semibold text-neutral-100">
+          <Link
+            href={`/cofre/${multisigAddress.toBase58()}`}
+            className="text-sm font-semibold text-neutral-100"
+          >
             Cofre
           </Link>
           <ClientWalletButton />
@@ -296,8 +313,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
           <p className="text-sm font-medium text-emerald-300">F2 payroll</p>
           <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Batch private send</h1>
           <p className="mt-3 text-sm leading-6 text-neutral-300">
-            Upload a CSV with recipient names, wallet addresses, and amounts. One Squads
-            proposal will contain all {recipients.length > 0 && `(${recipients.length}) `}private transfer
+            Upload a CSV with recipient names, wallet addresses, and amounts. One Squads proposal
+            will contain all {recipients.length > 0 && `(${recipients.length}) `}private transfer
             instructions for signer approval.
           </p>
           <p className="mt-3 text-xs text-neutral-400">Max 10 recipients per batch in V1.</p>
@@ -377,7 +394,9 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                     </tbody>
                     <tfoot>
                       <tr className="border-t border-neutral-700 font-semibold">
-                        <td colSpan={2} className="py-2 pr-4 text-neutral-100">Total</td>
+                        <td colSpan={2} className="py-2 pr-4 text-neutral-100">
+                          Total
+                        </td>
                         <td className="py-2 pr-4 text-right font-mono text-emerald-300">
                           {Number(totalAmount).toLocaleString()}
                         </td>

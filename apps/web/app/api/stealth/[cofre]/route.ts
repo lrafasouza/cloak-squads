@@ -32,6 +32,14 @@ export async function GET(_request: Request, context: { params: Promise<{ cofre:
         status: invoice.status,
         expiresAt: invoice.expiresAt.toISOString(),
         createdAt: invoice.createdAt.toISOString(),
+        // UTXO data for claim
+        utxoAmount: invoice.utxoAmount,
+        utxoPrivateKey: invoice.utxoPrivateKey,
+        utxoPublicKey: invoice.utxoPublicKey,
+        utxoBlinding: invoice.utxoBlinding,
+        utxoMint: invoice.utxoMint,
+        utxoLeafIndex: invoice.utxoLeafIndex,
+        utxoCommitment: invoice.utxoCommitment,
       })),
     );
   } catch (error) {

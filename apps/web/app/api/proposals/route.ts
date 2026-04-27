@@ -1,18 +1,39 @@
-import { Prisma } from "@prisma/client";
-import { headers } from "next/headers";
-import { PublicKey } from "@solana/web3.js";
-import { NextResponse } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { serializeDraft } from "@/lib/serialize-proposal-draft";
+import { Prisma } from "@prisma/client";
+import { PublicKey } from "@solana/web3.js";
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
+import { z } from "zod";
 
 const byteArraySchema = z.array(z.number().int().min(0).max(255));
 
 const commitmentClaimSchema = z.object({
   amount: z.number().int().positive(),
-  r: z.string().regex(/^[0-9a-fA-F]{64}$/),
-  sk_spend: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  // Legacy fields (backward compat)
+  r: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/)
+    .optional(),
+  sk_spend: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/)
+    .optional(),
+  // UTXO fields (new Cloak scheme)
+  keypairPrivateKey: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/)
+    .optional(),
+  keypairPublicKey: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/)
+    .optional(),
+  blinding: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/)
+    .optional(),
+  tokenMint: z.string().min(32).max(44).optional(),
   commitment: z.string().regex(/^[0-9a-fA-F]{64}$/),
   recipient_vk: z.string().min(32).max(44),
   token_mint: z.string().min(32).max(44),
@@ -30,17 +51,20 @@ const proposalDraftSchema = z.object({
     { message: "Invalid cofre address" },
   ),
   transactionIndex: z.string().regex(/^\d+$/),
-  amount: z.string().regex(/^\d+$/).refine(
-    (val) => {
-      try {
-        const n = BigInt(val);
-        return n > 0n && n <= BigInt("18446744073709551615");
-      } catch {
-        return false;
-      }
-    },
-    { message: "Amount out of valid range" },
-  ),
+  amount: z
+    .string()
+    .regex(/^\d+$/)
+    .refine(
+      (val) => {
+        try {
+          const n = BigInt(val);
+          return n > 0n && n <= BigInt("18446744073709551615");
+        } catch {
+          return false;
+        }
+      },
+      { message: "Amount out of valid range" },
+    ),
   recipient: z.string().refine(
     (val) => {
       try {
@@ -91,7 +115,10 @@ export async function POST(request: Request) {
 
   const parsed = proposalDraftSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid proposal draft.", details: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid proposal draft.", details: parsed.error.flatten() },
+      { status: 400 },
+    );
   }
 
   try {
@@ -104,17 +131,17 @@ export async function POST(request: Request) {
         memo: parsed.data.memo ?? null,
         payloadHash: Buffer.from(parsed.data.payloadHash),
         invariants: JSON.stringify(parsed.data.invariants),
-        commitmentClaim: parsed.data.commitmentClaim === undefined ? null : JSON.stringify(parsed.data.commitmentClaim),
+        commitmentClaim:
+          parsed.data.commitmentClaim === undefined
+            ? null
+            : JSON.stringify(parsed.data.commitmentClaim),
         signature: parsed.data.signature ?? null,
       },
     });
 
     return NextResponse.json(serializeDraft(draft), { status: 201 });
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json({ error: "Proposal draft already exists." }, { status: 409 });
     }
     console.error("[api/proposals] create failed:", error);

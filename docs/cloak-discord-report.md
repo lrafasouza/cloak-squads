@@ -205,4 +205,4 @@ Paste this into `#dev-help` / `#bugs`:
 ## Update log
 
 - **2026-04-26** — initial report compiled. Discord post pending.
-- Add date + thread link here once posted, plus any responses we get back.
+- **2026-04-27** — **RESOLVED** ✅. Cloak team endorsed the `transact()` workaround. Implemented `cloakDeposit()` wrapper using zero-input deposit pattern. See `packages/core/src/cloak-deposit.ts` and updated `docs/devnet-blocker.md`.
