@@ -48,13 +48,16 @@ export async function POST(request: Request, context: { params: Promise<{ linkId
       return NextResponse.json({ error: "Only the issuer can revoke this link." }, { status: 403 });
     }
 
-    // TODO: Call revoke_audit on-chain
-    // For now, just delete from DB
-    await prisma.auditLink.delete({
+    // Delete from DB and return diversifier for on-chain revocation
+    const deleted = await prisma.auditLink.delete({
       where: { id: linkId },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      diversifier: Array.from(new Uint8Array(deleted.diversifier)),
+      cofreAddress: deleted.cofreAddress,
+    });
   } catch (error) {
     console.error("[api/audit/revoke] failed:", error);
     return NextResponse.json({ error: "Could not revoke audit link." }, { status: 500 });

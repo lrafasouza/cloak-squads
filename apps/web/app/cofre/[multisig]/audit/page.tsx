@@ -4,12 +4,16 @@ import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import {
   type AuditScope,
   base64urlEncode,
+  exportAuditToCSV,
   generateAuditLinkSecret,
+  generateDeterministicMockData,
 } from "@cloak-squads/core/audit";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { buildRevokeAuditIxBrowser } from "@/lib/gatekeeper-instructions";
+import { createIssueLicenseProposal } from "@/lib/squads-sdk";
 
 type AuditLinkSummary = {
   id: string;
@@ -27,6 +31,7 @@ function truncateAddress(address: string) {
 export default function AuditAdminPage({ params }: { params: Promise<{ multisig: string }> }) {
   const { multisig } = use(params);
   const wallet = useWallet();
+  const { connection } = useConnection();
 
   const multisigAddress = useMemo(() => {
     try {
@@ -135,9 +140,9 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
   };
 
   const handleRevokeLink = async (linkId: string) => {
-    if (!wallet.publicKey || !wallet.signMessage) return;
+    if (!wallet.publicKey || !wallet.signMessage || !connection) return;
 
-    if (!confirm("Revoke this audit link? This action cannot be undone.")) return;
+    if (!confirm("Revoke this audit link? This will create a Squads proposal to revoke it on-chain.")) return;
 
     try {
       const message = `revoke-audit-link:${linkId}:${wallet.publicKey.toBase58()}`;
@@ -153,23 +158,62 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
         }),
       });
 
-      if (res.ok) {
-        void loadLinks();
-      } else {
+      if (!res.ok) {
         const error = await res.json();
         alert(error.error || "Failed to revoke link");
+        return;
       }
+
+      const data = await res.json();
+      if (!data.success || !data.diversifier || !data.cofreAddress) {
+        alert("Failed to get revocation data");
+        return;
+      }
+
+      // Create on-chain revocation proposal via Squads
+      const multisigAddress = new PublicKey(data.cofreAddress);
+      const diversifier = new Uint8Array(data.diversifier);
+
+      const { instruction } = await buildRevokeAuditIxBrowser({
+        multisig: multisigAddress,
+        diversifier,
+      });
+
+      const result = await createIssueLicenseProposal({
+        connection,
+        wallet,
+        multisigPda: multisigAddress,
+        issueLicenseIx: instruction,
+        memo: `revoke audit: ${linkId}`,
+      });
+
+      alert(`Revocation proposal created! Transaction index: ${result.transactionIndex.toString()}`);
+      void loadLinks();
     } catch (err) {
       console.error("Failed to revoke link:", err);
-      alert("Failed to revoke link");
+      alert(err instanceof Error ? err.message : "Failed to revoke link");
     }
   };
 
   const exportToCSV = (link: AuditLinkSummary) => {
-    // TODO: Fetch actual transaction data and export
-    const headers = ["timestamp", "type", "amount", "nullifier", "status"];
-    const csvContent = headers.join(",");
-    const blob = new Blob([csvContent], { type: "text/csv" });
+    // Generate deterministic mock data based on linkId
+    const scopeParams = link.scopeParams ? JSON.parse(link.scopeParams) : undefined;
+    const mockData = generateDeterministicMockData(link.id, 8);
+    
+    // Filter by scope (time_ranged only; full/amounts_only pass through)
+    let filtered = mockData;
+    if (link.scope === "time_ranged" && scopeParams?.startDate && scopeParams?.endDate) {
+      filtered = mockData.filter(
+        (tx) =>
+          tx.timestamp >= scopeParams.startDate && tx.timestamp <= scopeParams.endDate,
+      );
+    }
+    if (link.scope === "amounts_only") {
+      filtered = filtered.map((tx) => ({ ...tx, amount: undefined }));
+    }
+
+    const csv = exportAuditToCSV(filtered);
+    const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
