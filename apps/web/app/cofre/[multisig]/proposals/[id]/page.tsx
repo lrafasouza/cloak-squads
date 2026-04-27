@@ -66,6 +66,7 @@ export default function ProposalApprovalPage({
   const [status, setStatus] = useState<ProposalStatusKind | "loading" | "missing">("loading");
   const [approvals, setApprovals] = useState<number>(0);
   const [threshold, setThreshold] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     try {
@@ -155,6 +156,13 @@ export default function ProposalApprovalPage({
     status !== "active";
   const executeBlocked = status !== "approved";
 
+  function copyProposalLink() {
+    void navigator.clipboard.writeText(window.location.href).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   return (
     <main className="min-h-screen">
       <header className="border-b border-neutral-800 bg-neutral-950/95">
@@ -174,6 +182,21 @@ export default function ProposalApprovalPage({
             Review the decrypted transfer claim, verify the commitment, then submit your Squads
             vote.
           </p>
+          <div className="mt-4 flex items-start gap-3 rounded-md border border-neutral-800 bg-neutral-900 p-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-neutral-100">Share with other signers</p>
+              <p className="mt-1 break-all font-mono text-xs text-neutral-400">
+                {typeof window !== "undefined" ? window.location.href : ""}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={copyProposalLink}
+              className="shrink-0 rounded-md border border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-100 transition hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+            >
+              {copied ? "Copied!" : "Copy link"}
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-4">
