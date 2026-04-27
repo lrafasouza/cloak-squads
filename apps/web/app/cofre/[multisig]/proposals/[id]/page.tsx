@@ -1,7 +1,8 @@
 "use client";
 
 import type { CommitmentClaim } from "@cloak-squads/core/commitment";
-import { useConnection } from "@solana/wallet-adapter-react";
+import { getMemberVote, type MemberVote } from "@cloak-squads/core/proposal-vote";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import Link from "next/link";
@@ -57,6 +58,7 @@ export default function ProposalApprovalPage({
 }) {
   const { multisig: multisigParam, id } = use(params);
   const { connection } = useConnection();
+  const wallet = useWallet();
   const [commitmentState, setCommitmentState] = useState<CommitmentCheckState>("checking");
   const [signature, setSignature] = useState<string | null>(null);
   const [executeSignature, setExecuteSignature] = useState<string | null>(null);
@@ -66,6 +68,7 @@ export default function ProposalApprovalPage({
   const [status, setStatus] = useState<ProposalStatusKind | "loading" | "missing">("loading");
   const [approvals, setApprovals] = useState<number>(0);
   const [threshold, setThreshold] = useState<number | null>(null);
+  const [memberVote, setMemberVote] = useState<MemberVote>(null);
   const [copied, setCopied] = useState(false);
   const [proposalUrl, setProposalUrl] = useState("");
 
@@ -112,6 +115,7 @@ export default function ProposalApprovalPage({
       const proposal = await multisig.accounts.Proposal.fromAccountAddress(connection, proposalPda);
       setStatus(readProposalStatus(proposal.status));
       setApprovals(proposal.approved.length);
+      setMemberVote(getMemberVote(proposal, wallet.publicKey?.toBase58()));
 
       if (threshold === null) {
         try {
@@ -124,8 +128,9 @@ export default function ProposalApprovalPage({
     } catch (err) {
       console.warn("[proposals] could not load proposal status:", err);
       setStatus("missing");
+      setMemberVote(null);
     }
-  }, [connection, multisigParam, id, threshold]);
+  }, [connection, multisigParam, id, threshold, wallet.publicKey]);
 
   useEffect(() => {
     void refreshStatus();
@@ -138,8 +143,9 @@ export default function ProposalApprovalPage({
   }, [status, refreshStatus]);
 
   const onVoteSubmitted = useCallback(
-    (sig: string) => {
+    (sig: string, kind: "approve" | "reject") => {
       setSignature(sig);
+      setMemberVote(kind === "approve" ? "approved" : "rejected");
       setTimeout(() => void refreshStatus(), 1500);
     },
     [refreshStatus],
@@ -156,6 +162,7 @@ export default function ProposalApprovalPage({
     (commitmentClaim !== null && commitmentState === "mismatch") ||
     status !== "active";
   const executeBlocked = status !== "approved";
+  const executeComplete = status === "executed" || executeSignature !== null;
 
   useEffect(() => {
     setProposalUrl(window.location.href);
@@ -274,32 +281,56 @@ export default function ProposalApprovalPage({
 
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
             <h2 className="mb-4 text-base font-semibold text-neutral-50">Vote</h2>
-            <ApprovalButtons
-              multisig={multisigParam}
-              transactionIndex={id}
-              disabled={approveBlocked}
-              onSubmitted={onVoteSubmitted}
-            />
+            {memberVote ? (
+              <div className="rounded-md border border-emerald-900 bg-emerald-950 p-3">
+                <p className="text-sm font-medium text-emerald-100">
+                  You already {memberVote === "approved" ? "approved" : memberVote === "rejected" ? "rejected" : "cancelled"} this proposal.
+                </p>
+                <p className="mt-1 text-xs text-emerald-200/80">
+                  Squads records one vote per member. The proposal can still move forward when
+                  the threshold is reached.
+                </p>
+              </div>
+            ) : (
+              <ApprovalButtons
+                multisig={multisigParam}
+                transactionIndex={id}
+                disabled={approveBlocked}
+                onSubmitted={onVoteSubmitted}
+              />
+            )}
             {signature ? <p className="mt-3 break-all font-mono text-xs text-emerald-200">{signature}</p> : null}
           </section>
 
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
             <h2 className="mb-4 text-base font-semibold text-neutral-50">Execute</h2>
-            <ExecuteButton
-              multisig={multisigParam}
-              transactionIndex={id}
-              onSubmitted={onExecuteSubmitted}
-              disabled={executeBlocked}
-            />
-            {executeBlocked && status !== "loading" ? (
+            {executeComplete ? (
+              <div className="rounded-md border border-emerald-900 bg-emerald-950 p-3">
+                <p className="text-sm font-medium text-emerald-100">
+                  Vault transaction executed.
+                </p>
+                <p className="mt-1 text-xs text-emerald-200/80">
+                  The Squads proposal is complete. The operator flow can now use the issued
+                  license.
+                </p>
+                {executeSignature ? (
+                  <p className="mt-3 break-all font-mono text-xs text-emerald-200">{executeSignature}</p>
+                ) : null}
+              </div>
+            ) : (
+              <ExecuteButton
+                multisig={multisigParam}
+                transactionIndex={id}
+                onSubmitted={onExecuteSubmitted}
+                disabled={executeBlocked}
+              />
+            )}
+            {!executeComplete && executeBlocked && status !== "loading" ? (
               <p className="mt-2 text-xs text-neutral-400">
                 {status === "active" && threshold !== null
                   ? `Need ${Math.max(0, threshold - approvals)} more approval(s) before executing.`
                   : `Execute requires status = approved. Current: ${status}.`}
               </p>
-            ) : null}
-            {executeSignature ? (
-              <p className="mt-3 break-all font-mono text-xs text-emerald-200">{executeSignature}</p>
             ) : null}
           </section>
         </div>
