@@ -69,7 +69,7 @@ test("e2e full flow: 1 single + 3 batch licenses all consumed", async () => {
       nullifier: new Uint8Array(32).fill(diversifierByte),
       commitment: new Uint8Array(32).fill(diversifierByte + 1),
       amount,
-      tokenMint: mint.toBytes(),
+      tokenMint: mint,
       recipientVkPub: new Uint8Array(32).fill(diversifierByte + 2),
       nonce: new Uint8Array(16).fill(diversifierByte + 3),
     };
