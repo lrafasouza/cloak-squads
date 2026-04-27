@@ -89,11 +89,18 @@ async function listWalletMultisigs(
       account: { data: Buffer.alloc(0) }, // Will fetch separately
     }));
     
-    // Fetch account data in parallel batches
-    const accountInfos = await connection.getMultipleAccountsInfo(
-      accountsWithData.map(a => a.pubkey),
-      "confirmed",
-    );
+    // Fetch account data in parallel batches (max 100 per call)
+    const BATCH_SIZE = 100;
+    const accountInfos: (import("@solana/web3.js").AccountInfo<Buffer> | null)[] = [];
+    
+    for (let i = 0; i < accountsWithData.length; i += BATCH_SIZE) {
+      const batch = accountsWithData.slice(i, i + BATCH_SIZE);
+      const batchInfos = await connection.getMultipleAccountsInfo(
+        batch.map(a => a.pubkey),
+        "confirmed",
+      );
+      accountInfos.push(...batchInfos);
+    }
     
     const validAccounts = accountInfos
       .map((info, idx) => (info ? { pubkey: accountsWithData[idx].pubkey, account: { data: Buffer.from(info.data) } } : null))
