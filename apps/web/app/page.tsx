@@ -7,10 +7,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useMemo, useState, useCallback } from "react";
 
-function truncateAddress(address: string) {
-  return `${address.slice(0, 4)}...${address.slice(-4)}`;
-}
-
 export default function HomePage() {
   const router = useRouter();
   const wallet = useWallet();
