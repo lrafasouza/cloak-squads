@@ -123,3 +123,34 @@ export async function buildExecuteWithLicenseIxBrowser(params: {
     data: Buffer.from(data),
   });
 }
+
+export async function buildRevokeAuditIxBrowser(params: {
+  multisig: PublicKey;
+  diversifier: Uint8Array;
+}) {
+  const gatekeeperProgram = new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID);
+  const cofre = cofrePda(params.multisig, gatekeeperProgram)[0];
+  const squadsProgram = new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID);
+  const vault = squadsVaultPda(params.multisig, squadsProgram)[0];
+
+  // Take first 16 bytes of diversifier as diversifier_trunc
+  const diversifierTrunc = params.diversifier.slice(0, 16);
+
+  const discriminator = await anchorDiscriminator("revoke_audit");
+  const data = concatBytes(discriminator, diversifierTrunc);
+
+  return {
+    cofre,
+    vault,
+    instruction: new TransactionInstruction({
+      programId: gatekeeperProgram,
+      keys: [
+        { pubkey: cofre, isSigner: false, isWritable: true },
+        { pubkey: vault, isSigner: true, isWritable: false },
+        { pubkey: vault, isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: Buffer.from(data),
+    }),
+  };
+}

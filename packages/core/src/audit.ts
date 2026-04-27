@@ -218,3 +218,52 @@ export function base64urlEncode(bytes: Uint8Array): string {
     .join("");
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
+
+/**
+ * Deterministic pseudo-random generator using a string seed.
+ * Produces consistent mock data for the same linkId.
+ */
+function seededRandom(seed: string) {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash + char) | 0;
+  }
+  return () => {
+    hash = ((hash * 16807) % 2147483647) | 0;
+    return (hash >>> 0) / 2147483647;
+  };
+}
+
+/**
+ * Generate deterministic mock audit transactions based on a linkId seed.
+ * Useful for demo and testing when real Cloak scan data is unavailable.
+ */
+export function generateDeterministicMockData(
+  linkId: string,
+  count: number = 5,
+): FilteredAuditTransaction[] {
+  const rand = seededRandom(linkId);
+  const types: Array<"deposit" | "transfer" | "withdraw"> = ["deposit", "transfer", "withdraw"];
+  const statuses: Array<"confirmed" | "pending"> = ["confirmed", "pending"];
+  const now = Date.now();
+
+  return Array.from({ length: count }, (_, i) => {
+    const type = types[Math.floor(rand() * types.length)];
+    const status = statuses[Math.floor(rand() * statuses.length)];
+    const amount = String(Math.floor(rand() * 10_000_000_000) + 100_000);
+    const daysAgo = Math.floor(rand() * 30);
+    const hoursAgo = Math.floor(rand() * 24);
+    const timestamp = now - (daysAgo * 86400000 + hoursAgo * 3600000 + i * 60000);
+
+    return {
+      timestamp,
+      type,
+      amount,
+      nullifier: `${linkId.slice(0, 8)}-${i.toString(16).padStart(4, "0")}-${Buffer.from(
+        Array.from({ length: 8 }, () => Math.floor(rand() * 256)),
+      ).toString("hex")}`,
+      status,
+    };
+  }).sort((a, b) => b.timestamp - a.timestamp);
+}

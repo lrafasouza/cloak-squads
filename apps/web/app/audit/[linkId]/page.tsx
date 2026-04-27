@@ -6,6 +6,7 @@ import {
   deriveViewKeyFromSecret,
   exportAuditToCSV,
   filterAuditData,
+  generateDeterministicMockData,
   validateAuditFragment,
 } from "@cloak-squads/core/audit";
 import Link from "next/link";
@@ -101,23 +102,8 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
     console.log("Derived view key:", Buffer.from(viewKey).toString("hex"));
 
     // TODO: Fetch actual transactions from Cloak scan using viewKey
-    // For now, show mock data
-    const mockData: FilteredAuditTransaction[] = [
-      {
-        timestamp: Date.now() - 86400000 * 2,
-        type: "deposit",
-        amount: "1000000000",
-        nullifier: "abc123...",
-        status: "confirmed",
-      },
-      {
-        timestamp: Date.now() - 86400000,
-        type: "transfer",
-        amount: "500000000",
-        nullifier: "def456...",
-        status: "confirmed",
-      },
-    ];
+    // For now, show deterministic mock data based on linkId
+    const mockData = generateDeterministicMockData(metadata.id, 8);
 
     const filtered = filterAuditData(mockData, metadata.scope, scopeParams);
     setTransactions(filtered);
