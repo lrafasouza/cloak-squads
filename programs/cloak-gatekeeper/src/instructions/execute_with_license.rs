@@ -9,7 +9,11 @@ use crate::events::LicenseConsumed;
 use crate::state::*;
 
 pub const PAYLOAD_DOMAIN_SEP: &[u8] = b"cloak-squads-payload-v1\0";
-pub const CLOAK_MOCK_PROGRAM_ID: Pubkey = pubkey!("2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe");
+#[cfg(not(feature = "mainnet"))]
+pub const CLOAK_PROGRAM_ID: Pubkey = pubkey!("2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe");
+
+#[cfg(feature = "mainnet")]
+pub const CLOAK_PROGRAM_ID: Pubkey = pubkey!("Zc1kHfp4rajSMeASFDwFFgkHRjv7dFQuLheJoQus27h");
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct PayloadInvariants {
@@ -62,7 +66,7 @@ pub fn handler(
     );
     require_keys_eq!(
         ctx.accounts.cloak_program.key(),
-        CLOAK_MOCK_PROGRAM_ID,
+        CLOAK_PROGRAM_ID,
         CloakSquadsError::InvalidCpiTarget
     );
     require!(
