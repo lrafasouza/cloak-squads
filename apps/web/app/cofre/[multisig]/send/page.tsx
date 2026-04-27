@@ -4,6 +4,7 @@ import { computePayloadHash } from "@cloak-squads/core/hashing";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { computeCommitment } from "@cloak.dev/sdk-devnet";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -77,10 +78,21 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       const recipientPubkey = new PublicKey(recipient.trim());
       setProofStep("generate-witness");
 
+      const r = bytesToHex(randomBytes(32));
+      const sk_spend = bytesToHex(randomBytes(32));
+      
+      // Compute commitment using SDK (deterministic from r and sk_spend)
+      const commitmentBigInt = await computeCommitment(
+        BigInt(amount),
+        BigInt("0x" + r),
+        BigInt("0x" + sk_spend),
+      );
+      const commitment = commitmentBigInt.toString(16).padStart(64, "0");
+      
       const note = {
-        commitment: bytesToHex(randomBytes(32)),
-        r: bytesToHex(randomBytes(32)),
-        sk_spend: bytesToHex(randomBytes(32)),
+        commitment,
+        r,
+        sk_spend,
       };
       const invariants: PayloadInvariants = {
         nullifier: randomBytes(32),
