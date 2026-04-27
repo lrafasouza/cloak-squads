@@ -50,6 +50,25 @@ type ProposalDraft = {
   };
 };
 
+type PayrollRecipient = {
+  id: string;
+  name: string;
+  wallet: string;
+  amount: string;
+  memo?: string;
+  payloadHash: number[];
+  invariants: {
+    commitment: number[];
+  };
+};
+
+type PayrollDraft = {
+  totalAmount: string;
+  recipientCount: number;
+  memo?: string;
+  recipients: PayrollRecipient[];
+};
+
 export default function ProposalApprovalPage({
   params,
 }: {
@@ -62,7 +81,9 @@ export default function ProposalApprovalPage({
   const [executeSignature, setExecuteSignature] = useState<string | null>(null);
   const [draftLoading, setDraftLoading] = useState(true);
   const [draft, setDraft] = useState<ProposalDraft | null>(null);
+  const [payrollDraft, setPayrollDraft] = useState<PayrollDraft | null>(null);
   const [commitmentClaim, setCommitmentClaim] = useState<CommitmentClaim | null>(null);
+  const [commitmentClaims, setCommitmentClaims] = useState<Map<string, CommitmentClaim>>(new Map());
   const [status, setStatus] = useState<ProposalStatusKind | "loading" | "missing">("loading");
   const [approvals, setApprovals] = useState<number>(0);
   const [threshold, setThreshold] = useState<number | null>(null);
@@ -71,8 +92,21 @@ export default function ProposalApprovalPage({
 
   useEffect(() => {
     try {
+      // Try loading single claim first
       const raw = sessionStorage.getItem(`claim:${multisigParam}:${id}`);
       if (raw) setCommitmentClaim(JSON.parse(raw) as CommitmentClaim);
+
+      // Try loading payroll claims
+      const payrollClaims = new Map<string, CommitmentClaim>();
+      for (let i = 0; i < 10; i++) {
+        const rawPayroll = sessionStorage.getItem(`claim:${multisigParam}:${id}:${i}`);
+        if (rawPayroll) {
+          payrollClaims.set(i.toString(), JSON.parse(rawPayroll) as CommitmentClaim);
+        }
+      }
+      if (payrollClaims.size > 0) {
+        setCommitmentClaims(payrollClaims);
+      }
     } catch { /* ignore */ }
   }, [multisigParam, id]);
 
@@ -80,24 +114,41 @@ export default function ProposalApprovalPage({
     let cancelled = false;
     setDraftLoading(true);
     async function loadDraft() {
-      const response = await fetch(
+      // Try single proposal first
+      const singleResponse = await fetch(
         `/api/proposals/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
       );
-      if (response.status === 404) {
-        if (!cancelled) setDraft(null);
+      if (singleResponse.ok) {
+        if (!cancelled) setDraft((await singleResponse.json()) as ProposalDraft);
+        if (!cancelled) setDraftLoading(false);
         return;
       }
-      if (!response.ok) {
-        throw new Error("Could not load proposal draft.");
+
+      // Try payroll
+      const payrollResponse = await fetch(
+        `/api/payrolls/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
+      );
+      if (payrollResponse.ok) {
+        if (!cancelled) setPayrollDraft((await payrollResponse.json()) as PayrollDraft);
+        if (!cancelled) setDraftLoading(false);
+        return;
       }
-      if (!cancelled) setDraft((await response.json()) as ProposalDraft);
+
+      if (!cancelled) {
+        setDraft(null);
+        setPayrollDraft(null);
+        setDraftLoading(false);
+      }
     }
 
     loadDraft()
-      .then(() => { if (!cancelled) setDraftLoading(false); })
       .catch((error: unknown) => {
         console.warn("[proposals] could not load draft:", error);
-        if (!cancelled) { setDraft(null); setDraftLoading(false); }
+        if (!cancelled) {
+          setDraft(null);
+          setPayrollDraft(null);
+          setDraftLoading(false);
+        }
       });
     return () => { cancelled = true; };
   }, [multisigParam, id]);
@@ -168,6 +219,8 @@ export default function ProposalApprovalPage({
     });
   }
 
+  const isPayroll = payrollDraft !== null;
+
   return (
     <main className="min-h-screen">
       <header className="border-b border-neutral-800 bg-neutral-950/95">
@@ -181,11 +234,14 @@ export default function ProposalApprovalPage({
 
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
-          <p className="text-sm font-medium text-emerald-300">Proposal #{id}</p>
+          <p className="text-sm font-medium text-emerald-300">
+            {isPayroll ? "Payroll batch" : "Proposal"} #{id}
+          </p>
           <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Signer approval</h1>
           <p className="mt-3 text-sm leading-6 text-neutral-300">
-            Review the decrypted transfer claim, verify the commitment, then submit your Squads
-            vote.
+            {isPayroll
+              ? `Review the ${payrollDraft?.recipientCount ?? 0} private transfer claims, verify commitments, then submit your Squads vote.`
+              : "Review the decrypted transfer claim, verify the commitment, then submit your Squads vote."}
           </p>
           <div className="mt-4 flex items-start gap-3 rounded-md border border-neutral-800 bg-neutral-900 p-3">
             <div className="min-w-0 flex-1">
@@ -205,46 +261,128 @@ export default function ProposalApprovalPage({
         </div>
 
         <div className="grid gap-4">
-          <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-            <h2 className="text-base font-semibold text-neutral-50">Transfer claim</h2>
-            {draft ? (
-              <dl className="mt-4 grid gap-3 text-sm">
-                <div>
-                  <dt className="text-neutral-400">Amount</dt>
-                  <dd className="mt-1 font-mono text-neutral-100">{draft.amount}</dd>
+          {/* Transfer Claim Section */}
+          {isPayroll ? (
+            <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+              <h2 className="text-base font-semibold text-neutral-50">
+                Payroll batch — {payrollDraft?.recipientCount ?? 0} recipients
+              </h2>
+              {payrollDraft ? (
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-neutral-800 text-left">
+                        <th className="pb-2 pr-4 text-neutral-400">Name</th>
+                        <th className="pb-2 pr-4 text-neutral-400">Wallet</th>
+                        <th className="pb-2 pr-4 text-neutral-400 text-right">Amount</th>
+                        <th className="pb-2 text-neutral-400">Memo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-800">
+                      {payrollDraft.recipients.map((r) => (
+                        <tr key={r.id}>
+                          <td className="py-2 pr-4 text-neutral-100">{r.name}</td>
+                          <td className="py-2 pr-4 font-mono text-xs text-neutral-300">
+                            {r.wallet.slice(0, 8)}...{r.wallet.slice(-8)}
+                          </td>
+                          <td className="py-2 pr-4 text-right font-mono text-neutral-100">
+                            {Number(r.amount).toLocaleString()}
+                          </td>
+                          <td className="py-2 text-neutral-400">{r.memo || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-neutral-700 font-semibold">
+                        <td colSpan={2} className="py-2 pr-4 text-neutral-100">Total</td>
+                        <td className="py-2 pr-4 text-right font-mono text-emerald-300">
+                          {Number(payrollDraft.totalAmount).toLocaleString()}
+                        </td>
+                        <td className="py-2 text-neutral-400">lamports</td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
-                <div>
-                  <dt className="text-neutral-400">Recipient stealth pubkey</dt>
-                  <dd className="mt-1 break-all font-mono text-neutral-100">{draft.recipient}</dd>
-                </div>
-                <div>
-                  <dt className="text-neutral-400">Memo</dt>
-                  <dd className="mt-1 text-neutral-100">{draft.memo || "None"}</dd>
-                </div>
-              </dl>
-            ) : draftLoading ? (
-              <p className="mt-3 text-sm text-neutral-400">Loading proposal draft…</p>
-            ) : (
-              <p className="mt-3 text-sm text-neutral-300">
-                No persisted proposal draft found for this multisig and proposal index.
-              </p>
-            )}
-          </section>
-
-          {commitmentClaim && draft ? (
-            <CommitmentCheck
-              claim={{
-                ...commitmentClaim,
-                onChainCommitment: Uint8Array.from(draft.invariants.commitment),
-              }}
-              onStateChange={setCommitmentState}
-            />
+              ) : draftLoading ? (
+                <p className="mt-3 text-sm text-neutral-400">Loading payroll draft…</p>
+              ) : (
+                <p className="mt-3 text-sm text-neutral-300">
+                  No persisted payroll draft found for this multisig and proposal index.
+                </p>
+              )}
+            </section>
           ) : (
-            <section className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
-              Commitment claim is only available in the proposer's browser session.
+            <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+              <h2 className="text-base font-semibold text-neutral-50">Transfer claim</h2>
+              {draft ? (
+                <dl className="mt-4 grid gap-3 text-sm">
+                  <div>
+                    <dt className="text-neutral-400">Amount</dt>
+                    <dd className="mt-1 font-mono text-neutral-100">{draft.amount}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-neutral-400">Recipient stealth pubkey</dt>
+                    <dd className="mt-1 break-all font-mono text-neutral-100">{draft.recipient}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-neutral-400">Memo</dt>
+                    <dd className="mt-1 text-neutral-100">{draft.memo || "None"}</dd>
+                  </div>
+                </dl>
+              ) : draftLoading ? (
+                <p className="mt-3 text-sm text-neutral-400">Loading proposal draft…</p>
+              ) : (
+                <p className="mt-3 text-sm text-neutral-300">
+                  No persisted proposal draft found for this multisig and proposal index.
+                </p>
+              )}
             </section>
           )}
 
+          {/* Commitment Check */}
+          {isPayroll && payrollDraft ? (
+            <div className="grid gap-3">
+              {payrollDraft.recipients.map((r, i) => {
+                const claim = commitmentClaims.get(i.toString());
+                return claim ? (
+                  <CommitmentCheck
+                    key={r.id}
+                    claim={{
+                      ...claim,
+                      onChainCommitment: Uint8Array.from(r.invariants.commitment),
+                    }}
+                    onStateChange={(state) => {
+                      // For payroll, we just track the overall state
+                      // If any fails, we show warning
+                      if (state === "mismatch") {
+                        setCommitmentState("mismatch");
+                      }
+                    }}
+                  />
+                ) : (
+                  <section key={r.id} className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
+                    Commitment claim for {r.name} is only available in the proposer&apos;s browser session.
+                  </section>
+                );
+              })}
+            </div>
+          ) : (
+            commitmentClaim && draft ? (
+              <CommitmentCheck
+                claim={{
+                  ...commitmentClaim,
+                  onChainCommitment: Uint8Array.from(draft.invariants.commitment),
+                }}
+                onStateChange={setCommitmentState}
+              />
+            ) : (
+              <section className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
+                Commitment claim is only available in the proposer&apos;s browser session.
+              </section>
+            )
+          )}
+
+          {/* On-chain Status */}
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-neutral-50">On-chain status</h2>
@@ -260,7 +398,7 @@ export default function ProposalApprovalPage({
             </div>
             {status === "executed" || status === "cancelled" || status === "rejected" ? (
               <p className="mt-3 text-sm text-amber-200">
-                This proposal is closed ({status}). Create a new one from the Send page to test
+                This proposal is closed ({status}). Create a new one from the Send or Payroll page to test
                 again.
               </p>
             ) : null}
@@ -272,6 +410,7 @@ export default function ProposalApprovalPage({
             ) : null}
           </section>
 
+          {/* Vote */}
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
             <h2 className="mb-4 text-base font-semibold text-neutral-50">Vote</h2>
             <ApprovalButtons
@@ -283,6 +422,7 @@ export default function ProposalApprovalPage({
             {signature ? <p className="mt-3 break-all font-mono text-xs text-emerald-200">{signature}</p> : null}
           </section>
 
+          {/* Execute */}
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
             <h2 className="mb-4 text-base font-semibold text-neutral-50">Execute</h2>
             <ExecuteButton

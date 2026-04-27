@@ -100,7 +100,7 @@ pnpm typecheck:all
 | Feature | Status |
 |---------|--------|
 | F1 — Private Send | **DONE** |
-| F2 — Payroll (batch CSV) | Pending |
+| F2 — Payroll (batch CSV) | **DONE** |
 | F3 — Audit Admin | Pending |
 | F3.5 — Public Audit Link | Pending |
 

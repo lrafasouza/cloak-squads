@@ -125,6 +125,83 @@ export async function createIssueLicenseProposal(params: {
   return { signature, transactionIndex, vaultTransactionPda };
 }
 
+export async function createBatchIssueLicenseProposal(params: {
+  connection: Connection;
+  wallet: BrowserSquadsWallet;
+  multisigPda: PublicKey;
+  issueLicenseIxs: TransactionInstruction[];
+  memo?: string;
+}) {
+  assertBrowserSquadsWallet(params.wallet);
+  const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
+  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: 0 });
+  const latestBlockhash = await params.connection.getLatestBlockhash();
+  const message = new TransactionMessage({
+    payerKey: vaultPda,
+    recentBlockhash: latestBlockhash.blockhash,
+    instructions: params.issueLicenseIxs,
+  });
+
+  const createVaultIx = multisig.instructions.vaultTransactionCreate({
+    multisigPda: params.multisigPda,
+    transactionIndex,
+    creator: params.wallet.publicKey,
+    rentPayer: params.wallet.publicKey,
+    vaultIndex: 0,
+    ephemeralSigners: 0,
+    transactionMessage: message,
+    memo: params.memo ?? `issue license batch (${params.issueLicenseIxs.length} recipients)`,
+  });
+  const createProposalIx = multisig.instructions.proposalCreate({
+    multisigPda: params.multisigPda,
+    creator: params.wallet.publicKey,
+    rentPayer: params.wallet.publicKey,
+    transactionIndex,
+  });
+
+  const tx = new Transaction().add(createVaultIx, createProposalIx);
+  tx.feePayer = params.wallet.publicKey;
+  tx.recentBlockhash = latestBlockhash.blockhash;
+
+  try {
+    const sim = await params.connection.simulateTransaction(tx, undefined, true);
+    console.log("[squads-sdk] batch simulate result:", sim);
+    if (sim.value.err) {
+      console.error("[squads-sdk] batch simulate error:", sim.value.err);
+      console.error("[squads-sdk] batch simulate logs:", sim.value.logs);
+      throw new Error(
+        `Batch simulation failed: ${JSON.stringify(sim.value.err)} | logs: ${(sim.value.logs ?? []).join(" || ")}`,
+      );
+    }
+  } catch (simErr) {
+    console.error("[squads-sdk] batch simulate threw:", simErr);
+    throw simErr;
+  }
+
+  let signature: string;
+  try {
+    signature = await params.wallet.sendTransaction(tx, params.connection);
+  } catch (sendErr) {
+    console.error("[squads-sdk] batch sendTransaction error:", sendErr);
+    throw sendErr;
+  }
+
+  console.log("[squads-sdk] batch awaiting confirmation:", signature);
+  const { blockhash: confirmBh, lastValidBlockHeight } = await params.connection.getLatestBlockhash();
+  await params.connection.confirmTransaction(
+    { signature, blockhash: confirmBh, lastValidBlockHeight },
+    "confirmed",
+  );
+  console.log("[squads-sdk] batch confirmed:", signature);
+
+  const [vaultTransactionPda] = multisig.getTransactionPda({
+    multisigPda: params.multisigPda,
+    index: transactionIndex,
+  });
+
+  return { signature, transactionIndex, vaultTransactionPda };
+}
+
 export async function proposalApprove(params: {
   connection: Connection;
   wallet: BrowserSquadsWallet;
