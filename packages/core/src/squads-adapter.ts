@@ -12,13 +12,20 @@ export async function buildIssueLicenseProposal(params: {
   multisigPda: PublicKey;
   creator: Signer;
   issueLicenseIx: TransactionInstruction;
-}): Promise<{ transactionIndex: bigint; vaultTransactionPda: PublicKey }> {
+}): Promise<{
+  transactionIndex: bigint;
+  vaultTransactionPda: PublicKey;
+  signature: string;
+}> {
   const multisigAccount = await multisig.accounts.Multisig.fromAccountAddress(
     params.connection,
     params.multisigPda,
   );
   const newTxIndex = BigInt(multisigAccount.transactionIndex.toString()) + 1n;
-  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: 0 });
+  const [vaultPda] = multisig.getVaultPda({
+    multisigPda: params.multisigPda,
+    index: 0,
+  });
 
   const message = new TransactionMessage({
     payerKey: vaultPda,
@@ -26,7 +33,7 @@ export async function buildIssueLicenseProposal(params: {
     instructions: [params.issueLicenseIx],
   });
 
-  const createTx = await multisig.rpc.vaultTransactionCreate({
+  await multisig.rpc.vaultTransactionCreate({
     connection: params.connection,
     feePayer: params.creator,
     multisigPda: params.multisigPda,
@@ -37,12 +44,19 @@ export async function buildIssueLicenseProposal(params: {
     transactionMessage: message,
     memo: "issue license",
   });
-  void createTx;
+
+  const signature = await multisig.rpc.proposalCreate({
+    connection: params.connection,
+    feePayer: params.creator,
+    creator: params.creator,
+    multisigPda: params.multisigPda,
+    transactionIndex: newTxIndex,
+  });
 
   const [vaultTransactionPda] = multisig.getTransactionPda({
     multisigPda: params.multisigPda,
     index: newTxIndex,
   });
 
-  return { transactionIndex: newTxIndex, vaultTransactionPda };
+  return { transactionIndex: newTxIndex, vaultTransactionPda, signature };
 }
