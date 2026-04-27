@@ -33,7 +33,7 @@ export async function buildIssueLicenseProposal(params: {
     instructions: [params.issueLicenseIx],
   });
 
-  await multisig.rpc.vaultTransactionCreate({
+  const vaultSig = await multisig.rpc.vaultTransactionCreate({
     connection: params.connection,
     feePayer: params.creator,
     multisigPda: params.multisigPda,
@@ -44,6 +44,7 @@ export async function buildIssueLicenseProposal(params: {
     transactionMessage: message,
     memo: "issue license",
   });
+  await params.connection.confirmTransaction(vaultSig, "confirmed");
 
   const signature = await multisig.rpc.proposalCreate({
     connection: params.connection,

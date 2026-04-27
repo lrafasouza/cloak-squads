@@ -67,6 +67,7 @@ export default function ProposalApprovalPage({
   const [approvals, setApprovals] = useState<number>(0);
   const [threshold, setThreshold] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
+  const [proposalUrl, setProposalUrl] = useState("");
 
   useEffect(() => {
     try {
@@ -156,6 +157,10 @@ export default function ProposalApprovalPage({
     status !== "active";
   const executeBlocked = status !== "approved";
 
+  useEffect(() => {
+    setProposalUrl(window.location.href);
+  }, []);
+
   function copyProposalLink() {
     void navigator.clipboard.writeText(window.location.href).then(() => {
       setCopied(true);
@@ -186,7 +191,7 @@ export default function ProposalApprovalPage({
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-neutral-100">Share with other signers</p>
               <p className="mt-1 break-all font-mono text-xs text-neutral-400">
-                {typeof window !== "undefined" ? window.location.href : ""}
+                {proposalUrl}
               </p>
             </div>
             <button

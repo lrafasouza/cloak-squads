@@ -29,7 +29,8 @@ const proposalDraftSchema = z.object({
 
 export async function POST(request: Request) {
   const hdrs = await headers();
-  const ip = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
+  const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
+  const ip = raw.split(",")[0].trim();
   if (!checkRateLimit(ip)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

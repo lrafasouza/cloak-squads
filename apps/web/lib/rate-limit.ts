@@ -1,3 +1,5 @@
+// Entries are never evicted — acceptable for devnet scale.
+// Replace with Redis + sliding window before mainnet.
 const map = new Map<string, { count: number; reset: number }>();
 
 export function checkRateLimit(

@@ -11,7 +11,6 @@ use crate::state::*;
 pub const PAYLOAD_DOMAIN_SEP: &[u8] = b"cloak-squads-payload-v1\0";
 #[cfg(not(feature = "mainnet"))]
 pub const CLOAK_PROGRAM_ID: Pubkey = pubkey!("2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe");
-
 #[cfg(feature = "mainnet")]
 pub const CLOAK_PROGRAM_ID: Pubkey = pubkey!("Zc1kHfp4rajSMeASFDwFFgkHRjv7dFQuLheJoQus27h");
 

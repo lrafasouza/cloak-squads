@@ -10,6 +10,7 @@ name = "cloak_gatekeeper"
 
 [features]
 default = []
+# Use `--features mainnet` to target the real Cloak program instead of the devnet mock.
 mainnet = []
 cpi = ["no-entrypoint"]
 no-entrypoint = []
