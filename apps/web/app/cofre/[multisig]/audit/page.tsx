@@ -1,0 +1,404 @@
+"use client";
+
+import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import {
+  type AuditScope,
+  base64urlEncode,
+  generateAuditLinkSecret,
+} from "@cloak-squads/core/audit";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import Link from "next/link";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
+
+type AuditLinkSummary = {
+  id: string;
+  scope: AuditScope;
+  scopeParams: string | null;
+  expiresAt: string;
+  issuedBy: string;
+  createdAt: string;
+};
+
+function truncateAddress(address: string) {
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
+}
+
+export default function AuditAdminPage({ params }: { params: Promise<{ multisig: string }> }) {
+  const { multisig } = use(params);
+  const wallet = useWallet();
+
+  const multisigAddress = useMemo(() => {
+    try {
+      return new PublicKey(multisig);
+    } catch {
+      return null;
+    }
+  }, [multisig]);
+
+  const [links, setLinks] = useState<AuditLinkSummary[]>([]);
+  const [linksLoading, setLinksLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [lastCreatedUrl, setLastCreatedUrl] = useState<string | null>(null);
+
+  // Form state
+  const [scope, setScope] = useState<AuditScope>("full");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [expiresInDays, setExpiresInDays] = useState<number>(30);
+
+  const loadLinks = useCallback(async () => {
+    if (!multisigAddress) return;
+    try {
+      const res = await fetch(`/api/audit-links/${encodeURIComponent(multisigAddress.toBase58())}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLinks(data);
+      }
+    } catch (err) {
+      console.error("Failed to load audit links:", err);
+    } finally {
+      setLinksLoading(false);
+    }
+  }, [multisigAddress]);
+
+  useEffect(() => {
+    void loadLinks();
+  }, [loadLinks]);
+
+  const handleCreateLink = async () => {
+    if (!wallet.publicKey || !wallet.signMessage || !multisigAddress) {
+      setCreateError("Connect wallet first");
+      return;
+    }
+
+    setIsCreating(true);
+    setCreateError(null);
+    setLastCreatedUrl(null);
+
+    try {
+      // Prepare message for signing
+      const expiresAt = Date.now() + expiresInDays * 24 * 60 * 60 * 1000;
+      const scopeParams: { startDate?: number; endDate?: number } = {};
+
+      if (scope === "time_ranged") {
+        if (!startDate || !endDate) {
+          throw new Error("Select start and end dates for time-ranged scope");
+        }
+        scopeParams.startDate = new Date(startDate).getTime();
+        scopeParams.endDate = new Date(endDate).getTime();
+      }
+
+      const message = `create-audit-link:${multisigAddress.toBase58()}:${scope}:${expiresAt}:${wallet.publicKey.toBase58()}`;
+      const messageBytes = new TextEncoder().encode(message);
+
+      // Sign message
+      const signature = await wallet.signMessage(messageBytes);
+
+      // Create audit link
+      const res = await fetch("/api/audit-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cofreAddress: multisigAddress.toBase58(),
+          scope,
+          scopeParams: Object.keys(scopeParams).length > 0 ? scopeParams : undefined,
+          expiresAt,
+          issuedBy: wallet.publicKey.toBase58(),
+          signature: Buffer.from(signature).toString("base64"),
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create audit link");
+      }
+
+      const data = await res.json();
+
+      // Generate secret for the link fragment
+      const secret = generateAuditLinkSecret();
+      const secretB64 = base64urlEncode(secret);
+
+      // Build shareable URL with fragment
+      const baseUrl = window.location.origin;
+      const shareableUrl = `${baseUrl}/audit/${data.id}#${secretB64}`;
+
+      setLastCreatedUrl(shareableUrl);
+      void loadLinks();
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Failed to create link");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleRevokeLink = async (linkId: string) => {
+    if (!wallet.publicKey || !wallet.signMessage) return;
+
+    if (!confirm("Revoke this audit link? This action cannot be undone.")) return;
+
+    try {
+      const message = `revoke-audit-link:${linkId}:${wallet.publicKey.toBase58()}`;
+      const messageBytes = new TextEncoder().encode(message);
+      const signature = await wallet.signMessage(messageBytes);
+
+      const res = await fetch(`/api/audit/${linkId}/revoke`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          issuedBy: wallet.publicKey.toBase58(),
+          signature: Buffer.from(signature).toString("base64"),
+        }),
+      });
+
+      if (res.ok) {
+        void loadLinks();
+      } else {
+        const error = await res.json();
+        alert(error.error || "Failed to revoke link");
+      }
+    } catch (err) {
+      console.error("Failed to revoke link:", err);
+      alert("Failed to revoke link");
+    }
+  };
+
+  const exportToCSV = (link: AuditLinkSummary) => {
+    // TODO: Fetch actual transaction data and export
+    const headers = ["timestamp", "type", "amount", "nullifier", "status"];
+    const csvContent = headers.join(",");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `audit-${link.id}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (!multisigAddress) {
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-10">
+        <Link
+          href="/"
+          className="text-sm text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+        >
+          Back to picker
+        </Link>
+        <h1 className="mt-6 text-2xl font-semibold text-neutral-50">Invalid multisig address</h1>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen">
+      <header className="border-b border-neutral-800 bg-neutral-950/95">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
+          <Link
+            href={`/cofre/${multisigAddress.toBase58()}`}
+            className="rounded-md text-sm font-semibold text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+          >
+            Cloak Squads
+          </Link>
+          <ClientWalletButton />
+        </div>
+      </header>
+
+      <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-sm font-medium text-emerald-300">Audit Admin</p>
+            <h1 className="mt-2 text-3xl font-semibold text-neutral-50">
+              {truncateAddress(multisigAddress.toBase58())}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-300">
+              Create and manage scoped audit links for compliance and transparency.
+            </p>
+          </div>
+        </div>
+
+        {/* Create Link Form */}
+        <section className="mt-8 rounded-lg border border-neutral-800 bg-neutral-900 p-6">
+          <h2 className="text-lg font-semibold text-neutral-50">Create Audit Link</h2>
+          <p className="mt-1 text-sm text-neutral-400">
+            Generate a shareable link with view-only access to transaction history.
+          </p>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <div>
+              <label htmlFor="scope" className="block text-sm font-medium text-neutral-300">
+                Scope
+              </label>
+              <select
+                id="scope"
+                value={scope}
+                onChange={(e) => setScope(e.target.value as AuditScope)}
+                className="mt-1 block w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-emerald-500 focus:outline-none"
+              >
+                <option value="full">Full (all data)</option>
+                <option value="amounts_only">Amounts Only (no addresses)</option>
+                <option value="time_ranged">Time Ranged (date filter)</option>
+              </select>
+              <p className="mt-1 text-xs text-neutral-500">
+                {scope === "full" &&
+                  "View all transaction details including amounts and addresses."}
+                {scope === "amounts_only" && "View only transaction amounts (addresses redacted)."}
+                {scope === "time_ranged" && "View transactions within a specific date range."}
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="expiresInDays" className="block text-sm font-medium text-neutral-300">
+                Expires in (days)
+              </label>
+              <input
+                id="expiresInDays"
+                type="number"
+                min={1}
+                max={365}
+                value={expiresInDays}
+                onChange={(e) => setExpiresInDays(Number(e.target.value))}
+                className="mt-1 block w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+
+            {scope === "time_ranged" && (
+              <>
+                <div>
+                  <label htmlFor="startDate" className="block text-sm font-medium text-neutral-300">
+                    Start Date
+                  </label>
+                  <input
+                    id="startDate"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="endDate" className="block text-sm font-medium text-neutral-300">
+                    End Date
+                  </label>
+                  <input
+                    id="endDate"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {createError && (
+            <div className="mt-4 rounded-md bg-red-900/30 border border-red-700 px-4 py-3 text-sm text-red-200">
+              {createError}
+            </div>
+          )}
+
+          {lastCreatedUrl && (
+            <div className="mt-4 rounded-md bg-emerald-900/30 border border-emerald-700 px-4 py-3">
+              <p className="text-sm font-medium text-emerald-200">Audit link created!</p>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={lastCreatedUrl}
+                  className="flex-1 rounded-md bg-neutral-950 px-3 py-2 text-xs font-mono text-neutral-300"
+                />
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(lastCreatedUrl)}
+                  className="rounded-md bg-emerald-700 px-3 py-2 text-xs font-semibold text-neutral-100 hover:bg-emerald-600"
+                >
+                  Copy
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-emerald-300/70">
+                Share this URL carefully. Anyone with the link can view the scoped audit data.
+              </p>
+            </div>
+          )}
+
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={handleCreateLink}
+              disabled={isCreating || !wallet.publicKey}
+              className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isCreating ? "Creating..." : "Create Audit Link"}
+            </button>
+          </div>
+        </section>
+
+        {/* Links List */}
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold text-neutral-50">Active Audit Links</h2>
+
+          {linksLoading ? (
+            <p className="mt-4 text-sm text-neutral-400">Loading...</p>
+          ) : links.length === 0 ? (
+            <p className="mt-4 text-sm text-neutral-400">No audit links created yet.</p>
+          ) : (
+            <div className="mt-4 grid gap-4">
+              {links.map((link) => (
+                <div
+                  key={link.id}
+                  className="rounded-lg border border-neutral-800 bg-neutral-900 p-4"
+                >
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm text-neutral-100">{link.id}</span>
+                        <span
+                          className={`rounded px-2 py-0.5 text-xs font-medium ${
+                            link.scope === "full"
+                              ? "bg-emerald-900 text-emerald-200"
+                              : link.scope === "amounts_only"
+                                ? "bg-blue-900 text-blue-200"
+                                : "bg-amber-900 text-amber-200"
+                          }`}
+                        >
+                          {link.scope}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        Created {new Date(link.createdAt).toLocaleDateString()} · Expires{" "}
+                        {new Date(link.expiresAt).toLocaleDateString()}
+                      </p>
+                      {link.scopeParams && (
+                        <p className="mt-1 text-xs text-neutral-500">Params: {link.scopeParams}</p>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => exportToCSV(link)}
+                        className="rounded-md border border-neutral-700 px-3 py-2 text-xs font-semibold text-neutral-300 transition hover:bg-neutral-800"
+                      >
+                        Export CSV
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRevokeLink(link.id)}
+                        className="rounded-md bg-red-900/50 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-900"
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </section>
+    </main>
+  );
+}
