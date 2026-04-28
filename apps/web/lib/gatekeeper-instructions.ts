@@ -40,7 +40,9 @@ export async function buildIssueLicenseIxBrowser(params: {
   nonce: Uint8Array;
   ttlSecs?: number;
 }) {
-  const gatekeeperProgram = new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID);
+  const gatekeeperProgramId = publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID;
+  console.log("[buildIssueLicenseIxBrowser] Using gatekeeper program ID:", gatekeeperProgramId);
+  const gatekeeperProgram = new PublicKey(gatekeeperProgramId);
   const squadsProgram = new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID);
   const cofre = cofrePda(params.multisig, gatekeeperProgram)[0];
   const vault = squadsVaultPda(params.multisig, squadsProgram)[0];
