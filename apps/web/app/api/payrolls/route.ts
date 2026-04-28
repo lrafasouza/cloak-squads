@@ -9,7 +9,7 @@ import { z } from "zod";
 const byteArraySchema = z.array(z.number().int().min(0).max(255));
 
 const commitmentClaimSchema = z.object({
-  amount: z.number().int().positive(),
+  amount: z.union([z.number().int().positive(), z.string().regex(/^\d+$/)]),
   // Legacy fields (backward compat)
   r: z
     .string()
