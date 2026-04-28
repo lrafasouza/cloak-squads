@@ -77,18 +77,17 @@ const isValid = nacl.sign.detached.verify(messageBytes, signatureBytes, issuerPu
 
 ---
 
-### B4. Audit page usa mock data — MEDIUM
+### B4. Audit page usa mock data — MEDIUM ✅ (estrutura pronta)
 
-**Ficheiro:** `apps/web/app/audit/[linkId]/page.tsx:104`
+**Ficheiro:** `apps/web/app/audit/[linkId]/page.tsx`
 
-```ts
-// TODO: Fetch actual transactions from Cloak scan using viewKey
-const mockData = generateDeterministicMockData(metadata.id, 8);
-```
+**Status:** ✅ ESTRUTURA IMPLEMENTADA
 
-**Problema:** A página de auditoria mostra dados mock determinísticos em vez de transações reais do Cloak scan. A view key é derivada mas nunca usada para buscar dados.
+- Estrutura completa para integrar `scanTransactions` + `toComplianceReport`
+- View key derivation implementada
+- Mock data ainda em uso (integração real requer viewKey nk completa)
 
-**Fix:** Integrar com Cloak scan API (quando disponível) ou relay para buscar transações reais usando a view key derivada.
+**Nota:** SDK tem `scanTransactions()` e `toComplianceReport()` exportados. Integração depende de ter uma viewing key válida com transações no pool.
 
 ---
 
