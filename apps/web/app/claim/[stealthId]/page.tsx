@@ -13,6 +13,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
+import { lamportsToSol } from "@/lib/sol";
 
 type StealthInvoice = {
   id: string;
@@ -382,7 +383,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                   <dt className="text-xs text-neutral-500">Amount</dt>
                   <dd className="mt-1 font-mono text-sm text-neutral-300">
                     {invoice.amountHint
-                      ? `${Number(invoice.amountHint).toLocaleString()} lamports`
+                      ? `${lamportsToSol(invoice.amountHint)} SOL`
                       : "Hidden"}
                   </dd>
                 </div>

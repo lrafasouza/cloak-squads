@@ -7,6 +7,7 @@ import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
+import { lamportsToSol } from "@/lib/sol";
 import { ApprovalButtons } from "@/components/proposal/ApprovalButtons";
 import { CommitmentCheck, type CommitmentCheckState } from "@/components/proposal/CommitmentCheck";
 import { ExecuteButton } from "@/components/proposal/ExecuteButton";
@@ -352,7 +353,7 @@ export default function ProposalApprovalPage({
                             {r.wallet.slice(0, 8)}...{r.wallet.slice(-8)}
                           </td>
                           <td className="py-2 pr-4 text-right font-mono text-neutral-100">
-                            {Number(r.amount).toLocaleString()}
+                            {lamportsToSol(r.amount)} SOL
                           </td>
                           <td className="py-2 text-neutral-400">{r.memo || "—"}</td>
                         </tr>
@@ -362,9 +363,9 @@ export default function ProposalApprovalPage({
                       <tr className="border-t border-neutral-700 font-semibold">
                         <td colSpan={2} className="py-2 pr-4 text-neutral-100">Total</td>
                         <td className="py-2 pr-4 text-right font-mono text-emerald-300">
-                          {Number(payrollDraft.totalAmount).toLocaleString()}
+                          {lamportsToSol(payrollDraft.totalAmount)} SOL
                         </td>
-                        <td className="py-2 text-neutral-400">lamports</td>
+                        <td />
                       </tr>
                     </tfoot>
                   </table>
@@ -384,7 +385,7 @@ export default function ProposalApprovalPage({
                 <dl className="mt-4 grid gap-3 text-sm">
                   <div>
                     <dt className="text-neutral-400">Amount</dt>
-                    <dd className="mt-1 font-mono text-neutral-100">{draft.amount}</dd>
+                    <dd className="mt-1 font-mono text-neutral-100">{lamportsToSol(draft.amount)} SOL</dd>
                   </div>
                   <div>
                     <dt className="text-neutral-400">Recipient stealth pubkey</dt>

@@ -3,6 +3,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import Link from "next/link";
+import { solToLamports } from "@/lib/sol";
 import { type FormEvent, use, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,9 +38,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         throw new Error("Invalid multisig address.");
       }
 
-      if (!/^[0-9]+$/.test(amount) || BigInt(amount) <= 0n) {
-        throw new Error("Amount must be a positive integer in lamports.");
-      }
+      const amountLamports = solToLamports(amount);
 
       const recipientPubkey = new PublicKey(recipientWallet.trim());
 
@@ -47,7 +46,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         cofreAddress: multisigAddress.toBase58(),
         invoiceRef: invoiceRef.trim() || undefined,
         memo: memo.trim() || undefined,
-        amount,
+        amount: amountLamports,
         recipientWallet: recipientPubkey.toBase58(),
       };
 
@@ -139,16 +138,15 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
               </div>
 
               <div>
-                <Label htmlFor="amount">Amount in lamports</Label>
+                <Label htmlFor="amount">Amount (SOL)</Label>
                 <Input
                   id="amount"
                   type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
+                  inputMode="decimal"
                   autoComplete="off"
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
-                  placeholder="1000000"
+                  placeholder="0.5"
                   className="mt-1 font-mono"
                 />
               </div>

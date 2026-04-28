@@ -23,6 +23,7 @@ import { ComputeBudgetProgram, PublicKey, Transaction, VersionedTransaction } fr
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lamportsToSol } from "@/lib/sol";
 
 type DraftSummary = {
   id: string;
@@ -588,8 +589,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                       )}
                       <p className="mt-0.5 truncate text-xs text-neutral-400">
                         {d.type === "payroll"
-                          ? `${d.recipientCount ?? 0} recipients · ${Number(d.totalAmount ?? d.amount).toLocaleString()} lamports`
-                          : `${Number(d.amount).toLocaleString()} lamports`}
+                          ? `${d.recipientCount ?? 0} recipients · ${lamportsToSol(d.totalAmount ?? d.amount)} SOL`
+                          : `${lamportsToSol(d.amount)} SOL`}
                       </p>
                     </div>
                     <Button
@@ -670,7 +671,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               <dl className="grid gap-2 text-sm">
                 <div>
                   <dt className="text-neutral-400">Amount</dt>
-                  <dd className="font-mono text-neutral-100">{loadedDraft.amount} lamports</dd>
+                  <dd className="font-mono text-neutral-100">{lamportsToSol(loadedDraft.amount)} SOL</dd>
                 </div>
                 <div>
                   <dt className="text-neutral-400">Recipient</dt>

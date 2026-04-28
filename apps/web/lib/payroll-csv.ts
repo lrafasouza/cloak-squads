@@ -1,5 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
+import { solToLamports } from "@/lib/sol";
 
 const MAX_U64 = "18446744073709551615";
 
@@ -17,15 +18,16 @@ export const payrollRecipientSchema = z.object({
   wallet: z.string().refine(isValidSolanaAddress, {
     message: "Invalid Solana wallet address",
   }),
-  amount: z.string().regex(/^\d+$/, "Amount must be a positive integer in lamports").refine(
+  amount: z.string().regex(/^\d+(\.\d+)?$/, "Amount must be a number in SOL (e.g. 2 or 0.5)").refine(
     (val) => {
       try {
-        return BigInt(val) <= BigInt(MAX_U64) && BigInt(val) > 0n;
+        const lamports = BigInt(solToLamports(val));
+        return lamports > 0n && lamports <= BigInt(MAX_U64);
       } catch {
         return false;
       }
     },
-    { message: "Amount must be between 1 and " + MAX_U64 },
+    { message: "Amount must be greater than 0 and fit in u64" },
   ),
   memo: z.string().max(200).optional(),
 });
@@ -83,7 +85,8 @@ export function parsePayrollCsv(csvText: string): { data: PayrollRecipientInput[
       continue;
     }
 
-    recipients.push(parsed.data);
+    // Convert SOL → lamports so the rest of the app always works in lamports
+    recipients.push({ ...parsed.data, amount: solToLamports(parsed.data.amount) });
   }
 
   if (recipients.length === 0) {
@@ -113,5 +116,5 @@ export function parsePayrollCsv(csvText: string): { data: PayrollRecipientInput[
 }
 
 export function formatPayrollCsvTemplate(): string {
-  return "name,wallet,amount,memo\nAlice,7SrukWUsDNwpqqtN2p8zAeQe9A689jVYFUi9gSfseWir,1000000,Monthly salary\nBob,BsPyL4w7vR8DsFxVK6RM4oDjzdNJt7eDfC9BnMRzLop3,2000000,Bonus";
+  return "name,wallet,amount,memo\nAlice,7SrukWUsDNwpqqtN2p8zAeQe9A689jVYFUi9gSfseWir,1,Monthly salary\nBob,BsPyL4w7vR8DsFxVK6RM4oDjzdNJt7eDfC9BnMRzLop3,0.5,Bonus";
 }

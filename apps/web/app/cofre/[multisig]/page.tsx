@@ -5,6 +5,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { lamportsToSol } from "@/lib/sol";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
 
@@ -258,8 +259,8 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                           </p>
                           <p className="mt-1 text-xs text-neutral-400">
                             {d.type === "payroll"
-                              ? `${d.recipientCount} recipients · ${Number(d.totalAmount ?? d.amount).toLocaleString()} lamports total`
-                              : `${Number(d.amount).toLocaleString()} lamports → ${truncateAddress(d.recipient)}`}
+                              ? `${d.recipientCount} recipients · ${lamportsToSol(d.totalAmount ?? d.amount)} SOL total`
+                              : `${lamportsToSol(d.amount)} SOL → ${truncateAddress(d.recipient)}`}
                           </p>
                           <p className="mt-0.5 text-xs text-neutral-600">
                             {new Date(d.createdAt).toLocaleDateString()}

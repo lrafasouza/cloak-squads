@@ -19,6 +19,7 @@ import {
   createUtxo,
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
+import { lamportsToSol } from "@/lib/sol";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
@@ -382,7 +383,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                             {n.wallet.slice(0, 8)}...{n.wallet.slice(-8)}
                           </td>
                           <td className="py-2 pr-4 text-right font-mono text-neutral-100">
-                            {Number(n.amount).toLocaleString()}
+                            {lamportsToSol(n.amount)} SOL
                           </td>
                           <td className="py-2 text-neutral-400">{n.memo || "—"}</td>
                         </tr>
@@ -394,9 +395,9 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                           Total
                         </td>
                         <td className="py-2 pr-4 text-right font-mono text-emerald-300">
-                          {Number(totalAmount).toLocaleString()}
+                          {lamportsToSol(totalAmount)} SOL
                         </td>
-                        <td className="py-2 text-neutral-400">lamports</td>
+                        <td />
                       </tr>
                     </tfoot>
                   </table>

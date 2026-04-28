@@ -15,6 +15,7 @@ import {
   createUtxo,
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
+import { solToLamports } from "@/lib/sol";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
@@ -72,9 +73,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         throw new Error("Connect a wallet and open a valid multisig.");
       }
 
-      if (!/^[0-9]+$/.test(amount) || BigInt(amount) <= 0n) {
-        throw new Error("Amount must be a positive integer in lamports.");
-      }
+      const amountLamports = solToLamports(amount);
 
       const recipientPubkey = new PublicKey(recipient.trim());
       setProofStep("generate-witness");
@@ -82,7 +81,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       // Generate real Cloak UTXO commitment
       const keypair = await generateUtxoKeypair();
       const mint = NATIVE_SOL_MINT;
-      const utxo = await createUtxo(BigInt(amount), keypair, mint);
+      const utxo = await createUtxo(BigInt(amountLamports), keypair, mint);
       const commitmentBigInt = await computeUtxoCommitment(utxo);
       const commitment = commitmentBigInt.toString(16).padStart(64, "0");
 
@@ -96,7 +95,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       const invariants: PayloadInvariants = {
         nullifier: randomBytes(32),
         commitment: hexToBytes(commitment),
-        amount: BigInt(amount),
+        amount: BigInt(amountLamports),
         tokenMint: mint,
         recipientVkPub: recipientPubkey.toBytes(),
         nonce: randomBytes(16),
@@ -130,7 +129,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       const draft = {
         cofreAddress: multisigAddress.toBase58(),
         transactionIndex,
-        amount,
+        amount: amountLamports,
         recipient: recipientPubkey.toBase58(),
         memo,
         payloadHash: Array.from(hash),
@@ -217,16 +216,15 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
           >
             <div className="grid gap-4">
               <div>
-                <Label htmlFor="amount">Amount in lamports</Label>
+                <Label htmlFor="amount">Amount (SOL)</Label>
                 <Input
                   id="amount"
                   type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
+                  inputMode="decimal"
                   autoComplete="off"
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
-                  placeholder="1000000"
+                  placeholder="0.5"
                   className="mt-1 font-mono"
                 />
               </div>
