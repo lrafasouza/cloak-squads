@@ -7,7 +7,8 @@ const revokeSchema = z.object({
   issuedBy: z.string().refine(
     (val) => {
       try {
-        return PublicKey.isOnCurve(new PublicKey(val).toBytes());
+        new PublicKey(val);
+        return true;
       } catch {
         return false;
       }

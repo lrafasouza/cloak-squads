@@ -43,7 +43,8 @@ const proposalDraftSchema = z.object({
   cofreAddress: z.string().refine(
     (val) => {
       try {
-        return PublicKey.isOnCurve(new PublicKey(val).toBytes());
+        new PublicKey(val);
+        return true;
       } catch {
         return false;
       }
@@ -68,7 +69,8 @@ const proposalDraftSchema = z.object({
   recipient: z.string().refine(
     (val) => {
       try {
-        return PublicKey.isOnCurve(new PublicKey(val).toBytes());
+        new PublicKey(val);
+        return true;
       } catch {
         return false;
       }
@@ -84,7 +86,8 @@ const proposalDraftSchema = z.object({
     tokenMint: z.string().refine(
       (val) => {
         try {
-          return PublicKey.isOnCurve(new PublicKey(val).toBytes());
+          new PublicKey(val);
+          return true;
         } catch {
           return false;
         }

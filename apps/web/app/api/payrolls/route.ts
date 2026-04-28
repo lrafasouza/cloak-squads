@@ -43,7 +43,8 @@ const payrollRecipientSchema = z.object({
   wallet: z.string().refine(
     (val) => {
       try {
-        return PublicKey.isOnCurve(new PublicKey(val).toBytes());
+        new PublicKey(val);
+        return true;
       } catch {
         return false;
       }
@@ -73,7 +74,8 @@ const payrollRecipientSchema = z.object({
     tokenMint: z.string().refine(
       (val) => {
         try {
-          return PublicKey.isOnCurve(new PublicKey(val).toBytes());
+          new PublicKey(val);
+          return true;
         } catch {
           return false;
         }
@@ -91,7 +93,8 @@ const payrollDraftSchema = z.object({
   cofreAddress: z.string().refine(
     (val) => {
       try {
-        return PublicKey.isOnCurve(new PublicKey(val).toBytes());
+        new PublicKey(val);
+        return true;
       } catch {
         return false;
       }
