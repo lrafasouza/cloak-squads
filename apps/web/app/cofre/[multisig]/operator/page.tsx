@@ -152,7 +152,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
       const accountInfo = await connection.getAccountInfo(cofre);
       if (!accountInfo) return;
       const coder = new BorshAccountsCoder(IDL as Idl);
-      const decoded = coder.decode<any>("cofre", accountInfo.data);
+      const decoded = coder.decode<{ operator?: Uint8Array }>("cofre", accountInfo.data);
       if (decoded?.operator) {
         setRegisteredOperator(new PublicKey(decoded.operator).toBase58());
       }
@@ -242,8 +242,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
                 status: string;
               }>;
               const invoice = invoices.find(
-                (inv) =>
-                  inv.recipientWallet === loadedDraft.recipient && inv.status === "pending",
+                (inv) => inv.recipientWallet === loadedDraft.recipient && inv.status === "pending",
               );
               if (invoice) {
                 await fetch(`/api/stealth/${invoice.id}/utxo`, {
@@ -350,7 +349,8 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
       );
 
       try {
-        const recipient = payrollDraft.recipients[i]!;
+        const recipient = payrollDraft.recipients[i];
+        if (!recipient) continue;
         const sig = await executeSingle(
           {
             amount: recipient.amount,
@@ -368,14 +368,13 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
       } catch (caught) {
         const errorMsg = caught instanceof Error ? caught.message : "Execution failed";
         setExecutionSteps((prev) =>
-          prev.map((s) => (s.index === i ? { ...s, status: "error", error: errorMsg } : s)),
-        );
-        setError(
-          `Execution failed at step ${i + 1}/${payrollDraft.recipients.length}: ${errorMsg}`,
+          prev.map((s) => (s.index === i ? { ...s, status: "failed", error: errorMsg } : s)),
         );
         break;
       }
     }
+
+    setExecuting(false);
   }
 
   function retryFromStep(stepIndex: number) {
@@ -405,7 +404,8 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
       );
 
       try {
-        const recipient = payrollDraft.recipients[i]!;
+        const recipient = payrollDraft.recipients[i];
+        if (!recipient) continue;
         const sig = await executeSingle(
           {
             amount: recipient.amount,
@@ -423,10 +423,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
       } catch (caught) {
         const errorMsg = caught instanceof Error ? caught.message : "Execution failed";
         setExecutionSteps((prev) =>
-          prev.map((s) => (s.index === i ? { ...s, status: "error", error: errorMsg } : s)),
-        );
-        setError(
-          `Execution failed at step ${i + 1}/${payrollDraft.recipients.length}: ${errorMsg}`,
+          prev.map((s) => (s.index === i ? { ...s, status: "failed", error: errorMsg } : s)),
         );
         break;
       }
