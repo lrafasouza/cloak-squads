@@ -8,7 +8,7 @@ End-to-end flow: Squads vault approves a private execution license, then the ope
 
 - Devnet wallet funded with SOL.
 - Squads v4 multisig on devnet (threshold 1, member = your wallet).
-- `cloak-gatekeeper` deployed at `WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J`.
+- `cloak-gatekeeper` deployed at `AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq`.
 - `cloak-mock` deployed at `2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe`.
 - Program IDs configured in `apps/web/.env.local`.
 

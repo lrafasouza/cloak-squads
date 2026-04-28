@@ -12,7 +12,7 @@ Manages multisig state: members, threshold, proposals, and vault PDAs. The vault
 
 ### cloak-gatekeeper
 
-Deployed at `WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J` (devnet).
+Deployed at `AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq` (devnet).
 
 The gatekeeper is an Anchor program with 10 instructions:
 
@@ -20,7 +20,7 @@ The gatekeeper is an Anchor program with 10 instructions:
 |-------------|---------|
 | `init_cofre` | Initialize cofre account (multisig, operator, view key) |
 | `issue_license` | Create a time-limited execution license with payload hash |
-| `execute_with_license` | Operator consumes license, CPIs into Cloak |
+| `execute_with_license` | Operator consumes license (state machine — no CPI) |
 | `init_view_distribution` | Set up encrypted view key distribution |
 | `add_signer_view` | Add a signer to the view distribution |
 | `remove_signer_view` | Remove a signer from the view distribution |
@@ -46,20 +46,13 @@ Operator wallet sends transaction:
   │     ├─▶ Generate UTXO keypair + blinding
   │     ├─▶ Call transact() with zero inputs (deposit)
   │     └─▶ Store UTXO data for future claim
-  └─▶ gatekeeper::execute_with_license
-        ├─▶ Verify operator identity
-        ├─▶ Verify license not expired / not consumed
-        ├─▶ Verify payload hash matches license
-        └─▶ CPI into Cloak program (real proofs)
-              ├─▶ Record nullifier
-              └─▶ Update pool merkle root
+   └─▶ gatekeeper::execute_with_license
+         ├─▶ Verify operator identity
+         ├─▶ Verify license not expired / not consumed
+         ├─▶ Verify payload hash matches license
+         └─▶ Mark license as Consumed
+               └─▶ emit!(LicenseConsumed { ... })
 ```
-
-### cloak-mock
-
-Deployed at `2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe` (devnet).
-
-Stubs the real Cloak program. Accepts `stub_transact(nullifier, commitment, amount, token_mint, recipient_vk_pub, nonce, proof_bytes, merkle_root)` — proof and merkle root are ignored. Records the nullifier to prevent double-spend and XORs commitment into a stub merkle root.
 
 ## Frontend Architecture
 
@@ -138,9 +131,9 @@ User clicks Execute:
         ├─▶ Generate UTXO keypair + blinding
         ├─▶ Call transact() with zero inputs (deposit)
         └─▶ Store UTXO data via PATCH /api/stealth/{id}/utxo
-  → Build execute_with_license ix with real proof from Cloak SDK
-  → ComputeBudgetProgram.setComputeUnitLimit(1.4M CU) + priority fee
-  → sendTransaction → gatekeeper CPIs into Cloak program
+  → Build execute_with_license ix (state machine — no CPI)
+  → ComputeBudgetProgram.setComputeUnitLimit(200K CU) + priority fee
+  → sendTransaction → gatekeeper verifies and consumes license
 ```
 
 ## Shared Package (`@cloak-squads/core`)
@@ -173,13 +166,13 @@ SQLite via Prisma with four models:
 
 | Test | Scope | Runner |
 |------|-------|--------|
-| `spike-cpi.test.ts` | Gatekeeper → mock CPI (3-level deep) | anchor-bankrun |
 | `gatekeeper-instructions.test.ts` | All 10 instructions + 12 error cases | anchor-bankrun |
 | `f1-send.test.ts` | Full F1 flow: cofre → license → execute → verify | anchor-bankrun |
-| `f1-e2e-devnet.ts` | Full F1 flow on devnet (real transactions) | tsx script |
+| `f2-batch.test.ts` | Batch payroll with multiple recipients | anchor-bankrun |
+| `e2e-full-flow.test.ts` | End-to-end: 1 single + 3 batch licenses | anchor-bankrun |
 
 ## Devnet Integration
 
 The Cloak devnet SDK (`@cloak.dev/sdk-devnet@0.1.5-devnet.0`) had a broken `deposit()` that built a legacy instruction format rejected by the devnet program. **This has been resolved** by calling `transact()` directly with zero inputs (pure deposit pattern), as endorsed by the Cloak team. See `packages/core/src/cloak-deposit.ts` for the implementation.
 
-**Status:** Real Cloak deposits and withdrawals are working on devnet via the `transact()` unified instruction (disc-0).
+**Status:** Gatekeeper operates as a pure state machine (no CPI). Real Cloak deposits happen via `transact()` in a separate transaction before `execute_with_license`.

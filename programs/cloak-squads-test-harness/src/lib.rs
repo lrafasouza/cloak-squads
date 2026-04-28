@@ -7,7 +7,7 @@ use anchor_lang::solana_program::pubkey;
 declare_id!("SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf");
 
 pub const GATEKEEPER_PROGRAM_ID: Pubkey =
-    pubkey!("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J");
+    pubkey!("AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq");
 
 #[program]
 pub mod cloak_squads_test_harness {

@@ -2,7 +2,8 @@
 
 **Data:** 2026-04-27  
 **Solicitação:** Remover COMPLETAMENTE o cloak-mock. Nada de mock. Gatekeeper deve funcionar como state machine puro.  
-**Status:** Investigacao completa. Pronto para implementacao.
+**Status:** ✅ IMPLEMENTADO em 2026-04-28
+**Novo Program ID:** `AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq` (devnet)
 
 ---
 
@@ -275,17 +276,20 @@ Os testes bankrun usam o `.so` gerado em `target/deploy/cloak_gatekeeper.so`.
 
 ## 7. DEFINICAO DE PRONTO
 
-- [ ] Gatekeeper nao faz mais CPI para programa externo
-- [ ] execute_with_license é state machine puro (verificar + consumir)
-- [ ] Nenhuma referencia a `cloak-mock`, `CLOAK_MOCK`, `stub_transact`, `MOCK_PROGRAM_ID` no codebase
-- [ ] Testes bankrun passam com nova shape
-- [ ] Typecheck passa
-- [ ] programs/cloak-mock/ deletado
-- [ ] Anchor.toml e Cargo.toml atualizados
-- [ ] Frontend operator page simplificado (sem mock accounts)
-- [ ] .env.example atualizado (sem CLOAK_MOCK_PROGRAM_ID)
-- [ ] Test helpers atualizados (sem encodeStubPool, decodeStubPool, poolPda, nullifierPda)
-- [ ] IDL regenerada via anchor build
+- [x] Gatekeeper nao faz mais CPI para programa externo
+- [x] execute_with_license é state machine puro (verificar + consumir)
+- [x] Nenhuma referencia a `cloak-mock`, `CLOAK_MOCK`, `stub_transact`, `MOCK_PROGRAM_ID` no codebase
+- [x] Testes bankrun passam com nova shape (5/5 suites)
+- [x] Typecheck passa
+- [x] programs/cloak-mock/ deletado
+- [x] Anchor.toml e Cargo.toml atualizados
+- [x] Frontend operator page simplificado (sem mock accounts)
+- [x] .env.example atualizado (sem CLOAK_MOCK_PROGRAM_ID)
+- [x] Test helpers atualizados (sem encodeStubPool, decodeStubPool, poolPda, nullifierPda)
+- [x] IDL regenerada via anchor build
+- [x] Deploy com novo program ID: `AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq`
+- [x] .env.local atualizado com novo program ID
+- [x] Test harness atualizado com novo gatekeeper program ID
 
 ## 8. VERIFICACAO POS-IMPLEMENTACAO
 

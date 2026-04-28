@@ -23,7 +23,7 @@ pub(crate) use instructions::remove_signer_view::__client_accounts_remove_signer
 pub(crate) use instructions::revoke_audit::__client_accounts_revoke_audit;
 pub(crate) use instructions::set_operator::__client_accounts_set_operator;
 
-declare_id!("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J");
+declare_id!("AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq");
 
 #[program]
 pub mod cloak_gatekeeper {
@@ -50,10 +50,8 @@ pub mod cloak_gatekeeper {
     pub fn execute_with_license(
         ctx: Context<ExecuteWithLicense>,
         invariants: PayloadInvariants,
-        proof_bytes: [u8; 256],
-        merkle_root: [u8; 32],
     ) -> Result<()> {
-        instructions::execute_with_license::handler(ctx, invariants, proof_bytes, merkle_root)
+        instructions::execute_with_license::handler(ctx, invariants)
     }
 
     pub fn init_view_distribution(ctx: Context<InitViewDistribution>) -> Result<()> {

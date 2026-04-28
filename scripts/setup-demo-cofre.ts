@@ -25,7 +25,7 @@ import * as multisig from "@sqds/multisig";
 const { Permission, Permissions } = multisig.types;
 const { Multisig, ProgramConfig } = multisig.accounts;
 
-const GATEKEEPER_PROGRAM_ID = new PublicKey("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J");
+const GATEKEEPER_PROGRAM_ID = new PublicKey("AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq");
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const OUT_FILE = path.join(__dirname, ".demo-cofre.json");

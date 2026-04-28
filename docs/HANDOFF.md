@@ -109,7 +109,7 @@ Claim Page:
 
 ### Program IDs
 - Cloak devnet: `Zc1kHfp4rajSMeASFDwFFgkHRjv7dFQuLheJoQus27h`
-- Gatekeeper: `WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J`
+- Gatekeeper: `AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq`
 - Cloak mock: `2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe` (não usado para deposits)
 
 ### Prisma Schema (atualizado)

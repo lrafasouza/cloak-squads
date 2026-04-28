@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
-import { publicEnv } from "@/lib/env";
+
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import { cofrePda } from "@cloak-squads/core/pda";
@@ -275,33 +275,11 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
         );
       }
     }
-    }
 
-    const cloakProgram = new PublicKey(publicEnv.NEXT_PUBLIC_CLOAK_MOCK_PROGRAM_ID);
-
-    const [pool] = PublicKey.findProgramAddressSync(
-      [Buffer.from("stub_pool"), tokenMint.toBuffer()],
-      cloakProgram,
-    );
-    const [nullifierRecord] = PublicKey.findProgramAddressSync(
-      [Buffer.from("nullifier"), nullifier],
-      cloakProgram,
-    );
-
-    // TODO: Replace mock proofs with real ZK proofs before mainnet.
-    // This is safe for devnet/testing only. Real implementation needs:
-    // 1. Generate proof from Cloak SDK (proveOwnership + proveTransfer)
-    // 2. Build merkle root from on-chain shielded pool state
-    // 3. Use actual circuit artifacts (Groth16)
     const ix = await buildExecuteWithLicenseIxBrowser({
       multisig: multisigAddress,
       operator: wallet.publicKey,
       invariants: { nullifier, commitment, amount, tokenMint, recipientVkPub, nonce },
-      proofBytes: new Uint8Array(256).fill(0), // MOCK — replace with real proof
-      merkleRoot: new Uint8Array(32).fill(0), // MOCK — replace with real merkle root
-      cloakProgram,
-      pool,
-      nullifierRecord,
     });
 
     const tx = new Transaction().add(
@@ -658,8 +636,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
           >
             <h2 className="mb-4 text-base font-semibold text-neutral-50">Execute</h2>
             <p className="mb-4 text-xs text-neutral-400">
-              Uses mock proof (256 zero bytes) and mock merkle root (32 zero bytes). Connect the
-              operator wallet (different from the Squads member).
+              Connect the operator wallet (different from the Squads member).
             </p>
             <Button
               type="submit"

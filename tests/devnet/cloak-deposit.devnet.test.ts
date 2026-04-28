@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { Connection, Keypair } from "@solana/web3.js";
-import { cloakDeposit } from "../../packages/core/src/cloak-deposit";
+import { cloakDeposit } from "../../packages/core/src/cloak-deposit.ts";
 
 const ENABLED = process.env.RUN_DEVNET_TESTS === "1";
 

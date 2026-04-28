@@ -75,11 +75,6 @@ export async function buildExecuteWithLicenseIxBrowser(params: {
   multisig: PublicKey;
   operator: PublicKey;
   invariants: PayloadInvariants;
-  proofBytes: Uint8Array;
-  merkleRoot: Uint8Array;
-  cloakProgram: PublicKey;
-  pool: PublicKey;
-  nullifierRecord: PublicKey;
 }) {
   const gatekeeperProgram = new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID);
   const cofre = cofrePda(params.multisig, gatekeeperProgram)[0];
@@ -105,8 +100,6 @@ export async function buildExecuteWithLicenseIxBrowser(params: {
     params.invariants.tokenMint.toBytes(),
     params.invariants.recipientVkPub,
     params.invariants.nonce,
-    params.proofBytes,
-    params.merkleRoot,
   );
 
   return new TransactionInstruction({
@@ -115,9 +108,6 @@ export async function buildExecuteWithLicenseIxBrowser(params: {
       { pubkey: cofre, isSigner: false, isWritable: false },
       { pubkey: license, isSigner: false, isWritable: true },
       { pubkey: params.operator, isSigner: true, isWritable: false },
-      { pubkey: params.cloakProgram, isSigner: false, isWritable: false },
-      { pubkey: params.pool, isSigner: false, isWritable: true },
-      { pubkey: params.nullifierRecord, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: Buffer.from(data),

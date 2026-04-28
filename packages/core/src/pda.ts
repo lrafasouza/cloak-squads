@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 
-const DEFAULT_GATEKEEPER_PROGRAM_ID = new PublicKey("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J");
+const DEFAULT_GATEKEEPER_PROGRAM_ID = new PublicKey("AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq");
 const DEFAULT_SQUADS_PROGRAM_ID = new PublicKey("SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf");
 
 function programIdFromEnv(name: string, fallback: PublicKey): PublicKey {

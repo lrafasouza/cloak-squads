@@ -10,7 +10,7 @@ import { existsSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { Connection, PublicKey } from "@solana/web3.js";
 
-const GATEKEEPER_PROGRAM_ID = new PublicKey("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J");
+const GATEKEEPER_PROGRAM_ID = new PublicKey("AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq");
 
 function getArg(name: string): string | null {
   const idx = process.argv.indexOf(name);

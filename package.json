@@ -11,7 +11,7 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "test:unit": "vitest run -c tests/unit/vitest.config.ts",
-    "test:int": "node --experimental-strip-types tests/integration/spike-cpi.test.ts && node --experimental-strip-types tests/integration/gatekeeper-instructions.test.ts && node --experimental-strip-types tests/integration/f1-send.test.ts && node --experimental-strip-types tests/integration/f2-batch.test.ts && node --experimental-strip-types tests/integration/f3-audit.test.ts && node --experimental-strip-types tests/integration/e2e-full-flow.test.ts",
+    "test:int": "node --experimental-strip-types tests/integration/gatekeeper-instructions.test.ts && node --experimental-strip-types tests/integration/f1-send.test.ts && node --experimental-strip-types tests/integration/f2-batch.test.ts && node --experimental-strip-types tests/integration/f3-audit.test.ts && node --experimental-strip-types tests/integration/e2e-full-flow.test.ts",
     "test:devnet": "RUN_DEVNET_TESTS=1 node --experimental-strip-types tests/devnet/cloak-deposit.devnet.test.ts",
     "test:all": "pnpm test:unit && pnpm test:int",
     "lint": "biome check .",
@@ -31,8 +31,7 @@
     "seed:demo": "tsx scripts/seed-test-data.ts",
     "seed:reset": "tsx scripts/seed-test-data.ts --reset",
     "audit:export": "tsx scripts/compliance-export.ts",
-    "deploy:gk": "tsx scripts/deploy-gatekeeper.ts",
-    "deploy:mock": "tsx scripts/deploy-cloak-mock.ts"
+    "deploy:gk": "tsx scripts/deploy-gatekeeper.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

@@ -24,7 +24,7 @@ import * as multisig from "@sqds/multisig";
 
 const { Multisig } = multisig.accounts;
 
-const GATEKEEPER_PROGRAM_ID = new PublicKey("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J");
+const GATEKEEPER_PROGRAM_ID = new PublicKey("AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq");
 
 function loadKeypair(filePath = path.join(os.homedir(), ".config/solana/id.json")) {
   if (!fs.existsSync(filePath)) {

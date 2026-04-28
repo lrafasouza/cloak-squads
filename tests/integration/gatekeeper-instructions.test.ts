@@ -6,7 +6,6 @@ import {
   type BankrunContext,
   GATEKEEPER_PROGRAM_ID,
   MAX_REVOKED,
-  MOCK_PROGRAM_ID,
   type PayloadInvariants,
   SQUADS_HARNESS_PROGRAM_ID,
   VIEW_DIST_SPACE,
@@ -16,7 +15,6 @@ import {
   computePayloadHash,
   decodeCofre,
   decodeLicense,
-  decodeStubPool,
   decodeViewDistribution,
   encodeArray,
   encodeCofre,
@@ -27,8 +25,6 @@ import {
   expectTxFailure,
   fundedSystemAccount,
   licensePda,
-  nullifierPda,
-  poolPda,
   processTx,
   squadsVaultPda,
   viewDistributionPda,
@@ -52,14 +48,6 @@ function harnessIx(name: string, keys: TransactionInstruction["keys"], fields: B
 function gatekeeperIx(name: string, keys: TransactionInstruction["keys"], fields: Buffer[]) {
   return new TransactionInstruction({
     programId: GATEKEEPER_PROGRAM_ID,
-    keys,
-    data: buildIxData(name, fields),
-  });
-}
-
-function mockIx(name: string, keys: TransactionInstruction["keys"], fields: Buffer[]) {
-  return new TransactionInstruction({
-    programId: MOCK_PROGRAM_ID,
     keys,
     data: buildIxData(name, fields),
   });
@@ -274,12 +262,7 @@ function executeWithLicenseIx(input: {
   cofre: PublicKey;
   license: PublicKey;
   operator: PublicKey;
-  cloakProgram: PublicKey;
-  cloakPool: PublicKey;
-  nullifierRecord: PublicKey;
   params: PayloadInvariants;
-  proofBytes: Uint8Array;
-  merkleRoot: Uint8Array;
 }) {
   return gatekeeperIx(
     "execute_with_license",
@@ -287,9 +270,6 @@ function executeWithLicenseIx(input: {
       { pubkey: input.cofre, isSigner: false, isWritable: false },
       { pubkey: input.license, isSigner: false, isWritable: true },
       { pubkey: input.operator, isSigner: true, isWritable: true },
-      { pubkey: input.cloakProgram, isSigner: false, isWritable: false },
-      { pubkey: input.cloakPool, isSigner: false, isWritable: true },
-      { pubkey: input.nullifierRecord, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     [
@@ -299,21 +279,7 @@ function executeWithLicenseIx(input: {
       encodePubkey(input.params.tokenMint),
       encodeArray(input.params.recipientVkPub, 32, "recipientVkPub"),
       encodeArray(input.params.nonce, 16, "nonce"),
-      encodeArray(input.proofBytes, 256, "proofBytes"),
-      encodeArray(input.merkleRoot, 32, "merkleRoot"),
     ],
-  );
-}
-
-function initPoolIx(input: { pool: PublicKey; payer: PublicKey; mint: PublicKey }) {
-  return mockIx(
-    "init_pool",
-    [
-      { pubkey: input.pool, isSigner: false, isWritable: true },
-      { pubkey: input.payer, isSigner: true, isWritable: true },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-    ],
-    [encodePubkey(input.mint)],
   );
 }
 
@@ -333,8 +299,6 @@ function createFixture() {
   const nullifier = Keypair.generate().publicKey.toBytes();
   const commitment = Keypair.generate().publicKey.toBytes();
   const recipientVkPub = Keypair.generate().publicKey.toBytes();
-  const proofBytes = repeated(256, 29);
-  const merkleRoot = repeated(32, 31);
   const tokenMint = Keypair.generate().publicKey;
   const amount = 1_000_000n;
   const params = {
@@ -350,8 +314,6 @@ function createFixture() {
   const [squadsVault] = squadsVaultPda(multisig);
   const [license] = licensePda(cofre, payloadHash);
   const [viewDistribution] = viewDistributionPda(cofre);
-  const [pool] = poolPda(tokenMint);
-  const [nullifierRecord] = nullifierPda(nullifier);
   return {
     operator,
     alternateOperator,
@@ -362,8 +324,6 @@ function createFixture() {
     nullifier,
     commitment,
     recipientVkPub,
-    proofBytes,
-    merkleRoot,
     tokenMint,
     amount,
     params,
@@ -372,8 +332,6 @@ function createFixture() {
     squadsVault,
     license,
     viewDistribution,
-    pool,
-    nullifierRecord,
   };
 }
 
@@ -425,15 +383,7 @@ async function issueLicense(
   );
 }
 
-async function initMockPool(context: BankrunContext, fixture: ReturnType<typeof createFixture>) {
-  await processTx(context, [
-    initPoolIx({
-      pool: fixture.pool,
-      payer: context.payer.publicKey,
-      mint: fixture.tokenMint,
-    }),
-  ]);
-}
+
 
 async function main() {
   const context = (await startAnchor(ROOT, [], [])) as BankrunContext;
@@ -754,7 +704,6 @@ async function main() {
   {
     const fixture = await initializeCofre(context);
     await issueLicense(context, fixture);
-    await initMockPool(context, fixture);
     await processTx(
       context,
       [
@@ -762,30 +711,17 @@ async function main() {
           cofre: fixture.cofre,
           license: fixture.license,
           operator: fixture.operator.publicKey,
-          cloakProgram: MOCK_PROGRAM_ID,
-          cloakPool: fixture.pool,
-          nullifierRecord: fixture.nullifierRecord,
           params: fixture.params,
-          proofBytes: fixture.proofBytes,
-          merkleRoot: fixture.merkleRoot,
         }),
       ],
       [fixture.operator],
     );
     assert.equal(decodeLicense(await getAccount(context, fixture.license)).status, 1);
-    assert.equal(decodeStubPool(await getAccount(context, fixture.pool)).txCount, 1n);
-    const nullifierAccount = await getAccount(context, fixture.nullifierRecord);
-    assert.equal(nullifierAccount.owner.toBase58(), MOCK_PROGRAM_ID.toBase58());
-    assert.equal(
-      Buffer.from(nullifierAccount.data.slice(8, 40)).equals(Buffer.from(fixture.nullifier)),
-      true,
-    );
   }
 
   {
     const fixture = await initializeCofre(context);
     await issueLicense(context, fixture);
-    await initMockPool(context, fixture);
     await expectTxFailure(
       context,
       [
@@ -793,12 +729,7 @@ async function main() {
           cofre: fixture.cofre,
           license: fixture.license,
           operator: fixture.alternateOperator.publicKey,
-          cloakProgram: MOCK_PROGRAM_ID,
-          cloakPool: fixture.pool,
-          nullifierRecord: fixture.nullifierRecord,
           params: fixture.params,
-          proofBytes: fixture.proofBytes,
-          merkleRoot: fixture.merkleRoot,
         }),
       ],
       "NotOperator",
@@ -824,7 +755,6 @@ async function main() {
         }),
       ),
     );
-    await initMockPool(context, fixture);
     await expectTxFailure(
       context,
       [
@@ -832,12 +762,7 @@ async function main() {
           cofre: fixture.cofre,
           license: fixture.license,
           operator: fixture.operator.publicKey,
-          cloakProgram: MOCK_PROGRAM_ID,
-          cloakPool: fixture.pool,
-          nullifierRecord: fixture.nullifierRecord,
           params: fixture.params,
-          proofBytes: fixture.proofBytes,
-          merkleRoot: fixture.merkleRoot,
         }),
       ],
       "LicenseExpired",
@@ -848,7 +773,6 @@ async function main() {
   {
     const fixture = await initializeCofre(context);
     await issueLicense(context, fixture);
-    await initMockPool(context, fixture);
     const mutatedParams = { ...fixture.params, amount: fixture.params.amount + 1n };
     await expectTxFailure(
       context,
@@ -857,12 +781,7 @@ async function main() {
           cofre: fixture.cofre,
           license: fixture.license,
           operator: fixture.operator.publicKey,
-          cloakProgram: MOCK_PROGRAM_ID,
-          cloakPool: fixture.pool,
-          nullifierRecord: fixture.nullifierRecord,
           params: mutatedParams,
-          proofBytes: fixture.proofBytes,
-          merkleRoot: fixture.merkleRoot,
         }),
       ],
       "LicensePayloadMismatch",
@@ -873,7 +792,6 @@ async function main() {
   {
     const fixture = await initializeCofre(context);
     await issueLicense(context, fixture);
-    await initMockPool(context, fixture);
     await processTx(
       context,
       [
@@ -881,17 +799,11 @@ async function main() {
           cofre: fixture.cofre,
           license: fixture.license,
           operator: fixture.operator.publicKey,
-          cloakProgram: MOCK_PROGRAM_ID,
-          cloakPool: fixture.pool,
-          nullifierRecord: fixture.nullifierRecord,
           params: fixture.params,
-          proofBytes: fixture.proofBytes,
-          merkleRoot: fixture.merkleRoot,
         }),
       ],
       [fixture.operator],
     );
-    const secondNullifier = nullifierPda(repeated(32, 99))[0];
     await expectTxFailure(
       context,
       [
@@ -899,39 +811,10 @@ async function main() {
           cofre: fixture.cofre,
           license: fixture.license,
           operator: fixture.operator.publicKey,
-          cloakProgram: MOCK_PROGRAM_ID,
-          cloakPool: fixture.pool,
-          nullifierRecord: secondNullifier,
           params: fixture.params,
-          proofBytes: fixture.proofBytes,
-          merkleRoot: fixture.merkleRoot,
         }),
       ],
       "LicenseConsumed",
-      [fixture.operator],
-    );
-  }
-
-  {
-    const fixture = await initializeCofre(context);
-    await issueLicense(context, fixture);
-    await initMockPool(context, fixture);
-    await expectTxFailure(
-      context,
-      [
-        executeWithLicenseIx({
-          cofre: fixture.cofre,
-          license: fixture.license,
-          operator: fixture.operator.publicKey,
-          cloakProgram: SystemProgram.programId,
-          cloakPool: fixture.pool,
-          nullifierRecord: fixture.nullifierRecord,
-          params: fixture.params,
-          proofBytes: fixture.proofBytes,
-          merkleRoot: fixture.merkleRoot,
-        }),
-      ],
-      "InvalidCpiTarget",
       [fixture.operator],
     );
   }
@@ -1022,7 +905,6 @@ async function main() {
     assert.equal(cofre.operator.toBase58(), fixture.alternateOperator.publicKey.toBase58());
 
     await issueLicense(context, fixture);
-    await initMockPool(context, fixture);
     await expectTxFailure(
       context,
       [
@@ -1030,12 +912,7 @@ async function main() {
           cofre: fixture.cofre,
           license: fixture.license,
           operator: fixture.operator.publicKey,
-          cloakProgram: MOCK_PROGRAM_ID,
-          cloakPool: fixture.pool,
-          nullifierRecord: fixture.nullifierRecord,
           params: fixture.params,
-          proofBytes: fixture.proofBytes,
-          merkleRoot: fixture.merkleRoot,
         }),
       ],
       "NotOperator",
@@ -1049,12 +926,7 @@ async function main() {
           cofre: fixture.cofre,
           license: fixture.license,
           operator: fixture.alternateOperator.publicKey,
-          cloakProgram: MOCK_PROGRAM_ID,
-          cloakPool: fixture.pool,
-          nullifierRecord: fixture.nullifierRecord,
           params: fixture.params,
-          proofBytes: fixture.proofBytes,
-          merkleRoot: fixture.merkleRoot,
         }),
       ],
       [fixture.alternateOperator],

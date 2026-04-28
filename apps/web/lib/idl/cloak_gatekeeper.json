@@ -1,5 +1,5 @@
 {
-  "address": "WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J",
+  "address": "AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq",
   "metadata": {
     "name": "cloak_gatekeeper",
     "version": "0.1.0",
@@ -356,17 +356,6 @@
           "signer": true
         },
         {
-          "name": "cloak_program"
-        },
-        {
-          "name": "cloak_pool",
-          "writable": true
-        },
-        {
-          "name": "nullifier_record",
-          "writable": true
-        },
-        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
@@ -378,24 +367,6 @@
             "defined": {
               "name": "PayloadInvariants"
             }
-          }
-        },
-        {
-          "name": "proof_bytes",
-          "type": {
-            "array": [
-              "u8",
-              256
-            ]
-          }
-        },
-        {
-          "name": "merkle_root",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
           }
         }
       ]

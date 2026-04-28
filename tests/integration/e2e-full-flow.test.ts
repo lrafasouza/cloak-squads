@@ -13,20 +13,16 @@ import bankrun from "anchor-bankrun";
 import {
   type BankrunContext,
   GATEKEEPER_PROGRAM_ID,
-  MOCK_PROGRAM_ID,
   type PayloadInvariants,
   SQUADS_HARNESS_PROGRAM_ID,
   buildIxData,
   cofrePda,
   computePayloadHash,
   decodeLicense,
-  decodeStubPool,
   encodeArray,
   encodePubkey,
   encodeU64,
   licensePda,
-  nullifierPda,
-  poolPda,
   squadsVaultPda,
 } from "./helpers/gatekeeper.ts";
 
@@ -42,7 +38,6 @@ test("e2e full flow: 1 single + 3 batch licenses all consumed", async () => {
     ROOT,
     [
       { name: "cloak_gatekeeper", programId: GATEKEEPER_PROGRAM_ID },
-      { name: "cloak_mock", programId: MOCK_PROGRAM_ID },
       { name: "cloak_squads_test_harness", programId: SQUADS_HARNESS_PROGRAM_ID },
     ],
     [
@@ -61,7 +56,6 @@ test("e2e full flow: 1 single + 3 batch licenses all consumed", async () => {
 
   const cofre = cofrePda(multisig.publicKey)[0];
   const vaultPda = squadsVaultPda(multisig.publicKey)[0];
-  const pool = poolPda(mint)[0];
 
   // Helper to construct + send a single license cycle
   async function runLicenseCycle(diversifierByte: number, amount: bigint): Promise<void> {
@@ -75,14 +69,12 @@ test("e2e full flow: 1 single + 3 batch licenses all consumed", async () => {
     };
     const payloadHash = computePayloadHash(invariants);
     const license = licensePda(cofre, payloadHash)[0];
-    const nullifier = nullifierPda(invariants.nullifier)[0];
 
     // Issue + execute would normally take many ixs. For brevity and because the
     // exact end-to-end builder lives in apps/web/lib, this test asserts the
     // helper state machine *can* be exercised. Real ix construction follows
     // f2-batch.test.ts patterns — copy that structure inline if extending.
     assert.ok(license);
-    assert.ok(nullifier);
     assert.ok(payloadHash.length === 32);
   }
 
@@ -93,6 +85,5 @@ test("e2e full flow: 1 single + 3 batch licenses all consumed", async () => {
 
   // Sanity: at least the bankrun context started and PDAs derive deterministically
   assert.ok(cofre);
-  assert.ok(pool);
   assert.ok(vaultPda);
 });

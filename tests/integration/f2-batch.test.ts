@@ -5,22 +5,18 @@ import bankrun from "anchor-bankrun";
 import {
   type BankrunContext,
   GATEKEEPER_PROGRAM_ID,
-  MOCK_PROGRAM_ID,
   type PayloadInvariants,
   SQUADS_HARNESS_PROGRAM_ID,
   buildIxData,
   cofrePda,
   computePayloadHash,
   decodeLicense,
-  decodeStubPool,
   encodeArray,
   encodeI64,
   encodePubkey,
   encodeU64,
   fundedSystemAccount,
   licensePda,
-  nullifierPda,
-  poolPda,
   processTx,
   squadsVaultPda,
 } from "./helpers/gatekeeper.ts";
@@ -43,14 +39,6 @@ function harnessIx(name: string, keys: TransactionInstruction["keys"], fields: B
 function gatekeeperIx(name: string, keys: TransactionInstruction["keys"], fields: Buffer[]) {
   return new TransactionInstruction({
     programId: GATEKEEPER_PROGRAM_ID,
-    keys,
-    data: buildIxData(name, fields),
-  });
-}
-
-function mockIx(name: string, keys: TransactionInstruction["keys"], fields: Buffer[]) {
-  return new TransactionInstruction({
-    programId: MOCK_PROGRAM_ID,
     keys,
     data: buildIxData(name, fields),
   });
@@ -133,28 +121,11 @@ function invokeIssueLicenseIx(input: {
   );
 }
 
-function initPoolIx(input: { pool: PublicKey; payer: PublicKey; mint: PublicKey }) {
-  return mockIx(
-    "init_pool",
-    [
-      { pubkey: input.pool, isSigner: false, isWritable: true },
-      { pubkey: input.payer, isSigner: true, isWritable: true },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-    ],
-    [encodePubkey(input.mint)],
-  );
-}
-
 function executeWithLicenseIx(input: {
   cofre: PublicKey;
   license: PublicKey;
   operator: PublicKey;
-  cloakProgram: PublicKey;
-  cloakPool: PublicKey;
-  nullifierRecord: PublicKey;
   params: PayloadInvariants;
-  proofBytes: Uint8Array;
-  merkleRoot: Uint8Array;
 }) {
   return gatekeeperIx(
     "execute_with_license",
@@ -162,9 +133,6 @@ function executeWithLicenseIx(input: {
       { pubkey: input.cofre, isSigner: false, isWritable: false },
       { pubkey: input.license, isSigner: false, isWritable: true },
       { pubkey: input.operator, isSigner: true, isWritable: true },
-      { pubkey: input.cloakProgram, isSigner: false, isWritable: false },
-      { pubkey: input.cloakPool, isSigner: false, isWritable: true },
-      { pubkey: input.nullifierRecord, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     [
@@ -174,8 +142,6 @@ function executeWithLicenseIx(input: {
       encodePubkey(input.params.tokenMint),
       encodeArray(input.params.recipientVkPub, 32, "recipientVkPub"),
       encodeArray(input.params.nonce, 16, "nonce"),
-      encodeArray(input.proofBytes, 256, "proofBytes"),
-      encodeArray(input.merkleRoot, 32, "merkleRoot"),
     ],
   );
 }
@@ -212,30 +178,16 @@ async function main() {
     nonce: repeated(16, 13),
   }));
 
-  // Initialize pool for all recipients (same token mint for simplicity)
-  const sharedMint = recipients[0].tokenMint;
-  const [pool] = poolPda(sharedMint);
-  await processTx(context, [
-    initPoolIx({
-      pool,
-      payer: context.payer.publicKey,
-      mint: sharedMint,
-    }),
-  ]);
-
   // Build batch license instructions
   const batchIxs: TransactionInstruction[] = [];
   const licenses: PublicKey[] = [];
-  const nullifierRecords: PublicKey[] = [];
 
   for (let i = 0; i < recipientCount; i++) {
     const params = recipients[i];
     const payloadHash = computePayloadHash(params);
     const [license] = licensePda(cofre, payloadHash);
-    const [nullifierRecord] = nullifierPda(params.nullifier);
 
     licenses.push(license);
-    nullifierRecords.push(nullifierRecord);
 
     batchIxs.push(
       invokeIssueLicenseIx({
@@ -272,12 +224,7 @@ async function main() {
           cofre,
           license: licenses[i],
           operator: operator.publicKey,
-          cloakProgram: MOCK_PROGRAM_ID,
-          cloakPool: pool,
-          nullifierRecord: nullifierRecords[i],
           params,
-          proofBytes: repeated(256, 29),
-          merkleRoot: repeated(32, 31),
         }),
       ],
       [operator],
@@ -288,11 +235,6 @@ async function main() {
     assert.ok(licenseAccount, `License ${i} should still exist after execution`);
     assert.equal(decodeLicense(licenseAccount).status, 1, `License ${i} should be consumed`);
   }
-
-  // Verify pool transaction count
-  const poolAccount = await context.banksClient.getAccount(pool);
-  assert.ok(poolAccount);
-  assert.equal(decodeStubPool(poolAccount).txCount, BigInt(recipientCount));
 
   console.log(`F2 batch payroll test passed: ${recipientCount} recipients issued and executed`);
 }

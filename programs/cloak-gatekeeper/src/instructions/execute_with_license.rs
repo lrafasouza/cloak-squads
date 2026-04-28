@@ -1,18 +1,11 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
-use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
-use anchor_lang::solana_program::program::invoke;
-use anchor_lang::solana_program::pubkey;
 
 use crate::errors::CloakSquadsError;
 use crate::events::LicenseConsumed;
 use crate::state::*;
 
 pub const PAYLOAD_DOMAIN_SEP: &[u8] = b"cloak-squads-payload-v1\0";
-#[cfg(not(feature = "mainnet"))]
-pub const CLOAK_PROGRAM_ID: Pubkey = pubkey!("2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe");
-#[cfg(feature = "mainnet")]
-pub const CLOAK_PROGRAM_ID: Pubkey = pubkey!("Zc1kHfp4rajSMeASFDwFFgkHRjv7dFQuLheJoQus27h");
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct PayloadInvariants {
@@ -39,8 +32,6 @@ pub fn hash_payload(invariants: &PayloadInvariants) -> [u8; 32] {
 pub fn handler(
     ctx: Context<ExecuteWithLicense>,
     invariants: PayloadInvariants,
-    proof_bytes: [u8; 256],
-    merkle_root: [u8; 32],
 ) -> Result<()> {
     require_keys_eq!(
         ctx.accounts.operator.key(),
@@ -63,36 +54,6 @@ pub fn handler(
         ctx.accounts.license.payload_hash == payload_hash,
         CloakSquadsError::LicensePayloadMismatch
     );
-    require_keys_eq!(
-        ctx.accounts.cloak_program.key(),
-        CLOAK_PROGRAM_ID,
-        CloakSquadsError::InvalidCpiTarget
-    );
-    require!(
-        ctx.accounts.cloak_program.to_account_info().executable,
-        CloakSquadsError::InvalidCpiTarget
-    );
-
-    let ix = Instruction {
-        program_id: ctx.accounts.cloak_program.key(),
-        accounts: vec![
-            AccountMeta::new(ctx.accounts.cloak_pool.key(), false),
-            AccountMeta::new(ctx.accounts.nullifier_record.key(), false),
-            AccountMeta::new(ctx.accounts.operator.key(), true),
-            AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
-        ],
-        data: build_stub_transact_data(&invariants, proof_bytes, merkle_root),
-    };
-
-    invoke(
-        &ix,
-        &[
-            ctx.accounts.cloak_pool.to_account_info(),
-            ctx.accounts.nullifier_record.to_account_info(),
-            ctx.accounts.operator.to_account_info(),
-            ctx.accounts.system_program.to_account_info(),
-        ],
-    )?;
 
     ctx.accounts.license.status = LicenseStatus::Consumed;
 
@@ -103,23 +64,6 @@ pub fn handler(
     });
 
     Ok(())
-}
-
-fn build_stub_transact_data(
-    invariants: &PayloadInvariants,
-    proof_bytes: [u8; 256],
-    merkle_root: [u8; 32],
-) -> Vec<u8> {
-    let mut data = Vec::with_capacity(8 + 32 + 32 + 8 + 32 + 256 + 32);
-    let discriminator = anchor_lang::solana_program::hash::hash(b"global:stub_transact").to_bytes();
-    data.extend_from_slice(&discriminator[..8]);
-    data.extend_from_slice(&invariants.nullifier);
-    data.extend_from_slice(&invariants.commitment);
-    data.extend_from_slice(&invariants.amount.to_le_bytes());
-    data.extend_from_slice(&invariants.recipient_vk_pub);
-    data.extend_from_slice(&proof_bytes);
-    data.extend_from_slice(&merkle_root);
-    data
 }
 
 #[derive(Accounts)]
@@ -134,13 +78,5 @@ pub struct ExecuteWithLicense<'info> {
     )]
     pub license: Account<'info, License>,
     pub operator: Signer<'info>,
-    /// CHECK: CPI target program is selected by environment for the spike.
-    pub cloak_program: UncheckedAccount<'info>,
-    /// CHECK: Mock Cloak pool account owned and validated by the mock program.
-    #[account(mut)]
-    pub cloak_pool: UncheckedAccount<'info>,
-    /// CHECK: Created by cloak-mock during CPI.
-    #[account(mut)]
-    pub nullifier_record: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }

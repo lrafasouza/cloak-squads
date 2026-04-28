@@ -7,7 +7,6 @@ const publicEnvSchema = z.object({
   NEXT_PUBLIC_CLOAK_RELAY_URL: z.string().url(),
   NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID: z.string().min(32),
   NEXT_PUBLIC_SQUADS_PROGRAM_ID: z.string().min(32),
-  NEXT_PUBLIC_CLOAK_MOCK_PROGRAM_ID: z.string(),
 });
 
 const serverEnvSchema = z.object({
@@ -23,7 +22,6 @@ export const publicEnv = publicEnvSchema.parse({
   NEXT_PUBLIC_CLOAK_RELAY_URL: process.env.NEXT_PUBLIC_CLOAK_RELAY_URL,
   NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID: process.env.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID,
   NEXT_PUBLIC_SQUADS_PROGRAM_ID: process.env.NEXT_PUBLIC_SQUADS_PROGRAM_ID,
-  NEXT_PUBLIC_CLOAK_MOCK_PROGRAM_ID: process.env.NEXT_PUBLIC_CLOAK_MOCK_PROGRAM_ID ?? "",
 });
 
 export function getServerEnv() {

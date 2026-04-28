@@ -10,9 +10,8 @@ Pré-requisitos para uma demo estável do Cloak-Squads em Solana devnet. Não é
 - [ ] `NEXT_PUBLIC_RPC_URL` — usar Helius/QuickNode/Triton devnet (NÃO `api.devnet.solana.com` — rate limit baixo)
 - [ ] `NEXT_PUBLIC_CLOAK_PROGRAM_ID=Zc1kHfp4rajSMeASFDwFFgkHRjv7dFQuLheJoQus27h`
 - [ ] `NEXT_PUBLIC_CLOAK_RELAY_URL=https://api.devnet.cloak.ag`
-- [ ] `NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID=WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J`
+- [ ] `NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID=AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq`
 - [ ] `NEXT_PUBLIC_SQUADS_PROGRAM_ID=SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf`
-- [ ] `NEXT_PUBLIC_CLOAK_MOCK_PROGRAM_ID=2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe`
 - [ ] `DATABASE_URL=file:./dev.db` (ou Postgres em prod)
 - [ ] `JWT_SIGNING_SECRET` — string aleatória ≥32 bytes (NÃO usar default)
 - [ ] `LOG_LEVEL=info`
@@ -29,12 +28,12 @@ Pré-requisitos para uma demo estável do Cloak-Squads em Solana devnet. Não é
 
 ### Programas on-chain
 
-- [ ] `cloak_gatekeeper` deployado em devnet — verificar `solana program show WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J --url devnet`
-- [ ] `cloak_mock` deployado em devnet — verificar `solana program show 2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe --url devnet`
+- [ ] `cloak_gatekeeper` deployado em devnet — verificar `solana program show <PROGRAM_ID> --url devnet`
+- [ ] ~~`cloak_mock` deployado em devnet~~ ❌ REMOVIDO
 
 ### Testes
 
-- [ ] `pnpm test:int` passa (5+ ficheiros bankrun)
+- [ ] `pnpm test:int` passa (5 ficheiros bankrun)
 - [ ] `pnpm test:unit` passa (1 ficheiro vitest)
 - [ ] (opcional, custa SOL) `RUN_DEVNET_TESTS=1 pnpm test:devnet` passa
 
@@ -45,7 +44,7 @@ Pré-requisitos para uma demo estável do Cloak-Squads em Solana devnet. Não é
 A Solana Foundation faz reset periódico da devnet. Sintoma: `getAccountInfo(cofrePda)` retorna `null`. Procedimento:
 
 1. `pnpm seed:reset` (regenera DB + on-chain via `setup-demo-cofre.ts`)
-2. Se gatekeeper foi wiped também: `pnpm deploy:gk -- --cluster devnet` + `pnpm deploy:mock -- --cluster devnet`
+2. Se gatekeeper foi wiped também: `pnpm deploy:gk -- --cluster devnet`
 3. Atualizar `.demo-data.json` se necessário
 
 ### Cloak SDK quirks

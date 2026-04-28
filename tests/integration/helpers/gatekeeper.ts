@@ -31,8 +31,7 @@ export type BankrunContext = {
   setAccount(address: PublicKey, account: AccountInfoBytes): void;
 };
 
-export const GATEKEEPER_PROGRAM_ID = new PublicKey("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J");
-export const MOCK_PROGRAM_ID = new PublicKey("2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe");
+export const GATEKEEPER_PROGRAM_ID = new PublicKey("AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq");
 export const SQUADS_HARNESS_PROGRAM_ID = new PublicKey(
   "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf",
 );
@@ -137,21 +136,6 @@ export function encodeLicense(input: {
   ]);
 }
 
-export function encodeStubPool(input: {
-  mint: PublicKey;
-  merkleRootStub: Uint8Array;
-  txCount: bigint;
-  bump: number;
-}) {
-  return Buffer.concat([
-    accountDiscriminator("StubPool"),
-    encodePubkey(input.mint),
-    encodeArray(input.merkleRootStub, 32, "merkleRootStub"),
-    encodeU64(input.txCount),
-    Buffer.from([input.bump]),
-  ]);
-}
-
 export function readPubkey(data: Uint8Array, offset: number) {
   return new PublicKey(data.slice(offset, offset + 32));
 }
@@ -233,17 +217,6 @@ export function decodeViewDistribution(account: AccountInfoBytes) {
   };
 }
 
-export function decodeStubPool(account: AccountInfoBytes) {
-  assertOwner(account, MOCK_PROGRAM_ID);
-  assertDiscriminator(account.data, "StubPool");
-  return {
-    mint: readPubkey(account.data, 8),
-    merkleRootStub: account.data.slice(40, 72),
-    txCount: readU64(account.data, 72),
-    bump: account.data[80],
-  };
-}
-
 export function cofrePda(multisig: PublicKey) {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("cofre"), multisig.toBuffer()],
@@ -269,20 +242,6 @@ export function squadsVaultPda(multisig: PublicKey) {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("multisig"), multisig.toBuffer(), Buffer.from("vault"), Buffer.from([0])],
     SQUADS_HARNESS_PROGRAM_ID,
-  );
-}
-
-export function poolPda(mint: PublicKey) {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("stub_pool"), mint.toBuffer()],
-    MOCK_PROGRAM_ID,
-  );
-}
-
-export function nullifierPda(nullifier: Uint8Array) {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("nullifier"), Buffer.from(nullifier)],
-    MOCK_PROGRAM_ID,
   );
 }
 
