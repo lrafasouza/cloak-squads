@@ -2,6 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { cloakDeposit } from "@cloak-squads/core/cloak-deposit";
+import { NATIVE_SOL_MINT } from "@cloak.dev/sdk-devnet";
 import {
   ComputeBudgetProgram,
   Connection,
@@ -32,7 +34,6 @@ type DemoCofre = {
   cofre: string;
   creator: string;
   operator: string;
-  operatorSecretKey: number[];
   createKey: number[];
   threshold: number;
 };
@@ -141,17 +142,23 @@ async function main() {
   const multisigPda = new PublicKey(demo.multisig);
   const vaultPda = new PublicKey(demo.vault);
   const cofrePda = new PublicKey(demo.cofre);
-  const operator = Keypair.fromSecretKey(Uint8Array.from(demo.operatorSecretKey));
+
+  const operatorKeypairEnv = process.env.OPERATOR_KEYPAIR;
+  if (!operatorKeypairEnv) {
+    throw new Error(
+      "Set OPERATOR_KEYPAIR env var to the operator keypair path (e.g. /tmp/my-operator.json).",
+    );
+  }
+  const operatorPath = operatorKeypairEnv.replace("~", process.env.HOME || "");
+  const operator = Keypair.fromSecretKey(
+    Uint8Array.from(JSON.parse(fs.readFileSync(operatorPath, "utf-8")) as number[]),
+  );
 
   console.log("=== F1 Private Send — Devnet Test ===");
   console.log("Multisig: ", multisigPda.toBase58());
   console.log("Vault:    ", vaultPda.toBase58());
   console.log("Cofre:    ", cofrePda.toBase58());
   console.log("Operator: ", operator.publicKey.toBase58());
-
-  if (!demo.operatorSecretKey) {
-    throw new Error(".demo-cofre.json missing operatorSecretKey. Re-run pnpm demo:setup.");
-  }
 
   const connection = new Connection("https://api.devnet.solana.com", "confirmed");
 
@@ -204,25 +211,9 @@ async function main() {
     console.log("  fund tx:", fundSig);
   }
 
-  const operatorBalance = await connection.getBalance(operator.publicKey);
-  console.log(`Operator balance: ${operatorBalance / LAMPORTS_PER_SOL} SOL`);
-  if (operatorBalance < 0.01 * LAMPORTS_PER_SOL) {
-    console.log("[preflight] Funding operator with 0.05 SOL (fees)...");
-    const fundOpTx = new Transaction().add(
-      SystemProgram.transfer({
-        fromPubkey: creator.publicKey,
-        toPubkey: operator.publicKey,
-        lamports: 50_000_000,
-      }),
-    );
-    const fundOpSig = await connection.sendTransaction(fundOpTx, [creator], { skipPreflight: false });
-    await confirm(connection, fundOpSig);
-    console.log("  fund tx:", fundOpSig);
-  }
-
   const nullifier = randomBytes(32);
   const commitment = randomBytes(32);
-  const amount = 500_000n;
+  const amount = 10_000_000n;
   const tokenMint = Keypair.generate().publicKey;
   const recipientVkPub = randomBytes(32);
   const nonce = randomBytes(16);
@@ -249,7 +240,7 @@ async function main() {
   const multisigAccount = await Multisig.fromAccountAddress(connection, multisigPda);
   const transactionIndex = BigInt(multisigAccount.transactionIndex.toString()) + 1n;
 
-  console.log(`\n[1/5] vaultTransactionCreate (issue_license) — tx index ${transactionIndex}`);
+  console.log(`\n[1/6] vaultTransactionCreate (issue_license) — tx index ${transactionIndex}`);
 
   const innerIx = buildIssueLicenseIx({
     cofre: cofrePda,
@@ -280,7 +271,7 @@ async function main() {
   await confirm(connection, createTxSig);
   console.log("  tx:", createTxSig);
 
-  console.log("\n[2/5] proposalCreate...");
+  console.log("\n[2/6] proposalCreate...");
   const proposalSig = await multisig.rpc.proposalCreate({
     connection,
     feePayer: creator,
@@ -291,7 +282,7 @@ async function main() {
   await confirm(connection, proposalSig);
   console.log("  tx:", proposalSig);
 
-  console.log("\n[3/5] proposalApprove (threshold=1)...");
+  console.log("\n[3/6] proposalApprove (threshold=1)...");
   const approveSig = await multisig.rpc.proposalApprove({
     connection,
     feePayer: creator,
@@ -302,7 +293,7 @@ async function main() {
   await confirm(connection, approveSig);
   console.log("  tx:", approveSig);
 
-  console.log("\n[4/5] vaultTransactionExecute (issues license)...");
+  console.log("\n[4/6] vaultTransactionExecute (issues license)...");
   let executeSig: string;
   try {
     executeSig = await multisig.rpc.vaultTransactionExecute({
@@ -343,7 +334,40 @@ async function main() {
     throw new Error(`Expected Active (0), got ${licenseStatus}`);
   }
 
-  console.log("\n[5/5] execute_with_license (operator consumes)...");
+  console.log("\n[5/6] cloakDeposit (real SOL into shield pool)...");
+  const operatorBalance = await connection.getBalance(operator.publicKey);
+  console.log(`Operator balance: ${operatorBalance / LAMPORTS_PER_SOL} SOL`);
+  const minOperatorBalance = Number(amount) + 0.01 * LAMPORTS_PER_SOL;
+  if (operatorBalance < minOperatorBalance) {
+    const fundAmount = minOperatorBalance - operatorBalance + 0.01 * LAMPORTS_PER_SOL;
+    console.log(`[preflight] Funding operator with ${fundAmount / LAMPORTS_PER_SOL} SOL...`);
+    const fundOpTx = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: creator.publicKey,
+        toPubkey: operator.publicKey,
+        lamports: Math.ceil(fundAmount),
+      }),
+    );
+    const fundOpSig = await connection.sendTransaction(fundOpTx, [creator], {
+      skipPreflight: false,
+    });
+    await confirm(connection, fundOpSig);
+    console.log("  fund tx:", fundOpSig);
+  }
+
+  try {
+    const depositResult = await cloakDeposit(connection, operator, amount, NATIVE_SOL_MINT);
+    console.log("  Cloak deposit tx:", depositResult.signature);
+    console.log("  Leaf index:", depositResult.leafIndex);
+    console.log("  Spend key:", `${depositResult.spendKeyHex.slice(0, 16)}...`);
+    console.log("  Blinding:", `${depositResult.blindingHex.slice(0, 16)}...`);
+  } catch (err: unknown) {
+    console.error("\n  cloakDeposit FAILED");
+    console.error("  message:", (err as Error).message);
+    throw err;
+  }
+
+  console.log("\n[6/6] execute_with_license (operator consumes)...");
   const executeIx = buildExecuteWithLicenseIx({
     cofre: cofrePda,
     license: licensePda,

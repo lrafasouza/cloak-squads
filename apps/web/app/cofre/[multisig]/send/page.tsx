@@ -16,7 +16,7 @@ import {
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, use, useMemo, useState } from "react";

@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import {
   CLOAK_PROGRAM_ID,
-  NATIVE_SOL_MINT,
   createUtxo,
   deriveUtxoKeypairFromSpendKey,
   fullWithdraw,

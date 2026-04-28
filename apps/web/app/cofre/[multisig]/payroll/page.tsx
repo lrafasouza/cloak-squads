@@ -20,7 +20,7 @@ import {
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, type FormEvent, use, useMemo, useState } from "react";
@@ -41,10 +41,6 @@ function hexToBytes(hex: string) {
     out[i] = Number.parseInt(normalized.slice(i * 2, i * 2 + 2), 16);
   }
   return out;
-}
-
-function bytesToHex(bytes: Uint8Array) {
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 type RecipientNote = {

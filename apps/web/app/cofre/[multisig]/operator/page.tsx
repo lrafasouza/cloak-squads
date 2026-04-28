@@ -19,7 +19,7 @@ import {
 } from "@cloak.dev/sdk-devnet";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { ComputeBudgetProgram, PublicKey, Transaction } from "@solana/web3.js";
+import { ComputeBudgetProgram, PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
 import Link from "next/link";
 import { type FormEvent, use, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -220,12 +220,18 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
 
     // Step 1: Cloak deposit (real)
     let cloakSig: string | undefined;
-    let cloakLeafIndex: number | undefined;
     if (doCloakDeposit) {
+      if (!wallet.signTransaction) {
+        throw new Error("Wallet does not support signTransaction");
+      }
       try {
-        const cloakResult = await cloakDepositBrowser(connection, wallet, amount, tokenMint);
+        const cloakResult = await cloakDepositBrowser(
+          connection,
+          { publicKey: wallet.publicKey, signTransaction: wallet.signTransaction },
+          amount,
+          tokenMint,
+        );
         cloakSig = cloakResult.signature;
-        cloakLeafIndex = cloakResult.leafIndex;
         setCloakSignature(cloakSig);
 
         // Store UTXO data for future claim (linked by invoice if available)
@@ -368,7 +374,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
       } catch (caught) {
         const errorMsg = caught instanceof Error ? caught.message : "Execution failed";
         setExecutionSteps((prev) =>
-          prev.map((s) => (s.index === i ? { ...s, status: "failed", error: errorMsg } : s)),
+          prev.map((s) => (s.index === i ? { ...s, status: "error", error: errorMsg } : s)),
         );
         break;
       }
@@ -423,7 +429,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
       } catch (caught) {
         const errorMsg = caught instanceof Error ? caught.message : "Execution failed";
         setExecutionSteps((prev) =>
-          prev.map((s) => (s.index === i ? { ...s, status: "failed", error: errorMsg } : s)),
+          prev.map((s) => (s.index === i ? { ...s, status: "error", error: errorMsg } : s)),
         );
         break;
       }

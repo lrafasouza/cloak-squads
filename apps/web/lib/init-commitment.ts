@@ -3,7 +3,6 @@ import {
   NATIVE_SOL_MINT,
   computeUtxoCommitment,
   createUtxo,
-  generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
 import { PublicKey } from "@solana/web3.js";
 

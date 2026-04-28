@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@cloak.dev/sdk':
-        specifier: ^0.1.5
-        version: 0.1.5(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@cloak.dev/sdk-devnet':
         specifier: 0.1.5-devnet.0
         version: 0.1.5-devnet.0(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -54,9 +51,6 @@ importers:
       '@cloak-squads/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@cloak.dev/sdk':
-        specifier: ^0.1.5
-        version: 0.1.5(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@cloak.dev/sdk-devnet':
         specifier: 0.1.5-devnet.0
         version: 0.1.5-devnet.0(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -145,9 +139,9 @@ importers:
 
   packages/core:
     dependencies:
-      '@cloak.dev/sdk':
-        specifier: ^0.1.4
-        version: 0.1.5(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      '@cloak.dev/sdk-devnet':
+        specifier: 0.1.5-devnet.0
+        version: 0.1.5-devnet.0(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@coral-xyz/anchor':
         specifier: ^0.31.1
         version: 0.31.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
@@ -318,22 +312,6 @@ packages:
 
   '@cloak.dev/sdk-devnet@0.1.5-devnet.0':
     resolution: {integrity: sha512-tbjQL/WQ8nHqaapq7sK3zN2UXYz8cKkHlL/jfE2F7uoWMAOOvcgKvXje1TJOVVRNqpdgP81/hHpMThvOZjzHmg==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      '@solana/spl-token': '>=0.4.9'
-      '@solana/web3.js': '>=1.98.0'
-      '@switchboard-xyz/common': ^5.6.1
-      '@switchboard-xyz/on-demand': ^3.8.2
-    peerDependenciesMeta:
-      '@solana/spl-token':
-        optional: true
-      '@switchboard-xyz/common':
-        optional: true
-      '@switchboard-xyz/on-demand':
-        optional: true
-
-  '@cloak.dev/sdk@0.1.5':
-    resolution: {integrity: sha512-Makg4WFEVZf9U60dJ+S7Fb8S5P8xttztimtsV6vtKyzIXBKn+5lm5/wwLlKl7QEqHf7B/qsvEOfOc8kJvT5XiQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       '@solana/spl-token': '>=0.4.9'
@@ -5684,24 +5662,6 @@ snapshots:
     optional: true
 
   '@cloak.dev/sdk-devnet@0.1.5-devnet.0(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
-    dependencies:
-      '@jup-ag/api': 6.0.48
-      '@lightprotocol/hasher.rs': 0.2.1
-      '@noble/hashes': 1.8.0
-      '@solana/web3.js': 1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      bs58: 6.0.0
-      circomlibjs: 0.1.7(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      ffjavascript: 0.3.1
-      snarkjs: 0.7.6
-      tweetnacl: 1.0.3
-      tweetnacl-util: 0.15.1
-      yaml: 2.8.3
-    transitivePeerDependencies:
-      - bufferutil
-      - react-native-b4a
-      - utf-8-validate
-
-  '@cloak.dev/sdk@0.1.5(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
       '@jup-ag/api': 6.0.48
       '@lightprotocol/hasher.rs': 0.2.1
