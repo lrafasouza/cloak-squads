@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
-    "@cloak.dev/sdk": "^0.1.4",
+    "@cloak.dev/sdk-devnet": "0.1.5-devnet.0",
     "@noble/hashes": "^1.5.0",
     "@noble/curves": "^1.2.1",
     "@solana/web3.js": "^1.98.0",

@@ -1,4 +1,4 @@
-import { generateCloakKeys } from "@cloak.dev/sdk";
+import { generateCloakKeys } from "@cloak.dev/sdk-devnet";
 import { PublicKey } from "@solana/web3.js";
 import { describe, expect, test, vi } from "vitest";
 import { deriveOperatorCloakKeys, deriveSignerDecryptKeypair } from "../src/derivation";

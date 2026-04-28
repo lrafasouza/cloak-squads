@@ -6,13 +6,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "prisma": "DATABASE_URL=file:/home/rafazaum/cloak-squads/apps/web/prisma/dev.db prisma",
+    "prisma": "DATABASE_URL=file:./dev.db prisma",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cloak-squads/core": "workspace:*",
-    "@cloak.dev/sdk": "^0.1.5",
     "@cloak.dev/sdk-devnet": "0.1.5-devnet.0",
     "@coral-xyz/anchor": "^0.31.1",
     "@prisma/client": "^5.22.0",
