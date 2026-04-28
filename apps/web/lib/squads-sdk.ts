@@ -52,6 +52,59 @@ export async function createIssueLicenseProposalWithSigner(params: {
   return buildIssueLicenseProposal(params);
 }
 
+export async function createInitCofreProposal(params: {
+  connection: Connection;
+  wallet: BrowserSquadsWallet;
+  multisigPda: PublicKey;
+  initCofreIx: TransactionInstruction;
+  memo?: string;
+}) {
+  assertBrowserSquadsWallet(params.wallet);
+  const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
+  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: 0 });
+  const latestBlockhash = await params.connection.getLatestBlockhash();
+  const message = new TransactionMessage({
+    payerKey: vaultPda,
+    recentBlockhash: latestBlockhash.blockhash,
+    instructions: [params.initCofreIx],
+  });
+
+  const createVaultIx = multisig.instructions.vaultTransactionCreate({
+    multisigPda: params.multisigPda,
+    transactionIndex,
+    creator: params.wallet.publicKey,
+    rentPayer: params.wallet.publicKey,
+    vaultIndex: 0,
+    ephemeralSigners: 0,
+    transactionMessage: message,
+    memo: params.memo ?? "init cofre",
+  });
+  const createProposalIx = multisig.instructions.proposalCreate({
+    multisigPda: params.multisigPda,
+    creator: params.wallet.publicKey,
+    rentPayer: params.wallet.publicKey,
+    transactionIndex,
+  });
+
+  const tx = new Transaction().add(createVaultIx, createProposalIx);
+  tx.feePayer = params.wallet.publicKey;
+  tx.recentBlockhash = latestBlockhash.blockhash;
+
+  const signature = await params.wallet.sendTransaction(tx, params.connection);
+  const { blockhash: confirmBh, lastValidBlockHeight } = await params.connection.getLatestBlockhash();
+  await params.connection.confirmTransaction(
+    { signature, blockhash: confirmBh, lastValidBlockHeight },
+    "confirmed",
+  );
+
+  const [vaultTransactionPda] = multisig.getTransactionPda({
+    multisigPda: params.multisigPda,
+    index: transactionIndex,
+  });
+
+  return { signature, transactionIndex, vaultTransactionPda };
+}
+
 export async function createIssueLicenseProposal(params: {
   connection: Connection;
   wallet: BrowserSquadsWallet;

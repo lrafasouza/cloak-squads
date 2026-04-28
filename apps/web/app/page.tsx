@@ -7,6 +7,7 @@ import { PublicKey } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { CreateMultisigCard } from "@/components/create-multisig/CreateMultisigCard";
 import { useToast } from "@/components/ui/toast-provider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -289,6 +290,7 @@ export default function HomePage() {
                   <div className="flex-1"
                   >
                     <Input
+                      id="hero-input"
                       type="text"
                       placeholder="Enter Squads multisig address..."
                       value={multisigInput}
@@ -446,9 +448,9 @@ export default function HomePage() {
           <StaggerContainer staggerDelay={0.1}
           >
             <StaggerItem>
-              <div className="mx-auto max-w-2xl text-center"
+              <div className="mx-auto max-w-4xl"
               >
-                <div className="rounded-2xl border border-emerald-800/30 bg-gradient-to-b from-emerald-950/40 to-neutral-900/40 p-8 backdrop-blur-sm md:p-12"
+                <div className="mb-10 text-center"
                 >
                   <h2 className="text-3xl font-bold text-neutral-50"
                   >
@@ -459,35 +461,60 @@ export default function HomePage() {
                     Connect your wallet and open an existing Squads multisig, or
                     create a new one in seconds.
                   </p>
+                </div>
 
-                  <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
+                <div className="grid gap-6 md:grid-cols-[0.9fr_1.1fr] md:items-start"
+                >
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-xl backdrop-blur-sm"
                   >
+                    <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10"
+                    >
+                      <FeatureIcon name="send" className="h-5 w-5 text-emerald-400" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-neutral-100"
+                    >
+                      Open an existing multisig
+                    </h3>
+                    <p className="mt-2 text-sm text-neutral-500"
+                    >
+                      Jump back to the address field and open any Squads multisig PDA.
+                    </p>
                     <Button
                       size="lg"
                       variant="gradient"
+                      className="mt-6 w-full"
                       onClick={() => {
                         const el = document.getElementById("hero-input");
-                        el?.focus();
+                        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        el?.focus({ preventScroll: true });
                       }}
                     >
                       <FeatureIcon name="send" className="h-5 w-5 mr-2" />
                       Open a Multisig
                     </Button>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      onClick={() => router.push("/")}
-                    >
-                      Learn More
-                    </Button>
+
+                    {!wallet.connected && (
+                      <p className="mt-4 text-xs text-neutral-500"
+                      >
+                        You&apos;ll need a Solana wallet to interact with Cloak Squads.
+                      </p>
+                    )}
                   </div>
 
-                  {!wallet.connected && (
-                    <p className="mt-6 text-xs text-neutral-500"
-                    >
-                      You&apos;ll need a Solana wallet to interact with Cloak Squads.
-                    </p>
-                  )}
+                  <CreateMultisigCard
+                    onCreated={(multisigPda) => router.push(`/cofre/${multisigPda}`)}
+                  />
+                </div>
+
+                <div className="mt-8 flex justify-center"
+                >
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                  >
+                    Learn More
+                  </Button>
                 </div>
               </div>
             </StaggerItem>

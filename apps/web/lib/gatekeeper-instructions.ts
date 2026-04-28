@@ -73,6 +73,44 @@ export async function buildIssueLicenseIxBrowser(params: {
   };
 }
 
+export async function buildInitCofreIxBrowser(params: {
+  multisig: PublicKey;
+  operator: PublicKey;
+  viewKeyPublic?: Uint8Array;
+}) {
+  const gatekeeperProgram = new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID);
+  const squadsProgram = new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID);
+  const cofre = cofrePda(params.multisig, gatekeeperProgram)[0];
+  const vault = squadsVaultPda(params.multisig, squadsProgram)[0];
+  const viewKeyPublic = params.viewKeyPublic ?? new Uint8Array(32);
+  if (viewKeyPublic.length !== 32) {
+    throw new Error("View key public must be 32 bytes.");
+  }
+
+  const discriminator = await anchorDiscriminator("init_cofre");
+  const data = concatBytes(
+    discriminator,
+    params.multisig.toBytes(),
+    params.operator.toBytes(),
+    viewKeyPublic,
+  );
+
+  return {
+    cofre,
+    vault,
+    instruction: new TransactionInstruction({
+      programId: gatekeeperProgram,
+      keys: [
+        { pubkey: cofre, isSigner: false, isWritable: true },
+        { pubkey: vault, isSigner: true, isWritable: false },
+        { pubkey: vault, isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: Buffer.from(data),
+    }),
+  };
+}
+
 export async function buildExecuteWithLicenseIxBrowser(params: {
   multisig: PublicKey;
   operator: PublicKey;

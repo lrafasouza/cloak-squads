@@ -1,18 +1,22 @@
 "use client";
 
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
-import { type FormEvent, useCallback, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
 import { AnimatedCard, StaggerContainer, StaggerItem } from "@/components/ui/animations";
+import { buildInitCofreIxBrowser } from "@/lib/gatekeeper-instructions";
+import { createInitCofreProposal, proposalApprove, vaultTransactionExecute } from "@/lib/squads-sdk";
 
 
 const { Permission, Permissions } = multisig.types;
 
 type CreateState = "idle" | "pending" | "success" | "error";
+type BootstrapState = "idle" | "proposal-created" | "initialized" | "error";
 
 export function CreateMultisigCard({
   onCreated,
@@ -24,9 +28,18 @@ export function CreateMultisigCard({
   const { addToast } = useToast();
   const [threshold, setThreshold] = useState(1);
   const [memberInputs, setMemberInputs] = useState<string[]>([""]);
+  const [operatorInput, setOperatorInput] = useState("");
   const [state, setState] = useState<CreateState>("idle");
+  const [bootstrapState, setBootstrapState] = useState<BootstrapState>("idle");
+  const [bootstrapProposalIndex, setBootstrapProposalIndex] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createdPda, setCreatedPda] = useState<string | null>(null);
+  const [createdOperator, setCreatedOperator] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!wallet.publicKey || operatorInput) return;
+    setOperatorInput(wallet.publicKey.toBase58());
+  }, [operatorInput, wallet.publicKey]);
 
   const addMember = useCallback(() => {
     if (memberInputs.length >= 10) {
@@ -50,14 +63,18 @@ export function CreateMultisigCard({
       if (!wallet.publicKey || !wallet.sendTransaction) return;
 
       setState("pending");
+      setBootstrapState("idle");
+      setBootstrapProposalIndex(null);
       setError(null);
       addToast("Creating multisig...", "info");
 
       try {
+        const operator = new PublicKey(operatorInput.trim());
         const createKey = Keypair.generate();
         const [multisigPda] = multisig.getMultisigPda({
           createKey: createKey.publicKey,
         });
+        const [vaultPda] = multisig.getVaultPda({ multisigPda, index: 0 });
 
         const [programConfigPda] = multisig.getProgramConfigPda({});
         const programConfig =
@@ -111,7 +128,12 @@ export function CreateMultisigCard({
         });
 
         const latestBlockhash = await connection.getLatestBlockhash();
-        const tx = new Transaction().add(createIx);
+        const fundVaultIx = SystemProgram.transfer({
+          fromPubkey: wallet.publicKey,
+          toPubkey: vaultPda,
+          lamports: 20_000_000,
+        });
+        const tx = new Transaction().add(createIx, fundVaultIx);
         tx.feePayer = wallet.publicKey;
         tx.recentBlockhash = latestBlockhash.blockhash;
         tx.partialSign(createKey);
@@ -122,18 +144,62 @@ export function CreateMultisigCard({
           "confirmed",
         );
 
+        addToast("Creating cofre bootstrap proposal...", "info");
+        const initCofre = await buildInitCofreIxBrowser({
+          multisig: multisigPda,
+          operator,
+        });
+        const bootstrap = await createInitCofreProposal({
+          connection,
+          wallet,
+          multisigPda,
+          initCofreIx: initCofre.instruction,
+          memo: "Initialize Cloak Squads cofre",
+        });
+        setBootstrapProposalIndex(bootstrap.transactionIndex.toString());
+        setBootstrapState("proposal-created");
+
+        if (threshold === 1) {
+          addToast("Approving and executing cofre bootstrap...", "info");
+          await proposalApprove({
+            connection,
+            wallet,
+            multisigPda,
+            transactionIndex: bootstrap.transactionIndex,
+            memo: "Approve cofre bootstrap",
+          });
+          const executeSig = await vaultTransactionExecute({
+            connection,
+            wallet,
+            multisigPda,
+            transactionIndex: bootstrap.transactionIndex,
+          });
+          const executeBlockhash = await connection.getLatestBlockhash();
+          await connection.confirmTransaction(
+            { signature: executeSig, ...executeBlockhash },
+            "confirmed",
+          );
+          setBootstrapState("initialized");
+        }
+
         setCreatedPda(multisigPda.toBase58());
+        setCreatedOperator(operator.toBase58());
         setState("success");
-        addToast("Multisig created successfully!", "success");
-        onCreated(multisigPda.toBase58());
+        addToast(
+          threshold === 1
+            ? "Multisig and cofre initialized successfully!"
+            : "Multisig created. Cofre bootstrap proposal needs approvals.",
+          "success",
+        );
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to create multisig";
         setError(message);
         setState("error");
+        setBootstrapState("error");
         addToast(message, "error");
       }
     },
-    [wallet, connection, memberInputs, threshold, onCreated, addToast],
+    [wallet, connection, memberInputs, threshold, operatorInput, addToast],
   );
 
   const walletConnected = wallet.connected && !!wallet.publicKey && !!wallet.sendTransaction;
@@ -163,8 +229,8 @@ export function CreateMultisigCard({
           <div className="mt-4 space-y-3">
             {[
               { step: "1", text: "Connect your wallet above", icon: "wallet" },
-              { step: "2", text: "Define members and threshold", icon: "users" },
-              { step: "3", text: "Create and open your multisig", icon: "check" },
+              { step: "2", text: "Define members, threshold, and operator", icon: "users" },
+              { step: "3", text: "Create multisig and bootstrap the cofre", icon: "check" },
             ].map((item) => (
               <div key={item.step} className="flex items-center gap-3 rounded-lg border border-neutral-800/50 bg-neutral-950/50 px-4 py-3">
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-xs font-semibold text-neutral-400">
@@ -187,6 +253,22 @@ export function CreateMultisigCard({
                 {createdPda}
               </p>
             </div>
+            {createdOperator && (
+              <div className="rounded-lg border border-neutral-800 bg-neutral-950/50 p-4">
+                <p className="text-xs font-medium text-neutral-400">Operator wallet</p>
+                <p className="mt-2 break-all font-mono text-xs text-neutral-200">{createdOperator}</p>
+              </div>
+            )}
+            {bootstrapProposalIndex && bootstrapState !== "initialized" && (
+              <div className="rounded-lg border border-amber-900/50 bg-amber-950/30 p-4">
+                <p className="text-sm font-semibold text-amber-200">
+                  Cofre bootstrap proposal #{bootstrapProposalIndex} needs Squads approval.
+                </p>
+                <p className="mt-1 text-xs text-amber-100/80">
+                  Once approved and executed, this operator can run private executions.
+                </p>
+              </div>
+            )}
             <Button onClick={() => onCreated(createdPda)} size="sm" className="w-full">
               Open multisig
             </Button>
@@ -266,13 +348,33 @@ export function CreateMultisigCard({
               </p>
             </div>
 
+            <div>
+              <Label htmlFor="operator-wallet" className="mb-2 block">
+                Operator wallet
+              </Label>
+              <Input
+                id="operator-wallet"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                value={operatorInput}
+                onChange={(e) => setOperatorInput(e.target.value)}
+                placeholder={wallet.publicKey?.toBase58() ?? "Operator pubkey"}
+                className="font-mono text-xs"
+                aria-describedby="operator-wallet-help"
+              />
+              <p id="operator-wallet-help" className="mt-2 text-xs text-neutral-500">
+                This wallet executes approved licenses. It can be a member wallet or a separate operator.
+              </p>
+            </div>
+
             <Button
               type="submit"
-              disabled={state === "pending" || !walletConnected}
+              disabled={state === "pending" || !walletConnected || !operatorInput.trim()}
               isLoading={state === "pending"}
               className="w-full"
             >
-              {state === "pending" ? "Creating multisig..." : "Create multisig"}
+              {state === "pending" ? "Creating multisig..." : "Create multisig and cofre"}
             </Button>
 
             {error && (

@@ -9,7 +9,7 @@ import { publicEnv } from "@/lib/env";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import { cofrePda } from "@cloak-squads/core/pda";
-import * as multisig from "@sqds/multisig";
+import * as squadsMultisig from "@sqds/multisig";
 import {
   CLOAK_PROGRAM_ID,
   NATIVE_SOL_MINT,
@@ -157,6 +157,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const [loadedDraft, setLoadedDraft] = useState<SingleDraft | null>(null);
   const [payrollDraft, setPayrollDraft] = useState<PayrollDraft | null>(null);
   const [registeredOperator, setRegisteredOperator] = useState<string | null>(null);
+  const [cofreMissing, setCofreMissing] = useState(false);
+  const [operatorBalanceLamports, setOperatorBalanceLamports] = useState<number | null>(null);
+  const [operatorBalanceLoading, setOperatorBalanceLoading] = useState(false);
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const [executing, setExecuting] = useState(false);
   const [pendingDrafts, setPendingDrafts] = useState<DraftSummary[]>([]);
@@ -176,7 +179,12 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     try {
       const cofre = cofrePda(multisigAddress, gatekeeperProgram)[0];
       const accountInfo = await connection.getAccountInfo(cofre);
-      if (!accountInfo) return;
+      if (!accountInfo) {
+        setRegisteredOperator(null);
+        setCofreMissing(true);
+        return;
+      }
+      setCofreMissing(false);
       const coder = new BorshAccountsCoder(IDL as Idl);
       const decoded = coder.decode<{ operator?: Uint8Array }>("cofre", accountInfo.data);
       if (decoded?.operator) {
@@ -190,6 +198,29 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   useEffect(() => {
     void fetchOperator();
   }, [fetchOperator]);
+
+  useEffect(() => {
+    const address = registeredOperator ?? wallet.publicKey?.toBase58();
+    if (!address) {
+      setOperatorBalanceLamports(null);
+      return;
+    }
+    let cancelled = false;
+    setOperatorBalanceLoading(true);
+    void (async () => {
+      try {
+        const balance = await connection.getBalance(new PublicKey(address), "confirmed");
+        if (!cancelled) setOperatorBalanceLamports(balance);
+      } catch {
+        if (!cancelled) setOperatorBalanceLamports(null);
+      } finally {
+        if (!cancelled) setOperatorBalanceLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, registeredOperator, wallet.publicKey]);
 
   // Auto-load from ?proposal= query param
   useEffect(() => {
@@ -292,11 +323,11 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     if (!multisigAddress) return;
     setDraftOnChainStatus("loading");
     try {
-      const [proposalPda] = multisig.getProposalPda({
+      const [proposalPda] = squadsMultisig.getProposalPda({
         multisigPda: multisigAddress,
         transactionIndex: BigInt(txIndex),
       });
-      const proposal = await multisig.accounts.Proposal.fromAccountAddress(connection, proposalPda);
+      const proposal = await squadsMultisig.accounts.Proposal.fromAccountAddress(connection, proposalPda);
       const status = (proposal.status as { __kind?: string })?.__kind?.toLowerCase();
       if (status === "approved") {
         setDraftOnChainStatus("approved");
@@ -542,6 +573,16 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
   const successCount = executionSteps.filter((s) => s.status === "success").length;
   const isPayroll = payrollDraft !== null;
+  const lowOperatorSol =
+    operatorBalanceLamports !== null && operatorBalanceLamports < 10_000_000;
+  const canExecute =
+    !pending &&
+    !!(loadedDraft || payrollDraft) &&
+    !!wallet.publicKey &&
+    !operatorMismatch &&
+    !cofreMissing &&
+    !lowOperatorSol &&
+    draftOnChainStatus === "approved";
 
   if (!multisigAddress) {
     return (
@@ -584,10 +625,26 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             <section
               className={`rounded-lg border p-4 ${operatorMismatch ? "border-amber-900 bg-amber-950" : "border-emerald-900 bg-emerald-950"}`}
             >
-              <dl className="grid gap-1 text-sm">
+              <dl className="grid gap-3 text-sm">
                 <div>
                   <dt className="text-neutral-400">Registered operator</dt>
                   <dd className="break-all font-mono text-neutral-100">{registeredOperator}</dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-400">Connected wallet</dt>
+                  <dd className="break-all font-mono text-neutral-100">
+                    {wallet.publicKey ? wallet.publicKey.toBase58() : "Not connected"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-400">Operator balance</dt>
+                  <dd className="font-mono text-neutral-100">
+                    {operatorBalanceLoading
+                      ? "Loading..."
+                      : operatorBalanceLamports === null
+                        ? "Unavailable"
+                        : `${lamportsToSol(operatorBalanceLamports)} SOL`}
+                  </dd>
                 </div>
                 {operatorMismatch && wallet.publicKey ? (
                   <p className="mt-2 text-amber-200">
@@ -596,7 +653,19 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                     the registered operator. Switch wallets.
                   </p>
                 ) : null}
+                {lowOperatorSol ? (
+                  <p className="rounded-md border border-amber-800 bg-amber-900/40 px-3 py-2 text-amber-100">
+                    Operator balance is below 0.01 SOL. Airdrop devnet SOL before executing.
+                  </p>
+                ) : null}
               </dl>
+            </section>
+          ) : cofreMissing ? (
+            <section className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
+              <p className="font-semibold">Cofre is not initialized yet.</p>
+              <p className="mt-1">
+                Create, approve, and execute the bootstrap Squads proposal before using the operator flow.
+              </p>
             </section>
           ) : null}
 
@@ -820,7 +889,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             <Button
               type="submit"
               disabled={
-                pending || (!loadedDraft && !payrollDraft) || !wallet.publicKey || operatorMismatch || draftOnChainStatus !== "approved"
+                !canExecute
               }
             >
               {pending
@@ -837,6 +906,16 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             {operatorMismatch && wallet.publicKey ? (
               <p className="mt-2 text-xs text-amber-300">
                 Wrong wallet. Switch to the registered operator.
+              </p>
+            ) : null}
+            {lowOperatorSol ? (
+              <p className="mt-2 text-xs text-amber-300">
+                Operator needs at least 0.01 SOL on devnet before execution.
+              </p>
+            ) : null}
+            {cofreMissing ? (
+              <p className="mt-2 text-xs text-amber-300">
+                Cofre bootstrap proposal must be executed before operator execution.
               </p>
             ) : null}
             {!loadedDraft && !payrollDraft ? (
