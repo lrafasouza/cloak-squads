@@ -180,7 +180,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
           hash,
           instruction,
           claim: {
-            amount: Number(invariants.amount),
+            amount: invariants.amount.toString(),
             keypairPrivateKey: note.keypairPrivateKey,
             keypairPublicKey: note.keypairPublicKey,
             blinding: note.blinding,

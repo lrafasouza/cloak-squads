@@ -110,9 +110,14 @@ async function cloakDepositBrowser(
     } as Parameters<typeof transact>[1],
   );
 
+  const leafIndex = result.commitmentIndices[0];
+  if (leafIndex === undefined) {
+    throw new Error("Deposit returned no commitment indices.");
+  }
+
   return {
     signature: result.signature,
-    leafIndex: result.commitmentIndices[0],
+    leafIndex,
     spendKeyHex: outputKeypair.privateKey.toString(16).padStart(64, "0"),
     blindingHex: outputUtxo.blinding.toString(16).padStart(64, "0"),
   };
