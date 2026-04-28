@@ -1,6 +1,5 @@
 "use client";
 
-import { ProofGenerationState, type ProofStepId } from "@/components/proof/ProofGenerationState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,7 +50,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   const [error, setError] = useState<string | null>(null);
   const [payloadHash, setPayloadHash] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [proofStep, setProofStep] = useState<ProofStepId | null>(null);
 
   const multisigAddress = useMemo(() => {
     try {
@@ -66,7 +64,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
     setError(null);
     setPayloadHash(null);
     setPending(true);
-    setProofStep("load-circuits");
 
     try {
       if (!wallet.publicKey || !multisigAddress) {
@@ -76,7 +73,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       const amountLamports = solToLamports(amount);
 
       const recipientPubkey = new PublicKey(recipient.trim());
-      setProofStep("generate-witness");
 
       // Generate real Cloak UTXO commitment
       const keypair = await generateUtxoKeypair();
@@ -101,7 +97,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         nonce: randomBytes(16),
       };
 
-      setProofStep("prove");
       const hash = computePayloadHash(invariants);
       const { instruction } = await buildIssueLicenseIxBrowser({
         multisig: multisigAddress,
@@ -170,7 +165,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       setError(caught instanceof Error ? caught.message : "Could not create proposal.");
     } finally {
       setPending(false);
-      setProofStep(null);
     }
   }
 
@@ -201,12 +195,16 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
 
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
-          <p className="text-sm font-medium text-emerald-300">F1 private send</p>
-          <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Create license proposal</h1>
+          <p className="text-sm font-medium text-emerald-300">Private send</p>
+          <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Create transfer proposal</h1>
           <p className="mt-3 text-sm leading-6 text-neutral-300">
-            Build the gatekeeper license instruction, wrap it in a Squads vault transaction, and
-            create the proposal for signer approval.
+            Create a private transfer proposal for your Squads multisig. Signers will review and approve before execution.
           </p>
+          <div className="mt-4 rounded-lg border border-emerald-900/50 bg-emerald-950/30 p-3">
+            <p className="text-xs text-emerald-200/80">
+              <strong>Tip:</strong> Need a recipient key? Create an <Link href={`/cofre/${multisigAddress.toBase58()}/invoice`} className="underline">Invoice</Link> first — it generates a claimable link with the recipient key.
+            </p>
+          </div>
         </div>
 
         <div className="grid gap-4">
@@ -230,7 +228,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
               </div>
 
               <div>
-                <Label htmlFor="recipient">Recipient stealth pubkey</Label>
+                <Label htmlFor="recipient">Recipient key</Label>
                 <Input
                   id="recipient"
                   type="text"
@@ -238,9 +236,10 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                   spellCheck={false}
                   value={recipient}
                   onChange={(event) => setRecipient(event.target.value)}
-                  placeholder="32-byte recipient public key"
+                  placeholder="Paste the recipient key from an invoice"
                   className="mt-1 font-mono"
                 />
+                <p className="mt-1 text-xs text-neutral-500">This is the public key the recipient will use to claim funds.</p>
               </div>
 
               <div>
@@ -267,19 +266,19 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
               </p>
             ) : null}
 
-            {payloadHash ? (
-              <div className="mt-4 rounded-md border border-emerald-900 bg-emerald-950 p-3">
-                <p className="text-sm font-medium text-emerald-200">Payload hash</p>
-                <p className="mt-2 break-all font-mono text-xs text-emerald-100">{payloadHash}</p>
-              </div>
+            {error ? (
+              <p className="mt-4 rounded-md border border-red-900 bg-red-950 p-3 text-sm text-red-200">
+                {error}
+              </p>
             ) : null}
           </form>
 
-          <ProofGenerationState
-            currentStep={proofStep}
-            complete={Boolean(payloadHash)}
-            error={error}
-          />
+          {pending && (
+            <div className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+              <p className="text-sm text-neutral-300">Preparing secure transfer...</p>
+            </div>
+          )}
         </div>
       </section>
     </main>

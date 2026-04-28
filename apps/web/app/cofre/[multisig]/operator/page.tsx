@@ -9,6 +9,7 @@ import { publicEnv } from "@/lib/env";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import { cofrePda } from "@cloak-squads/core/pda";
+import * as multisig from "@sqds/multisig";
 import {
   CLOAK_PROGRAM_ID,
   NATIVE_SOL_MINT,
@@ -159,6 +160,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const [executing, setExecuting] = useState(false);
   const [pendingDrafts, setPendingDrafts] = useState<DraftSummary[]>([]);
+  const [draftOnChainStatus, setDraftOnChainStatus] = useState<"approved" | "executed" | "other" | "loading" | "error">("loading");
   const autoLoadFiredRef = useRef(false);
 
   const multisigAddress = useMemo(() => {
@@ -262,6 +264,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       if (singleResponse.ok) {
         const draft = (await singleResponse.json()) as SingleDraft;
         setLoadedDraft(draft);
+        void checkOnChainStatus(txIndex);
         return;
       }
 
@@ -273,6 +276,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         const draft = (await payrollResponse.json()) as PayrollDraft;
         setPayrollDraft(draft);
         setExecutionSteps(draft.recipients.map((_, i) => ({ index: i, status: "pending" })));
+        void checkOnChainStatus(txIndex);
         return;
       }
 
@@ -281,6 +285,28 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load proposal draft.");
+    }
+  }
+
+  async function checkOnChainStatus(txIndex: string) {
+    if (!multisigAddress) return;
+    setDraftOnChainStatus("loading");
+    try {
+      const [proposalPda] = multisig.getProposalPda({
+        multisigPda: multisigAddress,
+        transactionIndex: BigInt(txIndex),
+      });
+      const proposal = await multisig.accounts.Proposal.fromAccountAddress(connection, proposalPda);
+      const status = (proposal.status as { __kind?: string })?.__kind?.toLowerCase();
+      if (status === "approved") {
+        setDraftOnChainStatus("approved");
+      } else if (status === "executed") {
+        setDraftOnChainStatus("executed");
+      } else {
+        setDraftOnChainStatus("other");
+      }
+    } catch {
+      setDraftOnChainStatus("error");
     }
   }
 
@@ -773,6 +799,16 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             </section>
           ) : null}
 
+          {(loadedDraft || payrollDraft) && draftOnChainStatus !== "approved" && draftOnChainStatus !== "loading" ? (
+            <section className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
+              {draftOnChainStatus === "executed"
+                ? "This proposal has already been executed on-chain."
+                : draftOnChainStatus === "other"
+                  ? "This proposal is not yet approved on-chain. Wait for signers to reach the threshold before executing."
+                  : "Could not verify proposal status on-chain."}
+            </section>
+          ) : null}
+
           <form
             onSubmit={execute}
             className="rounded-lg border border-neutral-800 bg-neutral-900 p-4"
@@ -784,7 +820,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             <Button
               type="submit"
               disabled={
-                pending || (!loadedDraft && !payrollDraft) || !wallet.publicKey || operatorMismatch
+                pending || (!loadedDraft && !payrollDraft) || !wallet.publicKey || operatorMismatch || draftOnChainStatus !== "approved"
               }
             >
               {pending

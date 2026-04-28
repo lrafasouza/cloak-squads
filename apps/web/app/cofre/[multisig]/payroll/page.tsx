@@ -134,6 +134,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   async function buildNotes() {
     if (!multisigAddress) return;
     setError(null);
+    setPending(true);
     setStep("preview");
 
     try {
@@ -195,6 +196,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not build notes.");
       setStep("upload");
+    } finally {
+      setPending(false);
     }
   }
 
@@ -307,7 +310,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
-          <p className="text-sm font-medium text-emerald-300">F2 payroll</p>
+          <p className="text-sm font-medium text-emerald-300">Payroll</p>
           <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Batch private send</h1>
           <p className="mt-3 text-sm leading-6 text-neutral-300">
             Upload a CSV with recipient names, wallet addresses, and amounts. One Squads proposal
@@ -347,7 +350,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
                   {recipients.length > 0 && (
                     <Button onClick={buildNotes} disabled={pending}>
-                      Preview {recipients.length} recipient{recipients.length !== 1 ? "s" : ""}
+                      {pending ? "Preparing notes..." : `Preview ${recipients.length} recipient${recipients.length !== 1 ? "s" : ""}`}
                     </Button>
                   )}
                 </div>

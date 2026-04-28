@@ -14,6 +14,7 @@ import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { lamportsToSol } from "@/lib/sol";
+import { statusBadge, statusLabel } from "@/lib/status-labels";
 
 type StealthInvoice = {
   id: string;
@@ -234,17 +235,17 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
   const getStateMessage = () => {
     switch (claimState) {
       case "loading":
-        return "Loading invoice data...";
+        return "Carregando dados do invoice...";
       case "invalid":
-        return "Invalid or corrupted link";
+        return "Link inválido ou corrompido";
       case "expired":
-        return "This invoice has expired";
+        return "Este invoice expirou";
       case "claimed":
-        return "This invoice has already been claimed";
+        return "Este invoice já foi resgatado";
       case "voided":
-        return "This invoice has been voided";
+        return "Este invoice foi anulado";
       case "ready":
-        return "Ready to claim";
+        return "Pronto para resgate";
     }
   };
 
@@ -300,7 +301,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
 
         <section className="mx-auto max-w-3xl px-4 py-16 text-center">
           <div className="rounded-lg border border-red-800 bg-red-900/20 p-8">
-            <h1 className="text-xl font-semibold text-red-200">Access Error</h1>
+            <h1 className="text-xl font-semibold text-red-200">Erro de Acesso</h1>
             <p className="mt-4 text-neutral-300">{error ?? "Invalid or corrupted link."}</p>
             <Link
               href="/"
@@ -332,20 +333,14 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <p className="text-sm font-medium text-emerald-300">Stealth Invoice Claim</p>
+              <p className="text-sm font-medium text-emerald-300">Resgate de Pagamento</p>
               <span
-                className={`rounded px-2 py-0.5 text-xs font-medium ${
-                  claimState === "ready"
-                    ? "bg-emerald-900 text-emerald-200"
-                    : claimState === "claimed"
-                      ? "bg-blue-900 text-blue-200"
-                      : "bg-red-900 text-red-200"
-                }`}
+                className={`rounded px-2 py-0.5 text-xs font-medium ${statusBadge(claimState).bg} ${statusBadge(claimState).text}`}
               >
-                {claimState}
+                {statusLabel(claimState).label}
               </span>
             </div>
-            <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Claim Invoice</h1>
+              <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Resgatar Invoice</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-300">{getStateMessage()}</p>
           </div>
 
@@ -355,10 +350,10 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                 Cofre: {truncateAddress(invoice.cofreAddress)}
               </p>
               <p className="text-sm text-neutral-500">
-                Created: {new Date(invoice.createdAt).toLocaleDateString()}
+                Criado: {new Date(invoice.createdAt).toLocaleDateString()}
               </p>
               <p className="text-sm text-neutral-500">
-                Expires: {new Date(invoice.expiresAt).toLocaleDateString()}
+                Expira: {new Date(invoice.expiresAt).toLocaleDateString()}
               </p>
             </div>
           ) : null}
@@ -367,7 +362,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         {invoice ? (
           <>
             <section className="mt-8 rounded-lg border border-neutral-800 bg-neutral-900 p-6">
-              <h3 className="font-semibold text-neutral-50">Invoice Details</h3>
+              <h3 className="font-semibold text-neutral-50">Detalhes do Invoice</h3>
               <dl className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
                   <dt className="text-xs text-neutral-500">Invoice ID</dt>
@@ -375,12 +370,12 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                 </div>
                 {invoice.invoiceRef ? (
                   <div>
-                    <dt className="text-xs text-neutral-500">Reference</dt>
+                    <dt className="text-xs text-neutral-500">Referência</dt>
                     <dd className="mt-1 text-sm text-neutral-300">{invoice.invoiceRef}</dd>
                   </div>
                 ) : null}
                 <div>
-                  <dt className="text-xs text-neutral-500">Amount</dt>
+                  <dt className="text-xs text-neutral-500">Valor</dt>
                   <dd className="mt-1 font-mono text-sm text-neutral-300">
                     {invoice.amountHint
                       ? `${lamportsToSol(invoice.amountHint)} SOL`
@@ -388,14 +383,14 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-neutral-500">Stealth Pubkey</dt>
+                  <dt className="text-xs text-neutral-500">Chave do Destinatário</dt>
                   <dd className="mt-1 break-all font-mono text-xs text-neutral-300">
                     {invoice.stealthPubkey}
                   </dd>
                 </div>
                 {invoice.memo ? (
                   <div className="md:col-span-2">
-                    <dt className="text-xs text-neutral-500">Memo</dt>
+                    <dt className="text-xs text-neutral-500">Mensagem</dt>
                     <dd className="mt-1 text-sm text-neutral-300">{invoice.memo}</dd>
                   </div>
                 ) : null}
@@ -404,23 +399,30 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
 
             {claimState === "ready" ? (
               <section className="mt-8 rounded-lg border border-neutral-800 bg-neutral-900 p-6">
-                <h3 className="font-semibold text-neutral-50">Claim Funds</h3>
+                <h3 className="font-semibold text-neutral-50">Resgatar Fundos</h3>
                 <p className="mt-2 text-sm text-neutral-300">
-                  Connect your wallet and click the button below to claim the funds. This will
-                  execute a full withdrawal to your connected wallet.
+                  Conecte sua wallet e clique no botão abaixo para resgatar os fundos.
                 </p>
 
                 {!wallet.publicKey ? (
                   <p className="mt-4 text-sm text-amber-300">
-                    Please connect your wallet to continue.
+                    Conecte sua wallet para continuar.
                   </p>
+                ) : invoice.recipientWallet !== wallet.publicKey.toBase58() ? (
+                  <div className="mt-4 rounded-md border border-red-900 bg-red-950 p-3 text-sm text-red-200">
+                    <p className="font-medium">Wallet incorreta</p>
+                    <p className="mt-1 text-xs text-red-300">
+                      Este invoice foi criado para a wallet <span className="font-mono">{truncateAddress(invoice.recipientWallet)}</span>. 
+                      Conecte essa wallet para resgatar.
+                    </p>
+                  </div>
                 ) : (
                   <div className="mt-4">
-                    <p className="mb-3 text-sm text-neutral-400">
-                      Connected: {truncateAddress(wallet.publicKey.toBase58())}
+                    <p className="mb-3 text-sm text-emerald-400">
+                      Wallet correta conectada ✓
                     </p>
                     <Button onClick={handleClaim} disabled={claiming}>
-                      {claiming ? "Processing claim..." : "Claim funds"}
+                      {claiming ? "Processando resgate..." : "Resgatar fundos"}
                     </Button>
                   </div>
                 )}
@@ -436,14 +438,14 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                 <p className={`text-lg font-medium ${getStateColor()}`}>{getStateMessage()}</p>
                 {claimState === "expired" ? (
                   <p className="mt-2 text-sm text-neutral-400">
-                    This invoice expired on {new Date(invoice.expiresAt).toLocaleString()}.
+                    Este invoice expirou em {new Date(invoice.expiresAt).toLocaleString()}.
                   </p>
                 ) : null}
                 <Link
                   href="/"
                   className="mt-4 inline-block rounded-md bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:bg-neutral-700"
                 >
-                  Return Home
+              Voltar para Home
                 </Link>
               </section>
             )}

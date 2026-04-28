@@ -100,11 +100,11 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
 
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
-          <p className="text-sm font-medium text-emerald-300">F4 stealth invoicing</p>
-          <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Create stealth invoice</h1>
+          <p className="text-sm font-medium text-emerald-300">Invoice</p>
+          <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Create payment request</h1>
           <p className="mt-3 text-sm leading-6 text-neutral-300">
-            Generate an encrypted invoice with a unique claim URL. The recipient uses the URL
-            fragment to access and withdraw the funds privately.
+            Generate a payment request with a unique claim link. The recipient uses the link
+            to access and withdraw the funds privately.
           </p>
         </div>
 
@@ -180,20 +180,21 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
           {result ? (
             <div className="rounded-lg border border-emerald-900 bg-emerald-950 p-4">
               <p className="text-sm font-medium text-emerald-200">Invoice created successfully</p>
-              <div className="mt-3 space-y-2">
-                <div>
-                  <p className="text-xs text-emerald-300">Stealth pubkey</p>
-                  <p className="break-all font-mono text-xs text-emerald-100">{result.stealthPubkey}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-emerald-300">Claim URL</p>
-                  <p className="break-all font-mono text-xs text-emerald-100">
+              <div className="mt-3 space-y-4">
+                <div className="rounded-md bg-emerald-900/50 p-3">
+                  <p className="text-xs font-medium text-emerald-300">Claim link — send this to the recipient</p>
+                  <p className="mt-1 break-all font-mono text-sm text-emerald-100">
                     {`${typeof window !== "undefined" ? window.location.origin : ""}${result.claimUrl}`}
                   </p>
+                  <Button type="button" variant="outline" size="sm" className="mt-2" onClick={handleCopy}>
+                    Copy claim link
+                  </Button>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
-                  Copy claim URL
-                </Button>
+                <div>
+                  <p className="text-xs text-emerald-300">Recipient key (for Send page)</p>
+                  <p className="break-all font-mono text-xs text-emerald-100">{result.stealthPubkey}</p>
+                  <p className="mt-1 text-xs text-emerald-200/60">Paste this key in the Send page when creating the transfer.</p>
+                </div>
               </div>
             </div>
           ) : null}

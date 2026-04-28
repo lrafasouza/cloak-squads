@@ -133,63 +133,103 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
               {truncateAddress(multisigAddress.toBase58())}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-300">
-              Prepare private sends, review pending approvals, and monitor the shielded execution
-              state for this Squads vault.
+              Manage private transfers through your Squads multisig. Create proposals, get approvals, and execute with the operator.
             </p>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Link
-              href={`/cofre/${multisigAddress.toBase58()}/send`}
-              className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
-            >
-              Prepare send
-            </Link>
-            <Link
-              href={`/cofre/${multisigAddress.toBase58()}/payroll`}
-              className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
-            >
-              Payroll
-            </Link>
-            <Link
-              href={`/cofre/${multisigAddress.toBase58()}/audit`}
-              className="inline-flex min-h-10 items-center justify-center rounded-md border border-neutral-700 bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
-            >
-              Audit
-            </Link>
-            <Link
-              href={`/cofre/${multisigAddress.toBase58()}/invoice`}
-              className="inline-flex min-h-10 items-center justify-center rounded-md border border-neutral-700 bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
-            >
-              Invoice
-            </Link>
-            <Link
-              href={`/cofre/${multisigAddress.toBase58()}/operator`}
-              className="inline-flex min-h-10 items-center justify-center rounded-md border border-neutral-700 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
-            >
-              Operator
-            </Link>
+          <div className="flex flex-col gap-3">
+            {/* Primary actions */}
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/cofre/${multisigAddress.toBase58()}/send`}
+                className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+              >
+                Send
+              </Link>
+              <Link
+                href={`/cofre/${multisigAddress.toBase58()}/payroll`}
+                className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+              >
+                Payroll
+              </Link>
+              <Link
+                href={`/cofre/${multisigAddress.toBase58()}/invoice`}
+                className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-800 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+              >
+                Invoice
+              </Link>
+            </div>
+            {/* Secondary actions */}
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/cofre/${multisigAddress.toBase58()}/operator`}
+                className="inline-flex min-h-10 items-center justify-center rounded-md border-2 border-amber-600 bg-amber-950/50 px-4 py-2 text-sm font-semibold text-amber-200 transition hover:bg-amber-900/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+              >
+                Operator
+              </Link>
+              <Link
+                href={`/cofre/${multisigAddress.toBase58()}/audit`}
+                className="inline-flex min-h-10 items-center justify-center rounded-md border border-neutral-700 bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-400 transition hover:bg-neutral-700 hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+              >
+                Audit
+              </Link>
+            </div>
           </div>
         </div>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
+        {/* Flow Guide */}
+        <div className="mt-8 rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-neutral-500">How it works</p>
+          <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-900 text-sm font-bold text-emerald-300">1</div>
+              <div>
+                <p className="text-sm font-medium text-neutral-200">Create</p>
+                <p className="text-xs text-neutral-500">Send / Payroll / Invoice</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-900 text-sm font-bold text-emerald-300">2</div>
+              <div>
+                <p className="text-sm font-medium text-neutral-200">Approve</p>
+                <p className="text-xs text-neutral-500">Signers vote on-chain</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-900 text-sm font-bold text-emerald-300">3</div>
+              <div>
+                <p className="text-sm font-medium text-neutral-200">Execute</p>
+                <p className="text-xs text-neutral-500">Reach threshold</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-900 text-sm font-bold text-amber-300">4</div>
+              <div>
+                <p className="text-sm font-medium text-neutral-200">Operator</p>
+                <p className="text-xs text-neutral-500">Process the transfer</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-            <p className="text-sm text-neutral-400">Shielded balance</p>
+            <p className="text-sm text-neutral-400">Vault balance</p>
             <p className="mt-3 font-mono text-2xl font-semibold tabular-nums text-neutral-50">
               -- SOL
             </p>
-            <p className="mt-2 text-xs text-neutral-400">
-              Cloak scan integration lands in the F1 operator flow.
+            <p className="mt-2 text-xs text-neutral-500">
+              Balance will be available when connected.
             </p>
           </section>
 
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-            <p className="text-sm text-neutral-400">Proposal drafts</p>
+            <p className="text-sm text-neutral-400">Pending proposals</p>
             <p className="mt-3 font-mono text-2xl font-semibold tabular-nums text-neutral-50">
               {draftsLoading ? "…" : drafts.length}
             </p>
-            <p className="mt-2 text-xs text-neutral-400">
-              {drafts.length > 0 ? "Recent drafts listed below." : "Create one from Prepare send."}
+            <p className="mt-2 text-xs text-neutral-500">
+              {drafts.length > 0 ? "Awaiting approvals." : "No active proposals."}
             </p>
           </section>
 
@@ -198,7 +238,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
             <p className="mt-3 break-all font-mono text-sm text-neutral-50">
               {wallet.publicKey ? truncateAddress(wallet.publicKey.toBase58()) : "Not connected"}
             </p>
-            <p className="mt-2 text-xs text-neutral-400">Devnet execution context.</p>
+            <p className="mt-2 text-xs text-neutral-500">Connect to vote and execute.</p>
           </section>
         </div>
 
@@ -209,17 +249,17 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
             </div>
             <dl className="space-y-4 p-4 text-sm">
               <div>
-                <dt className="text-neutral-400">Multisig</dt>
+                <dt className="text-neutral-500">Multisig address</dt>
                 <dd className="mt-1 break-all font-mono text-neutral-100">
                   {multisigAddress.toBase58()}
                 </dd>
               </div>
               <div>
-                <dt className="text-neutral-400">Cofre PDA</dt>
+                <dt className="text-neutral-500">Cofre program account</dt>
                 <dd className="mt-1 break-all font-mono text-neutral-100">{cofre.toBase58()}</dd>
               </div>
               <div>
-                <dt className="text-neutral-400">Vault PDA</dt>
+                <dt className="text-neutral-500">Vault (funds held here)</dt>
                 <dd className="mt-1 break-all font-mono text-neutral-100">{vault.toBase58()}</dd>
               </div>
             </dl>

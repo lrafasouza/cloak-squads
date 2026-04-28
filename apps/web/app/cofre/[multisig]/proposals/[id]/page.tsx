@@ -12,6 +12,7 @@ import { ApprovalButtons } from "@/components/proposal/ApprovalButtons";
 import { CommitmentCheck, type CommitmentCheckState } from "@/components/proposal/CommitmentCheck";
 import { ExecuteButton } from "@/components/proposal/ExecuteButton";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { statusBadge, statusLabel } from "@/lib/status-labels";
 
 type ProposalStatusKind =
   | "draft"
@@ -427,8 +428,8 @@ export default function ProposalApprovalPage({
                     }}
                   />
                 ) : (
-                  <section key={r.id} className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
-                    Commitment claim for {r.name} is only available in the proposer&apos;s browser session.
+                  <section key={r.id} className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 text-sm text-neutral-400">
+                    Commitment verification unavailable — only the proposer who created this proposal can verify it locally. Other signers can still review the amount and recipient above.
                   </section>
                 );
               })}
@@ -443,8 +444,8 @@ export default function ProposalApprovalPage({
                 onStateChange={setCommitmentState}
               />
             ) : (
-              <section className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
-                Commitment claim is only available in the proposer&apos;s browser session.
+              <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 text-sm text-neutral-400">
+                Commitment verification unavailable — only the proposer who created this proposal can verify it locally. Other signers can still review the amount and recipient above.
               </section>
             )
           )}
@@ -453,26 +454,22 @@ export default function ProposalApprovalPage({
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-neutral-50">On-chain status</h2>
-              <span className="font-mono text-xs uppercase tracking-wide text-neutral-300">
+              <span className={`rounded px-2 py-0.5 text-xs font-medium ${statusBadge(status).bg} ${statusBadge(status).text}`}>
                 {status === "loading"
-                  ? "loading…"
+                  ? statusLabel("loading").label
                   : status === "missing"
-                    ? "not found"
-                    : threshold !== null
-                      ? `${status} (${approvals}/${threshold} approvals)`
-                      : `${status} (${approvals} approvals)`}
+                    ? statusLabel("missing").label
+                    : `${statusLabel(status).label} (${approvals}${threshold !== null ? `/${threshold}` : ""} assinaturas)`}
               </span>
             </div>
             {status === "executed" || status === "cancelled" || status === "rejected" ? (
               <p className="mt-3 text-sm text-amber-200">
-                This proposal is closed ({status}). Create a new one from the Send or Payroll page to test
-                again.
+                Esta proposta está fechada ({statusLabel(status).label}). Crie uma nova na página Send ou Payroll.
               </p>
             ) : null}
             {status === "missing" ? (
               <p className="mt-3 text-sm text-amber-200">
-                No proposal account at this index. The vault transaction may not have been created
-                yet, or this transactionIndex is wrong.
+                Nenhuma proposta encontrada neste índice. A transação ainda pode não ter sido criada.
               </p>
             ) : null}
           </section>
@@ -483,11 +480,10 @@ export default function ProposalApprovalPage({
             {memberVote ? (
               <div className="rounded-md border border-emerald-900 bg-emerald-950 p-3">
                 <p className="text-sm font-medium text-emerald-100">
-                  You already {memberVote === "approved" ? "approved" : memberVote === "rejected" ? "rejected" : "cancelled"} this proposal.
+                  Você já {memberVote === "approved" ? "aprovou" : memberVote === "rejected" ? "rejeitou" : "cancelou"} esta proposta.
                 </p>
                 <p className="mt-1 text-xs text-emerald-200/80">
-                  Squads records one vote per member. The proposal can still move forward when
-                  the threshold is reached.
+                  Cada membro pode votar uma vez. A proposta avança quando o threshold é atingido.
                 </p>
               </div>
             ) : (
@@ -534,8 +530,8 @@ export default function ProposalApprovalPage({
             {!executeComplete && executeBlocked && status !== "loading" ? (
               <p className="mt-2 text-xs text-neutral-400">
                 {status === "active" && threshold !== null
-                  ? `Need ${Math.max(0, threshold - approvals)} more approval(s) before executing.`
-                  : `Execute requires status = approved. Current: ${status}.`}
+                  ? `Faltam ${Math.max(0, threshold - approvals)} assinatura(s) para executar.`
+                  : `Execução requer status aprovado. Atual: ${statusLabel(status).label}.`}
               </p>
             ) : null}
           </section>

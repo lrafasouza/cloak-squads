@@ -139,10 +139,17 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
     }
   };
 
+  const [showRevokeConfirm, setShowRevokeConfirm] = useState<string | null>(null);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
+  const [revokeSuccess, setRevokeSuccess] = useState<string | null>(null);
+
   const handleRevokeLink = async (linkId: string) => {
     if (!wallet.publicKey || !wallet.signMessage || !connection) return;
+    setShowRevokeConfirm(linkId);
+  };
 
-    if (!confirm("Revoke this audit link? This will create a Squads proposal to revoke it on-chain.")) return;
+  const confirmRevoke = async (linkId: string) => {
+    setShowRevokeConfirm(null);
 
     try {
       const message = `revoke-audit-link:${linkId}:${wallet.publicKey.toBase58()}`;
@@ -160,38 +167,38 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
 
       if (!res.ok) {
         const error = await res.json();
-        alert(error.error || "Failed to revoke link");
+        setRevokeError(error.error || "Failed to revoke link");
         return;
       }
 
       const data = await res.json();
       if (!data.success || !data.diversifier || !data.cofreAddress) {
-        alert("Failed to get revocation data");
+        setRevokeError("Failed to get revocation data");
         return;
       }
 
       // Create on-chain revocation proposal via Squads
-      const multisigAddress = new PublicKey(data.cofreAddress);
+      const msAddress = new PublicKey(data.cofreAddress);
       const diversifier = new Uint8Array(data.diversifier);
 
       const { instruction } = await buildRevokeAuditIxBrowser({
-        multisig: multisigAddress,
+        multisig: msAddress,
         diversifier,
       });
 
       const result = await createIssueLicenseProposal({
         connection,
         wallet,
-        multisigPda: multisigAddress,
+        multisigPda: msAddress,
         issueLicenseIx: instruction,
         memo: `revoke audit: ${linkId}`,
       });
 
-      alert(`Revocation proposal created! Transaction index: ${result.transactionIndex.toString()}`);
+      setRevokeSuccess(`Revocation proposal created! Transaction index: ${result.transactionIndex.toString()}`);
       void loadLinks();
     } catch (err) {
       console.error("Failed to revoke link:", err);
-      alert(err instanceof Error ? err.message : "Failed to revoke link");
+      setRevokeError(err instanceof Error ? err.message : "Failed to revoke link");
     }
   };
 
@@ -244,7 +251,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
             href={`/cofre/${multisigAddress.toBase58()}`}
             className="rounded-md text-sm font-semibold text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
           >
-            Cloak Squads
+            Cofre
           </Link>
           <ClientWalletButton />
         </div>
@@ -398,7 +405,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm text-neutral-100">{link.id}</span>
+                        <span className="font-mono text-sm text-neutral-100" title={link.id}>{link.id.slice(0, 8)}...{link.id.slice(-4)}</span>
                         <span
                           className={`rounded px-2 py-0.5 text-xs font-medium ${
                             link.scope === "full"
@@ -416,7 +423,24 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                         {new Date(link.expiresAt).toLocaleDateString()}
                       </p>
                       {link.scopeParams && (
-                        <p className="mt-1 text-xs text-neutral-500">Params: {link.scopeParams}</p>
+                        <p className="mt-1 text-xs text-neutral-500">
+                          {(() => {
+                            try {
+                              const params = JSON.parse(link.scopeParams) as Record<string, string | number>;
+                              const entries = Object.entries(params);
+                              if (entries.length === 0) return null;
+                              const formatted = entries.map(([key, value]) => {
+                                if (typeof value === "number" && value > 1000000000) {
+                                  return `${key}: ${new Date(value).toLocaleDateString()}`;
+                                }
+                                return `${key}: ${value}`;
+                              }).join(" · ");
+                              return `Filter: ${formatted}`;
+                            } catch {
+                              return null;
+                            }
+                          })()}
+                        </p>
                       )}
                     </div>
 
@@ -442,6 +466,45 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
             </div>
           )}
         </section>
+
+        {/* Revoke Confirmation Dialog */}
+        {showRevokeConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-md rounded-lg border border-neutral-700 bg-neutral-900 p-6">
+              <h3 className="text-lg font-semibold text-neutral-50">Confirm Revoke</h3>
+              <p className="mt-2 text-sm text-neutral-400">
+                This will create a Squads proposal to revoke the audit link on-chain.
+              </p>
+              {revokeError && (
+                <p className="mt-3 rounded-md border border-red-900 bg-red-950 p-2 text-xs text-red-200">{revokeError}</p>
+              )}
+              {revokeSuccess && (
+                <p className="mt-3 rounded-md border border-emerald-900 bg-emerald-950 p-2 text-xs text-emerald-200">{revokeSuccess}</p>
+              )}
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRevokeConfirm(null);
+                    setRevokeError(null);
+                    setRevokeSuccess(null);
+                  }}
+                  className="flex-1 rounded-md border border-neutral-700 bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmRevoke(showRevokeConfirm)}
+                  disabled={Boolean(revokeSuccess)}
+                  className="flex-1 rounded-md bg-red-900/50 px-4 py-2 text-sm font-semibold text-red-200 transition hover:bg-red-900 disabled:opacity-50"
+                >
+                  Revoke
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
     </main>
   );

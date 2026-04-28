@@ -53,7 +53,20 @@ export default function HomePage() {
               Open a Squads multisig
             </h1>
             <p className="mt-3 text-sm text-neutral-400">
-              Enter your multisig address to manage private execution.
+              Manage private transfers through your Squads vault.
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4 text-sm text-neutral-400">
+            <p className="font-medium text-neutral-300">What is a multisig address?</p>
+            <p className="mt-2">
+              A multisig (multi-signature) is a shared wallet that requires multiple people to approve transactions. 
+              Think of it like a joint bank account for your team.
+            </p>
+            <p className="mt-2">
+              <strong className="text-neutral-300">Where to find it:</strong> If you already have a Squads multisig, 
+              copy its address from the Squads app (starts with a long string like <code className="text-neutral-500">SQDS...</code>). 
+              If not, create one below.
             </p>
           </div>
 
