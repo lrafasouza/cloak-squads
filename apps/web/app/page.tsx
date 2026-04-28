@@ -1,8 +1,9 @@
 "use client";
 
+import { CreateMultisigCard } from "@/components/create-multisig/CreateMultisigCard";
+import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useMemo, useState, useCallback } from "react";
@@ -25,6 +26,13 @@ export default function HomePage() {
       setManualError("Enter a valid Solana address.");
     }
   }, [manualAddress, router]);
+
+  const openCreatedMultisig = useCallback(
+    (multisigPda: string) => {
+      router.push(`/cofre/${multisigPda}`);
+    },
+    [router],
+  );
 
   return (
     <main className="min-h-screen">
@@ -77,37 +85,7 @@ export default function HomePage() {
             )}
           </form>
 
-          <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-5">
-            <h2 className="text-sm font-semibold text-neutral-100">Don't have a multisig?</h2>
-            <p className="mt-2 text-sm text-neutral-400">
-              Create one on</p>
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-neutral-500">1.</span>
-                <span className="text-neutral-300">Go to</span>
-                <a 
-                  href="https://devnet.squads.so" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-emerald-300 hover:text-emerald-200"
-                >
-                  devnet.squads.so
-                </a>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-neutral-500">2.</span>
-                <span className="text-neutral-300">Connect your wallet</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-neutral-500">3.</span>
-                <span className="text-neutral-300">Create a new multisig (1-of-1 is fine for testing)</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-neutral-500">4.</span>
-                <span className="text-neutral-300">Copy the multisig address and paste it above</span>
-              </div>
-            </div>
-          </div>
+          <CreateMultisigCard onCreated={openCreatedMultisig} />
 
           {wallet.connected && wallet.publicKey && (
             <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-5">
