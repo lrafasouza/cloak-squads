@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import {
   CLOAK_PROGRAM_ID,
+  computeUtxoCommitment,
   createUtxo,
-  deriveUtxoKeypairFromSpendKey,
+  derivePublicKey,
   fullWithdraw,
 } from "@cloak.dev/sdk-devnet";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -175,18 +176,18 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         invoice.utxoMint &&
         invoice.utxoCommitment
       ) {
-        // Reconstruct UTXO for fullWithdraw
-        const spendKeyBytes = new Uint8Array(32);
-        const skHex = invoice.utxoPrivateKey.padStart(64, "0");
-        for (let i = 0; i < 32; i++) {
-          spendKeyBytes[i] = Number.parseInt(skHex.slice(i * 2, i * 2 + 2), 16);
-        }
-
-        const keypair = await deriveUtxoKeypairFromSpendKey(spendKeyBytes);
+        // Reconstruct UTXO for fullWithdraw.
+        // The stored privateKey is the raw field element from generateUtxoKeypair(),
+        // NOT a wallet spend key — so we derive the publicKey directly instead of
+        // using deriveUtxoKeypairFromSpendKey (which applies a blake3 domain-hash).
+        const privateKey = BigInt(`0x${invoice.utxoPrivateKey.padStart(64, "0")}`);
+        const publicKey = await derivePublicKey(privateKey);
+        const keypair = { privateKey, publicKey };
         const mint = new PublicKey(invoice.utxoMint);
         const amount = BigInt(invoice.utxoAmount);
         const utxo = await createUtxo(amount, keypair, mint);
         utxo.blinding = BigInt(`0x${invoice.utxoBlinding}`);
+        utxo.commitment = await computeUtxoCommitment(utxo);
         if (invoice.utxoLeafIndex !== null) {
           utxo.index = invoice.utxoLeafIndex;
         }
@@ -199,6 +200,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
             programId: CLOAK_PROGRAM_ID,
             relayUrl: "https://api.devnet.cloak.ag",
             signTransaction: wallet.signTransaction,
+            ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
             depositorPublicKey: wallet.publicKey,
             onProgress: (s: string) => console.error(`[cloak-claim] ${s}`),
             onProofProgress: (p: number) => console.error(`[cloak-claim] proof ${p}%`),

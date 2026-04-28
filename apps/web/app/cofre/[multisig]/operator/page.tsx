@@ -73,6 +73,7 @@ async function cloakDepositBrowser(
   wallet: {
     publicKey: PublicKey | null;
     signTransaction: <T extends Transaction | VersionedTransaction>(transaction: T) => Promise<T>;
+    signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
   },
   amount: bigint,
   mint: PublicKey = NATIVE_SOL_MINT,
@@ -104,6 +105,7 @@ async function cloakDepositBrowser(
       programId: CLOAK_PROGRAM_ID,
       relayUrl: "https://api.devnet.cloak.ag",
       signTransaction: wallet.signTransaction,
+      signMessage: wallet.signMessage,
       depositorPublicKey: wallet.publicKey,
       onProgress: (s: string) => console.error(`[cloak] ${s}`),
       onProofProgress: (p: number) => console.error(`[cloak] proof ${p}%`),
@@ -232,7 +234,7 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
       try {
         const cloakResult = await cloakDepositBrowser(
           connection,
-          { publicKey: wallet.publicKey, signTransaction: wallet.signTransaction },
+          { publicKey: wallet.publicKey, signTransaction: wallet.signTransaction, ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}) },
           amount,
           tokenMint,
         );
