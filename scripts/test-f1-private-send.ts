@@ -12,7 +12,6 @@ import {
   Transaction,
   TransactionInstruction,
   TransactionMessage,
-  TransactionMessageV0,
   VersionedTransaction,
 } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
@@ -150,6 +149,29 @@ async function main() {
   console.log("Cofre:    ", cofrePda.toBase58());
   console.log("Operator: ", operator.publicKey.toBase58());
 
+  if (!demo.operatorSecretKey) {
+    throw new Error(".demo-cofre.json missing operatorSecretKey. Re-run pnpm demo:setup.");
+  }
+
+  const connection = new Connection("https://api.devnet.solana.com", "confirmed");
+
+  const cofreAccount = await connection.getAccountInfo(cofrePda);
+  if (!cofreAccount) {
+    throw new Error(`Cofre ${cofrePda.toBase58()} not found on devnet. Re-run pnpm demo:setup.`);
+  }
+  if (!cofreAccount.owner.equals(GATEKEEPER_PROGRAM_ID)) {
+    throw new Error(
+      `Cofre owned by ${cofreAccount.owner.toBase58()}, expected ${GATEKEEPER_PROGRAM_ID.toBase58()}. Re-run pnpm demo:setup.`,
+    );
+  }
+  const onChainOperator = new PublicKey(cofreAccount.data.subarray(40, 72));
+  if (!onChainOperator.equals(operator.publicKey)) {
+    throw new Error(
+      `Cofre operator mismatch: on-chain ${onChainOperator.toBase58()}, script ${operator.publicKey.toBase58()}. Re-run pnpm demo:setup.`,
+    );
+  }
+  console.log("Cofre OK  (verified on-chain)");
+
   const creatorKeypairEnv = process.env.SOLANA_KEYPAIR;
   if (!creatorKeypairEnv) {
     throw new Error("Set SOLANA_KEYPAIR env var to the creator keypair path.");
@@ -159,8 +181,6 @@ async function main() {
     Uint8Array.from(JSON.parse(fs.readFileSync(creatorPath, "utf-8")) as number[]),
   );
   console.log("Creator:  ", creator.publicKey.toBase58());
-
-  const connection = new Connection("https://api.devnet.solana.com", "confirmed");
 
   const creatorBalance = await connection.getBalance(creator.publicKey);
   console.log(`Creator balance: ${creatorBalance / LAMPORTS_PER_SOL} SOL`);
@@ -182,6 +202,22 @@ async function main() {
     const fundSig = await connection.sendTransaction(fundTx, [creator], { skipPreflight: false });
     await confirm(connection, fundSig);
     console.log("  fund tx:", fundSig);
+  }
+
+  const operatorBalance = await connection.getBalance(operator.publicKey);
+  console.log(`Operator balance: ${operatorBalance / LAMPORTS_PER_SOL} SOL`);
+  if (operatorBalance < 0.01 * LAMPORTS_PER_SOL) {
+    console.log("[preflight] Funding operator with 0.05 SOL (fees)...");
+    const fundOpTx = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: creator.publicKey,
+        toPubkey: operator.publicKey,
+        lamports: 50_000_000,
+      }),
+    );
+    const fundOpSig = await connection.sendTransaction(fundOpTx, [creator], { skipPreflight: false });
+    await confirm(connection, fundOpSig);
+    console.log("  fund tx:", fundOpSig);
   }
 
   const nullifier = randomBytes(32);
@@ -267,14 +303,31 @@ async function main() {
   console.log("  tx:", approveSig);
 
   console.log("\n[4/5] vaultTransactionExecute (issues license)...");
-  const executeSig = await multisig.rpc.vaultTransactionExecute({
-    connection,
-    feePayer: creator,
-    multisigPda,
-    transactionIndex,
-    member: creator.publicKey,
-    signers: [creator],
-  });
+  let executeSig: string;
+  try {
+    executeSig = await multisig.rpc.vaultTransactionExecute({
+      connection,
+      feePayer: creator,
+      multisigPda,
+      transactionIndex,
+      member: creator.publicKey,
+      signers: [creator],
+    });
+  } catch (err: unknown) {
+    const errAny = err as Record<string, unknown>;
+    console.error("\n  vaultTransactionExecute FAILED");
+    console.error("  message:", (err as Error).message);
+    if (errAny.logs) {
+      console.error("  logs:");
+      for (const log of errAny.logs as string[]) {
+        console.error(`    ${log}`);
+      }
+    }
+    if (errAny.simulationResponse) {
+      console.error("  simulationResponse:", JSON.stringify(errAny.simulationResponse, null, 2));
+    }
+    throw err;
+  }
   await confirm(connection, executeSig);
   console.log("  tx:", executeSig);
 
@@ -304,7 +357,7 @@ async function main() {
   });
 
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-  const txMessage = new TransactionMessageV0({
+  const txMessage = new TransactionMessage({
     payerKey: operator.publicKey,
     recentBlockhash: blockhash,
     instructions: [
@@ -312,7 +365,7 @@ async function main() {
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1000 }),
       executeIx,
     ],
-  }).compileToV0();
+  }).compileToV0Message();
 
   const vtx = new VersionedTransaction(txMessage);
   vtx.sign([operator]);
@@ -356,7 +409,14 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error("\nF1 TEST FAILED:", error.message ?? error);
+main().catch((error: unknown) => {
+  const err = error as Error & { logs?: string[]; simulationResponse?: unknown };
+  console.error("\nF1 TEST FAILED:", err.message ?? error);
+  if (err.logs?.length) {
+    console.error("Transaction logs:");
+    for (const log of err.logs) {
+      console.error(`  ${log}`);
+    }
+  }
   process.exit(1);
 });
