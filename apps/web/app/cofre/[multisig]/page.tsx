@@ -243,24 +243,38 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                         href={`/cofre/${multisigAddress.toBase58()}/proposals/${d.transactionIndex}`}
                         className="flex items-center justify-between rounded-md border border-neutral-800 p-3 transition hover:border-neutral-700 hover:bg-neutral-800/50"
                       >
-                         <div>
-                           <p className="font-mono text-sm text-neutral-100">
-                             #{d.transactionIndex}
-                             {d.type === "payroll" && (
-                               <span className="ml-2 rounded bg-emerald-900 px-1.5 py-0.5 text-xs text-emerald-200">
-                                 payroll
-                               </span>
-                             )}
-                           </p>
-                           <p className="mt-1 text-xs text-neutral-400">
-                             {d.type === "payroll"
-                               ? `${d.recipientCount} recipients, ${Number(d.totalAmount ?? d.amount).toLocaleString()} lamports total`
-                               : `${Number(d.amount).toLocaleString()} lamports → ${truncateAddress(d.recipient)}`}
-                           </p>
-                         </div>
-                         <span className="text-xs text-neutral-500">
-                           {new Date(d.createdAt).toLocaleDateString()}
-                         </span>
+                        <div className="min-w-0">
+                          <p className="font-mono text-sm text-neutral-100">
+                            #{d.transactionIndex}
+                            {d.type === "payroll" ? (
+                              <span className="ml-2 rounded bg-emerald-900 px-1.5 py-0.5 text-xs text-emerald-200">
+                                payroll
+                              </span>
+                            ) : (
+                              <span className="ml-2 rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-400">
+                                single
+                              </span>
+                            )}
+                          </p>
+                          <p className="mt-1 text-xs text-neutral-400">
+                            {d.type === "payroll"
+                              ? `${d.recipientCount} recipients · ${Number(d.totalAmount ?? d.amount).toLocaleString()} lamports total`
+                              : `${Number(d.amount).toLocaleString()} lamports → ${truncateAddress(d.recipient)}`}
+                          </p>
+                          <p className="mt-0.5 text-xs text-neutral-600">
+                            {new Date(d.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="ml-3 h-4 w-4 shrink-0 text-neutral-500"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
                       </Link>
                     </li>
                   ))}

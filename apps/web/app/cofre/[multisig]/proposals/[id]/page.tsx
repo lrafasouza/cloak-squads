@@ -268,6 +268,65 @@ export default function ProposalApprovalPage({
         </div>
 
         <div className="grid gap-4">
+          {/* Step Timeline */}
+          <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+            <ol className="flex flex-col gap-3 text-sm sm:flex-row sm:gap-0">
+              {(
+                [
+                  {
+                    label: "Criado",
+                    desc: "Proposal draft created",
+                    done: true,
+                    active: false,
+                  },
+                  {
+                    label: "Aprovação",
+                    desc: `${approvals}${threshold !== null ? `/${threshold}` : ""} approvals`,
+                    done: status === "approved" || status === "executed" || executeComplete,
+                    active: status === "active",
+                  },
+                  {
+                    label: "Executado",
+                    desc: "Squads tx executed",
+                    done: status === "executed" || executeComplete,
+                    active: status === "approved" && !executeComplete,
+                  },
+                  {
+                    label: "Operador",
+                    desc: "Cloak ZK deposit",
+                    done: false,
+                    active: executeComplete,
+                  },
+                ] as { label: string; desc: string; done: boolean; active: boolean }[]
+              ).map((step, i, arr) => (
+                <li key={step.label} className="flex flex-1 items-start gap-2 sm:flex-col sm:items-center sm:gap-1">
+                  <div className="flex items-center sm:w-full">
+                    <div
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ring-2 ${
+                        step.done
+                          ? "bg-emerald-400 text-neutral-950 ring-emerald-400"
+                          : step.active
+                            ? "bg-transparent text-emerald-300 ring-emerald-400"
+                            : "bg-transparent text-neutral-500 ring-neutral-700"
+                      }`}
+                    >
+                      {step.done ? "✓" : i + 1}
+                    </div>
+                    {i < arr.length - 1 && (
+                      <div className={`hidden h-px flex-1 sm:block ${step.done ? "bg-emerald-700" : "bg-neutral-800"}`} />
+                    )}
+                  </div>
+                  <div className="pb-1 sm:text-center">
+                    <p className={`font-medium leading-tight ${step.done ? "text-emerald-300" : step.active ? "text-neutral-100" : "text-neutral-500"}`}>
+                      {step.label}
+                    </p>
+                    <p className="mt-0.5 text-xs text-neutral-500">{step.desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+
           {/* Transfer Claim Section */}
           {isPayroll ? (
             <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
@@ -456,6 +515,12 @@ export default function ProposalApprovalPage({
                 {executeSignature ? (
                   <p className="mt-3 break-all font-mono text-xs text-emerald-200">{executeSignature}</p>
                 ) : null}
+                <Link
+                  href={`/cofre/${multisigParam}/operator?proposal=${id}`}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs font-semibold text-neutral-100 transition hover:bg-neutral-700"
+                >
+                  Go to Operator →
+                </Link>
               </div>
             ) : (
               <ExecuteButton

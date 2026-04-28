@@ -100,8 +100,8 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
     const viewKey = deriveViewKeyFromSecret(secretKey, {
       linkId: metadata.id,
       scope: metadata.scope,
-      startDate: BigInt(scopeParams.startDate ?? 0),
-      endDate: BigInt(scopeParams.endDate ?? Date.now()),
+      startDate: BigInt((scopeParams.startDate as number | undefined) ?? 0),
+      endDate: BigInt((scopeParams.endDate as number | undefined) ?? Date.now()),
     });
 
     console.log("Derived view key:", Buffer.from(viewKey).toString("hex"));
@@ -110,7 +110,7 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
     // For now, show deterministic mock data based on linkId
     const mockData = generateDeterministicMockData(metadata.id, 8);
 
-    const filtered = filterAuditData(mockData, metadata.scope, scopeParams);
+    const filtered = filterAuditData(mockData, metadata.scope, scopeParams as { startDate: number; endDate: number });
     setTransactions(filtered);
   }, [metadata, secretKey]);
 

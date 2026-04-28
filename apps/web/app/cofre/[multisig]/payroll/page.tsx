@@ -59,7 +59,7 @@ type RecipientNote = {
   hash: Uint8Array;
   instruction: Awaited<ReturnType<typeof buildIssueLicenseIxBrowser>>["instruction"];
   claim: {
-    amount: number;
+    amount: number | string;
     keypairPrivateKey: string;
     keypairPublicKey: string;
     blinding: string;

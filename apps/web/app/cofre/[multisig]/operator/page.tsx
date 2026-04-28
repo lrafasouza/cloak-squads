@@ -21,7 +21,20 @@ import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { ComputeBudgetProgram, PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
 import Link from "next/link";
-import { type FormEvent, use, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { type FormEvent, Suspense, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+type DraftSummary = {
+  id: string;
+  transactionIndex: string;
+  amount: string;
+  recipient: string;
+  memo: string;
+  createdAt: string;
+  type: "single" | "payroll";
+  recipientCount?: number;
+  totalAmount?: string;
+};
 
 type SingleDraft = {
   amount: string;
@@ -125,8 +138,9 @@ async function cloakDepositBrowser(
   };
 }
 
-export default function OperatorPage({ params }: { params: Promise<{ multisig: string }> }) {
+function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }) {
   const { multisig } = use(params);
+  const searchParams = useSearchParams();
   const { connection } = useConnection();
   const wallet = useWallet();
   const gatekeeperProgram = useMemo(
@@ -143,6 +157,8 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
   const [registeredOperator, setRegisteredOperator] = useState<string | null>(null);
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const [executing, setExecuting] = useState(false);
+  const [pendingDrafts, setPendingDrafts] = useState<DraftSummary[]>([]);
+  const autoLoadFiredRef = useRef(false);
 
   const multisigAddress = useMemo(() => {
     try {
@@ -171,6 +187,58 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
   useEffect(() => {
     void fetchOperator();
   }, [fetchOperator]);
+
+  // Auto-load from ?proposal= query param
+  useEffect(() => {
+    if (autoLoadFiredRef.current) return;
+    const proposalParam = searchParams.get("proposal");
+    if (!proposalParam) return;
+    autoLoadFiredRef.current = true;
+    setTxIndex(proposalParam);
+  }, [searchParams]);
+
+  // Trigger loadDraft once txIndex is set from query param
+  useEffect(() => {
+    if (!autoLoadFiredRef.current) return;
+    const proposalParam = searchParams.get("proposal");
+    if (!proposalParam || txIndex !== proposalParam) return;
+    void loadDraft();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txIndex]);
+
+  // Fetch pending proposal drafts for the list
+  const fetchPendingDrafts = useCallback(async () => {
+    if (!multisig) return;
+    try {
+      const [singleRes, payrollRes] = await Promise.all([
+        fetch(`/api/proposals/${encodeURIComponent(multisig)}`),
+        fetch(`/api/payrolls/${encodeURIComponent(multisig)}`),
+      ]);
+      const singleDrafts: DraftSummary[] = singleRes.ok
+        ? ((await singleRes.json()) as DraftSummary[]).map((d) => ({ ...d, type: "single" as const }))
+        : [];
+      const payrollDrafts: DraftSummary[] = payrollRes.ok
+        ? ((await payrollRes.json()) as DraftSummary[]).map((d) => ({
+            ...d,
+            type: "payroll" as const,
+            recipientCount: d.recipientCount ?? 0,
+            totalAmount: d.totalAmount ?? "0",
+            amount: d.totalAmount ?? "0",
+            recipient: `${d.recipientCount ?? 0} recipients`,
+          }))
+        : [];
+      const all = [...singleDrafts, ...payrollDrafts].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+      setPendingDrafts(all);
+    } catch {
+      // ignore
+    }
+  }, [multisig]);
+
+  useEffect(() => {
+    void fetchPendingDrafts();
+  }, [fetchPendingDrafts]);
 
   const operatorMismatch = useMemo(() => {
     if (!registeredOperator || !wallet.publicKey) return false;
@@ -505,6 +573,69 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
             </section>
           ) : null}
 
+          {pendingDrafts.length > 0 && (
+            <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+              <h2 className="mb-3 text-base font-semibold text-neutral-50">Proposals ready to execute</h2>
+              <ul className="grid gap-2">
+                {pendingDrafts.map((d) => (
+                  <li key={d.id} className="flex items-center justify-between gap-3 rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm">
+                    <div className="min-w-0">
+                      <span className="font-mono text-neutral-100">#{d.transactionIndex}</span>
+                      {d.type === "payroll" ? (
+                        <span className="ml-2 rounded bg-emerald-900 px-1.5 py-0.5 text-xs text-emerald-200">payroll</span>
+                      ) : (
+                        <span className="ml-2 rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-300">single</span>
+                      )}
+                      <p className="mt-0.5 truncate text-xs text-neutral-400">
+                        {d.type === "payroll"
+                          ? `${d.recipientCount ?? 0} recipients · ${Number(d.totalAmount ?? d.amount).toLocaleString()} lamports`
+                          : `${Number(d.amount).toLocaleString()} lamports`}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="shrink-0 text-xs px-3 py-1 h-auto"
+                      onClick={() => {
+                        setTxIndex(d.transactionIndex);
+                        void (async () => {
+                          setLoadedDraft(null);
+                          setPayrollDraft(null);
+                          setError(null);
+                          setSignature(null);
+                          setExecutionSteps([]);
+                          try {
+                            const singleResponse = await fetch(
+                              `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
+                            );
+                            if (singleResponse.ok) {
+                              setLoadedDraft((await singleResponse.json()) as SingleDraft);
+                              return;
+                            }
+                            const payrollResponse = await fetch(
+                              `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
+                            );
+                            if (payrollResponse.ok) {
+                              const draft = (await payrollResponse.json()) as PayrollDraft;
+                              setPayrollDraft(draft);
+                              setExecutionSteps(draft.recipients.map((_, i) => ({ index: i, status: "pending" })));
+                              return;
+                            }
+                            setError(`No persisted draft found for proposal #${d.transactionIndex}.`);
+                          } catch (caught) {
+                            setError(caught instanceof Error ? caught.message : "Could not load proposal draft.");
+                          }
+                        })();
+                      }}
+                    >
+                      Load
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
             <h2 className="mb-4 text-base font-semibold text-neutral-50">Load proposal draft</h2>
             <div className="flex items-end gap-3">
@@ -698,5 +829,13 @@ export default function OperatorPage({ params }: { params: Promise<{ multisig: s
         </div>
       </section>
     </main>
+  );
+}
+
+export default function OperatorPage({ params }: { params: Promise<{ multisig: string }> }) {
+  return (
+    <Suspense fallback={<main className="min-h-screen" />}>
+      <OperatorPageInner params={params} />
+    </Suspense>
   );
 }
