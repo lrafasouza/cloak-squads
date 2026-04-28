@@ -5,9 +5,10 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
-import { lamportsToSol } from "@/lib/sol";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
+import { AnimatedCard, StaggerContainer, StaggerItem } from "@/components/ui/animations";
+import { Spinner } from "@/components/ui/skeleton";
 
 type DraftSummary = {
   id: string;
@@ -22,7 +23,7 @@ type DraftSummary = {
 };
 
 function truncateAddress(address: string) {
-  return `${address.slice(0, 4)}...${address.slice(-4)}`;
+  return `${address.slice(0, 6)}...${address.slice(-6)}`;
 }
 
 export default function CofreDashboardPage({ params }: { params: Promise<{ multisig: string }> }) {
@@ -101,24 +102,41 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
       <main className="mx-auto max-w-3xl px-4 py-10">
         <Link
           href="/"
-          className="text-sm text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+          className="inline-flex items-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
         >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
           Back to picker
         </Link>
-        <h1 className="mt-6 text-2xl font-semibold text-neutral-50">Invalid multisig address</h1>
-        <p className="mt-2 text-sm text-neutral-300">Check the address and open the cofre again.</p>
+        <div className="mt-8 rounded-xl border border-red-900/50 bg-red-950/30 p-6">
+          <div className="flex items-center gap-3">
+            <svg className="h-8 w-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h1 className="text-2xl font-semibold text-neutral-50">Invalid multisig address</h1>
+              <p className="mt-1 text-sm text-neutral-400">Check the address and open the cofre again.</p>
+            </div>
+          </div>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen">
-      <header className="border-b border-neutral-800 bg-neutral-950/95">
+    <main className="min-h-screen bg-gradient-to-b from-neutral-950 via-neutral-950 to-neutral-900">
+      <header className="border-b border-neutral-800/50 bg-neutral-950/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
             href="/"
-            className="rounded-md text-sm font-semibold text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+            className="flex items-center gap-2 rounded-md text-sm font-semibold text-neutral-100 hover:text-emerald-400 transition-colors"
           >
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
+              <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
             Cloak Squads
           </Link>
           <ClientWalletButton />
@@ -126,204 +144,199 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
       </header>
 
       <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-sm font-medium text-emerald-300">Cofre dashboard</p>
-            <h1 className="mt-2 text-3xl font-semibold text-neutral-50">
-              {truncateAddress(multisigAddress.toBase58())}
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-300">
-              Manage private transfers through your Squads multisig. Create proposals, get approvals, and execute with the operator.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            {/* Primary actions */}
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href={`/cofre/${multisigAddress.toBase58()}/send`}
-                className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
-              >
-                Send
-              </Link>
-              <Link
-                href={`/cofre/${multisigAddress.toBase58()}/payroll`}
-                className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
-              >
-                Payroll
-              </Link>
-              <Link
-                href={`/cofre/${multisigAddress.toBase58()}/invoice`}
-                className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-800 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
-              >
-                Invoice
-              </Link>
-            </div>
-            {/* Secondary actions */}
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href={`/cofre/${multisigAddress.toBase58()}/operator`}
-                className="inline-flex min-h-10 items-center justify-center rounded-md border-2 border-amber-600 bg-amber-950/50 px-4 py-2 text-sm font-semibold text-amber-200 transition hover:bg-amber-900/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
-              >
-                Operator
-              </Link>
-              <Link
-                href={`/cofre/${multisigAddress.toBase58()}/audit`}
-                className="inline-flex min-h-10 items-center justify-center rounded-md border border-neutral-700 bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-400 transition hover:bg-neutral-700 hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
-              >
-                Audit
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Flow Guide */}
-        <div className="mt-8 rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-neutral-500">How it works</p>
-          <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-900 text-sm font-bold text-emerald-300">1</div>
+        <StaggerContainer staggerDelay={0.1}>
+          <StaggerItem>
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
-                <p className="text-sm font-medium text-neutral-200">Create</p>
-                <p className="text-xs text-neutral-500">Send / Payroll / Invoice</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-900 text-sm font-bold text-emerald-300">2</div>
-              <div>
-                <p className="text-sm font-medium text-neutral-200">Approve</p>
-                <p className="text-xs text-neutral-500">Signers vote on-chain</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-900 text-sm font-bold text-emerald-300">3</div>
-              <div>
-                <p className="text-sm font-medium text-neutral-200">Execute</p>
-                <p className="text-xs text-neutral-500">Reach threshold</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-900 text-sm font-bold text-amber-300">4</div>
-              <div>
-                <p className="text-sm font-medium text-neutral-200">Operator</p>
-                <p className="text-xs text-neutral-500">Process the transfer</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-            <p className="text-sm text-neutral-400">Vault balance</p>
-            <p className="mt-3 font-mono text-2xl font-semibold tabular-nums text-neutral-50">
-              -- SOL
-            </p>
-            <p className="mt-2 text-xs text-neutral-500">
-              Balance will be available when connected.
-            </p>
-          </section>
-
-          <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-            <p className="text-sm text-neutral-400">Pending proposals</p>
-            <p className="mt-3 font-mono text-2xl font-semibold tabular-nums text-neutral-50">
-              {draftsLoading ? "…" : drafts.length}
-            </p>
-            <p className="mt-2 text-xs text-neutral-500">
-              {drafts.length > 0 ? "Awaiting approvals." : "No active proposals."}
-            </p>
-          </section>
-
-          <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-            <p className="text-sm text-neutral-400">Connected wallet</p>
-            <p className="mt-3 break-all font-mono text-sm text-neutral-50">
-              {wallet.publicKey ? truncateAddress(wallet.publicKey.toBase58()) : "Not connected"}
-            </p>
-            <p className="mt-2 text-xs text-neutral-500">Connect to vote and execute.</p>
-          </section>
-        </div>
-
-        <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
-          <section className="rounded-lg border border-neutral-800 bg-neutral-900">
-            <div className="border-b border-neutral-800 p-4">
-              <h2 className="text-base font-semibold text-neutral-50">Addresses</h2>
-            </div>
-            <dl className="space-y-4 p-4 text-sm">
-              <div>
-                <dt className="text-neutral-500">Multisig address</dt>
-                <dd className="mt-1 break-all font-mono text-neutral-100">
-                  {multisigAddress.toBase58()}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-neutral-500">Cofre program account</dt>
-                <dd className="mt-1 break-all font-mono text-neutral-100">{cofre.toBase58()}</dd>
-              </div>
-              <div>
-                <dt className="text-neutral-500">Vault (funds held here)</dt>
-                <dd className="mt-1 break-all font-mono text-neutral-100">{vault.toBase58()}</dd>
-              </div>
-            </dl>
-          </section>
-
-          <section className="rounded-lg border border-neutral-800 bg-neutral-900">
-            <div className="border-b border-neutral-800 p-4">
-              <h2 className="text-base font-semibold text-neutral-50">Recent proposals</h2>
-            </div>
-            <div className="p-4 text-sm">
-              {draftsLoading ? (
-                <p className="text-neutral-400">Loading…</p>
-              ) : drafts.length === 0 ? (
-                <p className="text-neutral-300">
-                  No proposal drafts yet. Create one from the Send page.
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-800/50 bg-emerald-950/30 px-4 py-1.5 mb-3">
+                  <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  <span className="text-sm font-medium text-emerald-300">Cofre dashboard</span>
+                </div>
+                <h1 className="text-3xl font-bold text-neutral-50 md:text-4xl tracking-tight">
+                  {truncateAddress(multisigAddress.toBase58())}
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-neutral-400">
+                  Prepare private sends, review pending approvals, and monitor the shielded execution
+                  state for this Squads vault.
                 </p>
-              ) : (
-                <ul className="grid gap-3">
-                  {drafts.map((d) => (
-                    <li key={d.id}>
-                      <Link
-                        href={`/cofre/${multisigAddress.toBase58()}/proposals/${d.transactionIndex}`}
-                        className="flex items-center justify-between rounded-md border border-neutral-800 p-3 transition hover:border-neutral-700 hover:bg-neutral-800/50"
-                      >
-                        <div className="min-w-0">
-                          <p className="font-mono text-sm text-neutral-100">
-                            #{d.transactionIndex}
-                            {d.type === "payroll" ? (
-                              <span className="ml-2 rounded bg-emerald-900 px-1.5 py-0.5 text-xs text-emerald-200">
-                                payroll
-                              </span>
-                            ) : (
-                              <span className="ml-2 rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-400">
-                                single
-                              </span>
-                            )}
-                          </p>
-                          <p className="mt-1 text-xs text-neutral-400">
-                            {d.type === "payroll"
-                              ? `${d.recipientCount} recipients · ${lamportsToSol(d.totalAmount ?? d.amount)} SOL total`
-                              : `${lamportsToSol(d.amount)} SOL → ${truncateAddress(d.recipient)}`}
-                          </p>
-                          <p className="mt-0.5 text-xs text-neutral-600">
-                            {new Date(d.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="ml-3 h-4 w-4 shrink-0 text-neutral-500"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { href: "/send", label: "Prepare send", icon: "send", variant: "default" },
+                  { href: "/payroll", label: "Payroll", icon: "users", variant: "secondary" },
+                  { href: "/audit", label: "Audit", icon: "shield", variant: "outline" },
+                  { href: "/invoice", label: "Invoice", icon: "document", variant: "outline" },
+                  { href: "/operator", label: "Operator", icon: "cog", variant: "outline" },
+                ].map((action) => (
+                  <Link
+                    key={action.href}
+                    href={`/cofre/${multisigAddress.toBase58()}${action.href}`}
+                    className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+                      action.variant === "default"
+                        ? "bg-emerald-500 text-white hover:bg-emerald-400 shadow-lg shadow-emerald-500/20"
+                        : action.variant === "secondary"
+                        ? "bg-emerald-700 text-neutral-100 hover:bg-emerald-600"
+                        : "border-2 border-neutral-700 text-neutral-100 hover:bg-neutral-800 hover:border-neutral-600"
+                    }`}
+                  >
+                    {action.label}
+                  </Link>
+                ))}
+              </div>
             </div>
-          </section>
-        </div>
+          </StaggerItem>
+
+          <StaggerItem>
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+              <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
+                    <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-neutral-400">Shielded balance</p>
+                </div>
+                <p className="mt-2 font-mono text-2xl font-bold tabular-nums text-neutral-50">
+                  -- SOL
+                </p>
+                <p className="mt-2 text-xs text-neutral-500">
+                  Cloak scan integration lands in the F1 operator flow.
+                </p>
+              </AnimatedCard>
+
+              <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
+                    <svg className="h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-neutral-400">Proposal drafts</p>
+                </div>
+                <p className="mt-2 font-mono text-2xl font-bold tabular-nums text-neutral-50">
+                  {draftsLoading ? "..." : drafts.length}
+                </p>
+                <p className="mt-2 text-xs text-neutral-500">
+                  {drafts.length > 0 ? "Recent drafts listed below." : "Create one from Prepare send."}
+                </p>
+              </AnimatedCard>
+
+              <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10">
+                    <svg className="h-4 w-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-neutral-400">Connected wallet</p>
+                </div>
+                <p className="mt-2 break-all font-mono text-sm text-emerald-400 bg-emerald-950/20 rounded-lg px-3 py-2 border border-emerald-900/20">
+                  {wallet.publicKey ? truncateAddress(wallet.publicKey.toBase58()) : "Not connected"}
+                </p>
+                <p className="mt-2 text-xs text-neutral-500">Devnet execution context.</p>
+              </AnimatedCard>
+            </div>
+          </StaggerItem>
+
+          <StaggerItem>
+            <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
+              <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm shadow-xl overflow-hidden">
+                <div className="border-b border-neutral-800/50 p-4 bg-neutral-950/30">
+                  <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2">
+                    <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Addresses
+                  </h2>
+                </div>
+                <dl className="space-y-4 p-4 text-sm">
+                  {[
+                    { label: "Multisig", value: multisigAddress.toBase58() },
+                    { label: "Cofre PDA", value: cofre.toBase58() },
+                    { label: "Vault PDA", value: vault.toBase58() },
+                  ].map((item) => (
+                    <div key={item.label} className="group">
+                      <dt className="text-xs font-medium text-neutral-500 uppercase tracking-wider">{item.label}</dt>
+                      <dd className="mt-1 break-all font-mono text-xs text-neutral-300 bg-neutral-950/50 rounded-lg px-3 py-2 border border-neutral-800/50 group-hover:border-emerald-900/30 transition-colors">
+                        {item.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </AnimatedCard>
+
+              <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm shadow-xl overflow-hidden">
+                <div className="border-b border-neutral-800/50 p-4 bg-neutral-950/30 flex items-center justify-between">
+                  <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2">
+                    <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    Recent proposals
+                  </h2>
+                  {drafts.length > 0 && (
+                    <span className="text-xs text-neutral-500">{drafts.length} total</span>
+                  )}
+                </div>
+                <div className="p-4 text-sm">
+                  {draftsLoading ? (
+                    <div className="flex items-center gap-3 text-neutral-400">
+                      <Spinner size="sm" />
+                      <span>Loading proposals...</span>
+                    </div>
+                  ) : drafts.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral-800 mx-auto mb-3">
+                        <svg className="h-6 w-6 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <p className="text-neutral-400">No proposal drafts yet</p>
+                      <p className="text-xs text-neutral-500 mt-1">Create one from the Send page</p>
+                    </div>
+                  ) : (
+                    <ul className="grid gap-2">
+                      {drafts.map((d) => (
+                        <li key={d.id}>
+                          <Link
+                            href={`/cofre/${multisigAddress.toBase58()}/proposals/${d.transactionIndex}`}
+                            className="flex items-center justify-between rounded-lg border border-neutral-800/50 p-4 transition-all duration-200 hover:border-emerald-900/50 hover:bg-neutral-800/50 group"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-mono text-sm text-neutral-100 flex items-center gap-2">
+                                <span className="text-emerald-400">#{d.transactionIndex}</span>
+                                {d.type === "payroll" && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-900/50 px-2.5 py-0.5 text-xs text-emerald-200 border border-emerald-800/30">
+                                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    payroll
+                                  </span>
+                                )}
+                              </p>
+                              <p className="mt-1.5 text-xs text-neutral-400">
+                                {d.type === "payroll"
+                                  ? `${d.recipientCount} recipients, ${Number(d.totalAmount ?? d.amount).toLocaleString()} lamports total`
+                                  : `${Number(d.amount).toLocaleString()} lamports → ${truncateAddress(d.recipient)}`}
+                              </p>
+                            </div>
+                            <span className="text-xs text-neutral-500 shrink-0 ml-4">
+                              {new Date(d.createdAt).toLocaleDateString()}
+                            </span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </AnimatedCard>
+            </div>
+          </StaggerItem>
+        </StaggerContainer>
       </section>
     </main>
   );
