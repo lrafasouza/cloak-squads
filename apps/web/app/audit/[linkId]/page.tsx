@@ -91,7 +91,12 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
     if (!metadata || !secretKey) return;
 
     // Derive view key from secret
-    const scopeParams = metadata.scopeParams ? JSON.parse(metadata.scopeParams) : {};
+    let scopeParams: Record<string, unknown> = {};
+    try {
+      scopeParams = metadata.scopeParams ? (JSON.parse(metadata.scopeParams) as Record<string, unknown>) : {};
+    } catch {
+      scopeParams = {};
+    }
     const viewKey = deriveViewKeyFromSecret(secretKey, {
       linkId: metadata.id,
       scope: metadata.scope,
