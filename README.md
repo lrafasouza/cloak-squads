@@ -74,7 +74,7 @@ pnpm prisma db push
 | Program | Address |
 |---------|---------|
 | Squads v4 | `SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf` |
-| Gatekeeper | `WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J` |
+| Gatekeeper | `AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq` |
 | Cloak Mock | `2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe` |
 
 ### Deploying Your Own Gatekeeper
