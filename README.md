@@ -77,6 +77,29 @@ pnpm prisma db push
 | Gatekeeper | `WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J` |
 | Cloak Mock | `2RSPX6Lha1nGy2To6ePkj2FD2KFG5rpzdxtiQqTKFRxe` |
 
+### Deploying Your Own Gatekeeper
+
+If you're running your own instance or contributing to the project, you'll need to deploy the gatekeeper program yourself. Each deployment generates a unique Program ID.
+
+```bash
+# Deploy to devnet (automatically updates all config files)
+pnpm deploy:gk -- --cluster devnet
+
+# Or deploy to localnet
+pnpm deploy:gk -- --cluster localnet
+```
+
+This script will:
+1. Build and deploy the program
+2. Update `declare_id!` in the Rust source
+3. Update `Anchor.toml` with the new Program ID
+4. Update `.env.example` and `apps/web/.env.local`
+5. Regenerate the IDL
+
+After deploying, make sure your `apps/web/.env.local` has the correct `NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID`.
+
+> **Important:** The `declare_id!` macro in Anchor requires the Program ID to match the deployed program. If you see `DeclaredProgramIdMismatch` (error 4100), it means the Program ID in the code doesn't match what's on-chain. Run the deploy script above to fix it.
+
 ## Project Structure
 
 ```

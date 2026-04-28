@@ -23,7 +23,7 @@ pub(crate) use instructions::remove_signer_view::__client_accounts_remove_signer
 pub(crate) use instructions::revoke_audit::__client_accounts_revoke_audit;
 pub(crate) use instructions::set_operator::__client_accounts_set_operator;
 
-declare_id!("AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq");
+declare_id!("WkzdQAdWRmab53mN83ayqiEc4E3gShTwgACBDkPbe4J");
 
 #[program]
 pub mod cloak_gatekeeper {
