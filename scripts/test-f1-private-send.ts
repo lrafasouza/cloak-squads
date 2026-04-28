@@ -131,7 +131,29 @@ async function confirm(connection: Connection, signature: string) {
   await connection.confirmTransaction({ signature, ...latest }, "confirmed");
 }
 
+function readArgs(): { recipient: PublicKey; amountSol: number } {
+  const recipientArg = process.argv[2];
+  const amountArg = process.argv[3];
+  if (!recipientArg || !amountArg) {
+    throw new Error("Usage: pnpm test:f1 <recipient-pubkey> <amount-in-sol>");
+  }
+  let recipient: PublicKey;
+  try {
+    recipient = new PublicKey(recipientArg);
+  } catch {
+    throw new Error(`Invalid recipient pubkey: ${recipientArg}`);
+  }
+  const amountSol = Number.parseFloat(amountArg);
+  if (Number.isNaN(amountSol) || amountSol <= 0) {
+    throw new Error(`Invalid amount: ${amountArg}`);
+  }
+  return { recipient, amountSol };
+}
+
 async function main() {
+  const { recipient, amountSol } = readArgs();
+  const amount = BigInt(Math.ceil(amountSol * LAMPORTS_PER_SOL));
+
   if (!fs.existsSync(DEMO_FILE)) {
     throw new Error(
       `Demo cofre not found at ${DEMO_FILE}. Run "pnpm demo:setup <operator-pubkey>" first.`,
@@ -146,7 +168,7 @@ async function main() {
   const operatorKeypairEnv = process.env.OPERATOR_KEYPAIR;
   if (!operatorKeypairEnv) {
     throw new Error(
-      "Set OPERATOR_KEYPAIR env var to the operator keypair path (e.g. /tmp/my-operator.json).",
+      "Set OPERATOR_KEYPAIR env var to the operator keypair path (e.g. ~/.config/solana/id.json).",
     );
   }
   const operatorPath = operatorKeypairEnv.replace("~", process.env.HOME || "");
@@ -213,9 +235,8 @@ async function main() {
 
   const nullifier = randomBytes(32);
   const commitment = randomBytes(32);
-  const amount = 10_000_000n;
   const tokenMint = Keypair.generate().publicKey;
-  const recipientVkPub = randomBytes(32);
+  const recipientVkPub = recipient.toBytes();
   const nonce = randomBytes(16);
   const ttlSecs = 3_600n;
 
@@ -235,7 +256,7 @@ async function main() {
   console.log("\n--- Payload ---");
   console.log("Payload hash:", `${Buffer.from(payloadHash).toString("hex").slice(0, 16)}...`);
   console.log("License PDA: ", licensePda.toBase58());
-  console.log("Amount:      ", `${Number(amount) / LAMPORTS_PER_SOL} SOL (mock)`);
+  console.log("Amount:      ", `${Number(amount) / LAMPORTS_PER_SOL} SOL`);
 
   const multisigAccount = await Multisig.fromAccountAddress(connection, multisigPda);
   const transactionIndex = BigInt(multisigAccount.transactionIndex.toString()) + 1n;
