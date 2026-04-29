@@ -5,6 +5,7 @@ import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { lamportsToSol } from "@/lib/sol";
 import { statusBadge, statusLabel } from "@/lib/status-labels";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import {
   CLOAK_PROGRAM_ID,
   computeUtxoCommitment,
@@ -59,6 +60,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
   const { stealthId } = use(params);
   const { connection } = useConnection();
   const wallet = useWallet();
+  const { fetchWithAuth } = useWalletAuth();
 
   const [invoice, setInvoice] = useState<StealthInvoice | null>(null);
   const [claimState, setClaimState] = useState<ClaimState>("loading");
@@ -119,7 +121,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
           return;
         }
 
-        const res = await fetch(`/api/stealth/${encodeURIComponent(vault)}`);
+        const res = await fetchWithAuth(`/api/stealth/${encodeURIComponent(vault)}`);
         if (!res.ok) {
           setError("Failed to load invoice data.");
           setClaimState("invalid");
@@ -212,7 +214,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
       }
 
       // Call API to mark invoice as claimed
-      const response = await fetch(`/api/stealth/${invoice.id}/claim`, {
+      const response = await fetchWithAuth(`/api/stealth/${invoice.id}/claim`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ claimedBy: wallet.publicKey.toBase58() }),

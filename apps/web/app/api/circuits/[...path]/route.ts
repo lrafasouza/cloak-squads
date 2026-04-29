@@ -10,7 +10,7 @@ import { type NextRequest, NextResponse } from "next/server";
  * See: docs/CORS_S3_CIRCUITS_ERROR.md
  */
 
-const S3_BASE = "https://cloak-circuits.s3.us-east-1.amazonaws.com";
+const S3_BASE = "https://cloak-circuits.s3.us-east-1.amazonaws.com/circuits";
 
 // Circuit artifacts are immutable per version (0.1.0), safe to cache aggressively.
 const CACHE_CONTROL = "public, max-age=86400, s-maxage=604800, immutable";

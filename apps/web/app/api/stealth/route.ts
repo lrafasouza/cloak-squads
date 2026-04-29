@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { requireWalletAuth } from "@/lib/wallet-auth";
 import { Prisma } from "@prisma/client";
 import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -46,6 +47,9 @@ function base64urlEncode(bytes: Uint8Array): string {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireWalletAuth();
+  if (auth instanceof NextResponse) return auth;
+
   const hdrs = await headers();
   const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
   const ip = (raw.split(",")[0] ?? raw).trim();

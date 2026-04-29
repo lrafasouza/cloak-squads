@@ -2,6 +2,7 @@
 
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { buildRevokeAuditIxBrowser } from "@/lib/gatekeeper-instructions";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
 import {
   type AuditScope,
@@ -31,6 +32,7 @@ function truncateAddress(address: string) {
 export default function AuditAdminPage({ params }: { params: Promise<{ multisig: string }> }) {
   const { multisig } = use(params);
   const wallet = useWallet();
+  const { fetchWithAuth } = useWalletAuth();
   const { connection } = useConnection();
 
   const multisigAddress = useMemo(() => {
@@ -56,7 +58,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
   const loadLinks = useCallback(async () => {
     if (!multisigAddress) return;
     try {
-      const res = await fetch(`/api/audit-links/${encodeURIComponent(multisigAddress.toBase58())}`);
+      const res = await fetchWithAuth(`/api/audit-links/${encodeURIComponent(multisigAddress.toBase58())}`);
       if (res.ok) {
         const data = await res.json();
         setLinks(data);
@@ -163,7 +165,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
       const messageBytes = new TextEncoder().encode(message);
       const signature = await signMessage(messageBytes);
 
-      const res = await fetch(`/api/audit/${linkId}/revoke`, {
+      const res = await fetchWithAuth(`/api/audit/${linkId}/revoke`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

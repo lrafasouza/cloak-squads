@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireWalletAuth } from "@/lib/wallet-auth";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -19,6 +20,9 @@ const revokeSchema = z.object({
 });
 
 export async function POST(request: Request, context: { params: Promise<{ linkId: string }> }) {
+  const auth = await requireWalletAuth();
+  if (auth instanceof NextResponse) return auth;
+
   const { linkId } = await context.params;
 
   let body: unknown;

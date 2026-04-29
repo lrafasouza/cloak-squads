@@ -32,9 +32,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         status: invoice.status,
         expiresAt: invoice.expiresAt.toISOString(),
         createdAt: invoice.createdAt.toISOString(),
-        // UTXO data for claim
+        // UTXO data for claim (never expose utxoPrivateKey via GET)
         utxoAmount: invoice.utxoAmount,
-        utxoPrivateKey: invoice.utxoPrivateKey,
         utxoPublicKey: invoice.utxoPublicKey,
         utxoBlinding: invoice.utxoBlinding,
         utxoMint: invoice.utxoMint,

@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
@@ -43,6 +44,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   const router = useRouter();
   const { connection } = useConnection();
   const wallet = useWallet();
+  const { fetchWithAuth } = useWalletAuth();
 
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
@@ -138,7 +140,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         /* sessionStorage unavailable */
       }
 
-      const draftResponse = await fetch("/api/proposals", {
+      const draftResponse = await fetchWithAuth("/api/proposals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

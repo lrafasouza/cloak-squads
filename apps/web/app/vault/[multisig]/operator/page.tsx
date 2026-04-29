@@ -8,6 +8,7 @@ import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import {
   type OperatorExecutionBlockReason,
   type OperatorLicenseStatus,
@@ -292,6 +293,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const searchParams = useSearchParams();
   const { connection } = useConnection();
   const wallet = useWallet();
+  const { fetchWithAuth } = useWalletAuth();
   const gatekeeperProgram = useMemo(
     () => new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID),
     [],
@@ -393,8 +395,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     if (!multisig) return;
     try {
       const [singleRes, payrollRes] = await Promise.all([
-        fetch(`/api/proposals/${encodeURIComponent(multisig)}`),
-        fetch(`/api/payrolls/${encodeURIComponent(multisig)}`),
+        fetchWithAuth(`/api/proposals/${encodeURIComponent(multisig)}`),
+        fetchWithAuth(`/api/payrolls/${encodeURIComponent(multisig)}`),
       ]);
       const singleDrafts: DraftSummary[] = singleRes.ok
         ? ((await singleRes.json()) as DraftSummary[]).map((d) => ({
@@ -613,7 +615,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         if (effectiveInvoiceId) {
           // F4: store UTXO data for recipient claim.
           try {
-            const storeResponse = await fetch(`/api/stealth/${effectiveInvoiceId}/utxo`, {
+            const storeResponse = await fetchWithAuth(`/api/stealth/${effectiveInvoiceId}/utxo`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({

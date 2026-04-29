@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/toast-provider";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
@@ -45,6 +46,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   const router = useRouter();
   const { connection } = useConnection();
   const wallet = useWallet();
+  const { fetchWithAuth } = useWalletAuth();
   const { addToast } = useToast();
 
   const [invoiceRef, setInvoiceRef] = useState("");
@@ -96,7 +98,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       setProofStep("generate-witness");
 
       // Step 1: Create StealthInvoice in DB (server generates nacl keypair + claim URL)
-      const stealthRes = await fetch("/api/stealth", {
+      const stealthRes = await fetchWithAuth("/api/stealth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -167,7 +169,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       };
 
       // Step 4: Persist ProposalDraft (recipient = recipientWallet for operator lookup)
-      const draftRes = await fetch("/api/proposals", {
+      const draftRes = await fetchWithAuth("/api/proposals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

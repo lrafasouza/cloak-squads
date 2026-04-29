@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { serializeDraft } from "@/lib/serialize-proposal-draft";
+import { requireWalletAuth } from "@/lib/wallet-auth";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
@@ -7,6 +8,9 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ multisig: string; index: string }> },
 ) {
+  const auth = await requireWalletAuth();
+  if (auth instanceof NextResponse) return auth;
+
   const { multisig, index } = await context.params;
 
   try {

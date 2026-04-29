@@ -2,8 +2,8 @@
 
 import { Logo } from "@/components/brand/Logo";
 import { Address } from "@/components/ui/aegis";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import {
   FileText,
   Key,
@@ -104,12 +104,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-3">
             <OperatorInboxButton />
-            {/* Wallet button placeholder — will be styled via globals.css override */}
-            <div className="hidden sm:block">
-              <Button variant="ghost" size="sm">
-                Wallet
-              </Button>
-            </div>
+            <ClientWalletButton />
           </div>
         </header>
 

@@ -8,6 +8,7 @@ import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
 import { buildInitCofreIxBrowser } from "@/lib/gatekeeper-instructions";
 import { lamportsToSol } from "@/lib/sol";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import {
   createInitCofreProposal,
   proposalApprove,
@@ -41,6 +42,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
   const { multisig } = use(params);
   const { connection } = useConnection();
   const wallet = useWallet();
+  const { fetchWithAuth } = useWalletAuth();
   const { addToast } = useToast();
   const gatekeeperProgram = useMemo(
     () => new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID),
@@ -94,8 +96,8 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
     if (!multisigAddress) return;
     try {
       const [singleRes, payrollRes] = await Promise.all([
-        fetch(`/api/proposals/${encodeURIComponent(multisigAddress.toBase58())}`),
-        fetch(`/api/payrolls/${encodeURIComponent(multisigAddress.toBase58())}`),
+        fetchWithAuth(`/api/proposals/${encodeURIComponent(multisigAddress.toBase58())}`),
+        fetchWithAuth(`/api/payrolls/${encodeURIComponent(multisigAddress.toBase58())}`),
       ]);
 
       const singleDrafts: DraftSummary[] = singleRes.ok

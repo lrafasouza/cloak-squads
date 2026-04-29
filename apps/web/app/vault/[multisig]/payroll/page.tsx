@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import {
   type PayrollRecipientInput,
   formatPayrollCsvTemplate,
@@ -84,6 +85,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   const router = useRouter();
   const { connection } = useConnection();
   const wallet = useWallet();
+  const { fetchWithAuth } = useWalletAuth();
 
   const [csvText, setCsvText] = useState("");
   const [recipients, setRecipients] = useState<PayrollRecipientInput[]>([]);
@@ -247,7 +249,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       if (mode === "invoice") {
         const invoiceResults = await Promise.all(
           parsedNotes.map(async (n) => {
-            const res = await fetch("/api/stealth", {
+            const res = await fetchWithAuth("/api/stealth", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -313,7 +315,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         })),
       };
 
-      const draftResponse = await fetch("/api/payrolls", {
+      const draftResponse = await fetchWithAuth("/api/payrolls", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(draftPayload),

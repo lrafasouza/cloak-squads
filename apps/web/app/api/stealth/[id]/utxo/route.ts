@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { requireWalletAuth } from "@/lib/wallet-auth";
 import { NextResponse } from "next/server";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireWalletAuth();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { id } = await params;
     const body = await request.json();
