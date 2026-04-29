@@ -127,6 +127,20 @@ export async function createIssueLicenseProposal(params: {
   issueLicenseIx: TransactionInstruction;
   memo?: string;
 }) {
+  return createVaultProposal({
+    ...params,
+    instructions: [params.issueLicenseIx],
+    memo: params.memo ?? "issue license",
+  });
+}
+
+export async function createVaultProposal(params: {
+  connection: Connection;
+  wallet: BrowserSquadsWallet;
+  multisigPda: PublicKey;
+  instructions: TransactionInstruction[];
+  memo?: string;
+}) {
   assertBrowserSquadsWallet(params.wallet);
   const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
   const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: 0 });
@@ -134,7 +148,7 @@ export async function createIssueLicenseProposal(params: {
   const message = new TransactionMessage({
     payerKey: vaultPda,
     recentBlockhash: latestBlockhash.blockhash,
-    instructions: [params.issueLicenseIx],
+    instructions: params.instructions,
   });
 
   const createVaultIx = multisig.instructions.vaultTransactionCreate({
@@ -145,7 +159,7 @@ export async function createIssueLicenseProposal(params: {
     vaultIndex: 0,
     ephemeralSigners: 0,
     transactionMessage: message,
-    memo: params.memo ?? "issue license",
+    memo: params.memo ?? "vault transaction",
   });
   const createProposalIx = multisig.instructions.proposalCreate({
     multisigPda: params.multisigPda,

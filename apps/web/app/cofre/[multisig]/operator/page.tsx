@@ -19,8 +19,10 @@ import { cofrePda } from "@cloak-squads/core/pda";
 import {
   CLOAK_PROGRAM_ID,
   NATIVE_SOL_MINT,
+  computeUtxoCommitment,
   createUtxo,
   createZeroUtxo,
+  derivePublicKey,
   generateUtxoKeypair,
   transact,
 } from "@cloak.dev/sdk-devnet";
@@ -58,6 +60,16 @@ type DraftSummary = {
   totalAmount?: string;
 };
 
+type CommitmentClaim = {
+  amount: string;
+  keypairPrivateKey: string;
+  keypairPublicKey: string;
+  blinding: string;
+  commitment: string;
+  recipient_vk: string;
+  token_mint: string;
+};
+
 type SingleDraft = {
   amount: string;
   recipient: string;
@@ -71,6 +83,7 @@ type SingleDraft = {
     recipientVkPub: number[];
     nonce: number[];
   };
+  commitmentClaim?: CommitmentClaim;
 };
 
 type PayrollRecipient = {
@@ -147,6 +160,9 @@ async function cloakDepositBrowser(
   },
   amount: bigint,
   mint: PublicKey = NATIVE_SOL_MINT,
+  existingOutputUtxo?: Awaited<ReturnType<typeof createUtxo>> & {
+    keypair: { privateKey: bigint; publicKey: bigint };
+  },
 ): Promise<{
   signature: string;
   leafIndex: number;
@@ -156,8 +172,17 @@ async function cloakDepositBrowser(
   if (!wallet.publicKey) {
     throw new Error("Wallet not connected");
   }
-  const outputKeypair = await generateUtxoKeypair();
-  const outputUtxo = await createUtxo(amount, outputKeypair, mint);
+
+  let outputUtxo: Awaited<ReturnType<typeof createUtxo>>;
+  let outputKeypair: { privateKey: bigint; publicKey: bigint };
+
+  if (existingOutputUtxo) {
+    outputUtxo = existingOutputUtxo;
+    outputKeypair = existingOutputUtxo.keypair;
+  } else {
+    outputKeypair = await generateUtxoKeypair();
+    outputUtxo = await createUtxo(amount, outputKeypair, mint);
+  }
 
   const zeroIn0 = await createZeroUtxo(mint);
   const zeroIn1 = await createZeroUtxo(mint);
@@ -421,9 +446,22 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       }
       try {
         const cachedDeposit = readCloakDepositCache(multisigAddress.toBase58(), txIndex);
-        const cloakResult =
-          cachedDeposit ??
-          (await cloakDepositBrowser(
+        let cloakResult: Awaited<ReturnType<typeof cloakDepositBrowser>>;
+
+        if (cachedDeposit) {
+          cloakResult = cachedDeposit;
+        } else if (draft.commitmentClaim) {
+          // Reconstruct the original UTXO from the draft so the commitment matches the payload hash
+          const privateKey = BigInt(`0x${draft.commitmentClaim.keypairPrivateKey.padStart(64, "0")}`);
+          const publicKey = await derivePublicKey(privateKey);
+          const keypair = { privateKey, publicKey };
+          const reconstructedUtxo = await createUtxo(amount, keypair, tokenMint);
+          reconstructedUtxo.blinding = BigInt(`0x${draft.commitmentClaim.blinding}`);
+          reconstructedUtxo.commitment = await computeUtxoCommitment(reconstructedUtxo);
+          // Attach keypair for the deposit function to use
+          (reconstructedUtxo as typeof reconstructedUtxo & { keypair: typeof keypair }).keypair = keypair;
+
+          cloakResult = await cloakDepositBrowser(
             connection,
             {
               publicKey: wallet.publicKey,
@@ -432,7 +470,22 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             },
             amount,
             tokenMint,
-          ));
+            reconstructedUtxo as Awaited<ReturnType<typeof createUtxo>> & { keypair: { privateKey: bigint; publicKey: bigint } },
+          );
+        } else {
+          // Fallback: generate a fresh UTXO (legacy behavior)
+          cloakResult = await cloakDepositBrowser(
+            connection,
+            {
+              publicKey: wallet.publicKey,
+              signTransaction: wallet.signTransaction,
+              ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
+            },
+            amount,
+            tokenMint,
+          );
+        }
+
         cloakSig = cloakResult.signature;
         setCloakSignature(cloakSig);
         if (!cachedDeposit) {
@@ -480,6 +533,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             console.warn("Failed to store UTXO data for claim");
           }
         }
+
       } catch (caught) {
         throw new Error(
           `Cloak deposit failed: ${caught instanceof Error ? caught.message : String(caught)}`,
