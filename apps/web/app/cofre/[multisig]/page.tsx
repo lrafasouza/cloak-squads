@@ -328,7 +328,8 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
 
               <div className="flex flex-wrap gap-2">
                 {[
-                  { href: "/invoice", label: "Invoice", icon: "document", variant: "default" },
+                  { href: "/send", label: "Send", icon: "arrow-right", variant: "default" },
+                  { href: "/invoice", label: "Invoice", icon: "document", variant: "secondary" },
                   { href: "/payroll", label: "Payroll", icon: "users", variant: "secondary" },
                   { href: "/audit", label: "Audit", icon: "shield", variant: "outline" },
                   { href: "/operator", label: "Operator", icon: "cog", variant: "outline" },

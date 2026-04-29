@@ -8,21 +8,27 @@ import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
+import {
+  type OperatorExecutionBlockReason,
+  type OperatorLicenseStatus,
+  type ProposalStatus,
+  getOperatorExecutionState,
+  normalizeLicenseStatus,
+} from "@/lib/operator-license-state";
 import { lamportsToSol } from "@/lib/sol";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
-import {
-  type OperatorProposalStatus,
-  canRunOperatorExecution,
-  operatorProposalStatusMessage,
-} from "@cloak-squads/core/operator-readiness";
-import { cofrePda } from "@cloak-squads/core/pda";
+import { computePayloadHash } from "@cloak-squads/core/hashing";
+import { cofrePda, licensePda } from "@cloak-squads/core/pda";
 import {
   CLOAK_PROGRAM_ID,
+  type MerkleTree,
   NATIVE_SOL_MINT,
+  type Utxo,
   computeUtxoCommitment,
   createUtxo,
   createZeroUtxo,
   derivePublicKey,
+  fullWithdraw,
   generateUtxoKeypair,
   transact,
 } from "@cloak.dev/sdk-devnet";
@@ -101,6 +107,7 @@ type PayrollRecipient = {
     recipientVkPub: number[];
     nonce: number[];
   };
+  commitmentClaim?: CommitmentClaim;
 };
 
 type PayrollDraft = {
@@ -121,6 +128,16 @@ type CloakDepositCache = {
   leafIndex: number;
   spendKeyHex: string;
   blindingHex: string;
+  outputUtxos?: Utxo[] | undefined;
+  merkleTree?: MerkleTree | undefined;
+};
+
+type DraftInvariants = SingleDraft["invariants"];
+
+type DecodedLicense = {
+  status?: unknown;
+  expiresAt?: unknown;
+  expires_at?: unknown;
 };
 
 function cloakDepositCacheKey(multisig: string, transactionIndex: string) {
@@ -163,12 +180,7 @@ async function cloakDepositBrowser(
   existingOutputUtxo?: Awaited<ReturnType<typeof createUtxo>> & {
     keypair: { privateKey: bigint; publicKey: bigint };
   },
-): Promise<{
-  signature: string;
-  leafIndex: number;
-  spendKeyHex: string;
-  blindingHex: string;
-}> {
+): Promise<CloakDepositCache> {
   if (!wallet.publicKey) {
     throw new Error("Wallet not connected");
   }
@@ -219,7 +231,53 @@ async function cloakDepositBrowser(
     leafIndex,
     spendKeyHex: outputKeypair.privateKey.toString(16).padStart(64, "0"),
     blindingHex: outputUtxo.blinding.toString(16).padStart(64, "0"),
+    outputUtxos: result.outputUtxos,
+    merkleTree: result.merkleTree,
   };
+}
+
+function draftInvariantsToPayload(input: DraftInvariants) {
+  return {
+    nullifier: Uint8Array.from(input.nullifier),
+    commitment: Uint8Array.from(input.commitment),
+    amount: BigInt(input.amount),
+    tokenMint: new PublicKey(input.tokenMint),
+    recipientVkPub: Uint8Array.from(input.recipientVkPub),
+    nonce: Uint8Array.from(input.nonce),
+  };
+}
+
+function numberFromAnchorValue(value: unknown): number | null {
+  if (typeof value === "number") return value;
+  if (typeof value === "bigint") return Number(value);
+  if (value && typeof value === "object") {
+    const maybeNumber = value as { toNumber?: () => number; toString?: () => string };
+    if (typeof maybeNumber.toNumber === "function") return maybeNumber.toNumber();
+    if (typeof maybeNumber.toString === "function") {
+      const parsed = Number(maybeNumber.toString());
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+  return null;
+}
+
+function bytesToHex(bytes: Uint8Array | number[]) {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function operatorStatusMessage(reason: OperatorExecutionBlockReason) {
+  if (reason === "ready") return null;
+  if (reason === "license-loading") return "Checking license status on-chain...";
+  if (reason === "execute-vault-transaction") {
+    return "Execute the Squads vault transaction first to issue the license, then run operator execution.";
+  }
+  if (reason === "proposal-not-approved") {
+    return "This proposal is not ready yet. Wait for approvals, then execute the Squads vault transaction.";
+  }
+  if (reason === "license-consumed") return "This license has already been consumed.";
+  if (reason === "license-expired") return "This license has expired. Create a new proposal.";
+  if (reason === "license-error") return "Could not verify the license account on-chain.";
+  return null;
 }
 
 function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }) {
@@ -235,6 +293,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const [pending, setPending] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [cloakSignature, setCloakSignature] = useState<string | null>(null);
+  const [withdrawSignature, setWithdrawSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadedDraft, setLoadedDraft] = useState<SingleDraft | null>(null);
   const [payrollDraft, setPayrollDraft] = useState<PayrollDraft | null>(null);
@@ -245,7 +304,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const [executing, setExecuting] = useState(false);
   const [pendingDrafts, setPendingDrafts] = useState<DraftSummary[]>([]);
-  const [draftOnChainStatus, setDraftOnChainStatus] = useState<OperatorProposalStatus>("loading");
+  const [draftOnChainStatus, setDraftOnChainStatus] = useState<ProposalStatus>("loading");
+  const [licenseStatus, setLicenseStatus] = useState<OperatorLicenseStatus>("idle");
   const autoLoadFiredRef = useRef(false);
 
   const multisigAddress = useMemo(() => {
@@ -369,7 +429,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     setPayrollDraft(null);
     setError(null);
     setSignature(null);
+    setWithdrawSignature(null);
     setExecutionSteps([]);
+    setLicenseStatus("idle");
 
     try {
       // Try single draft first
@@ -379,7 +441,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       if (singleResponse.ok) {
         const draft = (await singleResponse.json()) as SingleDraft;
         setLoadedDraft(draft);
-        void checkOnChainStatus(txIndex);
+        void checkOnChainStatus(txIndex, draft);
         return;
       }
 
@@ -391,7 +453,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         const draft = (await payrollResponse.json()) as PayrollDraft;
         setPayrollDraft(draft);
         setExecutionSteps(draft.recipients.map((_, i) => ({ index: i, status: "pending" })));
-        void checkOnChainStatus(txIndex);
+        void checkOnChainStatus(txIndex, draft);
         return;
       }
 
@@ -403,9 +465,10 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     }
   }
 
-  async function checkOnChainStatus(txIndex: string) {
+  async function checkOnChainStatus(txIndex: string, draftForLicense?: SingleDraft | PayrollDraft) {
     if (!multisigAddress) return;
     setDraftOnChainStatus("loading");
+    setLicenseStatus(draftForLicense ? "loading" : "idle");
     try {
       const [proposalPda] = squadsMultisig.getProposalPda({
         multisigPda: multisigAddress,
@@ -423,12 +486,57 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       } else {
         setDraftOnChainStatus("other");
       }
+      if (draftForLicense) {
+        await checkLicenseStatus(draftForLicense);
+      }
     } catch {
       setDraftOnChainStatus("error");
+      if (draftForLicense) setLicenseStatus("error");
     }
   }
 
-  async function executeSingle(draft: SingleDraft, doCloakDeposit = true) {
+  async function checkLicenseStatus(draft: SingleDraft | PayrollDraft) {
+    if (!multisigAddress) return;
+    const cofre = cofrePda(multisigAddress, gatekeeperProgram)[0];
+    const coder = new BorshAccountsCoder(IDL as Idl);
+    const now = Math.floor(Date.now() / 1000);
+    const invariants =
+      "recipients" in draft
+        ? draft.recipients.map((recipient) => recipient.invariants)
+        : [draft.invariants];
+
+    let sawConsumed = false;
+    let sawExpired = false;
+    let sawError = false;
+
+    for (const invariant of invariants) {
+      const payloadHash = computePayloadHash(draftInvariantsToPayload(invariant));
+      const license = licensePda(cofre, payloadHash, gatekeeperProgram)[0];
+      const accountInfo = await connection.getAccountInfo(license);
+      if (!accountInfo) {
+        setLicenseStatus("missing");
+        return;
+      }
+
+      const decoded = coder.decode<DecodedLicense>("license", accountInfo.data);
+      const expiresAt = numberFromAnchorValue(decoded.expiresAt ?? decoded.expires_at);
+      const status = normalizeLicenseStatus(decoded.status, expiresAt, now);
+      if (status === "consumed") sawConsumed = true;
+      if (status === "expired") sawExpired = true;
+      if (status === "error") sawError = true;
+    }
+
+    if (sawError) setLicenseStatus("error");
+    else if (sawExpired) setLicenseStatus("expired");
+    else if (sawConsumed) setLicenseStatus("consumed");
+    else setLicenseStatus("active");
+  }
+
+  async function executeSingle(
+    draft: SingleDraft,
+    doCloakDeposit = true,
+    depositCacheKey = txIndex,
+  ) {
     if (!wallet.publicKey || !multisigAddress) return;
 
     const nullifier = Uint8Array.from(draft.invariants.nullifier);
@@ -445,21 +553,31 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         throw new Error("Wallet does not support signTransaction");
       }
       try {
-        const cachedDeposit = readCloakDepositCache(multisigAddress.toBase58(), txIndex);
+        const cachedDeposit = readCloakDepositCache(multisigAddress.toBase58(), depositCacheKey);
         let cloakResult: Awaited<ReturnType<typeof cloakDepositBrowser>>;
 
         if (cachedDeposit) {
           cloakResult = cachedDeposit;
         } else if (draft.commitmentClaim) {
-          // Reconstruct the original UTXO from the draft so the commitment matches the payload hash
-          const privateKey = BigInt(`0x${draft.commitmentClaim.keypairPrivateKey.padStart(64, "0")}`);
+          // Reconstruct the original UTXO from the draft so the deposit matches the approved payload.
+          const privateKey = BigInt(
+            `0x${draft.commitmentClaim.keypairPrivateKey.padStart(64, "0")}`,
+          );
           const publicKey = await derivePublicKey(privateKey);
           const keypair = { privateKey, publicKey };
           const reconstructedUtxo = await createUtxo(amount, keypair, tokenMint);
           reconstructedUtxo.blinding = BigInt(`0x${draft.commitmentClaim.blinding}`);
           reconstructedUtxo.commitment = await computeUtxoCommitment(reconstructedUtxo);
+          const reconstructedCommitmentHex = reconstructedUtxo.commitment
+            .toString(16)
+            .padStart(64, "0");
+          const approvedCommitmentHex = bytesToHex(commitment);
+          if (reconstructedCommitmentHex !== approvedCommitmentHex) {
+            throw new Error("Approved commitment does not match reconstructed Cloak UTXO.");
+          }
           // Attach keypair for the deposit function to use
-          (reconstructedUtxo as typeof reconstructedUtxo & { keypair: typeof keypair }).keypair = keypair;
+          (reconstructedUtxo as typeof reconstructedUtxo & { keypair: typeof keypair }).keypair =
+            keypair;
 
           cloakResult = await cloakDepositBrowser(
             connection,
@@ -470,32 +588,23 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             },
             amount,
             tokenMint,
-            reconstructedUtxo as Awaited<ReturnType<typeof createUtxo>> & { keypair: { privateKey: bigint; publicKey: bigint } },
+            reconstructedUtxo as Awaited<ReturnType<typeof createUtxo>> & {
+              keypair: { privateKey: bigint; publicKey: bigint };
+            },
           );
         } else {
-          // Fallback: generate a fresh UTXO (legacy behavior)
-          cloakResult = await cloakDepositBrowser(
-            connection,
-            {
-              publicKey: wallet.publicKey,
-              signTransaction: wallet.signTransaction,
-              ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
-            },
-            amount,
-            tokenMint,
-          );
+          throw new Error("Proposal draft is missing the Cloak UTXO claim. Create a new proposal.");
         }
 
         cloakSig = cloakResult.signature;
         setCloakSignature(cloakSig);
         if (!cachedDeposit) {
-          writeCloakDepositCache(multisigAddress.toBase58(), txIndex, cloakResult);
+          writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
         }
 
         // Store UTXO data for future claim (linked by invoice if available)
-        if (loadedDraft?.recipient) {
+        if (draft.recipient) {
           try {
-            // Find stealth invoice by recipient wallet
             const invoicesRes = await fetch(
               `/api/stealth/${encodeURIComponent(multisigAddress.toBase58())}`,
             );
@@ -506,7 +615,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 status: string;
               }>;
               const invoice = invoices.find(
-                (inv) => inv.recipientWallet === loadedDraft.recipient && inv.status === "pending",
+                (inv) => inv.recipientWallet === draft.recipient && inv.status === "pending",
               );
               if (invoice) {
                 await fetch(`/api/stealth/${invoice.id}/utxo`, {
@@ -515,7 +624,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   body: JSON.stringify({
                     utxoAmount: amount.toString(),
                     utxoPrivateKey: cloakResult.spendKeyHex,
-                    utxoPublicKey: cloakResult.spendKeyHex, // Will be derived
+                    utxoPublicKey:
+                      draft.commitmentClaim?.keypairPublicKey ?? cloakResult.spendKeyHex,
                     utxoBlinding: cloakResult.blindingHex,
                     utxoMint: tokenMint.toBase58(),
                     utxoLeafIndex: cloakResult.leafIndex,
@@ -526,6 +636,27 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                       : undefined,
                   }),
                 });
+              } else if (cloakResult.outputUtxos && cloakResult.merkleTree) {
+                // F1: direct withdrawal to recipient, no claim needed
+                const recipientPubkey = new PublicKey(draft.recipient);
+                const withdrawResult = await fullWithdraw(
+                  cloakResult.outputUtxos,
+                  recipientPubkey,
+                  {
+                    connection,
+                    programId: CLOAK_PROGRAM_ID,
+                    ...cloakDirectTransactOptions,
+                    signTransaction: wallet.signTransaction as Parameters<
+                      typeof fullWithdraw
+                    >[2]["signTransaction"],
+                    ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
+                    depositorPublicKey: wallet.publicKey,
+                    cachedMerkleTree: cloakResult.merkleTree,
+                    onProgress: (s: string) => console.error(`[cloak] withdraw ${s}`),
+                    onProofProgress: (p: number) => console.error(`[cloak] withdraw proof ${p}%`),
+                  } as Parameters<typeof fullWithdraw>[2],
+                );
+                setWithdrawSignature(withdrawResult.signature);
               }
             }
           } catch {
@@ -533,7 +664,6 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             console.warn("Failed to store UTXO data for claim");
           }
         }
-
       } catch (caught) {
         throw new Error(
           `Cloak deposit failed: ${caught instanceof Error ? caught.message : String(caught)}`,
@@ -577,6 +707,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     event.preventDefault();
     setError(null);
     setSignature(null);
+    setWithdrawSignature(null);
     setPending(true);
 
     try {
@@ -616,16 +747,15 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       try {
         const recipient = payrollDraft.recipients[i];
         if (!recipient) continue;
-        const sig = await executeSingle(
-          {
-            amount: recipient.amount,
-            recipient: recipient.wallet,
-            memo: recipient.memo ?? "",
-            payloadHash: recipient.payloadHash,
-            invariants: recipient.invariants,
-          },
-          false,
-        );
+        const recipientDraft: SingleDraft = {
+          amount: recipient.amount,
+          recipient: recipient.wallet,
+          memo: recipient.memo ?? "",
+          payloadHash: recipient.payloadHash,
+          invariants: recipient.invariants,
+          ...(recipient.commitmentClaim ? { commitmentClaim: recipient.commitmentClaim } : {}),
+        };
+        const sig = await executeSingle(recipientDraft, true, `${txIndex}:${i}`);
 
         setExecutionSteps((prev) =>
           prev.map((s) => (s.index === i ? { ...s, status: "success", signature: sig } : s)),
@@ -671,16 +801,15 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       try {
         const recipient = payrollDraft.recipients[i];
         if (!recipient) continue;
-        const sig = await executeSingle(
-          {
-            amount: recipient.amount,
-            recipient: recipient.wallet,
-            memo: recipient.memo ?? "",
-            payloadHash: recipient.payloadHash,
-            invariants: recipient.invariants,
-          },
-          false,
-        );
+        const recipientDraft: SingleDraft = {
+          amount: recipient.amount,
+          recipient: recipient.wallet,
+          memo: recipient.memo ?? "",
+          payloadHash: recipient.payloadHash,
+          invariants: recipient.invariants,
+          ...(recipient.commitmentClaim ? { commitmentClaim: recipient.commitmentClaim } : {}),
+        };
+        const sig = await executeSingle(recipientDraft, true, `${txIndex}:${i}`);
 
         setExecutionSteps((prev) =>
           prev.map((s) => (s.index === i ? { ...s, status: "success", signature: sig } : s)),
@@ -700,15 +829,17 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const successCount = executionSteps.filter((s) => s.status === "success").length;
   const isPayroll = payrollDraft !== null;
   const lowOperatorSol = operatorBalanceLamports !== null && operatorBalanceLamports < 10_000_000;
-  const canExecute =
-    !pending &&
-    !!(loadedDraft || payrollDraft) &&
-    !!wallet.publicKey &&
-    !operatorMismatch &&
-    !cofreMissing &&
-    !lowOperatorSol &&
-    canRunOperatorExecution(draftOnChainStatus);
-  const proposalStatusMessage = operatorProposalStatusMessage(draftOnChainStatus);
+  const executionState = getOperatorExecutionState({
+    hasDraft: !!(loadedDraft || payrollDraft),
+    walletConnected: !!wallet.publicKey,
+    operatorMismatch,
+    cofreMissing,
+    lowOperatorSol,
+    proposalStatus: draftOnChainStatus,
+    licenseStatus,
+  });
+  const canExecute = !pending && executionState.canExecute;
+  const proposalStatusMessage = operatorStatusMessage(executionState.reason);
 
   if (!multisigAddress) {
     return (
@@ -841,8 +972,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                               `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
                             );
                             if (singleResponse.ok) {
-                              setLoadedDraft((await singleResponse.json()) as SingleDraft);
-                              void checkOnChainStatus(d.transactionIndex);
+                              const draft = (await singleResponse.json()) as SingleDraft;
+                              setLoadedDraft(draft);
+                              void checkOnChainStatus(d.transactionIndex, draft);
                               return;
                             }
                             const payrollResponse = await fetch(
@@ -854,7 +986,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                               setExecutionSteps(
                                 draft.recipients.map((_, i) => ({ index: i, status: "pending" })),
                               );
-                              void checkOnChainStatus(d.transactionIndex);
+                              void checkOnChainStatus(d.transactionIndex, draft);
                               return;
                             }
                             setError(
@@ -1086,6 +1218,13 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             <section className="rounded-md border border-emerald-900 bg-emerald-950 p-3">
               <p className="text-sm font-medium text-emerald-200">License consumed</p>
               <p className="mt-2 break-all font-mono text-xs text-emerald-100">{signature}</p>
+            </section>
+          ) : null}
+
+          {withdrawSignature ? (
+            <section className="rounded-md border border-teal-900 bg-teal-950 p-3">
+              <p className="text-sm font-medium text-teal-200">Transfer delivered</p>
+              <p className="mt-2 break-all font-mono text-xs text-teal-100">{withdrawSignature}</p>
             </section>
           ) : null}
         </div>

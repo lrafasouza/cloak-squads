@@ -151,21 +151,23 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
   const confirmRevoke = async (linkId: string) => {
     setShowRevokeConfirm(null);
 
-    if (!wallet.publicKey || !wallet.signMessage) {
+    const publicKey = wallet.publicKey;
+    const signMessage = wallet.signMessage;
+    if (!publicKey || !signMessage) {
       setRevokeError("Connect a wallet with message signing support.");
       return;
     }
 
     try {
-      const message = `revoke-audit-link:${linkId}:${wallet.publicKey.toBase58()}`;
+      const message = `revoke-audit-link:${linkId}:${publicKey.toBase58()}`;
       const messageBytes = new TextEncoder().encode(message);
-      const signature = await wallet.signMessage(messageBytes);
+      const signature = await signMessage(messageBytes);
 
       const res = await fetch(`/api/audit/${linkId}/revoke`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          issuedBy: wallet.publicKey.toBase58(),
+          issuedBy: publicKey.toBase58(),
           signature: Buffer.from(signature).toString("base64"),
         }),
       });
