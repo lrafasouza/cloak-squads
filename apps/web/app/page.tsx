@@ -1,17 +1,11 @@
 "use client";
 
-import { CreateMultisigCard } from "@/components/create-multisig/CreateMultisigCard";
 import { FAQ } from "@/components/landing/FAQ";
 import { HeroDiagram } from "@/components/landing/HeroDiagram";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { Eyebrow } from "@/components/ui/aegis";
 import { StaggerContainer, StaggerItem } from "@/components/ui/animations";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/toast-provider";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
 import { motion } from "framer-motion";
 import {
   Eye,
@@ -26,28 +20,6 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-
-/* ── Redirect ?multisig= param ── */
-function useRedirectParam() {
-  const [redirected, setRedirected] = useState(false);
-  const router = useRouter();
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const target = url.searchParams.get("multisig");
-    if (target) {
-      try {
-        new PublicKey(target);
-        router.replace(`/cofre/${target}`);
-        setRedirected(true);
-      } catch {
-        /* ignore invalid pubkey */
-      }
-    }
-  }, [router]);
-  return redirected;
-}
 
 /* ── Trust bar ── */
 const trustItems = [
@@ -149,35 +121,6 @@ function FeatureCard({
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export default function HomePage() {
-  const redirected = useRedirectParam();
-  const wallet = useWallet();
-  const { addToast } = useToast();
-  const router = useRouter();
-
-  const [multisigInput, setMultisigInput] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [inputError, setInputError] = useState<string | null>(null);
-
-  if (redirected) return null;
-
-  function onOpenMultisig(e: React.FormEvent) {
-    e.preventDefault();
-    setInputError(null);
-    const trimmed = multisigInput.trim();
-    if (!trimmed) return;
-
-    setIsSubmitting(true);
-    try {
-      const pk = new PublicKey(trimmed);
-      addToast("Opening vault...", "info", 2000);
-      router.push(`/cofre/${pk.toBase58()}`);
-    } catch {
-      setInputError("Invalid Solana address");
-      addToast("Invalid Solana address", "error");
-      setIsSubmitting(false);
-    }
-  }
-
   return (
     <div className="relative min-h-screen bg-bg text-ink">
       {/* Background */}
@@ -218,48 +161,24 @@ export default function HomePage() {
             </StaggerItem>
 
             <StaggerItem>
-              <div className="mx-auto mt-10 max-w-xl">
-                <form
-                  onSubmit={onOpenMultisig}
-                  className="flex flex-col gap-3 sm:flex-row sm:items-start"
+              <div className="mx-auto mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+                <Link
+                  href="/vault"
+                  className="inline-flex items-center justify-center rounded-md bg-accent px-6 py-3 text-base font-semibold text-accent-ink transition-colors hover:bg-accent-hover shadow-raise-1"
                 >
-                  <div className="flex-1">
-                    <Input
-                      id="hero-input"
-                      type="text"
-                      placeholder="Enter Squads multisig address..."
-                      value={multisigInput}
-                      onChange={(e) => {
-                        setMultisigInput(e.target.value);
-                        setInputError(null);
-                      }}
-                      className="h-12 font-mono"
-                    />
-                    {inputError && (
-                      <p className="mt-2 text-left text-sm text-signal-danger">{inputError}</p>
-                    )}
-                  </div>
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting || !multisigInput.trim()}
-                    isLoading={isSubmitting}
-                    size="lg"
-                    className="shrink-0"
-                  >
-                    Open Vault
-                  </Button>
-                </form>
-                <p className="mt-3 text-xs text-ink-subtle">
-                  Or{" "}
-                  <Link
-                    href="#create"
-                    className="text-accent hover:text-accent-hover underline underline-offset-2"
-                  >
-                    create a new multisig
-                  </Link>{" "}
-                  to get started.
-                </p>
+                  Open Vault
+                </Link>
+                <Link
+                  href="/vault"
+                  className="inline-flex items-center justify-center rounded-md border border-border-strong px-6 py-3 text-base font-semibold text-ink transition-colors hover:bg-surface-2"
+                >
+                  Create Vault
+                </Link>
               </div>
+              <p className="mt-4 text-sm text-ink-subtle">
+                Free to use on{" "}
+                <span className="text-accent">Solana Devnet</span>.
+              </p>
             </StaggerItem>
           </StaggerContainer>
 
@@ -418,74 +337,6 @@ export default function HomePage() {
             </h2>
           </div>
           <FAQ />
-        </div>
-      </section>
-
-      {/* ═══════════ CTA ═══════════ */}
-      <section id="create" className="relative z-10 border-t border-border">
-        <div className="mx-auto max-w-7xl px-4 py-20 md:px-6 md:py-28">
-          <StaggerContainer staggerDelay={0.1}>
-            <StaggerItem>
-              <div className="mx-auto max-w-4xl">
-                <div className="mb-10 text-center">
-                  <h2 className="font-display text-display-sm font-bold text-ink">
-                    Ready to go private?
-                  </h2>
-                  <p className="mt-4 text-ink-muted">
-                    Connect your wallet and open an existing Squads multisig, or create a new one in
-                    seconds.
-                  </p>
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-[0.9fr_1.1fr] md:items-start">
-                  <div className="rounded-xl border border-border bg-surface/80 p-6 shadow-raise-1 backdrop-blur-sm">
-                    <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft">
-                      <Send className="h-5 w-5 text-accent" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-ink">
-                      Open an existing multisig
-                    </h3>
-                    <p className="mt-2 text-sm text-ink-subtle">
-                      Jump back to the address field and open any Squads multisig PDA.
-                    </p>
-                    <Button
-                      size="lg"
-                      variant="default"
-                      className="mt-6 w-full"
-                      onClick={() => {
-                        const el = document.getElementById("hero-input");
-                        el?.scrollIntoView({ behavior: "smooth", block: "center" });
-                        el?.focus({ preventScroll: true });
-                      }}
-                    >
-                      <Send className="h-5 w-5 mr-2" />
-                      Open a Vault
-                    </Button>
-
-                    {!wallet.connected && (
-                      <p className="mt-4 text-xs text-ink-subtle">
-                        You&apos;ll need a Solana wallet to interact with Aegis.
-                      </p>
-                    )}
-                  </div>
-
-                  <CreateMultisigCard
-                    onCreated={(multisigPda) => router.push(`/cofre/${multisigPda}`)}
-                  />
-                </div>
-
-                <div className="mt-8 flex justify-center">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-                  >
-                    Back to top
-                  </Button>
-                </div>
-              </div>
-            </StaggerItem>
-          </StaggerContainer>
         </div>
       </section>
 
