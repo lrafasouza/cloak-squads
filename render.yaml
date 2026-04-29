@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: aegis-web
+    runtime: node
+    plan: starter
+    buildCommand: |
+      npm install -g pnpm@9.12.0
+      pnpm install --frozen-lockfile
+      pnpm -F @cloak-squads/core build
+      cd apps/web && pnpm prisma generate && pnpm next build
+    startCommand: cd apps/web && npx prisma migrate deploy && pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_SOLANA_CLUSTER
+        value: devnet
+      - key: NEXT_PUBLIC_RPC_URL
+        value: https://api.devnet.solana.com
+      - key: NEXT_PUBLIC_CLOAK_PROGRAM_ID
+        value: Zc1kHfp4rajSMeASFDwFFgkHRjv7dFQuLheJoQus27h
+      - key: NEXT_PUBLIC_CLOAK_RELAY_URL
+        value: https://api.devnet.cloak.ag
+      - key: NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID
+        value: AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq
+      - key: NEXT_PUBLIC_SQUADS_PROGRAM_ID
+        value: SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aegis-db
+          property: connectionString
+      - key: JWT_SIGNING_SECRET
+        generateValue: true
+
+databases:
+  - name: aegis-db
+    plan: starter
+    databaseName: aegis
+    user: aegis

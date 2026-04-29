@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
+  output: "standalone",
   transpilePackages: ["@cloak-squads/core"],
   experimental: {
     // Reduz workers baseado em memória disponível

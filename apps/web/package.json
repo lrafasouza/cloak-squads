@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "prisma": "DATABASE_URL=file:./dev.db prisma",
+    "build": "prisma generate && next build",
+    "start": "node .next/standalone/server.js",
+    "postinstall": "prisma generate",
+    "prisma": "prisma",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit"
   },
