@@ -1,6 +1,6 @@
+import { solToLamports } from "@/lib/sol";
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
-import { solToLamports } from "@/lib/sol";
 
 const MAX_U64 = "18446744073709551615";
 
@@ -18,26 +18,35 @@ export const payrollRecipientSchema = z.object({
   wallet: z.string().refine(isValidSolanaAddress, {
     message: "Invalid Solana wallet address",
   }),
-  amount: z.string().regex(/^\d+(\.\d+)?$/, "Amount must be a number in SOL (e.g. 2 or 0.5)").refine(
-    (val) => {
-      try {
-        const lamports = BigInt(solToLamports(val));
-        return lamports > 0n && lamports <= BigInt(MAX_U64);
-      } catch {
-        return false;
-      }
-    },
-    { message: "Amount must be greater than 0 and fit in u64" },
-  ),
+  amount: z
+    .string()
+    .regex(/^\d+(\.\d+)?$/, "Amount must be a number in SOL (e.g. 2 or 0.5)")
+    .refine(
+      (val) => {
+        try {
+          const lamports = BigInt(solToLamports(val));
+          return lamports > 0n && lamports <= BigInt(MAX_U64);
+        } catch {
+          return false;
+        }
+      },
+      { message: "Amount must be greater than 0 and fit in u64" },
+    ),
   memo: z.string().max(200).optional(),
 });
 
-export const payrollCsvSchema = z.array(payrollRecipientSchema).min(1, "At least one recipient is required").max(10, "Maximum 10 recipients allowed in V1");
+export const payrollCsvSchema = z
+  .array(payrollRecipientSchema)
+  .min(1, "At least one recipient is required")
+  .max(10, "Maximum 10 recipients allowed in V1");
 
 export type PayrollRecipientInput = z.infer<typeof payrollRecipientSchema>;
 export type PayrollCsvInput = z.infer<typeof payrollCsvSchema>;
 
-export function parsePayrollCsv(csvText: string): { data: PayrollRecipientInput[] | null; errors: string[] } {
+export function parsePayrollCsv(csvText: string): {
+  data: PayrollRecipientInput[] | null;
+  errors: string[];
+} {
   const lines = csvText
     .split("\n")
     .map((line) => line.trim())
@@ -48,8 +57,11 @@ export function parsePayrollCsv(csvText: string): { data: PayrollRecipientInput[
   }
 
   // Check if first line is a header
-  const firstLine = lines[0]!;
-  const hasHeader = firstLine.toLowerCase().includes("name") || firstLine.toLowerCase().includes("wallet") || firstLine.toLowerCase().includes("amount");
+  const firstLine = lines[0] ?? "";
+  const hasHeader =
+    firstLine.toLowerCase().includes("name") ||
+    firstLine.toLowerCase().includes("wallet") ||
+    firstLine.toLowerCase().includes("amount");
   const dataLines = hasHeader ? lines.slice(1) : lines;
 
   if (dataLines.length === 0) {
@@ -60,7 +72,7 @@ export function parsePayrollCsv(csvText: string): { data: PayrollRecipientInput[
   const errors: string[] = [];
 
   for (let i = 0; i < dataLines.length; i++) {
-    const line = dataLines[i]!;
+    const line = dataLines[i] ?? "";
     const rowNum = hasHeader ? i + 2 : i + 1;
 
     // Try comma-separated first, then semicolon
@@ -70,7 +82,9 @@ export function parsePayrollCsv(csvText: string): { data: PayrollRecipientInput[
     }
 
     if (parts.length < 3) {
-      errors.push(`Row ${rowNum}: Expected at least 3 columns (name, wallet, amount), got ${parts.length}`);
+      errors.push(
+        `Row ${rowNum}: Expected at least 3 columns (name, wallet, amount), got ${parts.length}`,
+      );
       continue;
     }
 
@@ -78,9 +92,7 @@ export function parsePayrollCsv(csvText: string): { data: PayrollRecipientInput[
     const parsed = payrollRecipientSchema.safeParse({ name, wallet, amount, memo });
 
     if (!parsed.success) {
-      const errorMessages = Object.values(parsed.error.flatten().fieldErrors)
-        .flat()
-        .join("; ");
+      const errorMessages = Object.values(parsed.error.flatten().fieldErrors).flat().join("; ");
       errors.push(`Row ${rowNum}: ${errorMessages}`);
       continue;
     }
@@ -108,7 +120,9 @@ export function parsePayrollCsv(csvText: string): { data: PayrollRecipientInput[
   }
 
   if (recipients.length > 10) {
-    errors.push(`Maximum 10 recipients allowed in V1. Found ${recipients.length}. Only the first 10 will be used.`);
+    errors.push(
+      `Maximum 10 recipients allowed in V1. Found ${recipients.length}. Only the first 10 will be used.`,
+    );
     return { data: recipients.slice(0, 10), errors };
   }
 

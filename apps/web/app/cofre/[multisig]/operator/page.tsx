@@ -8,14 +8,14 @@ import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
+import { lamportsToSol } from "@/lib/sol";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
 import {
+  type OperatorProposalStatus,
   canRunOperatorExecution,
   operatorProposalStatusMessage,
-  type OperatorProposalStatus,
 } from "@cloak-squads/core/operator-readiness";
 import { cofrePda } from "@cloak-squads/core/pda";
-import * as squadsMultisig from "@sqds/multisig";
 import {
   CLOAK_PROGRAM_ID,
   NATIVE_SOL_MINT,
@@ -26,11 +26,25 @@ import {
 } from "@cloak.dev/sdk-devnet";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { ComputeBudgetProgram, PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
+import {
+  ComputeBudgetProgram,
+  PublicKey,
+  Transaction,
+  type VersionedTransaction,
+} from "@solana/web3.js";
+import * as squadsMultisig from "@sqds/multisig";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { type FormEvent, Suspense, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { lamportsToSol } from "@/lib/sol";
+import {
+  type FormEvent,
+  Suspense,
+  use,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 type DraftSummary = {
   id: string;
@@ -100,7 +114,10 @@ function cloakDepositCacheKey(multisig: string, transactionIndex: string) {
   return `cloak-deposit:${multisig}:${transactionIndex}`;
 }
 
-function readCloakDepositCache(multisig: string, transactionIndex: string): CloakDepositCache | null {
+function readCloakDepositCache(
+  multisig: string,
+  transactionIndex: string,
+): CloakDepositCache | null {
   try {
     const raw = sessionStorage.getItem(cloakDepositCacheKey(multisig, transactionIndex));
     return raw ? (JSON.parse(raw) as CloakDepositCache) : null;
@@ -109,7 +126,11 @@ function readCloakDepositCache(multisig: string, transactionIndex: string): Cloa
   }
 }
 
-function writeCloakDepositCache(multisig: string, transactionIndex: string, value: CloakDepositCache) {
+function writeCloakDepositCache(
+  multisig: string,
+  transactionIndex: string,
+  value: CloakDepositCache,
+) {
   try {
     sessionStorage.setItem(cloakDepositCacheKey(multisig, transactionIndex), JSON.stringify(value));
   } catch {
@@ -273,8 +294,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     const proposalParam = searchParams.get("proposal");
     if (!proposalParam || txIndex !== proposalParam) return;
     void loadDraft();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txIndex]);
+  }, [txIndex, searchParams]);
 
   // Fetch pending proposal drafts for the list
   const fetchPendingDrafts = useCallback(async () => {
@@ -285,7 +305,10 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         fetch(`/api/payrolls/${encodeURIComponent(multisig)}`),
       ]);
       const singleDrafts: DraftSummary[] = singleRes.ok
-        ? ((await singleRes.json()) as DraftSummary[]).map((d) => ({ ...d, type: "single" as const }))
+        ? ((await singleRes.json()) as DraftSummary[]).map((d) => ({
+            ...d,
+            type: "single" as const,
+          }))
         : [];
       const payrollDrafts: DraftSummary[] = payrollRes.ok
         ? ((await payrollRes.json()) as DraftSummary[]).map((d) => ({
@@ -363,7 +386,10 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         multisigPda: multisigAddress,
         transactionIndex: BigInt(txIndex),
       });
-      const proposal = await squadsMultisig.accounts.Proposal.fromAccountAddress(connection, proposalPda);
+      const proposal = await squadsMultisig.accounts.Proposal.fromAccountAddress(
+        connection,
+        proposalPda,
+      );
       const status = (proposal.status as { __kind?: string })?.__kind?.toLowerCase();
       if (status === "approved") {
         setDraftOnChainStatus("approved");
@@ -395,12 +421,18 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       }
       try {
         const cachedDeposit = readCloakDepositCache(multisigAddress.toBase58(), txIndex);
-        const cloakResult = cachedDeposit ?? await cloakDepositBrowser(
+        const cloakResult =
+          cachedDeposit ??
+          (await cloakDepositBrowser(
             connection,
-            { publicKey: wallet.publicKey, signTransaction: wallet.signTransaction, ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}) },
+            {
+              publicKey: wallet.publicKey,
+              signTransaction: wallet.signTransaction,
+              ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
+            },
             amount,
             tokenMint,
-          );
+          ));
         cloakSig = cloakResult.signature;
         setCloakSignature(cloakSig);
         if (!cachedDeposit) {
@@ -613,8 +645,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
   const successCount = executionSteps.filter((s) => s.status === "success").length;
   const isPayroll = payrollDraft !== null;
-  const lowOperatorSol =
-    operatorBalanceLamports !== null && operatorBalanceLamports < 10_000_000;
+  const lowOperatorSol = operatorBalanceLamports !== null && operatorBalanceLamports < 10_000_000;
   const canExecute =
     !pending &&
     !!(loadedDraft || payrollDraft) &&
@@ -705,23 +736,33 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             <section className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
               <p className="font-semibold">Cofre is not initialized yet.</p>
               <p className="mt-1">
-                Create, approve, and execute the bootstrap Squads proposal before using the operator flow.
+                Create, approve, and execute the bootstrap Squads proposal before using the operator
+                flow.
               </p>
             </section>
           ) : null}
 
           {pendingDrafts.length > 0 && (
             <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-              <h2 className="mb-3 text-base font-semibold text-neutral-50">Proposals ready to execute</h2>
+              <h2 className="mb-3 text-base font-semibold text-neutral-50">
+                Proposals ready to execute
+              </h2>
               <ul className="grid gap-2">
                 {pendingDrafts.map((d) => (
-                  <li key={d.id} className="flex items-center justify-between gap-3 rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm">
+                  <li
+                    key={d.id}
+                    className="flex items-center justify-between gap-3 rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm"
+                  >
                     <div className="min-w-0">
                       <span className="font-mono text-neutral-100">#{d.transactionIndex}</span>
                       {d.type === "payroll" ? (
-                        <span className="ml-2 rounded bg-emerald-900 px-1.5 py-0.5 text-xs text-emerald-200">payroll</span>
+                        <span className="ml-2 rounded bg-emerald-900 px-1.5 py-0.5 text-xs text-emerald-200">
+                          payroll
+                        </span>
                       ) : (
-                        <span className="ml-2 rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-300">single</span>
+                        <span className="ml-2 rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-300">
+                          single
+                        </span>
                       )}
                       <p className="mt-0.5 truncate text-xs text-neutral-400">
                         {d.type === "payroll"
@@ -756,13 +797,21 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                             if (payrollResponse.ok) {
                               const draft = (await payrollResponse.json()) as PayrollDraft;
                               setPayrollDraft(draft);
-                              setExecutionSteps(draft.recipients.map((_, i) => ({ index: i, status: "pending" })));
+                              setExecutionSteps(
+                                draft.recipients.map((_, i) => ({ index: i, status: "pending" })),
+                              );
                               void checkOnChainStatus(d.transactionIndex);
                               return;
                             }
-                            setError(`No persisted draft found for proposal #${d.transactionIndex}.`);
+                            setError(
+                              `No persisted draft found for proposal #${d.transactionIndex}.`,
+                            );
                           } catch (caught) {
-                            setError(caught instanceof Error ? caught.message : "Could not load proposal draft.");
+                            setError(
+                              caught instanceof Error
+                                ? caught.message
+                                : "Could not load proposal draft.",
+                            );
                           }
                         })();
                       }}
@@ -809,7 +858,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               <dl className="grid gap-2 text-sm">
                 <div>
                   <dt className="text-neutral-400">Amount</dt>
-                  <dd className="font-mono text-neutral-100">{lamportsToSol(loadedDraft.amount)} SOL</dd>
+                  <dd className="font-mono text-neutral-100">
+                    {lamportsToSol(loadedDraft.amount)} SOL
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-neutral-400">Recipient</dt>
@@ -930,12 +981,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 </span>
               ) : null}
             </p>
-            <Button
-              type="submit"
-              disabled={
-                !canExecute
-              }
-            >
+            <Button type="submit" disabled={!canExecute}>
               {pending
                 ? isPayroll
                   ? "Executing batch…"
@@ -945,7 +991,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   : "Execute with license"}
             </Button>
             {!wallet.publicKey ? (
-              <p className="mt-2 text-xs text-amber-300">Connect the registered operator wallet first.</p>
+              <p className="mt-2 text-xs text-amber-300">
+                Connect the registered operator wallet first.
+              </p>
             ) : null}
             {operatorMismatch && wallet.publicKey ? (
               <p className="mt-2 text-xs text-amber-300">

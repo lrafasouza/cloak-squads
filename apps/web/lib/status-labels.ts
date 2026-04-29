@@ -42,13 +42,16 @@ export function statusLabel(status: StatusKind | string): { label: string; color
       return { label: "Não encontrada", color: "text-red-200" };
     case "loading":
       return { label: "Carregando...", color: "text-neutral-400" };
-    case "unknown":
     default:
       return { label: "Desconhecido", color: "text-neutral-400" };
   }
 }
 
-export function statusBadge(status: StatusKind | string): { label: string; bg: string; text: string } {
+export function statusBadge(status: StatusKind | string): {
+  label: string;
+  bg: string;
+  text: string;
+} {
   switch (status) {
     case "active":
       return { label: "Pendente", bg: "bg-amber-900", text: "text-amber-200" };
@@ -76,7 +79,6 @@ export function statusBadge(status: StatusKind | string): { label: string; bg: s
       return { label: "Não encontrada", bg: "bg-red-900", text: "text-red-200" };
     case "loading":
       return { label: "Carregando", bg: "bg-neutral-800", text: "text-neutral-400" };
-    case "unknown":
     default:
       return { label: "Desconhecido", bg: "bg-neutral-800", text: "text-neutral-400" };
   }

@@ -11,6 +11,7 @@ export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
     <>
       {Array.from({ length: count }).map((_, i) => (
         <div
+          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholders have no identity — index is the only stable key
           key={i}
           ref={i === 0 ? ref : undefined}
           className={cn("animate-pulse rounded-md bg-neutral-800", className)}
@@ -18,7 +19,7 @@ export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
         />
       ))}
     </>
-  )
+  ),
 );
 Skeleton.displayName = "Skeleton";
 
@@ -46,13 +47,13 @@ export function SkeletonDashboard() {
         </div>
         <Skeleton className="h-10 w-32" />
       </div>
-      
+
       <div className="grid gap-4 md:grid-cols-3">
         <SkeletonCard />
         <SkeletonCard />
         <SkeletonCard />
       </div>
-      
+
       <div className="grid gap-4 lg:grid-cols-2">
         <SkeletonCard />
         <SkeletonCard />
@@ -80,6 +81,7 @@ export const Spinner = forwardRef<HTMLDivElement, SpinnerProps>(
         {...props}
       >
         <svg
+          aria-hidden="true"
           className={cn("animate-spin text-emerald-400", sizes[size])}
           fill="none"
           viewBox="0 0 24 24"
@@ -100,6 +102,6 @@ export const Spinner = forwardRef<HTMLDivElement, SpinnerProps>(
         </svg>
       </div>
     );
-  }
+  },
 );
 Spinner.displayName = "Spinner";

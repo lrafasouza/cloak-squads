@@ -1,6 +1,6 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
-export type ProposalDraftRow = Prisma.ProposalDraftGetPayload<{}>;
+export type ProposalDraftRow = Prisma.ProposalDraftGetPayload<Record<string, never>>;
 
 export function serializeDraft(draft: ProposalDraftRow) {
   return {

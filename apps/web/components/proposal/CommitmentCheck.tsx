@@ -1,10 +1,14 @@
 "use client";
 
-import { commitmentsEqual, recomputeCommitment, type CommitmentClaim } from "@cloak-squads/core/commitment";
-import { PublicKey } from "@solana/web3.js";
-import { useEffect, useMemo, useState } from "react";
 import { ensureCommitmentFn } from "@/lib/init-commitment";
 import { cn } from "@/lib/utils";
+import {
+  type CommitmentClaim,
+  commitmentsEqual,
+  recomputeCommitment,
+} from "@cloak-squads/core/commitment";
+import { PublicKey } from "@solana/web3.js";
+import { useEffect, useMemo, useState } from "react";
 
 export type CommitmentCheckState = "checking" | "match" | "mismatch" | "unavailable";
 
@@ -33,7 +37,8 @@ export function CommitmentCheck({
         if (!cancelled) setComputed(value);
       })
       .catch((caught: unknown) => {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : "Commitment check failed");
+        if (!cancelled)
+          setError(caught instanceof Error ? caught.message : "Commitment check failed");
       });
     return () => {
       cancelled = true;
@@ -76,7 +81,9 @@ export function CommitmentCheck({
       <dl className="mt-4 grid gap-3 text-sm">
         <div>
           <dt className="text-neutral-400">On-chain</dt>
-          <dd className="mt-1 font-mono text-neutral-100">{truncateBase58(claim.onChainCommitment)}</dd>
+          <dd className="mt-1 font-mono text-neutral-100">
+            {truncateBase58(claim.onChainCommitment)}
+          </dd>
         </div>
         <div>
           <dt className="text-neutral-400">Local recompute</dt>
@@ -87,9 +94,8 @@ export function CommitmentCheck({
       </dl>
       {state === "unavailable" ? (
         <p className="mt-4 text-sm text-amber-200">
-          Local commitment recompute failed. The on-chain payload hash is enforced by the
-          gatekeeper program — you can still vote, but commitment verification is a
-          defense-in-depth check.
+          Local commitment recompute failed. The on-chain payload hash is enforced by the gatekeeper
+          program — you can still vote, but commitment verification is a defense-in-depth check.
           {error ? (
             <span className="mt-1 block text-xs text-amber-300/80">Detail: {error}</span>
           ) : null}

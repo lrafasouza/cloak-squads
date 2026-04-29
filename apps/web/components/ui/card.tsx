@@ -1,10 +1,14 @@
+import { cn } from "@/lib/utils";
 import type { HTMLAttributes } from "react";
 import { forwardRef } from "react";
-import { cn } from "@/lib/utils";
 
 export const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("rounded-lg border border-neutral-800 bg-neutral-900", className)} {...props} />
+    <div
+      ref={ref}
+      className={cn("rounded-lg border border-neutral-800 bg-neutral-900", className)}
+      {...props}
+    />
   ),
 );
 Card.displayName = "Card";
@@ -23,11 +27,12 @@ export const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadi
 );
 CardTitle.displayName = "CardTitle";
 
-export const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
-  ({ className, ...props }, ref) => (
-    <p ref={ref} className={cn("mt-1 text-sm text-neutral-400", className)} {...props} />
-  ),
-);
+export const CardDescription = forwardRef<
+  HTMLParagraphElement,
+  HTMLAttributes<HTMLParagraphElement>
+>(({ className, ...props }, ref) => (
+  <p ref={ref} className={cn("mt-1 text-sm text-neutral-400", className)} {...props} />
+));
 CardDescription.displayName = "CardDescription";
 
 export const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(

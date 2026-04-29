@@ -1,10 +1,10 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { proposalApprove, proposalReject } from "@/lib/squads-sdk";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { proposalApprove, proposalReject } from "@/lib/squads-sdk";
 
 export function ApprovalButtons({
   multisig,
@@ -33,7 +33,8 @@ export function ApprovalButtons({
         transactionIndex: BigInt(transactionIndex),
         memo: kind === "approve" ? "Cloak Squads F1 approved" : "Cloak Squads F1 rejected",
       };
-      const signature = kind === "approve" ? await proposalApprove(params) : await proposalReject(params);
+      const signature =
+        kind === "approve" ? await proposalApprove(params) : await proposalReject(params);
       onSubmitted?.(signature, kind);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not submit vote");
@@ -45,7 +46,11 @@ export function ApprovalButtons({
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Button type="button" disabled={disabled || pending !== null} onClick={() => submit("approve")}>
+        <Button
+          type="button"
+          disabled={disabled || pending !== null}
+          onClick={() => submit("approve")}
+        >
           {pending === "approve" ? "Approving..." : "Approve"}
         </Button>
         <Button

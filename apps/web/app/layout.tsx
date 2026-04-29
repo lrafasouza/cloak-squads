@@ -2,9 +2,9 @@ import type { ReactNode } from "react";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import "./globals.css";
 import { QueryProvider } from "@/components/QueryProvider";
-import { WalletProviders } from "@/components/wallet/WalletProviders";
-import { ToastProvider } from "@/components/ui/toast-provider";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { ToastProvider } from "@/components/ui/toast-provider";
+import { WalletProviders } from "@/components/wallet/WalletProviders";
 
 export const metadata = {
   title: "Cloak Squads",

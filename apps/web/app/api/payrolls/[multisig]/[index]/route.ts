@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { PublicKey } from "@solana/web3.js";
 import { prisma } from "@/lib/prisma";
+import { PublicKey } from "@solana/web3.js";
+import { NextResponse } from "next/server";
 
 export async function GET(
   _request: Request,
@@ -40,19 +40,19 @@ export async function GET(
       recipients: draft.recipients.map((r) => {
         let invariants: unknown;
         let commitmentClaim: unknown;
-        
+
         try {
           invariants = JSON.parse(r.invariants);
         } catch {
           invariants = null;
         }
-        
+
         try {
           commitmentClaim = r.commitmentClaim !== null ? JSON.parse(r.commitmentClaim) : undefined;
         } catch {
           commitmentClaim = undefined;
         }
-        
+
         return {
           id: r.id,
           name: r.name,

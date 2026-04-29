@@ -36,12 +36,12 @@ export function AnimatedCard({ children, className, delay = 0 }: AnimatedContain
   );
 }
 
-export function StaggerContainer({ 
-  children, 
+export function StaggerContainer({
+  children,
   className,
-  staggerDelay = 0.1 
-}: { 
-  children: ReactNode; 
+  staggerDelay = 0.1,
+}: {
+  children: ReactNode;
   className?: string;
   staggerDelay?: number;
 }) {

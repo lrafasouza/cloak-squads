@@ -22,10 +22,9 @@ const stealthInvoiceCreateSchema = z.object({
   ),
   invoiceRef: z.string().min(1).max(64).optional(),
   memo: z.string().max(256).optional(),
-  amount: z.string().refine(
-    (val) => /^[0-9]+$/.test(val) && BigInt(val) > 0n,
-    { message: "Amount must be a positive integer in lamports (backend unit)" },
-  ),
+  amount: z.string().refine((val) => /^[0-9]+$/.test(val) && BigInt(val) > 0n, {
+    message: "Amount must be a positive integer in lamports (backend unit)",
+  }),
   recipientWallet: z.string().refine(
     (val) => {
       try {
@@ -76,7 +75,7 @@ export async function POST(request: Request) {
     const stealthPubkey = bs58.encode(stealthKp.publicKey);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-      const invoice = await prisma.stealthInvoice.create({
+    const invoice = await prisma.stealthInvoice.create({
       data: {
         cofreAddress,
         recipientWallet,

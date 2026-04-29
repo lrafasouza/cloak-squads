@@ -1,6 +1,8 @@
 "use client";
 
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { buildRevokeAuditIxBrowser } from "@/lib/gatekeeper-instructions";
+import { createIssueLicenseProposal } from "@/lib/squads-sdk";
 import {
   type AuditScope,
   base64urlEncode,
@@ -12,8 +14,6 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
-import { buildRevokeAuditIxBrowser } from "@/lib/gatekeeper-instructions";
-import { createIssueLicenseProposal } from "@/lib/squads-sdk";
 
 type AuditLinkSummary = {
   id: string;
@@ -151,6 +151,11 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
   const confirmRevoke = async (linkId: string) => {
     setShowRevokeConfirm(null);
 
+    if (!wallet.publicKey || !wallet.signMessage) {
+      setRevokeError("Connect a wallet with message signing support.");
+      return;
+    }
+
     try {
       const message = `revoke-audit-link:${linkId}:${wallet.publicKey.toBase58()}`;
       const messageBytes = new TextEncoder().encode(message);
@@ -194,7 +199,9 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
         memo: `revoke audit: ${linkId}`,
       });
 
-      setRevokeSuccess(`Revocation proposal created! Transaction index: ${result.transactionIndex.toString()}`);
+      setRevokeSuccess(
+        `Revocation proposal created! Transaction index: ${result.transactionIndex.toString()}`,
+      );
       void loadLinks();
     } catch (err) {
       console.error("Failed to revoke link:", err);
@@ -206,13 +213,12 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
     // Generate deterministic mock data based on linkId
     const scopeParams = link.scopeParams ? JSON.parse(link.scopeParams) : undefined;
     const mockData = generateDeterministicMockData(link.id, 8);
-    
+
     // Filter by scope (time_ranged only; full/amounts_only pass through)
     let filtered = mockData;
     if (link.scope === "time_ranged" && scopeParams?.startDate && scopeParams?.endDate) {
       filtered = mockData.filter(
-        (tx) =>
-          tx.timestamp >= scopeParams.startDate && tx.timestamp <= scopeParams.endDate,
+        (tx) => tx.timestamp >= scopeParams.startDate && tx.timestamp <= scopeParams.endDate,
       );
     }
     if (link.scope === "amounts_only") {
@@ -405,7 +411,9 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm text-neutral-100" title={link.id}>{link.id.slice(0, 8)}...{link.id.slice(-4)}</span>
+                        <span className="font-mono text-sm text-neutral-100" title={link.id}>
+                          {link.id.slice(0, 8)}...{link.id.slice(-4)}
+                        </span>
                         <span
                           className={`rounded px-2 py-0.5 text-xs font-medium ${
                             link.scope === "full"
@@ -426,15 +434,20 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                         <p className="mt-1 text-xs text-neutral-500">
                           {(() => {
                             try {
-                              const params = JSON.parse(link.scopeParams) as Record<string, string | number>;
+                              const params = JSON.parse(link.scopeParams) as Record<
+                                string,
+                                string | number
+                              >;
                               const entries = Object.entries(params);
                               if (entries.length === 0) return null;
-                              const formatted = entries.map(([key, value]) => {
-                                if (typeof value === "number" && value > 1000000000) {
-                                  return `${key}: ${new Date(value).toLocaleDateString()}`;
-                                }
-                                return `${key}: ${value}`;
-                              }).join(" · ");
+                              const formatted = entries
+                                .map(([key, value]) => {
+                                  if (typeof value === "number" && value > 1000000000) {
+                                    return `${key}: ${new Date(value).toLocaleDateString()}`;
+                                  }
+                                  return `${key}: ${value}`;
+                                })
+                                .join(" · ");
                               return `Filter: ${formatted}`;
                             } catch {
                               return null;
@@ -476,10 +489,14 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                 This will create a Squads proposal to revoke the audit link on-chain.
               </p>
               {revokeError && (
-                <p className="mt-3 rounded-md border border-red-900 bg-red-950 p-2 text-xs text-red-200">{revokeError}</p>
+                <p className="mt-3 rounded-md border border-red-900 bg-red-950 p-2 text-xs text-red-200">
+                  {revokeError}
+                </p>
               )}
               {revokeSuccess && (
-                <p className="mt-3 rounded-md border border-emerald-900 bg-emerald-950 p-2 text-xs text-emerald-200">{revokeSuccess}</p>
+                <p className="mt-3 rounded-md border border-emerald-900 bg-emerald-950 p-2 text-xs text-emerald-200">
+                  {revokeSuccess}
+                </p>
               )}
               <div className="mt-6 flex gap-3">
                 <button

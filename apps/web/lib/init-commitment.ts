@@ -1,9 +1,5 @@
 import { registerComputeCommitmentFn } from "@cloak-squads/core/commitment";
-import {
-  NATIVE_SOL_MINT,
-  computeUtxoCommitment,
-  createUtxo,
-} from "@cloak.dev/sdk-devnet";
+import { NATIVE_SOL_MINT, computeUtxoCommitment, createUtxo } from "@cloak.dev/sdk-devnet";
 import { PublicKey } from "@solana/web3.js";
 
 let _registered = false;

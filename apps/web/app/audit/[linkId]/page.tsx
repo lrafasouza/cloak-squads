@@ -93,7 +93,9 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
     // Derive view key from secret
     let scopeParams: Record<string, unknown> = {};
     try {
-      scopeParams = metadata.scopeParams ? (JSON.parse(metadata.scopeParams) as Record<string, unknown>) : {};
+      scopeParams = metadata.scopeParams
+        ? (JSON.parse(metadata.scopeParams) as Record<string, unknown>)
+        : {};
     } catch {
       scopeParams = {};
     }
@@ -110,7 +112,11 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
     // For now, show deterministic mock data based on linkId
     const mockData = generateDeterministicMockData(metadata.id, 8);
 
-    const filtered = filterAuditData(mockData, metadata.scope, scopeParams as { startDate: number; endDate: number });
+    const filtered = filterAuditData(
+      mockData,
+      metadata.scope,
+      scopeParams as { startDate: number; endDate: number },
+    );
     setTransactions(filtered);
   }, [metadata, secretKey]);
 

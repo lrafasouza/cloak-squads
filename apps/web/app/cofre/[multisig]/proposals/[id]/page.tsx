@@ -1,19 +1,19 @@
 "use client";
 
+import { ApprovalButtons } from "@/components/proposal/ApprovalButtons";
+import type { CommitmentCheckState } from "@/components/proposal/CommitmentCheck";
+import { ExecuteButton } from "@/components/proposal/ExecuteButton";
+import { AnimatedCard, StaggerContainer, StaggerItem } from "@/components/ui/animations";
+import { useToast } from "@/components/ui/toast-provider";
+import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { lamportsToSol } from "@/lib/sol";
 import type { CommitmentClaim } from "@cloak-squads/core/commitment";
-import { getMemberVote, type MemberVote } from "@cloak-squads/core/proposal-vote";
+import { type MemberVote, getMemberVote } from "@cloak-squads/core/proposal-vote";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
-import { ApprovalButtons } from "@/components/proposal/ApprovalButtons";
-import { type CommitmentCheckState } from "@/components/proposal/CommitmentCheck";
-import { ExecuteButton } from "@/components/proposal/ExecuteButton";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
-import { useToast } from "@/components/ui/toast-provider";
-import { AnimatedCard, StaggerContainer, StaggerItem } from "@/components/ui/animations";
-import { lamportsToSol } from "@/lib/sol";
 
 type ProposalStatusKind =
   | "draft"
@@ -57,8 +57,12 @@ function StatusBadge({ status }: { status: ProposalStatusKind }) {
   };
 
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${styles[status]}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${status === "active" ? "bg-blue-400 animate-pulse" : status === "approved" || status === "executed" ? "bg-emerald-400" : status === "rejected" || status === "cancelled" ? "bg-red-400" : "bg-neutral-400"}`} />
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${styles[status]}`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${status === "active" ? "bg-blue-400 animate-pulse" : status === "approved" || status === "executed" ? "bg-emerald-400" : status === "rejected" || status === "cancelled" ? "bg-red-400" : "bg-neutral-400"}`}
+      />
       {status}
     </span>
   );
@@ -135,7 +139,9 @@ export default function ProposalApprovalPage({
       if (payrollClaims.size > 0) {
         setCommitmentClaims(payrollClaims);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [multisigParam, id]);
 
   useEffect(() => {
@@ -167,16 +173,17 @@ export default function ProposalApprovalPage({
       }
     }
 
-    loadDraft()
-      .catch((error: unknown) => {
-        console.warn("[proposals] could not load draft:", error);
-        if (!cancelled) {
-          setDraft(null);
-          setPayrollDraft(null);
-          setDraftLoading(false);
-        }
-      });
-    return () => { cancelled = true; };
+    loadDraft().catch((error: unknown) => {
+      console.warn("[proposals] could not load draft:", error);
+      if (!cancelled) {
+        setDraft(null);
+        setPayrollDraft(null);
+        setDraftLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [multisigParam, id]);
 
   const refreshStatus = useCallback(async () => {
@@ -193,7 +200,10 @@ export default function ProposalApprovalPage({
 
       if (threshold === null) {
         try {
-          const msAccount = await multisig.accounts.Multisig.fromAccountAddress(connection, multisigPda);
+          const msAccount = await multisig.accounts.Multisig.fromAccountAddress(
+            connection,
+            multisigPda,
+          );
           setThreshold(msAccount.threshold);
         } catch {
           // threshold unavailable
@@ -224,12 +234,15 @@ export default function ProposalApprovalPage({
     (sig: string, kind: "approve" | "reject") => {
       setSignature(sig);
       setMemberVote(kind === "approve" ? "approved" : "rejected");
-      addToast(kind === "approve" ? "Vote approved!" : "Vote rejected", kind === "approve" ? "success" : "info");
+      addToast(
+        kind === "approve" ? "Vote approved!" : "Vote rejected",
+        kind === "approve" ? "success" : "info",
+      );
       setTimeout(() => void refreshStatus(), 1500);
     },
     [refreshStatus, addToast],
   );
-  
+
   const onExecuteSubmitted = useCallback(
     (sig: string) => {
       setExecuteSignature(sig);
@@ -240,8 +253,7 @@ export default function ProposalApprovalPage({
   );
 
   const approveBlocked =
-    (commitmentClaim !== null && commitmentState === "mismatch") ||
-    status !== "active";
+    (commitmentClaim !== null && commitmentState === "mismatch") || status !== "active";
   const executeBlocked = status !== "approved";
   const executeComplete = status === "executed" || executeSignature !== null;
 
@@ -259,9 +271,23 @@ export default function ProposalApprovalPage({
     <main className="min-h-screen bg-gradient-to-b from-neutral-950 via-neutral-950 to-neutral-900">
       <header className="border-b border-neutral-800/50 bg-neutral-950/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link href={`/cofre/${multisigParam}`} className="flex items-center gap-2 text-sm font-semibold text-neutral-100 hover:text-emerald-400 transition-colors">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          <Link
+            href={`/cofre/${multisigParam}`}
+            className="flex items-center gap-2 text-sm font-semibold text-neutral-100 hover:text-emerald-400 transition-colors"
+          >
+            <svg
+              aria-hidden="true"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
             </svg>
             Cofre
           </Link>
@@ -287,14 +313,23 @@ export default function ProposalApprovalPage({
               <div className="mt-4 flex items-start gap-3 rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-4">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-neutral-100 flex items-center gap-2">
-                    <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    <svg
+                      aria-hidden="true"
+                      className="h-4 w-4 text-neutral-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                      />
                     </svg>
                     Share with other signers
                   </p>
-                  <p className="mt-1 break-all font-mono text-xs text-neutral-500">
-                    {proposalUrl}
-                  </p>
+                  <p className="mt-1 break-all font-mono text-xs text-neutral-500">{proposalUrl}</p>
                 </div>
                 <button
                   type="button"
@@ -313,8 +348,19 @@ export default function ProposalApprovalPage({
               {isPayroll ? (
                 <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
                   <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2 mb-4">
-                    <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    <svg
+                      aria-hidden="true"
+                      className="h-4 w-4 text-neutral-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                      />
                     </svg>
                     Payroll batch — {payrollDraft?.recipientCount ?? 0} recipients
                   </h2>
@@ -323,10 +369,18 @@ export default function ProposalApprovalPage({
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-neutral-800 text-left">
-                            <th className="pb-2 pr-4 text-neutral-500 text-xs uppercase tracking-wider">Name</th>
-                            <th className="pb-2 pr-4 text-neutral-500 text-xs uppercase tracking-wider">Wallet</th>
-                            <th className="pb-2 pr-4 text-neutral-500 text-xs uppercase tracking-wider text-right">Amount</th>
-                            <th className="pb-2 text-neutral-500 text-xs uppercase tracking-wider">Memo</th>
+                            <th className="pb-2 pr-4 text-neutral-500 text-xs uppercase tracking-wider">
+                              Name
+                            </th>
+                            <th className="pb-2 pr-4 text-neutral-500 text-xs uppercase tracking-wider">
+                              Wallet
+                            </th>
+                            <th className="pb-2 pr-4 text-neutral-500 text-xs uppercase tracking-wider text-right">
+                              Amount
+                            </th>
+                            <th className="pb-2 text-neutral-500 text-xs uppercase tracking-wider">
+                              Memo
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-800/50">
@@ -345,7 +399,9 @@ export default function ProposalApprovalPage({
                         </tbody>
                         <tfoot>
                           <tr className="border-t border-neutral-700 font-semibold">
-                            <td colSpan={2} className="py-3 pr-4 text-neutral-100">Total</td>
+                            <td colSpan={2} className="py-3 pr-4 text-neutral-100">
+                              Total
+                            </td>
                             <td className="py-3 pr-4 text-right font-mono text-emerald-400">
                               {Number(payrollDraft.totalAmount).toLocaleString()}
                             </td>
@@ -368,8 +424,19 @@ export default function ProposalApprovalPage({
               ) : (
                 <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
                   <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2 mb-4">
-                    <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    <svg
+                      aria-hidden="true"
+                      className="h-4 w-4 text-neutral-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                      />
                     </svg>
                     Transfer claim
                   </h2>
@@ -381,8 +448,12 @@ export default function ProposalApprovalPage({
                         { label: "Memo", value: draft.memo || "None" },
                       ].map((item) => (
                         <div key={item.label} className="group">
-                          <dt className="text-xs font-medium text-neutral-500 uppercase tracking-wider">{item.label}</dt>
-                          <dd className={`mt-1 ${item.isMono ? "break-all font-mono text-xs" : ""} text-neutral-100 bg-neutral-950/50 rounded-lg px-3 py-2 border border-neutral-800/50`}>
+                          <dt className="text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                            {item.label}
+                          </dt>
+                          <dd
+                            className={`mt-1 ${item.isMono ? "break-all font-mono text-xs" : ""} text-neutral-100 bg-neutral-950/50 rounded-lg px-3 py-2 border border-neutral-800/50`}
+                          >
                             {item.value}
                           </dd>
                         </div>
@@ -405,12 +476,25 @@ export default function ProposalApprovalPage({
               <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2">
-                    <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg
+                      aria-hidden="true"
+                      className="h-4 w-4 text-neutral-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
                     </svg>
                     On-chain status
                   </h2>
-                  <StatusBadge status={status === "loading" || status === "missing" ? "unknown" : status} />
+                  <StatusBadge
+                    status={status === "loading" || status === "missing" ? "unknown" : status}
+                  />
                 </div>
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-sm mb-2">
@@ -430,14 +514,14 @@ export default function ProposalApprovalPage({
                 </div>
                 {status === "executed" || status === "cancelled" || status === "rejected" ? (
                   <p className="mt-4 text-sm text-amber-200">
-                    This proposal is closed ({status}). Create a new one from the Send or Payroll page to test
-                    again.
+                    This proposal is closed ({status}). Create a new one from the Send or Payroll
+                    page to test again.
                   </p>
                 ) : null}
                 {status === "missing" ? (
                   <p className="mt-4 text-sm text-amber-200">
-                    No proposal account at this index. The vault transaction may not have been created
-                    yet, or this transactionIndex is wrong.
+                    No proposal account at this index. The vault transaction may not have been
+                    created yet, or this transactionIndex is wrong.
                   </p>
                 ) : null}
               </AnimatedCard>
@@ -445,19 +529,47 @@ export default function ProposalApprovalPage({
               {/* Vote */}
               <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
                 <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2 mb-4">
-                  <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  <svg
+                    aria-hidden="true"
+                    className="h-4 w-4 text-neutral-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                    />
                   </svg>
                   Vote
                 </h2>
                 {memberVote ? (
                   <div className="rounded-lg border border-emerald-900/50 bg-emerald-950/30 p-4">
                     <div className="flex items-center gap-2">
-                      <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <svg
+                        aria-hidden="true"
+                        className="h-5 w-5 text-emerald-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                       <p className="text-sm font-semibold text-emerald-300">
-                        You already {memberVote === "approved" ? "approved" : memberVote === "rejected" ? "rejected" : "cancelled"} this proposal.
+                        You already{" "}
+                        {memberVote === "approved"
+                          ? "approved"
+                          : memberVote === "rejected"
+                            ? "rejected"
+                            : "cancelled"}{" "}
+                        this proposal.
                       </p>
                     </div>
                     <p className="mt-2 text-xs text-emerald-200/80">
@@ -473,31 +585,61 @@ export default function ProposalApprovalPage({
                     onSubmitted={onVoteSubmitted}
                   />
                 )}
-                {signature ? <p className="mt-4 break-all font-mono text-xs text-emerald-400 bg-emerald-950/20 rounded-lg px-3 py-2">{signature}</p> : null}
+                {signature ? (
+                  <p className="mt-4 break-all font-mono text-xs text-emerald-400 bg-emerald-950/20 rounded-lg px-3 py-2">
+                    {signature}
+                  </p>
+                ) : null}
               </AnimatedCard>
 
               {/* Execute */}
               <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
                 <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2 mb-4">
-                  <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <svg
+                    aria-hidden="true"
+                    className="h-4 w-4 text-neutral-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
                   </svg>
                   Execute
                 </h2>
                 {executeComplete ? (
                   <div className="rounded-lg border border-emerald-900/50 bg-emerald-950/30 p-4">
                     <div className="flex items-center gap-2">
-                      <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <svg
+                        aria-hidden="true"
+                        className="h-5 w-5 text-emerald-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
-                      <p className="text-sm font-semibold text-emerald-300">Vault transaction executed.</p>
+                      <p className="text-sm font-semibold text-emerald-300">
+                        Vault transaction executed.
+                      </p>
                     </div>
                     <p className="mt-2 text-xs text-emerald-200/80">
                       The Squads proposal is complete. The operator flow can now use the issued
                       license.
                     </p>
                     {executeSignature ? (
-                      <p className="mt-3 break-all font-mono text-xs text-emerald-400 bg-emerald-950/20 rounded-lg px-3 py-2">{executeSignature}</p>
+                      <p className="mt-3 break-all font-mono text-xs text-emerald-400 bg-emerald-950/20 rounded-lg px-3 py-2">
+                        {executeSignature}
+                      </p>
                     ) : null}
                   </div>
                 ) : (

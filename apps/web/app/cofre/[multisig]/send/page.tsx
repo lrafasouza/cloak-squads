@@ -1,16 +1,16 @@
 "use client";
 
 import { ProofGenerationState, type ProofStepId } from "@/components/proof/ProofGenerationState";
+import { StaggerContainer, StaggerItem } from "@/components/ui/animations";
 import { Button } from "@/components/ui/button";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
-import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useToast } from "@/components/ui/toast-provider";
-import { StaggerContainer, StaggerItem } from "@/components/ui/animations";
+import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
-import { publicEnv } from "@/lib/env";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
@@ -197,7 +197,10 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Link href="/" className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors">
+        <Link
+          href="/"
+          className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+        >
           Back to picker
         </Link>
         <h1 className="mt-6 text-2xl font-semibold text-neutral-50">Invalid multisig address</h1>
@@ -213,8 +216,19 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
             href={`/cofre/${multisigAddress.toBase58()}`}
             className="flex items-center gap-2 text-sm font-semibold text-neutral-100 hover:text-emerald-400 transition-colors"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            <svg
+              aria-hidden="true"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
             </svg>
             Cofre
           </Link>
@@ -227,8 +241,19 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
           <StaggerItem>
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-800/50 bg-emerald-950/30 px-4 py-1.5 mb-3">
-                <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                <svg
+                  aria-hidden="true"
+                  className="h-4 w-4 text-emerald-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                  />
                 </svg>
                 <span className="text-sm font-medium text-emerald-300">F1 private send</span>
               </div>
@@ -295,7 +320,11 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                   </StaggerItem>
 
                   <StaggerItem>
-                    <Button type="submit" disabled={pending || !amount || !recipient} className="w-full">
+                    <Button
+                      type="submit"
+                      disabled={pending || !amount || !recipient}
+                      className="w-full"
+                    >
                       {pending ? "Creating proposal..." : "Create proposal"}
                     </Button>
                   </StaggerItem>
@@ -303,8 +332,19 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
 
                 {error ? (
                   <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3">
-                    <svg className="h-4 w-4 shrink-0 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg
+                      aria-hidden="true"
+                      className="h-4 w-4 shrink-0 text-red-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
                     </svg>
                     <p className="text-sm text-red-300">{error}</p>
                   </div>
@@ -313,12 +353,25 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                 {payloadHash ? (
                   <div className="mt-4 rounded-lg border border-emerald-900/50 bg-emerald-950/30 p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <svg
+                        aria-hidden="true"
+                        className="h-5 w-5 text-emerald-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                       <p className="text-sm font-semibold text-emerald-300">Payload hash</p>
                     </div>
-                    <p className="break-all font-mono text-xs text-emerald-200 bg-emerald-950/50 rounded-lg px-3 py-2">{payloadHash}</p>
+                    <p className="break-all font-mono text-xs text-emerald-200 bg-emerald-950/50 rounded-lg px-3 py-2">
+                      {payloadHash}
+                    </p>
                   </div>
                 ) : null}
               </form>

@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { PublicKey } from "@solana/web3.js";
 import { prisma } from "@/lib/prisma";
+import { PublicKey } from "@solana/web3.js";
+import { NextResponse } from "next/server";
 
 export async function GET(
   _request: Request,

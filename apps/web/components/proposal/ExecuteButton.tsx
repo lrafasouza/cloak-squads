@@ -1,12 +1,12 @@
 "use client";
 
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { publicEnv } from "@/lib/env";
 import { vaultTransactionExecute } from "@/lib/squads-sdk";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import { useState } from "react";
 
 export function ExecuteButton({
   multisig,

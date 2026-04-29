@@ -2,11 +2,7 @@
 // Replace with Redis + sliding window before mainnet.
 const map = new Map<string, { count: number; reset: number }>();
 
-export function checkRateLimit(
-  ip: string,
-  limit = 10,
-  windowMs = 60_000,
-): boolean {
+export function checkRateLimit(ip: string, limit = 10, windowMs = 60_000): boolean {
   const now = Date.now();
   const existing = map.get(ip);
 

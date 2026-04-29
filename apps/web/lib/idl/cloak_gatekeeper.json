@@ -9,16 +9,7 @@
   "instructions": [
     {
       "name": "add_signer_view",
-      "discriminator": [
-        219,
-        20,
-        84,
-        154,
-        12,
-        70,
-        97,
-        143
-      ],
+      "discriminator": [219, 20, 84, 154, 12, 70, 97, 143],
       "accounts": [
         {
           "name": "cofre",
@@ -26,13 +17,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  102,
-                  114,
-                  101
-                ]
+                "value": [99, 111, 102, 114, 101]
               },
               {
                 "kind": "account",
@@ -53,17 +38,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  118,
-                  105,
-                  101,
-                  119,
-                  95,
-                  100,
-                  105,
-                  115,
-                  116
-                ]
+                "value": [118, 105, 101, 119, 95, 100, 105, 115, 116]
               },
               {
                 "kind": "account",
@@ -90,44 +65,26 @@
         {
           "name": "ephemeral_pk",
           "type": {
-            "array": [
-              "u8",
-              32
-            ]
+            "array": ["u8", 32]
           }
         },
         {
           "name": "nonce",
           "type": {
-            "array": [
-              "u8",
-              24
-            ]
+            "array": ["u8", 24]
           }
         },
         {
           "name": "ciphertext",
           "type": {
-            "array": [
-              "u8",
-              48
-            ]
+            "array": ["u8", 48]
           }
         }
       ]
     },
     {
       "name": "close_expired_license",
-      "discriminator": [
-        152,
-        66,
-        133,
-        12,
-        126,
-        164,
-        72,
-        224
-      ],
+      "discriminator": [152, 66, 133, 12, 126, 164, 72, 224],
       "accounts": [
         {
           "name": "cofre",
@@ -135,13 +92,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  102,
-                  114,
-                  101
-                ]
+                "value": [99, 111, 102, 114, 101]
               },
               {
                 "kind": "account",
@@ -150,9 +101,7 @@
               }
             ]
           },
-          "relations": [
-            "license"
-          ]
+          "relations": ["license"]
         },
         {
           "name": "license",
@@ -161,15 +110,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  108,
-                  105,
-                  99,
-                  101,
-                  110,
-                  115,
-                  101
-                ]
+                "value": [108, 105, 99, 101, 110, 115, 101]
               },
               {
                 "kind": "account",
@@ -189,9 +130,7 @@
         },
         {
           "name": "payer",
-          "docs": [
-            "Tx-fee payer. Anyone can submit, no constraint on identity."
-          ],
+          "docs": ["Tx-fee payer. Anyone can submit, no constraint on identity."],
           "writable": true,
           "signer": true
         }
@@ -200,16 +139,7 @@
     },
     {
       "name": "emergency_close_license",
-      "discriminator": [
-        79,
-        11,
-        159,
-        66,
-        182,
-        96,
-        226,
-        3
-      ],
+      "discriminator": [79, 11, 159, 66, 182, 96, 226, 3],
       "accounts": [
         {
           "name": "cofre",
@@ -217,13 +147,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  102,
-                  114,
-                  101
-                ]
+                "value": [99, 111, 102, 114, 101]
               },
               {
                 "kind": "account",
@@ -232,9 +156,7 @@
               }
             ]
           },
-          "relations": [
-            "license"
-          ]
+          "relations": ["license"]
         },
         {
           "name": "squads_vault",
@@ -247,15 +169,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  108,
-                  105,
-                  99,
-                  101,
-                  110,
-                  115,
-                  101
-                ]
+                "value": [108, 105, 99, 101, 110, 115, 101]
               },
               {
                 "kind": "account",
@@ -275,9 +189,7 @@
         },
         {
           "name": "payer",
-          "docs": [
-            "Tx-fee payer."
-          ],
+          "docs": ["Tx-fee payer."],
           "writable": true,
           "signer": true
         }
@@ -286,16 +198,7 @@
     },
     {
       "name": "execute_with_license",
-      "discriminator": [
-        155,
-        154,
-        237,
-        135,
-        25,
-        140,
-        67,
-        54
-      ],
+      "discriminator": [155, 154, 237, 135, 25, 140, 67, 54],
       "accounts": [
         {
           "name": "cofre",
@@ -303,13 +206,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  102,
-                  114,
-                  101
-                ]
+                "value": [99, 111, 102, 114, 101]
               },
               {
                 "kind": "account",
@@ -318,9 +215,7 @@
               }
             ]
           },
-          "relations": [
-            "license"
-          ]
+          "relations": ["license"]
         },
         {
           "name": "license",
@@ -329,15 +224,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  108,
-                  105,
-                  99,
-                  101,
-                  110,
-                  115,
-                  101
-                ]
+                "value": [108, 105, 99, 101, 110, 115, 101]
               },
               {
                 "kind": "account",
@@ -373,16 +260,7 @@
     },
     {
       "name": "init_cofre",
-      "discriminator": [
-        86,
-        234,
-        240,
-        211,
-        55,
-        64,
-        86,
-        176
-      ],
+      "discriminator": [86, 234, 240, 211, 55, 64, 86, 176],
       "accounts": [
         {
           "name": "cofre",
@@ -391,13 +269,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  102,
-                  114,
-                  101
-                ]
+                "value": [99, 111, 102, 114, 101]
               },
               {
                 "kind": "arg",
@@ -432,26 +304,14 @@
         {
           "name": "view_key_public",
           "type": {
-            "array": [
-              "u8",
-              32
-            ]
+            "array": ["u8", 32]
           }
         }
       ]
     },
     {
       "name": "init_view_distribution",
-      "discriminator": [
-        227,
-        252,
-        147,
-        152,
-        110,
-        222,
-        69,
-        187
-      ],
+      "discriminator": [227, 252, 147, 152, 110, 222, 69, 187],
       "accounts": [
         {
           "name": "cofre",
@@ -459,13 +319,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  102,
-                  114,
-                  101
-                ]
+                "value": [99, 111, 102, 114, 101]
               },
               {
                 "kind": "account",
@@ -486,17 +340,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  118,
-                  105,
-                  101,
-                  119,
-                  95,
-                  100,
-                  105,
-                  115,
-                  116
-                ]
+                "value": [118, 105, 101, 119, 95, 100, 105, 115, 116]
               },
               {
                 "kind": "account",
@@ -519,16 +363,7 @@
     },
     {
       "name": "issue_license",
-      "discriminator": [
-        5,
-        103,
-        183,
-        220,
-        230,
-        209,
-        57,
-        154
-      ],
+      "discriminator": [5, 103, 183, 220, 230, 209, 57, 154],
       "accounts": [
         {
           "name": "cofre",
@@ -536,13 +371,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  102,
-                  114,
-                  101
-                ]
+                "value": [99, 111, 102, 114, 101]
               },
               {
                 "kind": "account",
@@ -563,15 +392,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  108,
-                  105,
-                  99,
-                  101,
-                  110,
-                  115,
-                  101
-                ]
+                "value": [108, 105, 99, 101, 110, 115, 101]
               },
               {
                 "kind": "account",
@@ -598,19 +419,13 @@
         {
           "name": "payload_hash",
           "type": {
-            "array": [
-              "u8",
-              32
-            ]
+            "array": ["u8", 32]
           }
         },
         {
           "name": "nonce",
           "type": {
-            "array": [
-              "u8",
-              16
-            ]
+            "array": ["u8", 16]
           }
         },
         {
@@ -621,16 +436,7 @@
     },
     {
       "name": "remove_signer_view",
-      "discriminator": [
-        202,
-        101,
-        123,
-        239,
-        146,
-        103,
-        197,
-        9
-      ],
+      "discriminator": [202, 101, 123, 239, 146, 103, 197, 9],
       "accounts": [
         {
           "name": "cofre",
@@ -638,13 +444,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  102,
-                  114,
-                  101
-                ]
+                "value": [99, 111, 102, 114, 101]
               },
               {
                 "kind": "account",
@@ -665,17 +465,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  118,
-                  105,
-                  101,
-                  119,
-                  95,
-                  100,
-                  105,
-                  115,
-                  116
-                ]
+                "value": [118, 105, 101, 119, 95, 100, 105, 115, 116]
               },
               {
                 "kind": "account",
@@ -703,16 +493,7 @@
     },
     {
       "name": "revoke_audit",
-      "discriminator": [
-        125,
-        176,
-        108,
-        91,
-        220,
-        87,
-        215,
-        58
-      ],
+      "discriminator": [125, 176, 108, 91, 220, 87, 215, 58],
       "accounts": [
         {
           "name": "cofre",
@@ -721,13 +502,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  102,
-                  114,
-                  101
-                ]
+                "value": [99, 111, 102, 114, 101]
               },
               {
                 "kind": "account",
@@ -755,26 +530,14 @@
         {
           "name": "diversifier_trunc",
           "type": {
-            "array": [
-              "u8",
-              16
-            ]
+            "array": ["u8", 16]
           }
         }
       ]
     },
     {
       "name": "set_operator",
-      "discriminator": [
-        238,
-        153,
-        101,
-        169,
-        243,
-        131,
-        36,
-        1
-      ],
+      "discriminator": [238, 153, 101, 169, 243, 131, 36, 1],
       "accounts": [
         {
           "name": "cofre",
@@ -783,13 +546,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  102,
-                  114,
-                  101
-                ]
+                "value": [99, 111, 102, 114, 101]
               },
               {
                 "kind": "account",
@@ -815,83 +572,29 @@
   "accounts": [
     {
       "name": "Cofre",
-      "discriminator": [
-        41,
-        87,
-        215,
-        100,
-        199,
-        10,
-        165,
-        235
-      ]
+      "discriminator": [41, 87, 215, 100, 199, 10, 165, 235]
     },
     {
       "name": "License",
-      "discriminator": [
-        248,
-        152,
-        195,
-        100,
-        185,
-        108,
-        176,
-        231
-      ]
+      "discriminator": [248, 152, 195, 100, 185, 108, 176, 231]
     },
     {
       "name": "ViewKeyDistribution",
-      "discriminator": [
-        182,
-        182,
-        75,
-        145,
-        210,
-        5,
-        111,
-        10
-      ]
+      "discriminator": [182, 182, 75, 145, 210, 5, 111, 10]
     }
   ],
   "events": [
     {
       "name": "CofreInitialized",
-      "discriminator": [
-        114,
-        199,
-        0,
-        39,
-        227,
-        123,
-        116,
-        255
-      ]
+      "discriminator": [114, 199, 0, 39, 227, 123, 116, 255]
     },
     {
       "name": "LicenseConsumed",
-      "discriminator": [
-        207,
-        38,
-        229,
-        147,
-        122,
-        63,
-        141,
-        93
-      ]
+      "discriminator": [207, 38, 229, 147, 122, 63, 141, 93]
     },
     {
       "name": "LicenseIssued",
-      "discriminator": [
-        193,
-        166,
-        92,
-        209,
-        232,
-        70,
-        195,
-        168
-      ]
+      "discriminator": [193, 166, 92, 209, 232, 70, 195, 168]
     }
   ],
   "errors": [
@@ -983,10 +686,7 @@
           {
             "name": "view_key_public",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
@@ -1001,10 +701,7 @@
             "name": "revoked_audit",
             "type": {
               "vec": {
-                "array": [
-                  "u8",
-                  16
-                ]
+                "array": ["u8", 16]
               }
             }
           },
@@ -1047,28 +744,19 @@
           {
             "name": "ephemeral_pk",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
             "name": "nonce",
             "type": {
-              "array": [
-                "u8",
-                24
-              ]
+              "array": ["u8", 24]
             }
           },
           {
             "name": "ciphertext",
             "type": {
-              "array": [
-                "u8",
-                48
-              ]
+              "array": ["u8", 48]
             }
           },
           {
@@ -1090,19 +778,13 @@
           {
             "name": "payload_hash",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
             "name": "nonce",
             "type": {
-              "array": [
-                "u8",
-                16
-              ]
+              "array": ["u8", 16]
             }
           },
           {
@@ -1144,19 +826,13 @@
           {
             "name": "payload_hash",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
             "name": "cloak_tx_signature_hint",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           }
         ]
@@ -1174,10 +850,7 @@
           {
             "name": "payload_hash",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
@@ -1209,19 +882,13 @@
           {
             "name": "nullifier",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
             "name": "commitment",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
@@ -1235,19 +902,13 @@
           {
             "name": "recipient_vk_pub",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
             "name": "nonce",
             "type": {
-              "array": [
-                "u8",
-                16
-              ]
+              "array": ["u8", 16]
             }
           }
         ]

@@ -2,6 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { lamportsToSol } from "@/lib/sol";
+import { statusBadge, statusLabel } from "@/lib/status-labels";
 import {
   CLOAK_PROGRAM_ID,
   computeUtxoCommitment,
@@ -13,8 +15,6 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
-import { lamportsToSol } from "@/lib/sol";
-import { statusBadge, statusLabel } from "@/lib/status-labels";
 
 type StealthInvoice = {
   id: string;
@@ -65,7 +65,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
   const [claiming, setClaiming] = useState(false);
   const [secretKey, setSecretKey] = useState<Uint8Array | null>(null);
 
-  // Parse fragment from URL
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally runs once on mount; window.location is not reactive
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -194,20 +194,16 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
           utxo.index = invoice.utxoLeafIndex;
         }
 
-        const result = await fullWithdraw(
-          [utxo],
-          wallet.publicKey,
-          {
-            connection,
-            programId: CLOAK_PROGRAM_ID,
-            relayUrl: "https://api.devnet.cloak.ag",
-            signTransaction: wallet.signTransaction,
-            ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
-            depositorPublicKey: wallet.publicKey,
-            onProgress: (s: string) => console.error(`[cloak-claim] ${s}`),
-            onProofProgress: (p: number) => console.error(`[cloak-claim] proof ${p}%`),
-          } as Parameters<typeof fullWithdraw>[2],
-        );
+        const result = await fullWithdraw([utxo], wallet.publicKey, {
+          connection,
+          programId: CLOAK_PROGRAM_ID,
+          relayUrl: "https://api.devnet.cloak.ag",
+          signTransaction: wallet.signTransaction,
+          ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
+          depositorPublicKey: wallet.publicKey,
+          onProgress: (s: string) => console.error(`[cloak-claim] ${s}`),
+          onProofProgress: (p: number) => console.error(`[cloak-claim] proof ${p}%`),
+        } as Parameters<typeof fullWithdraw>[2]);
 
         console.log("Claim tx:", result.signature);
       }
@@ -340,7 +336,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                 {statusLabel(claimState).label}
               </span>
             </div>
-              <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Resgatar Invoice</h1>
+            <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Resgatar Invoice</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-300">{getStateMessage()}</p>
           </div>
 
@@ -377,9 +373,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                 <div>
                   <dt className="text-xs text-neutral-500">Valor</dt>
                   <dd className="mt-1 font-mono text-sm text-neutral-300">
-                    {invoice.amountHint
-                      ? `${lamportsToSol(invoice.amountHint)} SOL`
-                      : "Hidden"}
+                    {invoice.amountHint ? `${lamportsToSol(invoice.amountHint)} SOL` : "Hidden"}
                   </dd>
                 </div>
                 <div>
@@ -405,22 +399,19 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                 </p>
 
                 {!wallet.publicKey ? (
-                  <p className="mt-4 text-sm text-amber-300">
-                    Conecte sua wallet para continuar.
-                  </p>
+                  <p className="mt-4 text-sm text-amber-300">Conecte sua wallet para continuar.</p>
                 ) : invoice.recipientWallet !== wallet.publicKey.toBase58() ? (
                   <div className="mt-4 rounded-md border border-red-900 bg-red-950 p-3 text-sm text-red-200">
                     <p className="font-medium">Wallet incorreta</p>
                     <p className="mt-1 text-xs text-red-300">
-                      Este invoice foi criado para a wallet <span className="font-mono">{truncateAddress(invoice.recipientWallet)}</span>. 
+                      Este invoice foi criado para a wallet{" "}
+                      <span className="font-mono">{truncateAddress(invoice.recipientWallet)}</span>.
                       Conecte essa wallet para resgatar.
                     </p>
                   </div>
                 ) : (
                   <div className="mt-4">
-                    <p className="mb-3 text-sm text-emerald-400">
-                      Wallet correta conectada ✓
-                    </p>
+                    <p className="mb-3 text-sm text-emerald-400">Wallet correta conectada ✓</p>
                     <Button onClick={handleClaim} disabled={claiming}>
                       {claiming ? "Processando resgate..." : "Resgatar fundos"}
                     </Button>
@@ -445,7 +436,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                   href="/"
                   className="mt-4 inline-block rounded-md bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:bg-neutral-700"
                 >
-              Voltar para Home
+                  Voltar para Home
                 </Link>
               </section>
             )}

@@ -1,10 +1,12 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 import { createContext, useContext, useMemo, useState } from "react";
-import { cn } from "@/lib/utils";
 
-const TabsContext = createContext<{ value: string; setValue: (value: string) => void } | null>(null);
+const TabsContext = createContext<{ value: string; setValue: (value: string) => void } | null>(
+  null,
+);
 
 export function Tabs({
   defaultValue,
@@ -40,10 +42,22 @@ export function Tabs({
 }
 
 export function TabsList({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("inline-flex rounded-md border border-neutral-800 bg-neutral-900 p-1", className)} {...props} />;
+  return (
+    <div
+      className={cn(
+        "inline-flex rounded-md border border-neutral-800 bg-neutral-900 p-1",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
-export function TabsTrigger({ value, className, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { value: string }) {
+export function TabsTrigger({
+  value,
+  className,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { value: string }) {
   const tabs = useContext(TabsContext);
   const active = tabs?.value === value;
   return (
@@ -60,7 +74,11 @@ export function TabsTrigger({ value, className, ...props }: ButtonHTMLAttributes
   );
 }
 
-export function TabsContent({ value, className, ...props }: HTMLAttributes<HTMLDivElement> & { value: string }) {
+export function TabsContent({
+  value,
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & { value: string }) {
   const tabs = useContext(TabsContext);
   if (tabs?.value !== value) return null;
   return <div className={cn("mt-4", className)} {...props} />;

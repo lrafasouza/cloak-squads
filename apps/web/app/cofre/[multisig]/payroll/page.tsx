@@ -10,6 +10,7 @@ import {
   formatPayrollCsvTemplate,
   parsePayrollCsv,
 } from "@/lib/payroll-csv";
+import { lamportsToSol } from "@/lib/sol";
 import { createBatchIssueLicenseProposal } from "@/lib/squads-sdk";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
@@ -19,7 +20,6 @@ import {
   createUtxo,
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
-import { lamportsToSol } from "@/lib/sol";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
@@ -265,7 +265,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
       // Store claims in sessionStorage
       for (let i = 0; i < parsedNotes.length; i++) {
-        const n = parsedNotes[i]!;
+        const n = parsedNotes[i]; // safe: loop bound is parsedNotes.length
+        if (!n) continue;
         try {
           sessionStorage.setItem(
             `claim:${multisigAddress.toBase58()}:${transactionIndex}:${i}`,
@@ -350,7 +351,9 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
                   {recipients.length > 0 && (
                     <Button onClick={buildNotes} disabled={pending}>
-                      {pending ? "Preparing notes..." : `Preview ${recipients.length} recipient${recipients.length !== 1 ? "s" : ""}`}
+                      {pending
+                        ? "Preparing notes..."
+                        : `Preview ${recipients.length} recipient${recipients.length !== 1 ? "s" : ""}`}
                     </Button>
                   )}
                 </div>
@@ -379,8 +382,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-800">
-                      {parsedNotes.map((n, i) => (
-                        <tr key={i}>
+                      {parsedNotes.map((n) => (
+                        <tr key={n.name + n.wallet}>
                           <td className="py-2 pr-4 text-neutral-100">{n.name}</td>
                           <td className="py-2 pr-4 font-mono text-xs text-neutral-300">
                             {n.wallet.slice(0, 8)}...{n.wallet.slice(-8)}

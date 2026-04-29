@@ -1,12 +1,15 @@
 "use client";
 
-import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import type { HTMLAttributes, ReactNode } from "react";
 
 export function Toast({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm text-neutral-100 shadow-lg", className)}
+      className={cn(
+        "rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm text-neutral-100 shadow-lg",
+        className,
+      )}
       {...props}
     />
   );

@@ -1,8 +1,14 @@
 "use client";
 
-import { buildIssueLicenseProposal } from "@cloak-squads/core/squads-adapter";
 import { translateOnchainError } from "@cloak-squads/core/onchain-error";
-import type { Connection, PublicKey, SendOptions, Signer, TransactionInstruction } from "@solana/web3.js";
+import { buildIssueLicenseProposal } from "@cloak-squads/core/squads-adapter";
+import type {
+  Connection,
+  PublicKey,
+  SendOptions,
+  Signer,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import { Transaction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 
@@ -99,7 +105,8 @@ export async function createInitCofreProposal(params: {
   tx.recentBlockhash = latestBlockhash.blockhash;
 
   const signature = await params.wallet.sendTransaction(tx, params.connection);
-  const { blockhash: confirmBh, lastValidBlockHeight } = await params.connection.getLatestBlockhash();
+  const { blockhash: confirmBh, lastValidBlockHeight } =
+    await params.connection.getLatestBlockhash();
   await params.connection.confirmTransaction(
     { signature, blockhash: confirmBh, lastValidBlockHeight },
     "confirmed",
@@ -179,7 +186,8 @@ export async function createIssueLicenseProposal(params: {
   }
 
   log("[squads-sdk] awaiting confirmation:", signature);
-  const { blockhash: confirmBh, lastValidBlockHeight } = await params.connection.getLatestBlockhash();
+  const { blockhash: confirmBh, lastValidBlockHeight } =
+    await params.connection.getLatestBlockhash();
   await params.connection.confirmTransaction(
     { signature, blockhash: confirmBh, lastValidBlockHeight },
     "confirmed",
@@ -254,7 +262,8 @@ export async function createBatchIssueLicenseProposal(params: {
   }
 
   log("[squads-sdk] batch awaiting confirmation:", signature);
-  const { blockhash: confirmBh, lastValidBlockHeight } = await params.connection.getLatestBlockhash();
+  const { blockhash: confirmBh, lastValidBlockHeight } =
+    await params.connection.getLatestBlockhash();
   await params.connection.confirmTransaction(
     { signature, blockhash: confirmBh, lastValidBlockHeight },
     "confirmed",
@@ -330,9 +339,7 @@ export async function vaultTransactionExecute(params: {
     log("[squads-sdk] proposal status:", proposal.status, "approved:", proposal.approved.length);
   } catch (err) {
     logError("[squads-sdk] could not load proposal — was it created?", err);
-    throw new Error(
-      "Proposal not found on-chain. Did you create + approve it before executing?",
-    );
+    throw new Error("Proposal not found on-chain. Did you create + approve it before executing?");
   }
 
   const { instruction, lookupTableAccounts } = await multisig.instructions.vaultTransactionExecute({
@@ -414,9 +421,9 @@ async function sendSingleInstruction(
     logError(`[squads-sdk] ${label} sendTransaction error:`, sendErr);
     if (sendErr && typeof sendErr === "object") {
       const anyErr = sendErr as { logs?: unknown; cause?: unknown; message?: unknown };
-      logError(`[squads-sdk]   .logs:`, anyErr.logs);
-      logError(`[squads-sdk]   .cause:`, anyErr.cause);
-      logError(`[squads-sdk]   .message:`, anyErr.message);
+      logError("[squads-sdk]   .logs:", anyErr.logs);
+      logError("[squads-sdk]   .cause:", anyErr.cause);
+      logError("[squads-sdk]   .message:", anyErr.message);
     }
     throw sendErr;
   }
