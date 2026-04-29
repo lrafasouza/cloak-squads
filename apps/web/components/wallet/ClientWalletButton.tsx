@@ -13,7 +13,7 @@ export function ClientWalletButton() {
   if (!mounted) {
     return (
       <div
-        className="h-11 w-36 rounded-lg bg-neutral-800 animate-pulse border border-neutral-700"
+        className="h-11 w-36 rounded-lg bg-surface-2 animate-pulse border border-border-strong"
         aria-hidden="true"
       />
     );
@@ -21,17 +21,7 @@ export function ClientWalletButton() {
 
   return (
     <div className="wallet-adapter-button-wrapper">
-      <WalletMultiButton
-        style={{
-          backgroundColor: "#10b981",
-          borderRadius: "0.5rem",
-          height: "2.75rem",
-          fontSize: "0.875rem",
-          fontWeight: 600,
-          padding: "0 1rem",
-          transition: "all 0.2s",
-        }}
-      />
+      <WalletMultiButton />
     </div>
   );
 }

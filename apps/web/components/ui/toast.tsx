@@ -7,7 +7,7 @@ export function Toast({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "rounded-md border border-neutral-800 bg-neutral-900 p-3 text-sm text-neutral-100 shadow-lg",
+        "rounded-md border border-border bg-surface p-3 text-sm text-ink shadow-raise-1",
         className,
       )}
       {...props}
@@ -16,11 +16,11 @@ export function Toast({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
 }
 
 export function ToastTitle({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("font-semibold text-neutral-50", className)} {...props} />;
+  return <div className={cn("font-semibold text-ink", className)} {...props} />;
 }
 
 export function ToastDescription({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("mt-1 text-neutral-300", className)} {...props} />;
+  return <div className={cn("mt-1 text-ink-muted", className)} {...props} />;
 }
 
 export function Toaster({ children }: { children?: ReactNode }) {

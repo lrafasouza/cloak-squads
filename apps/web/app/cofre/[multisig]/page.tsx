@@ -171,7 +171,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
         wallet,
         multisigPda: multisigAddress,
         initCofreIx: initCofre.instruction,
-        memo: "Initialize Cloak Squads cofre",
+        memo: "Initialize Aegis cofre",
       });
       setBootstrapProposalIndex(bootstrap.transactionIndex.toString());
 
@@ -219,7 +219,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
       <main className="mx-auto max-w-3xl px-4 py-10">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+          className="inline-flex items-center gap-2 text-sm text-accent hover:text-accent transition-colors"
         >
           <svg
             aria-hidden="true"
@@ -237,11 +237,11 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
           </svg>
           Back to picker
         </Link>
-        <div className="mt-8 rounded-xl border border-red-900/50 bg-red-950/30 p-6">
+        <div className="mt-8 rounded-xl border border-signal-danger/30 bg-signal-danger/15 p-6">
           <div className="flex items-center gap-3">
             <svg
               aria-hidden="true"
-              className="h-8 w-8 text-red-400"
+              className="h-8 w-8 text-signal-danger"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -254,8 +254,8 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
               />
             </svg>
             <div>
-              <h1 className="text-2xl font-semibold text-neutral-50">Invalid multisig address</h1>
-              <p className="mt-1 text-sm text-neutral-400">
+              <h1 className="text-2xl font-semibold text-ink">Invalid multisig address</h1>
+              <p className="mt-1 text-sm text-ink-muted">
                 Check the address and open the cofre again.
               </p>
             </div>
@@ -266,17 +266,17 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-neutral-950 via-neutral-950 to-neutral-900">
-      <header className="border-b border-neutral-800/50 bg-neutral-950/80 backdrop-blur-xl sticky top-0 z-40">
+    <main className="min-h-screen bg-gradient-to-b from-bg via-bg to-surface">
+      <header className="border-b border-border/50 bg-bg/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
             href="/"
-            className="flex items-center gap-2 rounded-md text-sm font-semibold text-neutral-100 hover:text-emerald-400 transition-colors"
+            className="flex items-center gap-2 rounded-md text-sm font-semibold text-ink hover:text-accent transition-colors"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft">
               <svg
                 aria-hidden="true"
-                className="h-5 w-5 text-emerald-400"
+                className="h-5 w-5 text-accent"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -289,7 +289,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                 />
               </svg>
             </div>
-            Cloak Squads
+            Aegis
           </Link>
           <ClientWalletButton />
         </div>
@@ -300,10 +300,10 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
           <StaggerItem>
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-800/50 bg-emerald-950/30 px-4 py-1.5 mb-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft px-4 py-1.5 mb-3">
                   <svg
                     aria-hidden="true"
-                    className="h-4 w-4 text-emerald-400"
+                    className="h-4 w-4 text-accent"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -315,12 +315,12 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                       d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
                     />
                   </svg>
-                  <span className="text-sm font-medium text-emerald-300">Cofre dashboard</span>
+                  <span className="text-sm font-medium text-accent">Cofre dashboard</span>
                 </div>
-                <h1 className="text-3xl font-bold text-neutral-50 md:text-4xl tracking-tight">
+                <h1 className="text-3xl font-bold text-ink md:text-4xl tracking-tight">
                   {truncateAddress(multisigAddress.toBase58())}
                 </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-neutral-400">
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-muted">
                   Prepare private sends, review pending approvals, and monitor the shielded
                   execution state for this Squads vault.
                 </p>
@@ -339,10 +339,10 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                     href={`/cofre/${multisigAddress.toBase58()}${action.href}`}
                     className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 ${
                       action.variant === "default"
-                        ? "bg-emerald-500 text-white hover:bg-emerald-400 shadow-lg shadow-emerald-500/20"
+                        ? "bg-emerald-500 text-white hover:bg-accent shadow-raise-1 shadow-accent/20"
                         : action.variant === "secondary"
-                          ? "bg-emerald-700 text-neutral-100 hover:bg-emerald-600"
-                          : "border-2 border-neutral-700 text-neutral-100 hover:bg-neutral-800 hover:border-neutral-600"
+                          ? "bg-emerald-700 text-ink hover:bg-emerald-600"
+                          : "border-2 border-border-strong text-ink hover:bg-surface-2 hover:border-border-strong"
                     }`}
                   >
                     {action.label}
@@ -354,7 +354,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
 
           {cofreStatus === "missing" || cofreStatus === "error" ? (
             <StaggerItem>
-              <div className="mt-6 rounded-xl border border-amber-800/50 bg-amber-950/20 p-5">
+              <div className="mt-6 rounded-xl border border-signal-warn/30/50 bg-amber-950/20 p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <h2 className="text-base font-semibold text-amber-100">
@@ -371,7 +371,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                       </p>
                     ) : null}
                     {bootstrapError ? (
-                      <p className="mt-3 text-sm text-red-300">{bootstrapError}</p>
+                      <p className="mt-3 text-sm text-signal-danger">{bootstrapError}</p>
                     ) : null}
                   </div>
                   <Button
@@ -389,12 +389,12 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
 
           <StaggerItem>
             <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
+              <AnimatedCard className="rounded-xl border border-border bg-surface/80 backdrop-blur-sm p-5 shadow-raise-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft">
                     <svg
                       aria-hidden="true"
-                      className="h-4 w-4 text-emerald-400"
+                      className="h-4 w-4 text-accent"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -407,22 +407,22 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                       />
                     </svg>
                   </div>
-                  <p className="text-sm text-neutral-400">Shielded balance</p>
+                  <p className="text-sm text-ink-muted">Shielded balance</p>
                 </div>
-                <p className="mt-2 font-mono text-2xl font-bold tabular-nums text-neutral-50">
+                <p className="mt-2 font-mono text-2xl font-bold tabular-nums text-ink">
                   -- SOL
                 </p>
-                <p className="mt-2 text-xs text-neutral-500">
+                <p className="mt-2 text-xs text-ink-subtle">
                   Cloak scan integration lands in the F1 operator flow.
                 </p>
               </AnimatedCard>
 
-              <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
+              <AnimatedCard className="rounded-xl border border-border bg-surface/80 backdrop-blur-sm p-5 shadow-raise-1">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
                     <svg
                       aria-hidden="true"
-                      className="h-4 w-4 text-blue-400"
+                      className="h-4 w-4 text-signal-info"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -435,19 +435,19 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                       />
                     </svg>
                   </div>
-                  <p className="text-sm text-neutral-400">Proposal drafts</p>
+                  <p className="text-sm text-ink-muted">Proposal drafts</p>
                 </div>
-                <p className="mt-2 font-mono text-2xl font-bold tabular-nums text-neutral-50">
+                <p className="mt-2 font-mono text-2xl font-bold tabular-nums text-ink">
                   {draftsLoading ? "..." : drafts.length}
                 </p>
-                <p className="mt-2 text-xs text-neutral-500">
+                <p className="mt-2 text-xs text-ink-subtle">
                   {drafts.length > 0
                     ? "Recent drafts listed below."
                     : "Create one from Prepare send."}
                 </p>
               </AnimatedCard>
 
-              <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
+              <AnimatedCard className="rounded-xl border border-border bg-surface/80 backdrop-blur-sm p-5 shadow-raise-1">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10">
                     <svg
@@ -465,26 +465,26 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                       />
                     </svg>
                   </div>
-                  <p className="text-sm text-neutral-400">Connected wallet</p>
+                  <p className="text-sm text-ink-muted">Connected wallet</p>
                 </div>
-                <p className="mt-2 break-all font-mono text-sm text-emerald-400 bg-emerald-950/20 rounded-lg px-3 py-2 border border-emerald-900/20">
+                <p className="mt-2 break-all font-mono text-sm text-accent bg-emerald-950/20 rounded-lg px-3 py-2 border border-emerald-900/20">
                   {wallet.publicKey
                     ? truncateAddress(wallet.publicKey.toBase58())
                     : "Not connected"}
                 </p>
-                <p className="mt-2 text-xs text-neutral-500">Devnet execution context.</p>
+                <p className="mt-2 text-xs text-ink-subtle">Devnet execution context.</p>
               </AnimatedCard>
             </div>
           </StaggerItem>
 
           <StaggerItem>
             <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
-              <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm shadow-xl overflow-hidden">
-                <div className="border-b border-neutral-800/50 p-4 bg-neutral-950/30">
-                  <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2">
+              <AnimatedCard className="rounded-xl border border-border bg-surface/80 backdrop-blur-sm shadow-raise-1 overflow-hidden">
+                <div className="border-b border-border/50 p-4 bg-bg/30">
+                  <h2 className="text-base font-semibold text-ink flex items-center gap-2">
                     <svg
                       aria-hidden="true"
-                      className="h-4 w-4 text-neutral-400"
+                      className="h-4 w-4 text-ink-muted"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -512,10 +512,10 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                     { label: "Vault PDA", value: vault.toBase58() },
                   ].map((item) => (
                     <div key={item.label} className="group">
-                      <dt className="text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                      <dt className="text-xs font-medium text-ink-subtle uppercase tracking-wider">
                         {item.label}
                       </dt>
-                      <dd className="mt-1 break-all font-mono text-xs text-neutral-300 bg-neutral-950/50 rounded-lg px-3 py-2 border border-neutral-800/50 group-hover:border-emerald-900/30 transition-colors">
+                      <dd className="mt-1 break-all font-mono text-xs text-neutral-300 bg-bg/50 rounded-lg px-3 py-2 border border-border/50 group-hover:border-emerald-900/30 transition-colors">
                         {item.value}
                       </dd>
                     </div>
@@ -523,12 +523,12 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                 </dl>
               </AnimatedCard>
 
-              <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm shadow-xl overflow-hidden">
-                <div className="border-b border-neutral-800/50 p-4 bg-neutral-950/30 flex items-center justify-between">
-                  <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2">
+              <AnimatedCard className="rounded-xl border border-border bg-surface/80 backdrop-blur-sm shadow-raise-1 overflow-hidden">
+                <div className="border-b border-border/50 p-4 bg-bg/30 flex items-center justify-between">
+                  <h2 className="text-base font-semibold text-ink flex items-center gap-2">
                     <svg
                       aria-hidden="true"
-                      className="h-4 w-4 text-neutral-400"
+                      className="h-4 w-4 text-ink-muted"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -543,21 +543,21 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                     Recent proposals
                   </h2>
                   {drafts.length > 0 && (
-                    <span className="text-xs text-neutral-500">{drafts.length} total</span>
+                    <span className="text-xs text-ink-subtle">{drafts.length} total</span>
                   )}
                 </div>
                 <div className="p-4 text-sm">
                   {draftsLoading ? (
-                    <div className="flex items-center gap-3 text-neutral-400">
+                    <div className="flex items-center gap-3 text-ink-muted">
                       <Spinner size="sm" />
                       <span>Loading proposals...</span>
                     </div>
                   ) : drafts.length === 0 ? (
                     <div className="text-center py-8">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral-800 mx-auto mb-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-2 mx-auto mb-3">
                         <svg
                           aria-hidden="true"
-                          className="h-6 w-6 text-neutral-500"
+                          className="h-6 w-6 text-ink-subtle"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -570,8 +570,8 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                           />
                         </svg>
                       </div>
-                      <p className="text-neutral-400">No proposal drafts yet</p>
-                      <p className="text-xs text-neutral-500 mt-1">Create one from the Send page</p>
+                      <p className="text-ink-muted">No proposal drafts yet</p>
+                      <p className="text-xs text-ink-subtle mt-1">Create one from the Send page</p>
                     </div>
                   ) : (
                     <ul className="grid gap-2">
@@ -579,13 +579,13 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                         <li key={d.id}>
                           <Link
                             href={`/cofre/${multisigAddress.toBase58()}/proposals/${d.transactionIndex}`}
-                            className="flex items-center justify-between rounded-lg border border-neutral-800/50 p-4 transition-all duration-200 hover:border-emerald-900/50 hover:bg-neutral-800/50 group"
+                            className="flex items-center justify-between rounded-lg border border-border/50 p-4 transition-all duration-200 hover:border-emerald-900/50 hover:bg-surface-2/50 group"
                           >
                             <div className="min-w-0">
-                              <p className="font-mono text-sm text-neutral-100 flex items-center gap-2">
-                                <span className="text-emerald-400">#{d.transactionIndex}</span>
+                              <p className="font-mono text-sm text-ink flex items-center gap-2">
+                                <span className="text-accent">#{d.transactionIndex}</span>
                                 {d.type === "payroll" && (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-900/50 px-2.5 py-0.5 text-xs text-emerald-200 border border-emerald-800/30">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft/50 px-2.5 py-0.5 text-xs text-accent border border-accent/20/30">
                                     <svg
                                       aria-hidden="true"
                                       className="h-3 w-3"
@@ -604,13 +604,13 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                                   </span>
                                 )}
                               </p>
-                              <p className="mt-1.5 text-xs text-neutral-400">
+                              <p className="mt-1.5 text-xs text-ink-muted">
                                 {d.type === "payroll"
                                   ? `${d.recipientCount} recipients, ${lamportsToSol(d.totalAmount ?? d.amount)} SOL total`
                                   : `${lamportsToSol(d.amount)} SOL → ${truncateAddress(d.recipient)}`}
                               </p>
                             </div>
-                            <span className="text-xs text-neutral-500 shrink-0 ml-4">
+                            <span className="text-xs text-ink-subtle shrink-0 ml-4">
                               {new Date(d.createdAt).toLocaleDateString()}
                             </span>
                           </Link>

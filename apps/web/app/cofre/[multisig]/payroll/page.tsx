@@ -362,21 +362,21 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Link href="/" className="text-sm text-emerald-300">
+        <Link href="/" className="text-sm text-accent">
           Back to picker
         </Link>
-        <h1 className="mt-6 text-2xl font-semibold text-neutral-50">Invalid multisig address</h1>
+        <h1 className="mt-6 text-2xl font-semibold text-ink">Invalid multisig address</h1>
       </main>
     );
   }
 
   return (
     <main className="min-h-screen">
-      <header className="border-b border-neutral-800 bg-neutral-950/95">
+      <header className="border-b border-border bg-bg/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
             href={`/cofre/${multisigAddress.toBase58()}`}
-            className="text-sm font-semibold text-neutral-100"
+            className="text-sm font-semibold text-ink"
           >
             Cofre
           </Link>
@@ -386,20 +386,20 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
-          <p className="text-sm font-medium text-emerald-300">Payroll</p>
-          <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Batch private send</h1>
+          <p className="text-sm font-medium text-accent">Payroll</p>
+          <h1 className="mt-2 text-3xl font-semibold text-ink">Batch private send</h1>
           <p className="mt-3 text-sm leading-6 text-neutral-300">
             Upload a CSV with recipient names, wallet addresses, and amounts. One Squads proposal
             will contain all {recipients.length > 0 && `(${recipients.length}) `}private transfer
             instructions for signer approval.
           </p>
-          <p className="mt-3 text-xs text-neutral-400">Max 10 recipients per batch in V1.</p>
+          <p className="mt-3 text-xs text-ink-muted">Max 10 recipients per batch in V1.</p>
         </div>
 
         <div className="grid gap-4">
           {step === "upload" && (
             <div className="grid gap-4">
-              <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 md:p-5">
+              <div className="rounded-lg border border-border bg-surface p-4 md:p-5">
                 <div className="grid gap-4">
                   <div>
                     <Label htmlFor="csv-file">Upload CSV file</Label>
@@ -420,21 +420,21 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                       onChange={handleCsvChange}
                       placeholder={formatPayrollCsvTemplate()}
                       rows={6}
-                      className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 font-mono text-sm text-neutral-100 placeholder:text-neutral-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                      className="mt-1 w-full rounded-md border border-border-strong bg-bg px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                     />
                   </div>
 
                   <fieldset className="grid gap-2">
-                    <legend className="text-sm font-medium text-neutral-100">Delivery mode</legend>
+                    <legend className="text-sm font-medium text-ink">Delivery mode</legend>
                     <div className="grid gap-2 sm:grid-cols-2">
                       <button
                         type="button"
                         onClick={() => setMode("direct")}
                         aria-pressed={mode === "direct"}
-                        className={`min-h-16 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                        className={`min-h-16 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                           mode === "direct"
-                            ? "border-emerald-800 bg-emerald-950 text-emerald-300"
-                            : "border-neutral-700 bg-neutral-950 text-neutral-400 hover:border-neutral-600"
+                            ? "border-accent/20 bg-emerald-950 text-accent"
+                            : "border-border-strong bg-bg text-ink-muted hover:border-border-strong"
                         }`}
                       >
                         <span className="font-semibold">Direct send</span>
@@ -446,10 +446,10 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                         type="button"
                         onClick={() => setMode("invoice")}
                         aria-pressed={mode === "invoice"}
-                        className={`min-h-16 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                        className={`min-h-16 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                           mode === "invoice"
-                            ? "border-emerald-800 bg-emerald-950 text-emerald-300"
-                            : "border-neutral-700 bg-neutral-950 text-neutral-400 hover:border-neutral-600"
+                            ? "border-accent/20 bg-emerald-950 text-accent"
+                            : "border-border-strong bg-bg text-ink-muted hover:border-border-strong"
                         }`}
                       >
                         <span className="font-semibold">Invoice / Claim</span>
@@ -480,38 +480,38 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
           {step === "preview" && parsedNotes.length > 0 && (
             <form onSubmit={submitPayroll} className="grid gap-4">
-              <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-                <h2 className="text-base font-semibold text-neutral-50">Preview</h2>
+              <div className="rounded-lg border border-border bg-surface p-4">
+                <h2 className="text-base font-semibold text-ink">Preview</h2>
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-neutral-800 text-left">
-                        <th className="pb-2 pr-4 text-neutral-400">Name</th>
-                        <th className="pb-2 pr-4 text-neutral-400">Wallet</th>
-                        <th className="pb-2 pr-4 text-neutral-400 text-right">Amount</th>
-                        <th className="pb-2 text-neutral-400">Memo</th>
+                      <tr className="border-b border-border text-left">
+                        <th className="pb-2 pr-4 text-ink-muted">Name</th>
+                        <th className="pb-2 pr-4 text-ink-muted">Wallet</th>
+                        <th className="pb-2 pr-4 text-ink-muted text-right">Amount</th>
+                        <th className="pb-2 text-ink-muted">Memo</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-800">
                       {parsedNotes.map((n) => (
                         <tr key={n.name + n.wallet}>
-                          <td className="py-2 pr-4 text-neutral-100">{n.name}</td>
+                          <td className="py-2 pr-4 text-ink">{n.name}</td>
                           <td className="py-2 pr-4 font-mono text-xs text-neutral-300">
                             {n.wallet.slice(0, 8)}...{n.wallet.slice(-8)}
                           </td>
-                          <td className="py-2 pr-4 text-right font-mono text-neutral-100">
+                          <td className="py-2 pr-4 text-right font-mono text-ink">
                             {lamportsToSol(n.amount)} SOL
                           </td>
-                          <td className="py-2 text-neutral-400">{n.memo || "—"}</td>
+                          <td className="py-2 text-ink-muted">{n.memo || "—"}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="border-t border-neutral-700 font-semibold">
-                        <td colSpan={2} className="py-2 pr-4 text-neutral-100">
+                      <tr className="border-t border-border-strong font-semibold">
+                        <td colSpan={2} className="py-2 pr-4 text-ink">
                           Total
                         </td>
-                        <td className="py-2 pr-4 text-right font-mono text-emerald-300">
+                        <td className="py-2 pr-4 text-right font-mono text-accent">
                           {lamportsToSol(totalAmount)} SOL
                         </td>
                         <td />
@@ -520,7 +520,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                   </table>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between text-xs text-neutral-400">
+                <div className="mt-4 flex items-center justify-between text-xs text-ink-muted">
                   <span>Recipients: {parsedNotes.length}/10</span>
                   <span>
                     {mode === "invoice" ? "Delivery: claim links" : "Delivery: direct send"}
@@ -559,8 +559,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
           {step === "created" && createdPayroll ? (
             <div className="grid gap-4">
-              <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-                <h2 className="text-base font-semibold text-neutral-50">Claim links created</h2>
+              <div className="rounded-lg border border-border bg-surface p-4">
+                <h2 className="text-base font-semibold text-ink">Claim links created</h2>
                 <p className="mt-2 text-sm text-neutral-300">
                   Share each link with the matching recipient. These secret links are only shown in
                   this browser session.
@@ -591,12 +591,12 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                     return (
                       <div
                         key={link.wallet}
-                        className="rounded-md border border-neutral-800 bg-neutral-950 p-3"
+                        className="rounded-md border border-border bg-bg p-3"
                       >
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
-                            <p className="text-sm font-medium text-neutral-100">{link.name}</p>
-                            <p className="font-mono text-xs text-neutral-400">
+                            <p className="text-sm font-medium text-ink">{link.name}</p>
+                            <p className="font-mono text-xs text-ink-muted">
                               {link.wallet.slice(0, 8)}...{link.wallet.slice(-8)}
                             </p>
                           </div>
@@ -608,7 +608,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                             Copy link
                           </Button>
                         </div>
-                        <p className="mt-2 break-all font-mono text-xs text-neutral-400">
+                        <p className="mt-2 break-all font-mono text-xs text-ink-muted">
                           {fullUrl}
                         </p>
                       </div>
@@ -620,7 +620,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
                   href={`/cofre/${multisigAddress.toBase58()}/proposals/${createdPayroll.transactionIndex}`}
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all duration-200 hover:bg-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 active:scale-[0.98]"
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-raise-1 shadow-accent/20 transition-all duration-200 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:scale-[0.98]"
                 >
                   View proposal
                 </Link>

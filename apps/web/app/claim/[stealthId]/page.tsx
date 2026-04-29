@@ -248,34 +248,34 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
   const getStateColor = () => {
     switch (claimState) {
       case "loading":
-        return "text-neutral-400";
+        return "text-ink-muted";
       case "invalid":
       case "expired":
       case "voided":
         return "text-red-200";
       case "claimed":
-        return "text-emerald-200";
+        return "text-accent";
       case "ready":
-        return "text-emerald-300";
+        return "text-accent";
     }
   };
 
   if (claimState === "loading") {
     return (
-      <main className="min-h-screen bg-neutral-950">
-        <header className="border-b border-neutral-800 bg-neutral-950/95">
+      <main className="min-h-screen bg-bg">
+        <header className="border-b border-border bg-bg/95">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
             <Link
               href="/"
-              className="rounded-md text-sm font-semibold text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+              className="rounded-md text-sm font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
-              Cloak Squads
+              Aegis
             </Link>
           </div>
         </header>
 
         <section className="mx-auto max-w-6xl px-4 py-10">
-          <p className="text-neutral-400">Loading invoice data...</p>
+          <p className="text-ink-muted">Loading invoice data...</p>
         </section>
       </main>
     );
@@ -283,14 +283,14 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
 
   if (claimState === "invalid") {
     return (
-      <main className="min-h-screen bg-neutral-950">
-        <header className="border-b border-neutral-800 bg-neutral-950/95">
+      <main className="min-h-screen bg-bg">
+        <header className="border-b border-border bg-bg/95">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
             <Link
               href="/"
-              className="rounded-md text-sm font-semibold text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+              className="rounded-md text-sm font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
-              Cloak Squads
+              Aegis
             </Link>
           </div>
         </header>
@@ -301,7 +301,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
             <p className="mt-4 text-neutral-300">{error ?? "Invalid or corrupted link."}</p>
             <Link
               href="/"
-              className="mt-6 inline-block rounded-md bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:bg-neutral-700"
+              className="mt-6 inline-block rounded-md bg-surface-2 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:bg-surface-3"
             >
               Return Home
             </Link>
@@ -312,14 +312,14 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
   }
 
   return (
-    <main className="min-h-screen bg-neutral-950">
-      <header className="border-b border-neutral-800 bg-neutral-950/95">
+    <main className="min-h-screen bg-bg">
+      <header className="border-b border-border bg-bg/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
             href="/"
-            className="rounded-md text-sm font-semibold text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+            className="rounded-md text-sm font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           >
-            Cloak Squads
+            Aegis
           </Link>
           <ClientWalletButton />
         </div>
@@ -329,26 +329,26 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <p className="text-sm font-medium text-emerald-300">Resgate de Pagamento</p>
+              <p className="text-sm font-medium text-accent">Resgate de Pagamento</p>
               <span
                 className={`rounded px-2 py-0.5 text-xs font-medium ${statusBadge(claimState).bg} ${statusBadge(claimState).text}`}
               >
                 {statusLabel(claimState).label}
               </span>
             </div>
-            <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Resgatar Invoice</h1>
+            <h1 className="mt-2 text-3xl font-semibold text-ink">Resgatar Invoice</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-300">{getStateMessage()}</p>
           </div>
 
           {invoice ? (
             <div className="flex flex-col gap-2 text-right">
-              <p className="text-sm text-neutral-500">
+              <p className="text-sm text-ink-subtle">
                 Cofre: {truncateAddress(invoice.cofreAddress)}
               </p>
-              <p className="text-sm text-neutral-500">
+              <p className="text-sm text-ink-subtle">
                 Criado: {new Date(invoice.createdAt).toLocaleDateString()}
               </p>
-              <p className="text-sm text-neutral-500">
+              <p className="text-sm text-ink-subtle">
                 Expira: {new Date(invoice.expiresAt).toLocaleDateString()}
               </p>
             </div>
@@ -357,34 +357,34 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
 
         {invoice ? (
           <>
-            <section className="mt-8 rounded-lg border border-neutral-800 bg-neutral-900 p-6">
-              <h3 className="font-semibold text-neutral-50">Detalhes do Invoice</h3>
+            <section className="mt-8 rounded-lg border border-border bg-surface p-6">
+              <h3 className="font-semibold text-ink">Detalhes do Invoice</h3>
               <dl className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
-                  <dt className="text-xs text-neutral-500">Invoice ID</dt>
+                  <dt className="text-xs text-ink-subtle">Invoice ID</dt>
                   <dd className="mt-1 font-mono text-sm text-neutral-300">{invoice.id}</dd>
                 </div>
                 {invoice.invoiceRef ? (
                   <div>
-                    <dt className="text-xs text-neutral-500">Referência</dt>
+                    <dt className="text-xs text-ink-subtle">Referência</dt>
                     <dd className="mt-1 text-sm text-neutral-300">{invoice.invoiceRef}</dd>
                   </div>
                 ) : null}
                 <div>
-                  <dt className="text-xs text-neutral-500">Valor</dt>
+                  <dt className="text-xs text-ink-subtle">Valor</dt>
                   <dd className="mt-1 font-mono text-sm text-neutral-300">
                     {invoice.amountHint ? `${lamportsToSol(invoice.amountHint)} SOL` : "Hidden"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-neutral-500">Chave do Destinatário</dt>
+                  <dt className="text-xs text-ink-subtle">Chave do Destinatário</dt>
                   <dd className="mt-1 break-all font-mono text-xs text-neutral-300">
                     {invoice.stealthPubkey}
                   </dd>
                 </div>
                 {invoice.memo ? (
                   <div className="md:col-span-2">
-                    <dt className="text-xs text-neutral-500">Mensagem</dt>
+                    <dt className="text-xs text-ink-subtle">Mensagem</dt>
                     <dd className="mt-1 text-sm text-neutral-300">{invoice.memo}</dd>
                   </div>
                 ) : null}
@@ -392,8 +392,8 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
             </section>
 
             {claimState === "ready" ? (
-              <section className="mt-8 rounded-lg border border-neutral-800 bg-neutral-900 p-6">
-                <h3 className="font-semibold text-neutral-50">Resgatar Fundos</h3>
+              <section className="mt-8 rounded-lg border border-border bg-surface p-6">
+                <h3 className="font-semibold text-ink">Resgatar Fundos</h3>
                 <p className="mt-2 text-sm text-neutral-300">
                   Conecte sua wallet e clique no botão abaixo para resgatar os fundos.
                 </p>
@@ -403,7 +403,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                 ) : invoice.recipientWallet !== wallet.publicKey.toBase58() ? (
                   <div className="mt-4 rounded-md border border-red-900 bg-red-950 p-3 text-sm text-red-200">
                     <p className="font-medium">Wallet incorreta</p>
-                    <p className="mt-1 text-xs text-red-300">
+                    <p className="mt-1 text-xs text-signal-danger">
                       Este invoice foi criado para a wallet{" "}
                       <span className="font-mono">{truncateAddress(invoice.recipientWallet)}</span>.
                       Conecte essa wallet para resgatar.
@@ -411,7 +411,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                   </div>
                 ) : (
                   <div className="mt-4">
-                    <p className="mb-3 text-sm text-emerald-400">Wallet correta conectada ✓</p>
+                    <p className="mb-3 text-sm text-accent">Wallet correta conectada ✓</p>
                     <Button onClick={handleClaim} disabled={claiming}>
                       {claiming ? "Processando resgate..." : "Resgatar fundos"}
                     </Button>
@@ -425,16 +425,16 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                 ) : null}
               </section>
             ) : (
-              <section className="mt-8 rounded-lg border border-neutral-800 bg-neutral-900 p-6 text-center">
+              <section className="mt-8 rounded-lg border border-border bg-surface p-6 text-center">
                 <p className={`text-lg font-medium ${getStateColor()}`}>{getStateMessage()}</p>
                 {claimState === "expired" ? (
-                  <p className="mt-2 text-sm text-neutral-400">
+                  <p className="mt-2 text-sm text-ink-muted">
                     Este invoice expirou em {new Date(invoice.expiresAt).toLocaleString()}.
                   </p>
                 ) : null}
                 <Link
                   href="/"
-                  className="mt-4 inline-block rounded-md bg-neutral-800 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:bg-neutral-700"
+                  className="mt-4 inline-block rounded-md bg-surface-2 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:bg-surface-3"
                 >
                   Voltar para Home
                 </Link>

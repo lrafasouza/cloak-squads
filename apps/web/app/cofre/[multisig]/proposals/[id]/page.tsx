@@ -46,14 +46,14 @@ function readProposalStatus(status: unknown): ProposalStatusKind {
 
 function StatusBadge({ status }: { status: ProposalStatusKind }) {
   const styles = {
-    draft: "bg-neutral-800 text-neutral-300 border-neutral-700",
-    active: "bg-blue-900/50 text-blue-300 border-blue-800/50",
-    approved: "bg-emerald-900/50 text-emerald-300 border-emerald-800/50",
-    rejected: "bg-red-900/50 text-red-300 border-red-800/50",
-    executing: "bg-amber-900/50 text-amber-300 border-amber-800/50",
-    executed: "bg-emerald-900/50 text-emerald-300 border-emerald-800/50",
-    cancelled: "bg-red-900/50 text-red-300 border-red-800/50",
-    unknown: "bg-neutral-800 text-neutral-400 border-neutral-700",
+    draft: "bg-surface-2 text-neutral-300 border-border-strong",
+    active: "bg-blue-900/50 text-blue-300 border-signal-info/30/50",
+    approved: "bg-accent-soft/50 text-accent border-accent/20",
+    rejected: "bg-signal-danger/15 text-signal-danger border-signal-danger/30",
+    executing: "bg-amber-900/50 text-amber-300 border-signal-warn/30/50",
+    executed: "bg-accent-soft/50 text-accent border-accent/20",
+    cancelled: "bg-signal-danger/15 text-signal-danger border-signal-danger/30",
+    unknown: "bg-surface-2 text-ink-muted border-border-strong",
   };
 
   return (
@@ -268,12 +268,12 @@ export default function ProposalApprovalPage({
   const isPayroll = payrollDraft !== null;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-neutral-950 via-neutral-950 to-neutral-900">
-      <header className="border-b border-neutral-800/50 bg-neutral-950/80 backdrop-blur-xl sticky top-0 z-40">
+    <main className="min-h-screen bg-gradient-to-b from-bg via-bg to-surface">
+      <header className="border-b border-border/50 bg-bg/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
             href={`/cofre/${multisigParam}`}
-            className="flex items-center gap-2 text-sm font-semibold text-neutral-100 hover:text-emerald-400 transition-colors"
+            className="flex items-center gap-2 text-sm font-semibold text-ink hover:text-accent transition-colors"
           >
             <svg
               aria-hidden="true"
@@ -299,23 +299,23 @@ export default function ProposalApprovalPage({
         <StaggerContainer staggerDelay={0.1}>
           <StaggerItem>
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-800/50 bg-emerald-950/30 px-4 py-1.5 mb-3">
-                <span className="text-sm font-medium text-emerald-300">
+              <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft px-4 py-1.5 mb-3">
+                <span className="text-sm font-medium text-accent">
                   {isPayroll ? "Payroll batch" : "Proposal"} #{id}
                 </span>
               </div>
-              <h1 className="mt-2 text-3xl font-bold text-neutral-50">Signer approval</h1>
-              <p className="mt-3 text-sm leading-relaxed text-neutral-400">
+              <h1 className="mt-2 text-3xl font-bold text-ink">Signer approval</h1>
+              <p className="mt-3 text-sm leading-relaxed text-ink-muted">
                 {isPayroll
                   ? `Review the ${payrollDraft?.recipientCount ?? 0} private transfer claims, verify commitments, then submit your Squads vote.`
                   : "Review the decrypted transfer claim, verify the commitment, then submit your Squads vote."}
               </p>
-              <div className="mt-4 flex items-start gap-3 rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-4">
+              <div className="mt-4 flex items-start gap-3 rounded-xl border border-border bg-surface/80 backdrop-blur-sm p-4">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-neutral-100 flex items-center gap-2">
+                  <p className="text-sm font-semibold text-ink flex items-center gap-2">
                     <svg
                       aria-hidden="true"
-                      className="h-4 w-4 text-neutral-400"
+                      className="h-4 w-4 text-ink-muted"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -329,12 +329,12 @@ export default function ProposalApprovalPage({
                     </svg>
                     Share with other signers
                   </p>
-                  <p className="mt-1 break-all font-mono text-xs text-neutral-500">{proposalUrl}</p>
+                  <p className="mt-1 break-all font-mono text-xs text-ink-subtle">{proposalUrl}</p>
                 </div>
                 <button
                   type="button"
                   onClick={copyProposalLink}
-                  className="shrink-0 rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2 text-xs font-semibold text-neutral-100 transition-all hover:bg-neutral-700 hover:border-neutral-600"
+                  className="shrink-0 rounded-lg border border-border-strong bg-surface-2 px-4 py-2 text-xs font-semibold text-ink transition-all hover:bg-surface-3 hover:border-border-strong"
                 >
                   {copied ? "Copied!" : "Copy link"}
                 </button>
@@ -346,11 +346,11 @@ export default function ProposalApprovalPage({
             <div className="grid gap-4">
               {/* Transfer Claim Section */}
               {isPayroll ? (
-                <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
-                  <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2 mb-4">
+                <AnimatedCard className="rounded-xl border border-border bg-surface/80 backdrop-blur-sm p-5 shadow-raise-1">
+                  <h2 className="text-base font-semibold text-ink flex items-center gap-2 mb-4">
                     <svg
                       aria-hidden="true"
-                      className="h-4 w-4 text-neutral-400"
+                      className="h-4 w-4 text-ink-muted"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -368,51 +368,51 @@ export default function ProposalApprovalPage({
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-neutral-800 text-left">
-                            <th className="pb-2 pr-4 text-neutral-500 text-xs uppercase tracking-wider">
+                          <tr className="border-b border-border text-left">
+                            <th className="pb-2 pr-4 text-ink-subtle text-xs uppercase tracking-wider">
                               Name
                             </th>
-                            <th className="pb-2 pr-4 text-neutral-500 text-xs uppercase tracking-wider">
+                            <th className="pb-2 pr-4 text-ink-subtle text-xs uppercase tracking-wider">
                               Wallet
                             </th>
-                            <th className="pb-2 pr-4 text-neutral-500 text-xs uppercase tracking-wider text-right">
+                            <th className="pb-2 pr-4 text-ink-subtle text-xs uppercase tracking-wider text-right">
                               Amount
                             </th>
-                            <th className="pb-2 text-neutral-500 text-xs uppercase tracking-wider">
+                            <th className="pb-2 text-ink-subtle text-xs uppercase tracking-wider">
                               Memo
                             </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-800/50">
                           {payrollDraft.recipients.map((r) => (
-                            <tr key={r.id} className="hover:bg-neutral-800/30 transition-colors">
-                              <td className="py-3 pr-4 text-neutral-100 font-medium">{r.name}</td>
-                              <td className="py-3 pr-4 font-mono text-xs text-neutral-400">
+                            <tr key={r.id} className="hover:bg-surface-2/30 transition-colors">
+                              <td className="py-3 pr-4 text-ink font-medium">{r.name}</td>
+                              <td className="py-3 pr-4 font-mono text-xs text-ink-muted">
                                 {r.wallet.slice(0, 8)}...{r.wallet.slice(-8)}
                               </td>
-                              <td className="py-3 pr-4 text-right font-mono tabular-nums text-neutral-100">
+                              <td className="py-3 pr-4 text-right font-mono tabular-nums text-ink">
                                 {lamportsToSol(r.amount)} SOL
                               </td>
-                              <td className="py-3 text-neutral-500">{r.memo || "—"}</td>
+                              <td className="py-3 text-ink-subtle">{r.memo || "—"}</td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
-                          <tr className="border-t border-neutral-700 font-semibold">
-                            <td colSpan={2} className="py-3 pr-4 text-neutral-100">
+                          <tr className="border-t border-border-strong font-semibold">
+                            <td colSpan={2} className="py-3 pr-4 text-ink">
                               Total
                             </td>
-                            <td className="py-3 pr-4 text-right font-mono tabular-nums text-emerald-400">
+                            <td className="py-3 pr-4 text-right font-mono tabular-nums text-accent">
                               {lamportsToSol(payrollDraft.totalAmount)}
                             </td>
-                            <td className="py-3 text-neutral-500">SOL</td>
+                            <td className="py-3 text-ink-subtle">SOL</td>
                           </tr>
                         </tfoot>
                       </table>
                     </div>
                   ) : draftLoading ? (
-                    <div className="flex items-center gap-3 text-neutral-400 py-4">
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-neutral-600 border-t-emerald-400" />
+                    <div className="flex items-center gap-3 text-ink-muted py-4">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-border-strong border-t-emerald-400" />
                       <span>Loading payroll draft...</span>
                     </div>
                   ) : (
@@ -422,11 +422,11 @@ export default function ProposalApprovalPage({
                   )}
                 </AnimatedCard>
               ) : (
-                <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
-                  <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2 mb-4">
+                <AnimatedCard className="rounded-xl border border-border bg-surface/80 backdrop-blur-sm p-5 shadow-raise-1">
+                  <h2 className="text-base font-semibold text-ink flex items-center gap-2 mb-4">
                     <svg
                       aria-hidden="true"
-                      className="h-4 w-4 text-neutral-400"
+                      className="h-4 w-4 text-ink-muted"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -448,11 +448,11 @@ export default function ProposalApprovalPage({
                         { label: "Memo", value: draft.memo || "None" },
                       ].map((item) => (
                         <div key={item.label} className="group">
-                          <dt className="text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                          <dt className="text-xs font-medium text-ink-subtle uppercase tracking-wider">
                             {item.label}
                           </dt>
                           <dd
-                            className={`mt-1 ${item.isMono ? "break-all font-mono text-xs" : ""} text-neutral-100 bg-neutral-950/50 rounded-lg px-3 py-2 border border-neutral-800/50`}
+                            className={`mt-1 ${item.isMono ? "break-all font-mono text-xs" : ""} text-ink bg-bg/50 rounded-lg px-3 py-2 border border-border/50`}
                           >
                             {item.value}
                           </dd>
@@ -460,8 +460,8 @@ export default function ProposalApprovalPage({
                       ))}
                     </dl>
                   ) : draftLoading ? (
-                    <div className="flex items-center gap-3 text-neutral-400 py-4">
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-neutral-600 border-t-emerald-400" />
+                    <div className="flex items-center gap-3 text-ink-muted py-4">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-border-strong border-t-emerald-400" />
                       <span>Loading proposal draft...</span>
                     </div>
                   ) : (
@@ -473,12 +473,12 @@ export default function ProposalApprovalPage({
               )}
 
               {/* On-chain Status */}
-              <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
+              <AnimatedCard className="rounded-xl border border-border bg-surface/80 backdrop-blur-sm p-5 shadow-raise-1">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2">
+                  <h2 className="text-base font-semibold text-ink flex items-center gap-2">
                     <svg
                       aria-hidden="true"
-                      className="h-4 w-4 text-neutral-400"
+                      className="h-4 w-4 text-ink-muted"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -498,12 +498,12 @@ export default function ProposalApprovalPage({
                 </div>
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-neutral-400">Approvals</span>
-                    <span className="font-mono text-neutral-100">
+                    <span className="text-ink-muted">Approvals</span>
+                    <span className="font-mono text-ink">
                       {threshold !== null ? `${approvals}/${threshold}` : `${approvals} votes`}
                     </span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-neutral-800">
+                  <div className="h-2 overflow-hidden rounded-full bg-surface-2">
                     <div
                       className="h-full bg-emerald-500 transition-all duration-500"
                       style={{
@@ -527,11 +527,11 @@ export default function ProposalApprovalPage({
               </AnimatedCard>
 
               {/* Vote */}
-              <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
-                <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2 mb-4">
+              <AnimatedCard className="rounded-xl border border-border bg-surface/80 backdrop-blur-sm p-5 shadow-raise-1">
+                <h2 className="text-base font-semibold text-ink flex items-center gap-2 mb-4">
                   <svg
                     aria-hidden="true"
-                    className="h-4 w-4 text-neutral-400"
+                    className="h-4 w-4 text-ink-muted"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -546,11 +546,11 @@ export default function ProposalApprovalPage({
                   Vote
                 </h2>
                 {memberVote ? (
-                  <div className="rounded-lg border border-emerald-900/50 bg-emerald-950/30 p-4">
+                  <div className="rounded-lg border border-emerald-900/50 bg-accent-soft p-4">
                     <div className="flex items-center gap-2">
                       <svg
                         aria-hidden="true"
-                        className="h-5 w-5 text-emerald-400"
+                        className="h-5 w-5 text-accent"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -562,7 +562,7 @@ export default function ProposalApprovalPage({
                           d="M5 13l4 4L19 7"
                         />
                       </svg>
-                      <p className="text-sm font-semibold text-emerald-300">
+                      <p className="text-sm font-semibold text-accent">
                         You already{" "}
                         {memberVote === "approved"
                           ? "approved"
@@ -572,7 +572,7 @@ export default function ProposalApprovalPage({
                         this proposal.
                       </p>
                     </div>
-                    <p className="mt-2 text-xs text-emerald-200/80">
+                    <p className="mt-2 text-xs text-accent/80">
                       Squads records one vote per member. The proposal can still move forward when
                       the threshold is reached.
                     </p>
@@ -586,18 +586,18 @@ export default function ProposalApprovalPage({
                   />
                 )}
                 {signature ? (
-                  <p className="mt-4 break-all font-mono text-xs text-emerald-400 bg-emerald-950/20 rounded-lg px-3 py-2">
+                  <p className="mt-4 break-all font-mono text-xs text-accent bg-emerald-950/20 rounded-lg px-3 py-2">
                     {signature}
                   </p>
                 ) : null}
               </AnimatedCard>
 
               {/* Execute */}
-              <AnimatedCard className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl">
-                <h2 className="text-base font-semibold text-neutral-50 flex items-center gap-2 mb-4">
+              <AnimatedCard className="rounded-xl border border-border bg-surface/80 backdrop-blur-sm p-5 shadow-raise-1">
+                <h2 className="text-base font-semibold text-ink flex items-center gap-2 mb-4">
                   <svg
                     aria-hidden="true"
-                    className="h-4 w-4 text-neutral-400"
+                    className="h-4 w-4 text-ink-muted"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -612,11 +612,11 @@ export default function ProposalApprovalPage({
                   Execute
                 </h2>
                 {executeComplete ? (
-                  <div className="rounded-lg border border-emerald-900/50 bg-emerald-950/30 p-4">
+                  <div className="rounded-lg border border-emerald-900/50 bg-accent-soft p-4">
                     <div className="flex items-center gap-2">
                       <svg
                         aria-hidden="true"
-                        className="h-5 w-5 text-emerald-400"
+                        className="h-5 w-5 text-accent"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -628,16 +628,16 @@ export default function ProposalApprovalPage({
                           d="M5 13l4 4L19 7"
                         />
                       </svg>
-                      <p className="text-sm font-semibold text-emerald-300">
+                      <p className="text-sm font-semibold text-accent">
                         Vault transaction executed.
                       </p>
                     </div>
-                    <p className="mt-2 text-xs text-emerald-200/80">
+                    <p className="mt-2 text-xs text-accent/80">
                       The Squads proposal is complete. The operator flow can now use the issued
                       license.
                     </p>
                     {executeSignature ? (
-                      <p className="mt-3 break-all font-mono text-xs text-emerald-400 bg-emerald-950/20 rounded-lg px-3 py-2">
+                      <p className="mt-3 break-all font-mono text-xs text-accent bg-emerald-950/20 rounded-lg px-3 py-2">
                         {executeSignature}
                       </p>
                     ) : null}
@@ -651,7 +651,7 @@ export default function ProposalApprovalPage({
                       disabled={executeBlocked}
                     />
                     {!executeComplete && executeBlocked && status !== "loading" ? (
-                      <p className="mt-3 text-xs text-neutral-500">
+                      <p className="mt-3 text-xs text-ink-subtle">
                         {status === "active" && threshold !== null
                           ? `Need ${Math.max(0, threshold - approvals)} more approval(s) before executing.`
                           : `Execute requires status = approved. Current: ${status}.`}

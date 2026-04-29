@@ -1,19 +1,35 @@
 "use client";
 
 import { CreateMultisigCard } from "@/components/create-multisig/CreateMultisigCard";
+import { FAQ } from "@/components/landing/FAQ";
+import { HeroDiagram } from "@/components/landing/HeroDiagram";
+import { SiteFooter } from "@/components/site/SiteFooter";
+import { SiteHeader } from "@/components/site/SiteHeader";
+import { Eyebrow } from "@/components/ui/aegis";
 import { StaggerContainer, StaggerItem } from "@/components/ui/animations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast-provider";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { motion } from "framer-motion";
+import {
+  Eye,
+  FileText,
+  Key,
+  Lock,
+  RefreshCw,
+  Send,
+  Shield,
+  ShieldCheck,
+  Users,
+  Zap,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-/* ── Page entry: if user lands on / with a ?multisig= param, forward them ── */
+/* ── Redirect ?multisig= param ── */
 function useRedirectParam() {
   const [redirected, setRedirected] = useState(false);
   const router = useRouter();
@@ -33,45 +49,22 @@ function useRedirectParam() {
   return redirected;
 }
 
-/* ── Animated gradient orbs background ── */
-function BackgroundOrbs() {
-  return (
-    <div className="pointer-events-none fixed inset-0 overflow-hidden">
-      <motion.div
-        className="absolute -top-40 -right-40 h-[600px] w-[600px] rounded-full bg-emerald-500/5 blur-3xl"
-        animate={{ x: [0, 30, 0], y: [0, -20, 0], scale: [1, 1.1, 1] }}
-        transition={{ duration: 12, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-      />
-      <motion.div
-        className="absolute -bottom-40 -left-40 h-[500px] w-[500px] rounded-full bg-teal-500/5 blur-3xl"
-        animate={{ x: [0, -20, 0], y: [0, 30, 0], scale: [1, 1.15, 1] }}
-        transition={{ duration: 15, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-      />
-      <motion.div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[800px] w-[800px] rounded-full bg-emerald-900/10 blur-3xl"
-        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-        transition={{ duration: 10, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-      />
-    </div>
-  );
-}
-
 /* ── Trust bar ── */
-function TrustBar() {
-  const items = [
-    { icon: "shield", label: "ZK Privacy" },
-    { icon: "lock", label: "End-to-end encrypted" },
-    { icon: "users", label: "Multi-sig security" },
-    { icon: "check", label: "Auditable" },
-    { icon: "zap", label: "Solana L1" },
-  ];
+const trustItems = [
+  { icon: Shield, label: "ZK Privacy" },
+  { icon: Lock, label: "End-to-end encrypted" },
+  { icon: Users, label: "Multi-sig security" },
+  { icon: ShieldCheck, label: "Auditable" },
+  { icon: Zap, label: "Solana L1" },
+];
 
+function TrustBar() {
   return (
-    <div className="border-y border-neutral-800/50 bg-neutral-950/50 backdrop-blur-sm">
+    <div className="border-y border-border bg-surface/50 backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-8 gap-y-3 px-4 py-6">
-        {items.map((item) => (
-          <div key={item.label} className="flex items-center gap-2 text-sm text-neutral-500">
-            <FeatureIcon name={item.icon} className="h-4 w-4 text-emerald-500/60" />
+        {trustItems.map((item) => (
+          <div key={item.label} className="flex items-center gap-2 text-sm text-ink-subtle">
+            <item.icon className="h-4 w-4 text-accent/60" />
             {item.label}
           </div>
         ))}
@@ -80,63 +73,33 @@ function TrustBar() {
   );
 }
 
-/* ── Small icon helper ── */
-function FeatureIcon({ name, className }: { name: string; className?: string }) {
-  const paths: Record<string, string> = {
-    shield: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
-    lock: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z",
-    users:
-      "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z",
-    check: "M5 13l4 4L19 7",
-    zap: "M13 2L3 14h9l-1 8 10-12h-9l1-8z",
-    send: "M12 19l9 2-9-18-9 18 9-2zm0 0v-8",
-    eye: "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z",
-    file: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z",
-    repeat: "M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3",
-    key: "M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5",
-    hash: "M4 9h16M4 15h16M10 3L8 21M16 3l-2 18",
-  };
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.5}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d={paths[name] ?? paths.shield} />
-    </svg>
-  );
-}
-
-/* ── How it works step ── */
+/* ── Step card ── */
 function StepCard({
   number,
   title,
   description,
-  icon,
+  icon: Icon,
 }: {
   number: string;
   title: string;
   description: string;
-  icon: string;
+  icon: React.ElementType;
 }) {
   return (
     <StaggerItem>
       <motion.div
         whileHover={{ y: -4 }}
         transition={{ duration: 0.2 }}
-        className="relative rounded-xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm"
+        className="relative rounded-xl border border-border bg-surface/60 p-6 backdrop-blur-sm"
       >
-        <div className="absolute -top-3 -right-3 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20 text-xs font-bold text-emerald-400 border border-emerald-500/30">
+        <div className="absolute -top-3 -right-3 flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent border border-accent/30">
           {number}
         </div>
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500/10">
-          <FeatureIcon name={icon} className="h-6 w-6 text-emerald-400" />
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-accent-soft">
+          <Icon className="h-6 w-6 text-accent" />
         </div>
-        <h3 className="mb-2 text-lg font-semibold text-neutral-100">{title}</h3>
-        <p className="text-sm leading-relaxed text-neutral-400">{description}</p>
+        <h3 className="mb-2 text-lg font-semibold text-ink">{title}</h3>
+        <p className="text-sm leading-relaxed text-ink-muted">{description}</p>
       </motion.div>
     </StaggerItem>
   );
@@ -144,12 +107,12 @@ function StepCard({
 
 /* ── Feature card ── */
 function FeatureCard({
-  icon,
+  icon: Icon,
   title,
   description,
   tag,
 }: {
-  icon: string;
+  icon: React.ElementType;
   title: string;
   description: string;
   tag?: string;
@@ -159,22 +122,22 @@ function FeatureCard({
       <motion.div
         whileHover={{ scale: 1.02 }}
         transition={{ duration: 0.2 }}
-        className="group relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm"
+        className="group relative overflow-hidden rounded-xl border border-border bg-surface/60 p-6 backdrop-blur-sm"
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+        <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
         <div className="relative">
           <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
-              <FeatureIcon name={icon} className="h-5 w-5 text-emerald-400" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft">
+              <Icon className="h-5 w-5 text-accent" />
             </div>
             {tag && (
-              <span className="rounded-full border border-emerald-800/50 bg-emerald-950/50 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
+              <span className="rounded-full border border-accent/30 bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent">
                 {tag}
               </span>
             )}
           </div>
-          <h3 className="mb-2 text-lg font-semibold text-neutral-100">{title}</h3>
-          <p className="text-sm leading-relaxed text-neutral-400">{description}</p>
+          <h3 className="mb-2 text-lg font-semibold text-ink">{title}</h3>
+          <p className="text-sm leading-relaxed text-ink-muted">{description}</p>
         </div>
       </motion.div>
     </StaggerItem>
@@ -195,7 +158,7 @@ export default function HomePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
 
-  if (redirected) return null; // already forwarding
+  if (redirected) return null;
 
   function onOpenMultisig(e: React.FormEvent) {
     e.preventDefault();
@@ -206,7 +169,7 @@ export default function HomePage() {
     setIsSubmitting(true);
     try {
       const pk = new PublicKey(trimmed);
-      addToast("Opening multisig...", "info", 2000);
+      addToast("Opening vault...", "info", 2000);
       router.push(`/cofre/${pk.toBase58()}`);
     } catch {
       setInputError("Invalid Solana address");
@@ -216,49 +179,40 @@ export default function HomePage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-neutral-950 text-neutral-100">
-      <BackgroundOrbs />
+    <div className="relative min-h-screen bg-bg text-ink">
+      {/* Background */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute inset-0 bg-radial-fade" />
+        <div className="absolute inset-0 bg-grid-faint bg-grid-md opacity-30" />
+      </div>
 
-      {/* ═══════════ HEADER ═══════════ */}
-      <header className="relative z-30 border-b border-neutral-800/50 bg-neutral-950/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/20">
-              <FeatureIcon name="shield" className="h-5 w-5 text-emerald-400" />
-            </div>
-            <span className="text-lg font-bold tracking-tight">Cloak Squads</span>
-          </Link>
-          <ClientWalletButton />
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* ═══════════ HERO ═══════════ */}
-      <section className="relative z-10">
-        <div className="mx-auto max-w-7xl px-4 pt-20 pb-16 md:px-6 md:pt-28 md:pb-24">
+      <section id="hero" className="relative z-10">
+        <div className="mx-auto max-w-7xl px-4 pt-20 pb-10 md:px-6 md:pt-28 md:pb-16">
           <StaggerContainer className="mx-auto max-w-3xl text-center" staggerDelay={0.15}>
             <StaggerItem>
-              <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-800/50 bg-emerald-950/30 px-4 py-1.5">
+              <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-1.5">
                 <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal-warn opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-signal-warn" />
                 </span>
-                <span className="text-sm font-medium text-emerald-300">Devnet Live</span>
+                <span className="text-eyebrow text-accent">Devnet Live</span>
               </div>
             </StaggerItem>
 
             <StaggerItem>
-              <h1 className="text-5xl font-bold tracking-tight text-neutral-50 md:text-7xl">
-                Private Multisig
+              <h1 className="font-display text-display font-bold text-ink">
+                Private Execution for
                 <br />
-                <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-                  Transactions
-                </span>
+                <span className="text-accent">Shared Treasuries</span>
               </h1>
             </StaggerItem>
 
             <StaggerItem>
-              <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-neutral-400 md:text-xl">
-                Zero-knowledge private execution for Squads vaults. Send, receive, and manage funds
+              <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-ink-muted md:text-xl">
+                Shielded multisig operations on Solana. Send, receive, and manage funds
                 without revealing amounts or counterparties on-chain.
               </p>
             </StaggerItem>
@@ -282,7 +236,7 @@ export default function HomePage() {
                       className="h-12 font-mono"
                     />
                     {inputError && (
-                      <p className="mt-2 text-left text-sm text-red-400">{inputError}</p>
+                      <p className="mt-2 text-left text-sm text-signal-danger">{inputError}</p>
                     )}
                   </div>
                   <Button
@@ -292,14 +246,14 @@ export default function HomePage() {
                     size="lg"
                     className="shrink-0"
                   >
-                    Open Cofre
+                    Open Vault
                   </Button>
                 </form>
-                <p className="mt-3 text-xs text-neutral-500">
+                <p className="mt-3 text-xs text-ink-subtle">
                   Or{" "}
                   <Link
-                    href="/#create"
-                    className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2"
+                    href="#create"
+                    className="text-accent hover:text-accent-hover underline underline-offset-2"
                   >
                     create a new multisig
                   </Link>{" "}
@@ -308,21 +262,25 @@ export default function HomePage() {
               </div>
             </StaggerItem>
           </StaggerContainer>
+
+          <HeroDiagram />
         </div>
       </section>
 
       <TrustBar />
 
       {/* ═══════════ HOW IT WORKS ═══════════ */}
-      <section className="relative z-10">
+      <section id="how" className="relative z-10">
         <div className="mx-auto max-w-7xl px-4 py-20 md:px-6 md:py-28">
           <StaggerContainer staggerDelay={0.1}>
             <StaggerItem>
               <div className="mb-16 text-center">
-                <h2 className="text-3xl font-bold text-neutral-50 md:text-4xl">How it works</h2>
-                <p className="mx-auto mt-4 max-w-2xl text-neutral-400">
-                  Three simple steps to private, auditable transactions with your existing Squads
-                  setup.
+                <Eyebrow as="div" className="mb-3">How it works</Eyebrow>
+                <h2 className="font-display text-display-sm font-bold text-ink">
+                  Three steps to privacy
+                </h2>
+                <p className="mx-auto mt-4 max-w-2xl text-ink-muted">
+                  Private, auditable transactions with your existing Squads setup.
                 </p>
               </div>
             </StaggerItem>
@@ -330,37 +288,38 @@ export default function HomePage() {
             <div className="grid gap-6 md:grid-cols-3">
               <StepCard
                 number="1"
-                icon="send"
+                icon={Send}
                 title="Prepare"
                 description="Create a private transfer proposal inside your Squads vault. Set the amount, recipient stealth pubkey, and optional memo."
               />
               <StepCard
                 number="2"
-                icon="check"
+                icon={ShieldCheck}
                 title="Approve"
                 description="Multisig members review the proposal, verify the zero-knowledge commitment, and vote to approve or reject."
               />
               <StepCard
                 number="3"
-                icon="zap"
+                icon={Zap}
                 title="Execute"
-                description="The operator consumes the approved license and executes the private transfer on Cloak, shielding the transaction details."
+                description="The operator consumes the approved license and executes the private transfer, shielding the transaction details."
               />
             </div>
           </StaggerContainer>
         </div>
       </section>
 
-      {/* ═══════════ FEATURES ═══════════ */}
-      <section className="relative z-10 border-y border-neutral-800/50 bg-neutral-950/30">
+      {/* ═══════════ USE CASES ═══════════ */}
+      <section id="usecases" className="relative z-10 border-y border-border bg-surface/30">
         <div className="mx-auto max-w-7xl px-4 py-20 md:px-6 md:py-28">
           <StaggerContainer staggerDelay={0.1}>
             <StaggerItem>
               <div className="mb-16 text-center">
-                <h2 className="text-3xl font-bold text-neutral-50 md:text-4xl">
+                <Eyebrow as="div" className="mb-3">Use cases</Eyebrow>
+                <h2 className="font-display text-display-sm font-bold text-ink">
                   Everything you need
                 </h2>
-                <p className="mx-auto mt-4 max-w-2xl text-neutral-400">
+                <p className="mx-auto mt-4 max-w-2xl text-ink-muted">
                   Built for teams that demand both privacy and accountability.
                 </p>
               </div>
@@ -368,33 +327,33 @@ export default function HomePage() {
 
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               <FeatureCard
-                icon="eye"
+                icon={Eye}
                 title="Private Sends"
-                description="Hide amounts and recipients on-chain using Cloak zero-knowledge proofs."
+                description="Hide amounts and recipients on-chain using zero-knowledge proofs."
               />
               <FeatureCard
-                icon="users"
+                icon={Users}
                 title="Payroll Batches"
                 description="Process multi-recipient payroll in a single Squads proposal."
                 tag="New"
               />
               <FeatureCard
-                icon="file"
+                icon={FileText}
                 title="Stealth Invoicing"
                 description="Generate encrypted invoices with claim URLs for private withdrawals."
               />
               <FeatureCard
-                icon="shield"
+                icon={Shield}
                 title="Scoped Audit Links"
                 description="Create time-bound, permissioned audit views for compliance."
               />
               <FeatureCard
-                icon="repeat"
+                icon={RefreshCw}
                 title="Operator Flow"
                 description="Separate operator wallet executes without signer private keys."
               />
               <FeatureCard
-                icon="key"
+                icon={Key}
                 title="Commitment Checks"
                 description="Verify on-chain commitments locally before signing anything."
               />
@@ -403,34 +362,95 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ═══════════ SECURITY ═══════════ */}
+      <section id="security" className="relative z-10">
+        <div className="mx-auto max-w-7xl px-4 py-20 md:px-6 md:py-28">
+          <div className="mx-auto max-w-3xl text-center">
+            <Eyebrow as="div" className="mb-3">Security</Eyebrow>
+            <h2 className="font-display text-display-sm font-bold text-ink">
+              Trust architecture
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-ink-muted">
+              Aegis never holds your keys. The on-chain Gatekeeper program issues single-use,
+              time-limited licenses that only a registered Operator can consume. Every action is
+              auditable through scoped viewing keys.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-12 grid max-w-3xl gap-6 md:grid-cols-3">
+            {[
+              {
+                icon: Lock,
+                title: "Single-use licenses",
+                desc: "Each license expires after one execution or TTL timeout.",
+              },
+              {
+                icon: Shield,
+                title: "No key custody",
+                desc: "Aegis never touches signer private keys. Operators only consume licenses.",
+              },
+              {
+                icon: Key,
+                title: "Viewing keys",
+                desc: "Generate scoped, revocable audit links for compliance without revealing everything.",
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-xl border border-border bg-surface/60 p-5 backdrop-blur-sm"
+              >
+                <item.icon className="mb-3 h-6 w-6 text-accent" />
+                <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
+                <p className="mt-1.5 text-sm text-ink-muted">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════ FAQ ═══════════ */}
+      <section id="docs" className="relative z-10 border-t border-border">
+        <div className="mx-auto max-w-7xl px-4 py-20 md:px-6 md:py-28">
+          <div className="mb-12 text-center">
+            <Eyebrow as="div" className="mb-3">FAQ</Eyebrow>
+            <h2 className="font-display text-display-sm font-bold text-ink">
+              Common questions
+            </h2>
+          </div>
+          <FAQ />
+        </div>
+      </section>
+
       {/* ═══════════ CTA ═══════════ */}
-      <section id="create" className="relative z-10">
+      <section id="create" className="relative z-10 border-t border-border">
         <div className="mx-auto max-w-7xl px-4 py-20 md:px-6 md:py-28">
           <StaggerContainer staggerDelay={0.1}>
             <StaggerItem>
               <div className="mx-auto max-w-4xl">
                 <div className="mb-10 text-center">
-                  <h2 className="text-3xl font-bold text-neutral-50">Ready to go private?</h2>
-                  <p className="mt-4 text-neutral-400">
+                  <h2 className="font-display text-display-sm font-bold text-ink">
+                    Ready to go private?
+                  </h2>
+                  <p className="mt-4 text-ink-muted">
                     Connect your wallet and open an existing Squads multisig, or create a new one in
                     seconds.
                   </p>
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-[0.9fr_1.1fr] md:items-start">
-                  <div className="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-xl backdrop-blur-sm">
-                    <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                      <FeatureIcon name="send" className="h-5 w-5 text-emerald-400" />
+                  <div className="rounded-xl border border-border bg-surface/80 p-6 shadow-raise-1 backdrop-blur-sm">
+                    <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft">
+                      <Send className="h-5 w-5 text-accent" />
                     </div>
-                    <h3 className="text-sm font-semibold text-neutral-100">
+                    <h3 className="text-sm font-semibold text-ink">
                       Open an existing multisig
                     </h3>
-                    <p className="mt-2 text-sm text-neutral-500">
+                    <p className="mt-2 text-sm text-ink-subtle">
                       Jump back to the address field and open any Squads multisig PDA.
                     </p>
                     <Button
                       size="lg"
-                      variant="gradient"
+                      variant="default"
                       className="mt-6 w-full"
                       onClick={() => {
                         const el = document.getElementById("hero-input");
@@ -438,13 +458,13 @@ export default function HomePage() {
                         el?.focus({ preventScroll: true });
                       }}
                     >
-                      <FeatureIcon name="send" className="h-5 w-5 mr-2" />
-                      Open a Multisig
+                      <Send className="h-5 w-5 mr-2" />
+                      Open a Vault
                     </Button>
 
                     {!wallet.connected && (
-                      <p className="mt-4 text-xs text-neutral-500">
-                        You&apos;ll need a Solana wallet to interact with Cloak Squads.
+                      <p className="mt-4 text-xs text-ink-subtle">
+                        You&apos;ll need a Solana wallet to interact with Aegis.
                       </p>
                     )}
                   </div>
@@ -460,7 +480,7 @@ export default function HomePage() {
                     variant="outline"
                     onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
                   >
-                    Learn More
+                    Back to top
                   </Button>
                 </div>
               </div>
@@ -469,20 +489,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══════════ FOOTER ═══════════ */}
-      <footer className="relative z-10 border-t border-neutral-800/50">
-        <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
-          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <div className="flex items-center gap-2">
-              <FeatureIcon name="shield" className="h-5 w-5 text-emerald-500/60" />
-              <span className="text-sm font-semibold text-neutral-400">Cloak Squads</span>
-            </div>
-            <p className="text-xs text-neutral-600">
-              Zero-knowledge private execution for Squads vaults.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

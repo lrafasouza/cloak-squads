@@ -65,29 +65,29 @@ export function CommitmentCheck({
           : "Unavailable";
   const stateColor =
     state === "match"
-      ? "text-emerald-300"
+      ? "text-accent"
       : state === "mismatch"
-        ? "text-red-300"
+        ? "text-signal-danger"
         : state === "unavailable"
           ? "text-amber-300"
           : "text-neutral-300";
 
   return (
-    <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+    <section className="rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-base font-semibold text-neutral-50">Commitment check</h2>
+        <h2 className="text-base font-semibold text-ink">Commitment check</h2>
         <span className={cn("text-sm font-semibold", stateColor)}>{stateLabel}</span>
       </div>
       <dl className="mt-4 grid gap-3 text-sm">
         <div>
-          <dt className="text-neutral-400">On-chain</dt>
-          <dd className="mt-1 font-mono text-neutral-100">
+          <dt className="text-ink-muted">On-chain</dt>
+          <dd className="mt-1 font-mono text-ink">
             {truncateBase58(claim.onChainCommitment)}
           </dd>
         </div>
         <div>
-          <dt className="text-neutral-400">Local recompute</dt>
-          <dd className="mt-1 font-mono text-neutral-100">
+          <dt className="text-ink-muted">Local recompute</dt>
+          <dd className="mt-1 font-mono text-ink">
             {computed ? truncateBase58(computed) : error ? "Unavailable" : "Checking..."}
           </dd>
         </div>
@@ -102,7 +102,7 @@ export function CommitmentCheck({
         </p>
       ) : null}
       {state === "mismatch" ? (
-        <p className="mt-4 text-sm text-red-300">
+        <p className="mt-4 text-sm text-signal-danger">
           Local recompute does NOT match the on-chain commitment. Reject this proposal.
         </p>
       ) : null}

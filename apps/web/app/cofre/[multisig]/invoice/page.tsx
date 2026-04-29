@@ -229,11 +229,11 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       <main className="mx-auto max-w-3xl px-4 py-10">
         <Link
           href="/"
-          className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+          className="text-sm text-accent hover:text-accent transition-colors"
         >
           Back to picker
         </Link>
-        <h1 className="mt-6 text-2xl font-semibold text-neutral-50">Invalid multisig address</h1>
+        <h1 className="mt-6 text-2xl font-semibold text-ink">Invalid multisig address</h1>
       </main>
     );
   }
@@ -243,11 +243,11 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
     const fullClaimUrl = `${typeof window !== "undefined" ? window.location.origin : ""}${result.claimUrl}`;
     return (
       <main className="min-h-screen">
-        <header className="border-b border-neutral-800 bg-neutral-950/95">
+        <header className="border-b border-border bg-bg/95">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
             <Link
               href={`/cofre/${multisigAddress.toBase58()}`}
-              className="text-sm font-semibold text-neutral-100"
+              className="text-sm font-semibold text-ink"
             >
               Cofre
             </Link>
@@ -256,11 +256,11 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         </header>
 
         <section className="mx-auto max-w-xl px-4 py-12 md:px-6">
-          <div className="rounded-xl border border-emerald-800 bg-emerald-950/40 p-6">
+          <div className="rounded-xl border border-accent/20 bg-accent-soft p-6">
             <div className="flex items-center gap-3 mb-4">
               <svg
                 aria-hidden="true"
-                className="h-6 w-6 text-emerald-400"
+                className="h-6 w-6 text-accent"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -272,15 +272,15 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                   d="M5 13l4 4L19 7"
                 />
               </svg>
-              <h1 className="text-lg font-semibold text-emerald-200">Invoice created</h1>
+              <h1 className="text-lg font-semibold text-accent">Invoice created</h1>
             </div>
 
             <div className="grid gap-4">
-              <div className="rounded-lg bg-emerald-900/30 p-4">
-                <p className="text-xs font-medium text-emerald-300 mb-1">
+              <div className="rounded-lg bg-accent-soft p-4">
+                <p className="text-xs font-medium text-accent mb-1">
                   Claim link — send to recipient
                 </p>
-                <p className="break-all font-mono text-xs text-emerald-100 leading-relaxed">
+                <p className="break-all font-mono text-xs text-accent leading-relaxed">
                   {fullClaimUrl}
                 </p>
                 <Button
@@ -294,7 +294,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                 </Button>
               </div>
 
-              <p className="text-sm text-neutral-400">
+              <p className="text-sm text-ink-muted">
                 Copy the claim link before continuing. The recipient needs it to withdraw funds
                 after the proposal is executed.
               </p>
@@ -317,12 +317,12 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-neutral-950 via-neutral-950 to-neutral-900">
-      <header className="border-b border-neutral-800/50 bg-neutral-950/80 backdrop-blur-xl sticky top-0 z-40">
+    <main className="min-h-screen bg-gradient-to-b from-bg via-bg to-surface">
+      <header className="border-b border-border/50 bg-bg/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
             href={`/cofre/${multisigAddress.toBase58()}`}
-            className="flex items-center gap-2 text-sm font-semibold text-neutral-100 hover:text-emerald-400 transition-colors"
+            className="flex items-center gap-2 text-sm font-semibold text-ink hover:text-accent transition-colors"
           >
             <svg
               aria-hidden="true"
@@ -346,10 +346,10 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
 
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-800/50 bg-emerald-950/30 px-4 py-1.5 mb-3">
+          <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft px-4 py-1.5 mb-3">
             <svg
               aria-hidden="true"
-              className="h-4 w-4 text-emerald-400"
+              className="h-4 w-4 text-accent"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -361,10 +361,10 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            <span className="text-sm font-medium text-emerald-300">F4 stealth invoice</span>
+            <span className="text-sm font-medium text-accent">F4 stealth invoice</span>
           </div>
-          <h1 className="mt-2 text-3xl font-bold text-neutral-50">Create payment request</h1>
-          <p className="mt-3 text-sm leading-relaxed text-neutral-400">
+          <h1 className="mt-2 text-3xl font-bold text-ink">Create payment request</h1>
+          <p className="mt-3 text-sm leading-relaxed text-ink-muted">
             Creates a private invoice and a Squads proposal in one step. After approval and
             execution, the recipient uses the claim link to withdraw funds privately.
           </p>
@@ -373,7 +373,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         <div className="grid gap-4">
           <form
             onSubmit={handleSubmit}
-            className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-5 shadow-xl"
+            className="rounded-xl border border-border bg-surface/80 backdrop-blur-sm p-5 shadow-raise-1"
           >
             <div className="grid gap-4">
               <div>
@@ -444,10 +444,10 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
             </div>
 
             {error ? (
-              <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3">
+              <div className="mt-4 flex items-center gap-2 rounded-lg border border-signal-danger/30 bg-signal-danger/15 px-4 py-3">
                 <svg
                   aria-hidden="true"
-                  className="h-4 w-4 shrink-0 text-red-400"
+                  className="h-4 w-4 shrink-0 text-signal-danger"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -459,7 +459,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                     d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <p className="text-sm text-red-300">{error}</p>
+                <p className="text-sm text-signal-danger">{error}</p>
               </div>
             ) : null}
           </form>

@@ -31,7 +31,7 @@ export function ApprovalButtons({
         wallet,
         multisigPda: new PublicKey(multisig),
         transactionIndex: BigInt(transactionIndex),
-        memo: kind === "approve" ? "Cloak Squads F1 approved" : "Cloak Squads F1 rejected",
+        memo: kind === "approve" ? "Aegis F1 approved" : "Aegis F1 rejected",
       };
       const signature =
         kind === "approve" ? await proposalApprove(params) : await proposalReject(params);
@@ -62,7 +62,7 @@ export function ApprovalButtons({
           {pending === "reject" ? "Rejecting..." : "Reject"}
         </Button>
       </div>
-      {error ? <p className="text-sm text-red-300">{error}</p> : null}
+      {error ? <p className="text-sm text-signal-danger">{error}</p> : null}
     </div>
   );
 }

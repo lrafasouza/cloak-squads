@@ -53,7 +53,7 @@ export function ExecuteButton({
       <Button type="button" variant="secondary" disabled={pending || disabled} onClick={submit}>
         {pending ? "Executing..." : "Execute vault transaction"}
       </Button>
-      {error ? <p className="text-sm text-red-300">{error}</p> : null}
+      {error ? <p className="text-sm text-signal-danger">{error}</p> : null}
     </div>
   );
 }

@@ -175,21 +175,21 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Link href="/" className="text-sm text-emerald-300">
+        <Link href="/" className="text-sm text-accent">
           Back to picker
         </Link>
-        <h1 className="mt-6 text-2xl font-semibold text-neutral-50">Invalid multisig address</h1>
+        <h1 className="mt-6 text-2xl font-semibold text-ink">Invalid multisig address</h1>
       </main>
     );
   }
 
   return (
     <main className="min-h-screen">
-      <header className="border-b border-neutral-800 bg-neutral-950/95">
+      <header className="border-b border-border bg-bg/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
             href={`/cofre/${multisigAddress.toBase58()}`}
-            className="text-sm font-semibold text-neutral-100"
+            className="text-sm font-semibold text-ink"
           >
             Cofre
           </Link>
@@ -199,8 +199,8 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
 
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
-          <p className="text-sm font-medium text-emerald-300">Private Send</p>
-          <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Send SOL privately</h1>
+          <p className="text-sm font-medium text-accent">Private Send</p>
+          <h1 className="mt-2 text-3xl font-semibold text-ink">Send SOL privately</h1>
           <p className="mt-3 text-sm leading-6 text-neutral-300">
             Enter a recipient wallet and amount. A Squads proposal will be created for signer
             approval. Once executed, the operator delivers SOL directly to the recipient via the
@@ -209,7 +209,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         </div>
 
         <form onSubmit={handleSubmit} className="grid gap-4">
-          <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 md:p-5">
+          <div className="rounded-lg border border-border bg-surface p-4 md:p-5">
             <div className="grid gap-4">
               <div>
                 <Label htmlFor="recipient">Recipient</Label>
@@ -263,7 +263,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
               <div className="flex gap-3">
                 <Link
                   href={`/cofre/${multisigAddress.toBase58()}`}
-                  className="inline-flex items-center justify-center rounded-md border border-neutral-700 bg-transparent px-4 py-2 text-sm font-medium text-neutral-100 hover:bg-neutral-800"
+                  className="inline-flex items-center justify-center rounded-md border border-border-strong bg-transparent px-4 py-2 text-sm font-medium text-ink hover:bg-surface-2"
                 >
                   Back
                 </Link>

@@ -870,21 +870,21 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Link href="/" className="text-sm text-emerald-300">
+        <Link href="/" className="text-sm text-accent">
           Back to picker
         </Link>
-        <h1 className="mt-6 text-2xl font-semibold text-neutral-50">Invalid multisig address</h1>
+        <h1 className="mt-6 text-2xl font-semibold text-ink">Invalid multisig address</h1>
       </main>
     );
   }
 
   return (
     <main className="min-h-screen">
-      <header className="border-b border-neutral-800 bg-neutral-950/95">
+      <header className="border-b border-border bg-bg/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
             href={`/cofre/${multisigAddress.toBase58()}`}
-            className="text-sm font-semibold text-neutral-100"
+            className="text-sm font-semibold text-ink"
           >
             Cofre
           </Link>
@@ -894,11 +894,11 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
-          <p className="text-sm font-medium text-emerald-300">Operator</p>
-          <h1 className="mt-2 text-3xl font-semibold text-neutral-50">Execute with license</h1>
+          <p className="text-sm font-medium text-accent">Operator</p>
+          <h1 className="mt-2 text-3xl font-semibold text-ink">Execute with license</h1>
           <p className="mt-3 text-sm leading-6 text-neutral-300">
             The operator wallet consumes an approved+executed license, calling
-            <code className="mx-1 text-emerald-300">execute_with_license</code> on the gatekeeper.
+            <code className="mx-1 text-accent">execute_with_license</code> on the gatekeeper.
             Load a proposal draft created from the Send or Payroll page, then execute.
           </p>
         </div>
@@ -910,18 +910,18 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             >
               <dl className="grid gap-3 text-sm">
                 <div>
-                  <dt className="text-neutral-400">Registered operator</dt>
-                  <dd className="break-all font-mono text-neutral-100">{registeredOperator}</dd>
+                  <dt className="text-ink-muted">Registered operator</dt>
+                  <dd className="break-all font-mono text-ink">{registeredOperator}</dd>
                 </div>
                 <div>
-                  <dt className="text-neutral-400">Connected wallet</dt>
-                  <dd className="break-all font-mono text-neutral-100">
+                  <dt className="text-ink-muted">Connected wallet</dt>
+                  <dd className="break-all font-mono text-ink">
                     {wallet.publicKey ? wallet.publicKey.toBase58() : "Not connected"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-neutral-400">Operator balance</dt>
-                  <dd className="font-mono text-neutral-100">
+                  <dt className="text-ink-muted">Operator balance</dt>
+                  <dd className="font-mono text-ink">
                     {operatorBalanceLoading
                       ? "Loading..."
                       : operatorBalanceLamports === null
@@ -937,7 +937,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   </p>
                 ) : null}
                 {lowOperatorSol ? (
-                  <p className="rounded-md border border-amber-800 bg-amber-900/40 px-3 py-2 text-amber-100">
+                  <p className="rounded-md border border-signal-warn/30 bg-amber-900/40 px-3 py-2 text-amber-100">
                     Operator balance is below 0.01 SOL. Airdrop devnet SOL before executing.
                   </p>
                 ) : null}
@@ -954,28 +954,28 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           ) : null}
 
           {pendingDrafts.length > 0 && (
-            <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-              <h2 className="mb-3 text-base font-semibold text-neutral-50">
+            <section className="rounded-lg border border-border bg-surface p-4">
+              <h2 className="mb-3 text-base font-semibold text-ink">
                 Proposals ready to execute
               </h2>
               <ul className="grid gap-2">
                 {pendingDrafts.map((d) => (
                   <li
                     key={d.id}
-                    className="flex items-center justify-between gap-3 rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm"
+                    className="flex items-center justify-between gap-3 rounded-md border border-border bg-bg px-3 py-2 text-sm"
                   >
                     <div className="min-w-0">
-                      <span className="font-mono text-neutral-100">#{d.transactionIndex}</span>
+                      <span className="font-mono text-ink">#{d.transactionIndex}</span>
                       {d.type === "payroll" ? (
-                        <span className="ml-2 rounded bg-emerald-900 px-1.5 py-0.5 text-xs text-emerald-200">
+                        <span className="ml-2 rounded bg-accent-soft px-1.5 py-0.5 text-xs text-accent">
                           payroll
                         </span>
                       ) : (
-                        <span className="ml-2 rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-300">
+                        <span className="ml-2 rounded bg-surface-2 px-1.5 py-0.5 text-xs text-neutral-300">
                           single
                         </span>
                       )}
-                      <p className="mt-0.5 truncate text-xs text-neutral-400">
+                      <p className="mt-0.5 truncate text-xs text-ink-muted">
                         {d.type === "payroll"
                           ? `${d.recipientCount ?? 0} recipients · ${lamportsToSol(d.totalAmount ?? d.amount)} SOL`
                           : `${lamportsToSol(d.amount)} SOL`}
@@ -1036,8 +1036,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             </section>
           )}
 
-          <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-            <h2 className="mb-4 text-base font-semibold text-neutral-50">Load proposal draft</h2>
+          <section className="rounded-lg border border-border bg-surface p-4">
+            <h2 className="mb-4 text-base font-semibold text-ink">Load proposal draft</h2>
             <div className="flex items-end gap-3">
               <div className="flex-1">
                 <Label htmlFor="txIndex">Proposal # (transaction index)</Label>
@@ -1065,21 +1065,21 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           </section>
 
           {loadedDraft ? (
-            <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-              <h2 className="mb-3 text-base font-semibold text-neutral-50">Draft invariants</h2>
+            <section className="rounded-lg border border-border bg-surface p-4">
+              <h2 className="mb-3 text-base font-semibold text-ink">Draft invariants</h2>
               <dl className="grid gap-2 text-sm">
                 <div>
-                  <dt className="text-neutral-400">Amount</dt>
-                  <dd className="font-mono text-neutral-100">
+                  <dt className="text-ink-muted">Amount</dt>
+                  <dd className="font-mono text-ink">
                     {lamportsToSol(loadedDraft.amount)} SOL
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-neutral-400">Recipient</dt>
-                  <dd className="break-all font-mono text-neutral-100">{loadedDraft.recipient}</dd>
+                  <dt className="text-ink-muted">Recipient</dt>
+                  <dd className="break-all font-mono text-ink">{loadedDraft.recipient}</dd>
                 </div>
                 <div>
-                  <dt className="text-neutral-400">Nullifier</dt>
+                  <dt className="text-ink-muted">Nullifier</dt>
                   <dd className="break-all font-mono text-xs text-neutral-300">
                     {Uint8Array.from(loadedDraft.invariants.nullifier).reduce(
                       (s, b) => s + b.toString(16).padStart(2, "0"),
@@ -1088,7 +1088,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-neutral-400">Payload hash</dt>
+                  <dt className="text-ink-muted">Payload hash</dt>
                   <dd className="break-all font-mono text-xs text-neutral-300">
                     {Uint8Array.from(loadedDraft.payloadHash).reduce(
                       (s, b) => s + b.toString(16).padStart(2, "0"),
@@ -1101,18 +1101,18 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           ) : null}
 
           {isPayroll && payrollDraft ? (
-            <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-              <h2 className="mb-3 text-base font-semibold text-neutral-50">
+            <section className="rounded-lg border border-border bg-surface p-4">
+              <h2 className="mb-3 text-base font-semibold text-ink">
                 Payroll batch — {payrollDraft.recipientCount} recipients
               </h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-neutral-800 text-left">
-                      <th className="pb-2 pr-4 text-neutral-400">#</th>
-                      <th className="pb-2 pr-4 text-neutral-400">Name</th>
-                      <th className="pb-2 pr-4 text-neutral-400 text-right">Amount</th>
-                      <th className="pb-2 text-neutral-400">Status</th>
+                    <tr className="border-b border-border text-left">
+                      <th className="pb-2 pr-4 text-ink-muted">#</th>
+                      <th className="pb-2 pr-4 text-ink-muted">Name</th>
+                      <th className="pb-2 pr-4 text-ink-muted text-right">Amount</th>
+                      <th className="pb-2 text-ink-muted">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-800">
@@ -1120,26 +1120,26 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                       const step = executionSteps[i];
                       return (
                         <tr key={r.id}>
-                          <td className="py-2 pr-4 text-neutral-400">{i + 1}</td>
-                          <td className="py-2 pr-4 text-neutral-100">{r.name}</td>
-                          <td className="py-2 pr-4 text-right font-mono tabular-nums text-neutral-100">
+                          <td className="py-2 pr-4 text-ink-muted">{i + 1}</td>
+                          <td className="py-2 pr-4 text-ink">{r.name}</td>
+                          <td className="py-2 pr-4 text-right font-mono tabular-nums text-ink">
                             {lamportsToSol(r.amount)} SOL
                           </td>
                           <td className="py-2">
                             {!step || step.status === "pending" ? (
-                              <span className="text-neutral-400">Pending</span>
+                              <span className="text-ink-muted">Pending</span>
                             ) : step.status === "running" ? (
                               <span className="text-amber-300">Running…</span>
                             ) : step.status === "success" ? (
-                              <span className="text-emerald-300">Done</span>
+                              <span className="text-accent">Done</span>
                             ) : (
                               <div>
-                                <span className="text-red-300">Failed</span>
+                                <span className="text-signal-danger">Failed</span>
                                 <button
                                   type="button"
                                   onClick={() => retryFromStep(i)}
                                   disabled={executing}
-                                  className="ml-2 text-xs text-emerald-300 hover:text-emerald-200 disabled:text-neutral-500"
+                                  className="ml-2 text-xs text-accent hover:text-accent disabled:text-ink-subtle"
                                 >
                                   Retry
                                 </button>
@@ -1155,13 +1155,13 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
               {executionSteps.length > 0 && (
                 <div className="mt-4">
-                  <div className="flex items-center justify-between text-xs text-neutral-400">
+                  <div className="flex items-center justify-between text-xs text-ink-muted">
                     <span>Progress</span>
                     <span>
                       {successCount}/{payrollDraft.recipientCount}
                     </span>
                   </div>
-                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-neutral-800">
+                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-2">
                     <div
                       className="h-full bg-emerald-400 transition-all"
                       style={{
@@ -1182,10 +1182,10 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
           <form
             onSubmit={execute}
-            className="rounded-lg border border-neutral-800 bg-neutral-900 p-4"
+            className="rounded-lg border border-border bg-surface p-4"
           >
-            <h2 className="mb-4 text-base font-semibold text-neutral-50">Execute</h2>
-            <p className="mb-4 text-xs text-neutral-400">
+            <h2 className="mb-4 text-base font-semibold text-ink">Execute</h2>
+            <p className="mb-4 text-xs text-ink-muted">
               Connect the registered operator wallet for this cofre.
               {registeredOperator ? (
                 <span className="mt-1 block break-all font-mono text-neutral-300">
@@ -1242,8 +1242,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
           {signature && !isPayroll ? (
             <section className="rounded-md border border-emerald-900 bg-emerald-950 p-3">
-              <p className="text-sm font-medium text-emerald-200">License consumed</p>
-              <p className="mt-2 break-all font-mono text-xs text-emerald-100">{signature}</p>
+              <p className="text-sm font-medium text-accent">License consumed</p>
+              <p className="mt-2 break-all font-mono text-xs text-accent">{signature}</p>
             </section>
           ) : null}
 

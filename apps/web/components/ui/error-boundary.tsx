@@ -36,10 +36,10 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex min-h-[400px] items-center justify-center p-4">
           <div className="max-w-md text-center">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-red-900/20">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-signal-danger/15">
               <svg
                 aria-hidden="true"
-                className="h-8 w-8 text-red-400"
+                className="h-8 w-8 text-signal-danger"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -52,8 +52,8 @@ export class ErrorBoundary extends Component<Props, State> {
                 />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-neutral-50 mb-2">Something went wrong</h2>
-            <p className="text-sm text-neutral-400 mb-6">
+            <h2 className="text-xl font-semibold text-ink mb-2">Something went wrong</h2>
+            <p className="text-sm text-ink-muted mb-6">
               {this.state.error?.message || "An unexpected error occurred. Please try again."}
             </p>
             <Button

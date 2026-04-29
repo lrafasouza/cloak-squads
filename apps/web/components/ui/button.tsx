@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
 import type { ButtonHTMLAttributes } from "react";
 import { forwardRef } from "react";
-import { Spinner } from "./skeleton";
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "default" | "secondary" | "outline" | "destructive" | "ghost" | "gradient";
+  variant?: "default" | "secondary" | "outline" | "destructive" | "ghost" | "accent-soft" | "link";
   size?: "default" | "sm" | "lg" | "icon";
   isLoading?: boolean;
 };
@@ -17,21 +17,22 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center rounded-lg text-sm font-semibold transition-all duration-200",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950",
+        "inline-flex items-center justify-center rounded-md text-sm font-semibold transition-colors duration-150",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
         "disabled:pointer-events-none disabled:opacity-50",
         "active:scale-[0.98]",
         variant === "default" &&
-          "bg-emerald-500 text-white hover:bg-emerald-400 shadow-lg shadow-emerald-500/20",
+          "bg-accent text-accent-ink hover:bg-accent-hover shadow-raise-1",
         variant === "secondary" &&
-          "bg-neutral-800 text-neutral-100 hover:bg-neutral-700 border border-neutral-700",
+          "bg-surface-2 text-ink hover:bg-surface-3 border border-border",
         variant === "outline" &&
-          "border-2 border-neutral-700 text-neutral-100 hover:bg-neutral-800 hover:border-neutral-600",
+          "border border-border-strong text-ink hover:bg-surface-2 bg-transparent",
         variant === "destructive" &&
-          "bg-red-500 text-white hover:bg-red-400 shadow-lg shadow-red-500/20",
-        variant === "ghost" && "text-neutral-100 hover:bg-neutral-800/80",
-        variant === "gradient" &&
-          "bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-400 hover:to-teal-400 shadow-lg shadow-emerald-500/25",
+          "bg-signal-danger/15 text-signal-danger border border-signal-danger/30 hover:bg-signal-danger/25",
+        variant === "ghost" && "text-ink-muted hover:text-ink hover:bg-surface-2",
+        variant === "accent-soft" &&
+          "bg-accent-soft text-accent border border-accent/20 hover:border-accent/40",
+        variant === "link" && "text-accent underline-offset-4 hover:underline",
         size === "default" && "min-h-11 px-5 py-2.5",
         size === "sm" && "min-h-9 px-4 py-2 text-xs",
         size === "lg" && "min-h-12 px-6 py-3 text-base",
@@ -41,7 +42,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       disabled={disabled || isLoading}
       {...props}
     >
-      {isLoading && <Spinner size="sm" className="mr-2" />}
+      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
       {children}
     </button>
   ),

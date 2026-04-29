@@ -131,7 +131,7 @@ export function CreateMultisigCard({
           })),
           timeLock: 0,
           rentCollector: null,
-          memo: "Created via Cloak Squads",
+          memo: "Created via Aegis",
         });
 
         const latestBlockhash = await connection.getLatestBlockhash();
@@ -158,7 +158,7 @@ export function CreateMultisigCard({
           wallet,
           multisigPda,
           initCofreIx: initCofre.instruction,
-          memo: "Initialize Cloak Squads cofre",
+          memo: "Initialize Aegis cofre",
         });
         setBootstrapProposalIndex(bootstrap.transactionIndex.toString());
         setBootstrapState("proposal-created");
@@ -211,12 +211,12 @@ export function CreateMultisigCard({
 
   return (
     <AnimatedCard>
-      <div className="rounded-xl border border-neutral-800 bg-neutral-900/80 backdrop-blur-sm p-6 shadow-xl">
+      <div className="rounded-xl border border-border bg-surface/80 backdrop-blur-sm p-6 shadow-raise-1">
         <div className="flex items-center gap-3 mb-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft">
             <svg
               aria-hidden="true"
-              className="h-4 w-4 text-emerald-400"
+              className="h-4 w-4 text-accent"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -230,8 +230,8 @@ export function CreateMultisigCard({
             </svg>
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-neutral-100">Create a new multisig</h2>
-            <p className="text-xs text-neutral-500 mt-0.5">
+            <h2 className="text-sm font-semibold text-ink">Create a new multisig</h2>
+            <p className="text-xs text-ink-subtle mt-0.5">
               {walletConnected
                 ? "Add members and set the approval threshold."
                 : "Connect your wallet to create a multisig."}
@@ -248,22 +248,22 @@ export function CreateMultisigCard({
             ].map((item) => (
               <div
                 key={item.step}
-                className="flex items-center gap-3 rounded-lg border border-neutral-800/50 bg-neutral-950/50 px-4 py-3"
+                className="flex items-center gap-3 rounded-lg border border-border/50 bg-bg/50 px-4 py-3"
               >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-xs font-semibold text-neutral-400">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-ink-muted">
                   {item.step}
                 </div>
-                <span className="text-sm text-neutral-500">{item.text}</span>
+                <span className="text-sm text-ink-subtle">{item.text}</span>
               </div>
             ))}
           </div>
         ) : state === "success" && createdPda ? (
           <div className="mt-4 space-y-4">
-            <div className="rounded-lg border border-emerald-900/50 bg-emerald-950/30 p-4">
+            <div className="rounded-lg border border-emerald-900/50 bg-accent-soft p-4">
               <div className="flex items-center gap-2 mb-2">
                 <svg
                   aria-hidden="true"
-                  className="h-5 w-5 text-emerald-400"
+                  className="h-5 w-5 text-accent"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -275,17 +275,17 @@ export function CreateMultisigCard({
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                <span className="text-sm font-semibold text-emerald-300">
+                <span className="text-sm font-semibold text-accent">
                   Multisig created successfully!
                 </span>
               </div>
-              <p className="font-mono text-xs text-neutral-400 break-all bg-neutral-950/50 rounded-lg px-3 py-2">
+              <p className="font-mono text-xs text-ink-muted break-all bg-bg/50 rounded-lg px-3 py-2">
                 {createdPda}
               </p>
             </div>
             {createdOperator && (
-              <div className="rounded-lg border border-neutral-800 bg-neutral-950/50 p-4">
-                <p className="text-xs font-medium text-neutral-400">Operator wallet</p>
+              <div className="rounded-lg border border-border bg-bg/50 p-4">
+                <p className="text-xs font-medium text-ink-muted">Operator wallet</p>
                 <p className="mt-2 break-all font-mono text-xs text-neutral-200">
                   {createdOperator}
                 </p>
@@ -309,7 +309,7 @@ export function CreateMultisigCard({
           <form onSubmit={submit} className="mt-4 space-y-5">
             <div>
               <p className="text-sm font-medium text-neutral-300 mb-2">Members</p>
-              <p className="text-xs text-neutral-500 mb-3">
+              <p className="text-xs text-ink-subtle mb-3">
                 Your wallet is automatically included as a member.
               </p>
               <StaggerContainer className="space-y-2" staggerDelay={0.05}>
@@ -332,7 +332,7 @@ export function CreateMultisigCard({
                         <button
                           type="button"
                           onClick={() => removeMember(i)}
-                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-red-900/50 text-red-400 hover:bg-red-950/30 transition-colors"
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-signal-danger/30 text-signal-danger hover:bg-signal-danger/15 transition-colors"
                           title="Remove member"
                         >
                           <svg
@@ -358,7 +358,7 @@ export function CreateMultisigCard({
               <button
                 type="button"
                 onClick={addMember}
-                className="mt-3 inline-flex items-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+                className="mt-3 inline-flex items-center gap-2 text-sm text-accent hover:text-accent transition-colors"
               >
                 <svg
                   aria-hidden="true"
@@ -394,7 +394,7 @@ export function CreateMultisigCard({
                 onChange={(e) => setThreshold(Number(e.target.value))}
                 className="w-24"
               />
-              <p className="mt-2 text-xs text-neutral-500">
+              <p className="mt-2 text-xs text-ink-subtle">
                 How many members must approve a proposal.
               </p>
             </div>
@@ -418,19 +418,19 @@ export function CreateMultisigCard({
                 <button
                   type="button"
                   onClick={() => setOperatorInput(wallet.publicKey?.toBase58() ?? "")}
-                  className="inline-flex min-h-10 items-center rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                  className="inline-flex min-h-10 items-center rounded-md border border-border-strong px-3 text-xs font-medium text-neutral-300 transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   Use my wallet
                 </button>
                 <button
                   type="button"
                   onClick={() => setOperatorInput("")}
-                  className="inline-flex min-h-10 items-center rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                  className="inline-flex min-h-10 items-center rounded-md border border-border-strong px-3 text-xs font-medium text-neutral-300 transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   Clear
                 </button>
               </div>
-              <p id="operator-wallet-help" className="mt-2 text-xs text-neutral-500">
+              <p id="operator-wallet-help" className="mt-2 text-xs text-ink-subtle">
                 This wallet executes approved licenses. It can be a member wallet or a separate
                 operator. Your last used operator is remembered on this device.
               </p>
@@ -446,10 +446,10 @@ export function CreateMultisigCard({
             </Button>
 
             {error && (
-              <div className="flex items-center gap-2 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3">
+              <div className="flex items-center gap-2 rounded-lg border border-signal-danger/30 bg-signal-danger/15 px-4 py-3">
                 <svg
                   aria-hidden="true"
-                  className="h-4 w-4 shrink-0 text-red-400"
+                  className="h-4 w-4 shrink-0 text-signal-danger"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -461,7 +461,7 @@ export function CreateMultisigCard({
                     d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <p className="text-sm text-red-300">{error}</p>
+                <p className="text-sm text-signal-danger">{error}</p>
               </div>
             )}
           </form>

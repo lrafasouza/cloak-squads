@@ -1,3 +1,173 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Aegis — design tokens (Heraldic Dark)
+ * Definidos como HSL para suportar `<alpha-value>` no Tailwind.
+ */
+@layer base {
+  :root {
+    /* Surfaces */
+    --bg: 220 13% 5%;            /* #0A0B0D */
+    --surface: 220 12% 9%;        /* #131519 */
+    --surface-2: 220 13% 12%;     /* #1B1E24 */
+    --surface-3: 220 13% 16%;
+
+    /* Borders */
+    --border: 222 11% 17%;        /* #262932 */
+    --border-strong: 222 11% 26%; /* #3A3F4A */
+
+    /* Ink */
+    --ink: 240 5% 96%;            /* #F4F4F5 */
+    --ink-muted: 240 5% 65%;      /* #A1A1AA */
+    --ink-subtle: 240 5% 46%;     /* #71717A */
+
+    /* Accent — Burnished Gold */
+    --accent: 39 49% 60%;         /* #C9A86A */
+    --accent-hover: 39 56% 67%;   /* #D9B97A */
+    --accent-soft: 36 35% 16%;    /* #3A2F1A */
+    --accent-ink: 220 13% 5%;     /* dark text on accent fills */
+
+    /* Signals */
+    --signal-positive: 100 35% 55%;  /* #7FB069 */
+    --signal-warn: 39 60% 56%;       /* #D4A24C */
+    --signal-danger: 0 47% 56%;      /* #C45A5A */
+
+    /* Misc */
+    --ring: var(--accent);
+    --radius: 10px;
+    color-scheme: dark;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-bg text-ink font-sans;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  ::selection {
+    background: hsl(var(--accent) / 0.35);
+    color: hsl(var(--ink));
+  }
+
+  /* Scrollbar — dark, narrow */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--border-strong));
+  }
+
+  /* Focus ring shared across the app */
+  :where(button, a, input, textarea, select, [role="button"]):focus-visible {
+    outline: 2px solid hsl(var(--accent) / 0.7);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+/*
+ * Aegis utility classes — pequenos blocos de identidade reutilizáveis.
+ */
+@layer components {
+  .grid-bg {
+    background-image: var(--tw-gradient-from, none),
+      linear-gradient(to right, hsl(var(--border) / 0.45) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.45) 1px, transparent 1px);
+    background-size: auto, 48px 48px, 48px 48px;
+  }
+
+  .text-eyebrow {
+    @apply font-mono text-[11px] uppercase tracking-eyebrow text-ink-subtle;
+  }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Lenis smooth scroll requirement */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+/* ── Solana Wallet Adapter override ── */
+.wallet-adapter-button {
+  background: hsl(var(--surface-2)) !important;
+  color: hsl(var(--ink)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 6px !important;
+  font-family: inherit !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  height: 36px !important;
+  padding: 0 12px !important;
+  transition: background 150ms, border-color 150ms !important;
+}
+.wallet-adapter-button:hover {
+  background: hsl(var(--surface-3)) !important;
+  border-color: hsl(var(--border-strong)) !important;
+}
+.wallet-adapter-button:active {
+  background: hsl(var(--surface-2)) !important;
+}
+.wallet-adapter-button-start-icon img {
+  filter: grayscale(0.3);
+}
+
+.wallet-adapter-modal-wrapper {
+  background: hsl(var(--surface)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 24px 48px rgba(0,0,0,0.45) !important;
+  color: hsl(var(--ink)) !important;
+}
+.wallet-adapter-modal-title {
+  color: hsl(var(--ink)) !important;
+  font-family: inherit !important;
+}
+.wallet-adapter-modal-list-more {
+  background: hsl(var(--surface-2)) !important;
+  color: hsl(var(--ink-muted)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}
+.wallet-adapter-modal-list-more:hover {
+  background: hsl(var(--surface-3)) !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button {
+  background: transparent !important;
+  border: none !important;
+  color: hsl(var(--ink)) !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  background: hsl(var(--surface-2)) !important;
+}

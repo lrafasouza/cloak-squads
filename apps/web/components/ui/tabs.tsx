@@ -45,7 +45,7 @@ export function TabsList({ className, ...props }: HTMLAttributes<HTMLDivElement>
   return (
     <div
       className={cn(
-        "inline-flex rounded-md border border-neutral-800 bg-neutral-900 p-1",
+        "inline-flex rounded-md border border-border bg-surface p-1",
         className,
       )}
       {...props}
@@ -65,8 +65,8 @@ export function TabsTrigger({
       type="button"
       onClick={() => tabs?.setValue(value)}
       className={cn(
-        "min-h-9 rounded px-3 py-1.5 text-sm font-medium text-neutral-400 transition hover:text-neutral-100",
-        active && "bg-neutral-800 text-neutral-50",
+        "min-h-9 rounded px-3 py-1.5 text-sm font-medium text-ink-muted transition hover:text-ink",
+        active && "bg-surface-2 text-ink",
         className,
       )}
       {...props}
