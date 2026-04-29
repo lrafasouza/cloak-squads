@@ -7,6 +7,7 @@ import { AnimatedCard, StaggerContainer, StaggerItem } from "@/components/ui/ani
 import { useToast } from "@/components/ui/toast-provider";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { lamportsToSol } from "@/lib/sol";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import type { CommitmentClaim } from "@cloak-squads/core/commitment";
 import { type MemberVote, getMemberVote } from "@cloak-squads/core/proposal-vote";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -107,6 +108,7 @@ export default function ProposalApprovalPage({
   const { multisig: multisigParam, id } = use(params);
   const { connection } = useConnection();
   const wallet = useWallet();
+  const { fetchWithAuth } = useWalletAuth();
   const { addToast } = useToast();
   const [commitmentState] = useState<CommitmentCheckState>("checking");
   const [signature, setSignature] = useState<string | null>(null);
@@ -148,7 +150,7 @@ export default function ProposalApprovalPage({
     let cancelled = false;
     setDraftLoading(true);
     async function loadDraft() {
-      const singleResponse = await fetch(
+      const singleResponse = await fetchWithAuth(
         `/api/proposals/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
       );
       if (singleResponse.ok) {
@@ -157,7 +159,7 @@ export default function ProposalApprovalPage({
         return;
       }
 
-      const payrollResponse = await fetch(
+      const payrollResponse = await fetchWithAuth(
         `/api/payrolls/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
       );
       if (payrollResponse.ok) {

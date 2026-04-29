@@ -32,7 +32,9 @@
     "seed:reset": "tsx scripts/seed-test-data.ts --reset",
     "audit:export": "tsx scripts/compliance-export.ts",
     "test:f1": "tsx scripts/test-f1-private-send.ts",
+    "test:f1-2ofn": "tsx scripts/test-f1-private-send-2ofn.ts",
     "test:f4": "tsx scripts/test-f4-stealth-invoice.ts",
+    "demo:setup-2ofn": "tsx scripts/setup-demo-cofre-2ofn.ts",
     "deploy:gk": "tsx scripts/deploy-gatekeeper.ts"
   },
   "devDependencies": {

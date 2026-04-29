@@ -444,7 +444,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
     try {
       // Try single draft first
-      const singleResponse = await fetch(
+      const singleResponse = await fetchWithAuth(
         `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(txIndex)}`,
       );
       if (singleResponse.ok) {
@@ -455,7 +455,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       }
 
       // Try payroll draft
-      const payrollResponse = await fetch(
+      const payrollResponse = await fetchWithAuth(
         `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(txIndex)}`,
       );
       if (payrollResponse.ok) {
@@ -1000,7 +1000,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                           setSignature(null);
                           setExecutionSteps([]);
                           try {
-                            const singleResponse = await fetch(
+                            const singleResponse = await fetchWithAuth(
                               `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
                             );
                             if (singleResponse.ok) {
@@ -1009,7 +1009,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                               void checkOnChainStatus(d.transactionIndex, draft);
                               return;
                             }
-                            const payrollResponse = await fetch(
+                            const payrollResponse = await fetchWithAuth(
                               `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
                             );
                             if (payrollResponse.ok) {

@@ -104,7 +104,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
       const signature = await wallet.signMessage(messageBytes);
 
       // Create audit link
-      const res = await fetch("/api/audit-links", {
+      const res = await fetchWithAuth("/api/audit-links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
