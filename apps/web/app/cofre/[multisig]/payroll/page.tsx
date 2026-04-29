@@ -44,6 +44,14 @@ function hexToBytes(hex: string) {
   return out;
 }
 
+type PayrollMode = "direct" | "invoice";
+
+type PayrollClaimLink = {
+  name: string;
+  wallet: string;
+  claimUrl: string;
+};
+
 type RecipientNote = {
   name: string;
   wallet: string;
@@ -68,6 +76,7 @@ type RecipientNote = {
     recipient_vk: string;
     token_mint: string;
   };
+  invoiceId?: string;
 };
 
 export default function PayrollPage({ params }: { params: Promise<{ multisig: string }> }) {
@@ -81,7 +90,12 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   const [parsedNotes, setParsedNotes] = useState<RecipientNote[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [step, setStep] = useState<"upload" | "preview" | "submitting">("upload");
+  const [step, setStep] = useState<"upload" | "preview" | "created">("upload");
+  const [mode, setMode] = useState<PayrollMode>("direct");
+  const [createdPayroll, setCreatedPayroll] = useState<{
+    transactionIndex: string;
+    claimLinks: PayrollClaimLink[];
+  } | null>(null);
 
   const multisigAddress = useMemo(() => {
     try {
@@ -101,6 +115,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     setError(null);
     setRecipients([]);
     setParsedNotes([]);
+    setCreatedPayroll(null);
     setStep("upload");
 
     if (!text.trim()) return;
@@ -227,13 +242,58 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       const transactionIndex = result.transactionIndex.toString();
       const totalAmountStr = totalAmount.toString();
 
+      let notesWithInvoices: RecipientNote[] = parsedNotes;
+      let claimLinks: PayrollClaimLink[] = [];
+      if (mode === "invoice") {
+        const invoiceResults = await Promise.all(
+          parsedNotes.map(async (n) => {
+            const res = await fetch("/api/stealth", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                cofreAddress: multisigAddress.toBase58(),
+                invoiceRef: n.memo || undefined,
+                memo: `Payroll: ${n.name}`,
+                amount: n.amount,
+                recipientWallet: n.wallet,
+              }),
+            });
+            if (!res.ok) {
+              const body = (await res.json().catch(() => null)) as { error?: string } | null;
+              throw new Error(body?.error ?? `Failed to create stealth invoice for ${n.name}.`);
+            }
+            return (await res.json()) as { id: string; claimUrl: string };
+          }),
+        );
+        claimLinks = parsedNotes
+          .map((n, i) => {
+            const invoice = invoiceResults[i];
+            if (!invoice) throw new Error(`Missing invoice for ${n.name}.`);
+            return { note: n, invoice };
+          })
+          .map(({ note, invoice }) => {
+            const claimUrl = invoice.claimUrl;
+            if (!claimUrl) throw new Error(`Missing claim link for ${note.name}.`);
+            return { name: note.name, wallet: note.wallet, claimUrl };
+          });
+        notesWithInvoices = parsedNotes.map((n, i) => {
+          const invoice = invoiceResults[i];
+          if (!invoice) throw new Error(`Missing invoice for ${n.name}.`);
+          return {
+            ...n,
+            invoiceId: invoice.id,
+          };
+        });
+      }
+
       // Persist payroll draft
       const draftPayload = {
         cofreAddress: multisigAddress.toBase58(),
         transactionIndex,
         memo: `payroll batch (${parsedNotes.length} recipients)`,
         totalAmount: totalAmountStr,
-        recipients: parsedNotes.map((n) => ({
+        mode,
+        recipients: notesWithInvoices.map((n) => ({
           name: n.name,
           wallet: n.wallet,
           amount: n.amount,
@@ -248,6 +308,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
             nonce: Array.from(n.invariants.nonce),
           },
           commitmentClaim: n.claim,
+          invoiceId: n.invoiceId,
           signature: result.signature,
         })),
       };
@@ -277,7 +338,21 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         }
       }
 
-      router.push(`/cofre/${multisigAddress.toBase58()}/proposals/${transactionIndex}`);
+      if (mode === "invoice") {
+        try {
+          sessionStorage.setItem(
+            `payroll-claim-links:${multisigAddress.toBase58()}:${transactionIndex}`,
+            JSON.stringify(claimLinks),
+          );
+        } catch {
+          /* sessionStorage full or unavailable */
+        }
+        setCreatedPayroll({ transactionIndex, claimLinks });
+        setStep("created");
+        setPending(false);
+      } else {
+        router.push(`/cofre/${multisigAddress.toBase58()}/proposals/${transactionIndex}`);
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not create payroll proposal.");
       setPending(false);
@@ -349,6 +424,42 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                     />
                   </div>
 
+                  <fieldset className="grid gap-2">
+                    <legend className="text-sm font-medium text-neutral-100">Delivery mode</legend>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => setMode("direct")}
+                        aria-pressed={mode === "direct"}
+                        className={`min-h-16 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                          mode === "direct"
+                            ? "border-emerald-800 bg-emerald-950 text-emerald-300"
+                            : "border-neutral-700 bg-neutral-950 text-neutral-400 hover:border-neutral-600"
+                        }`}
+                      >
+                        <span className="font-semibold">Direct send</span>
+                        <span className="mt-0.5 block text-xs opacity-80">
+                          Funds arrive automatically. No claim needed.
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMode("invoice")}
+                        aria-pressed={mode === "invoice"}
+                        className={`min-h-16 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                          mode === "invoice"
+                            ? "border-emerald-800 bg-emerald-950 text-emerald-300"
+                            : "border-neutral-700 bg-neutral-950 text-neutral-400 hover:border-neutral-600"
+                        }`}
+                      >
+                        <span className="font-semibold">Invoice / Claim</span>
+                        <span className="mt-0.5 block text-xs opacity-80">
+                          Create one claim link per recipient.
+                        </span>
+                      </button>
+                    </div>
+                  </fieldset>
+
                   {recipients.length > 0 && (
                     <Button onClick={buildNotes} disabled={pending}>
                       {pending
@@ -411,7 +522,9 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
                 <div className="mt-4 flex items-center justify-between text-xs text-neutral-400">
                   <span>Recipients: {parsedNotes.length}/10</span>
-                  <span>Fee estimate: ~{(parsedNotes.length * 0.000005).toFixed(6)} SOL</span>
+                  <span>
+                    {mode === "invoice" ? "Delivery: claim links" : "Delivery: direct send"}
+                  </span>
                 </div>
               </div>
 
@@ -428,7 +541,11 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                   Back
                 </Button>
                 <Button type="submit" disabled={pending}>
-                  {pending ? "Creating proposal..." : "Create payroll proposal"}
+                  {pending
+                    ? mode === "invoice"
+                      ? "Creating invoices..."
+                      : "Creating proposal..."
+                    : "Create payroll proposal"}
                 </Button>
               </div>
 
@@ -439,6 +556,90 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
               ) : null}
             </form>
           )}
+
+          {step === "created" && createdPayroll ? (
+            <div className="grid gap-4">
+              <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+                <h2 className="text-base font-semibold text-neutral-50">Claim links created</h2>
+                <p className="mt-2 text-sm text-neutral-300">
+                  Share each link with the matching recipient. These secret links are only shown in
+                  this browser session.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => {
+                    const lines = createdPayroll.claimLinks.map((link) => {
+                      const fullUrl =
+                        typeof window === "undefined"
+                          ? link.claimUrl
+                          : `${window.location.origin}${link.claimUrl}`;
+                      return `${link.name},${link.wallet},${fullUrl}`;
+                    });
+                    navigator.clipboard.writeText(["name,wallet,claim_url", ...lines].join("\n"));
+                  }}
+                >
+                  Copy all links
+                </Button>
+                <div className="mt-4 grid gap-3">
+                  {createdPayroll.claimLinks.map((link) => {
+                    const fullUrl =
+                      typeof window === "undefined"
+                        ? link.claimUrl
+                        : `${window.location.origin}${link.claimUrl}`;
+                    return (
+                      <div
+                        key={link.wallet}
+                        className="rounded-md border border-neutral-800 bg-neutral-950 p-3"
+                      >
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-neutral-100">{link.name}</p>
+                            <p className="font-mono text-xs text-neutral-400">
+                              {link.wallet.slice(0, 8)}...{link.wallet.slice(-8)}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => navigator.clipboard.writeText(fullUrl)}
+                          >
+                            Copy link
+                          </Button>
+                        </div>
+                        <p className="mt-2 break-all font-mono text-xs text-neutral-400">
+                          {fullUrl}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href={`/cofre/${multisigAddress.toBase58()}/proposals/${createdPayroll.transactionIndex}`}
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all duration-200 hover:bg-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 active:scale-[0.98]"
+                >
+                  View proposal
+                </Link>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setCreatedPayroll(null);
+                    setParsedNotes([]);
+                    setRecipients([]);
+                    setCsvText("");
+                    setStep("upload");
+                  }}
+                >
+                  Create another payroll
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
     </main>

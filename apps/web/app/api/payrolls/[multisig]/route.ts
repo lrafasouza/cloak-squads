@@ -30,6 +30,7 @@ export async function GET(
         memo: draft.memo ?? undefined,
         totalAmount: draft.totalAmount,
         recipientCount: draft.recipientCount,
+        mode: draft.mode,
         createdAt: new Date(draft.createdAt).toISOString(),
       })),
     );

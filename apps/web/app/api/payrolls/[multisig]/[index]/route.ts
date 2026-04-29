@@ -37,6 +37,7 @@ export async function GET(
       memo: draft.memo ?? undefined,
       totalAmount: draft.totalAmount,
       recipientCount: draft.recipientCount,
+      mode: draft.mode,
       recipients: draft.recipients.map((r) => {
         let invariants: unknown;
         let commitmentClaim: unknown;
@@ -62,6 +63,7 @@ export async function GET(
           payloadHash: Array.from(Buffer.from(r.payloadHash)),
           invariants,
           commitmentClaim,
+          invoiceId: r.invoiceId ?? undefined,
           signature: r.signature ?? undefined,
         };
       }),

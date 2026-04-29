@@ -109,11 +109,13 @@ type PayrollRecipient = {
     nonce: number[];
   };
   commitmentClaim?: CommitmentClaim;
+  invoiceId?: string;
 };
 
 type PayrollDraft = {
   totalAmount: string;
   recipientCount: number;
+  mode: string;
   recipients: PayrollRecipient[];
 };
 
@@ -537,6 +539,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     draft: SingleDraft,
     doCloakDeposit = true,
     depositCacheKey = txIndex,
+    invoiceId?: string,
   ) {
     if (!wallet.publicKey || !multisigAddress) return;
 
@@ -600,50 +603,13 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         cloakSig = cloakResult.signature;
         setCloakSignature(cloakSig);
 
-        let invoice:
-          | {
-              id: string;
-              recipientWallet: string;
-              invoiceRef: string | null;
-              memo: string | null;
-              amountHint: string | null;
-              status: string;
-              utxoCommitment: string | null;
-            }
-          | undefined;
+        // F4 invoice mode: use explicit invoiceId param or fall back to legacy commitmentClaim lookup
+        const effectiveInvoiceId = invoiceId ?? draft.commitmentClaim?.invoiceId;
 
-        if (draft.recipient) {
-          try {
-            const invoicesRes = await fetch(
-              `/api/stealth/${encodeURIComponent(multisigAddress.toBase58())}`,
-            );
-            if (invoicesRes.ok) {
-              const invoices = (await invoicesRes.json()) as Array<{
-                id: string;
-                recipientWallet: string;
-                invoiceRef: string | null;
-                memo: string | null;
-                amountHint: string | null;
-                status: string;
-                utxoCommitment: string | null;
-              }>;
-              invoice = draft.commitmentClaim?.invoiceId
-                ? invoices.find(
-                    (inv) =>
-                      inv.id === draft.commitmentClaim?.invoiceId && inv.status === "pending",
-                  )
-                : undefined;
-            }
-          } catch {
-            // F4 invoice lookup is best effort. If no invoice is found, F1 direct withdraw below
-            // remains the authoritative delivery path.
-          }
-        }
-
-        if (invoice) {
+        if (effectiveInvoiceId) {
           // F4: store UTXO data for recipient claim.
           try {
-            await fetch(`/api/stealth/${invoice.id}/utxo`, {
+            const storeResponse = await fetch(`/api/stealth/${effectiveInvoiceId}/utxo`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -660,9 +626,17 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   : undefined,
               }),
             });
+            if (!storeResponse.ok) {
+              const body = (await storeResponse.json().catch(() => null)) as {
+                error?: string;
+              } | null;
+              throw new Error(body?.error ?? "Could not store UTXO data for claim.");
+            }
           } catch {
-            // Non-fatal: UTXO storage failure should not block gatekeeper execution.
-            console.warn("Failed to store UTXO data for claim");
+            if (!cachedDeposit) {
+              writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
+            }
+            throw new Error("Could not store UTXO data for claim.");
           }
           if (!cachedDeposit) {
             writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
@@ -789,7 +763,16 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           invariants: recipient.invariants,
           ...(recipient.commitmentClaim ? { commitmentClaim: recipient.commitmentClaim } : {}),
         };
-        const sig = await executeSingle(recipientDraft, true, `${txIndex}:${i}`);
+        const isInvoiceMode = payrollDraft.mode === "invoice";
+        if (isInvoiceMode && !recipient.invoiceId) {
+          throw new Error(`Recipient ${recipient.name} is missing an invoice.`);
+        }
+        const sig = await executeSingle(
+          recipientDraft,
+          true,
+          `${txIndex}:${i}`,
+          isInvoiceMode ? recipient.invoiceId : undefined,
+        );
 
         setExecutionSteps((prev) =>
           prev.map((s) => (s.index === i ? { ...s, status: "success", signature: sig } : s)),
@@ -843,7 +826,16 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           invariants: recipient.invariants,
           ...(recipient.commitmentClaim ? { commitmentClaim: recipient.commitmentClaim } : {}),
         };
-        const sig = await executeSingle(recipientDraft, true, `${txIndex}:${i}`);
+        const isInvoiceMode = payrollDraft.mode === "invoice";
+        if (isInvoiceMode && !recipient.invoiceId) {
+          throw new Error(`Recipient ${recipient.name} is missing an invoice.`);
+        }
+        const sig = await executeSingle(
+          recipientDraft,
+          true,
+          `${txIndex}:${i}`,
+          isInvoiceMode ? recipient.invoiceId : undefined,
+        );
 
         setExecutionSteps((prev) =>
           prev.map((s) => (s.index === i ? { ...s, status: "success", signature: sig } : s)),
@@ -1130,8 +1122,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                         <tr key={r.id}>
                           <td className="py-2 pr-4 text-neutral-400">{i + 1}</td>
                           <td className="py-2 pr-4 text-neutral-100">{r.name}</td>
-                          <td className="py-2 pr-4 text-right font-mono text-neutral-100">
-                            {Number(r.amount).toLocaleString()}
+                          <td className="py-2 pr-4 text-right font-mono tabular-nums text-neutral-100">
+                            {lamportsToSol(r.amount)} SOL
                           </td>
                           <td className="py-2">
                             {!step || step.status === "pending" ? (

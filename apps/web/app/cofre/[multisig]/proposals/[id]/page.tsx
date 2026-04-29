@@ -390,8 +390,8 @@ export default function ProposalApprovalPage({
                               <td className="py-3 pr-4 font-mono text-xs text-neutral-400">
                                 {r.wallet.slice(0, 8)}...{r.wallet.slice(-8)}
                               </td>
-                              <td className="py-3 pr-4 text-right font-mono text-neutral-100">
-                                {Number(r.amount).toLocaleString()}
+                              <td className="py-3 pr-4 text-right font-mono tabular-nums text-neutral-100">
+                                {lamportsToSol(r.amount)} SOL
                               </td>
                               <td className="py-3 text-neutral-500">{r.memo || "—"}</td>
                             </tr>
@@ -402,8 +402,8 @@ export default function ProposalApprovalPage({
                             <td colSpan={2} className="py-3 pr-4 text-neutral-100">
                               Total
                             </td>
-                            <td className="py-3 pr-4 text-right font-mono text-emerald-400">
-                              {Number(payrollDraft.totalAmount).toLocaleString()}
+                            <td className="py-3 pr-4 text-right font-mono tabular-nums text-emerald-400">
+                              {lamportsToSol(payrollDraft.totalAmount)}
                             </td>
                             <td className="py-3 text-neutral-500">SOL</td>
                           </tr>

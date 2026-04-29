@@ -14,12 +14,14 @@ import {
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 const { Permission, Permissions } = multisig.types;
 
 type CreateState = "idle" | "pending" | "success" | "error";
 type BootstrapState = "idle" | "proposal-created" | "initialized" | "error";
+const OPERATOR_PREFERENCE_KEY = "cloak-squads:operator-wallet";
+const OPERATOR_PLACEHOLDER = "7QqJ4Q5j9V7qgR3Qm2Yf6sY2VxK8gTq8nWvM9pL4cZ2A";
 
 export function CreateMultisigCard({
   onCreated,
@@ -38,11 +40,16 @@ export function CreateMultisigCard({
   const [error, setError] = useState<string | null>(null);
   const [createdPda, setCreatedPda] = useState<string | null>(null);
   const [createdOperator, setCreatedOperator] = useState<string | null>(null);
+  const operatorInitializedRef = useRef(false);
 
   useEffect(() => {
-    if (!wallet.publicKey || operatorInput) return;
-    setOperatorInput(wallet.publicKey.toBase58());
-  }, [operatorInput, wallet.publicKey]);
+    if (!wallet.publicKey || operatorInitializedRef.current) return;
+
+    const savedOperator =
+      typeof window === "undefined" ? null : localStorage.getItem(OPERATOR_PREFERENCE_KEY);
+    setOperatorInput(savedOperator?.trim() || wallet.publicKey.toBase58());
+    operatorInitializedRef.current = true;
+  }, [wallet.publicKey]);
 
   const addMember = useCallback(() => {
     if (memberInputs.length >= 10) {
@@ -181,6 +188,7 @@ export function CreateMultisigCard({
 
         setCreatedPda(multisigPda.toBase58());
         setCreatedOperator(operator.toBase58());
+        localStorage.setItem(OPERATOR_PREFERENCE_KEY, operator.toBase58());
         setState("success");
         addToast(
           threshold === 1
@@ -402,13 +410,29 @@ export function CreateMultisigCard({
                 spellCheck={false}
                 value={operatorInput}
                 onChange={(e) => setOperatorInput(e.target.value)}
-                placeholder={wallet.publicKey?.toBase58() ?? "Operator pubkey"}
+                placeholder={OPERATOR_PLACEHOLDER}
                 className="font-mono text-xs"
                 aria-describedby="operator-wallet-help"
               />
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOperatorInput(wallet.publicKey?.toBase58() ?? "")}
+                  className="inline-flex min-h-10 items-center rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                >
+                  Use my wallet
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOperatorInput("")}
+                  className="inline-flex min-h-10 items-center rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                >
+                  Clear
+                </button>
+              </div>
               <p id="operator-wallet-help" className="mt-2 text-xs text-neutral-500">
                 This wallet executes approved licenses. It can be a member wallet or a separate
-                operator.
+                operator. Your last used operator is remembered on this device.
               </p>
             </div>
 

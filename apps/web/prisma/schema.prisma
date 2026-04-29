@@ -72,6 +72,7 @@ model PayrollDraft {
   memo             String?
   totalAmount      String
   recipientCount   Int
+  mode             String   @default("direct")
   createdAt        DateTime @default(now())
 
   recipients PayrollRecipient[]
@@ -81,7 +82,7 @@ model PayrollDraft {
 }
 
 model PayrollRecipient {
-  id              String @id @default(uuid())
+  id              String  @id @default(uuid())
   payrollDraftId  String
   name            String
   wallet          String
@@ -90,6 +91,7 @@ model PayrollRecipient {
   payloadHash     Bytes
   invariants      String
   commitmentClaim String?
+  invoiceId       String?
   signature       String?
   createdAt       DateTime @default(now())
 
