@@ -17,6 +17,7 @@ import {
 } from "@/lib/operator-license-state";
 import { lamportsToSol } from "@/lib/sol";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
+import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import { cofrePda, licensePda } from "@cloak-squads/core/pda";
 import {
@@ -187,6 +188,9 @@ async function cloakDepositBrowser(
   if (!wallet.publicKey) {
     throw new Error("Wallet not connected");
   }
+
+  // Route ZK circuit fetches through our same-origin proxy to bypass S3 CORS.
+  ensureCircuitsProxy();
 
   let outputUtxo: Awaited<ReturnType<typeof createUtxo>>;
   let outputKeypair: { privateKey: bigint; publicKey: bigint };

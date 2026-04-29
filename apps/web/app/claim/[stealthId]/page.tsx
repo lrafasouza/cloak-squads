@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { lamportsToSol } from "@/lib/sol";
 import { statusBadge, statusLabel } from "@/lib/status-labels";
 import {
@@ -194,6 +195,8 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
           utxo.index = invoice.utxoLeafIndex;
         }
 
+        // Route circuit fetches through our same-origin proxy to bypass S3 CORS.
+        ensureCircuitsProxy();
         const result = await fullWithdraw([utxo], wallet.publicKey, {
           connection,
           programId: CLOAK_PROGRAM_ID,
