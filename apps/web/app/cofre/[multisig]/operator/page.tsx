@@ -68,6 +68,7 @@ type DraftSummary = {
 
 type CommitmentClaim = {
   amount: string;
+  invoiceId?: string;
   keypairPrivateKey: string;
   keypairPublicKey: string;
   blinding: string;
@@ -328,7 +329,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       }
       setCofreMissing(false);
       const coder = new BorshAccountsCoder(IDL as Idl);
-      const decoded = coder.decode<{ operator?: Uint8Array }>("cofre", accountInfo.data);
+      const decoded = coder.decode<{ operator?: Uint8Array }>("Cofre", accountInfo.data);
       if (decoded?.operator) {
         setRegisteredOperator(new PublicKey(decoded.operator).toBase58());
       }
@@ -518,7 +519,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         return;
       }
 
-      const decoded = coder.decode<DecodedLicense>("license", accountInfo.data);
+      const decoded = coder.decode<DecodedLicense>("License", accountInfo.data);
       const expiresAt = numberFromAnchorValue(decoded.expiresAt ?? decoded.expires_at);
       const status = normalizeLicenseStatus(decoded.status, expiresAt, now);
       if (status === "consumed") sawConsumed = true;
@@ -598,11 +599,19 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
         cloakSig = cloakResult.signature;
         setCloakSignature(cloakSig);
-        if (!cachedDeposit) {
-          writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
-        }
 
-        // Store UTXO data for future claim (linked by invoice if available)
+        let invoice:
+          | {
+              id: string;
+              recipientWallet: string;
+              invoiceRef: string | null;
+              memo: string | null;
+              amountHint: string | null;
+              status: string;
+              utxoCommitment: string | null;
+            }
+          | undefined;
+
         if (draft.recipient) {
           try {
             const invoicesRes = await fetch(
@@ -612,57 +621,82 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               const invoices = (await invoicesRes.json()) as Array<{
                 id: string;
                 recipientWallet: string;
+                invoiceRef: string | null;
+                memo: string | null;
+                amountHint: string | null;
                 status: string;
+                utxoCommitment: string | null;
               }>;
-              const invoice = invoices.find(
-                (inv) => inv.recipientWallet === draft.recipient && inv.status === "pending",
-              );
-              if (invoice) {
-                await fetch(`/api/stealth/${invoice.id}/utxo`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    utxoAmount: amount.toString(),
-                    utxoPrivateKey: cloakResult.spendKeyHex,
-                    utxoPublicKey:
-                      draft.commitmentClaim?.keypairPublicKey ?? cloakResult.spendKeyHex,
-                    utxoBlinding: cloakResult.blindingHex,
-                    utxoMint: tokenMint.toBase58(),
-                    utxoLeafIndex: cloakResult.leafIndex,
-                    utxoCommitment: draft.invariants.commitment
-                      ? Array.from(draft.invariants.commitment)
-                          .map((b) => b.toString(16).padStart(2, "0"))
-                          .join("")
-                      : undefined,
-                  }),
-                });
-              } else if (cloakResult.outputUtxos && cloakResult.merkleTree) {
-                // F1: direct withdrawal to recipient, no claim needed
-                const recipientPubkey = new PublicKey(draft.recipient);
-                const withdrawResult = await fullWithdraw(
-                  cloakResult.outputUtxos,
-                  recipientPubkey,
-                  {
-                    connection,
-                    programId: CLOAK_PROGRAM_ID,
-                    ...cloakDirectTransactOptions,
-                    signTransaction: wallet.signTransaction as Parameters<
-                      typeof fullWithdraw
-                    >[2]["signTransaction"],
-                    ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
-                    depositorPublicKey: wallet.publicKey,
-                    cachedMerkleTree: cloakResult.merkleTree,
-                    onProgress: (s: string) => console.error(`[cloak] withdraw ${s}`),
-                    onProofProgress: (p: number) => console.error(`[cloak] withdraw proof ${p}%`),
-                  } as Parameters<typeof fullWithdraw>[2],
-                );
-                setWithdrawSignature(withdrawResult.signature);
-              }
+              invoice = draft.commitmentClaim?.invoiceId
+                ? invoices.find(
+                    (inv) =>
+                      inv.id === draft.commitmentClaim?.invoiceId && inv.status === "pending",
+                  )
+                : undefined;
             }
           } catch {
-            // Non-fatal: UTXO storage failure shouldn't block execution
+            // F4 invoice lookup is best effort. If no invoice is found, F1 direct withdraw below
+            // remains the authoritative delivery path.
+          }
+        }
+
+        if (invoice) {
+          // F4: store UTXO data for recipient claim.
+          try {
+            await fetch(`/api/stealth/${invoice.id}/utxo`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                utxoAmount: amount.toString(),
+                utxoPrivateKey: cloakResult.spendKeyHex,
+                utxoPublicKey: draft.commitmentClaim?.keypairPublicKey ?? cloakResult.spendKeyHex,
+                utxoBlinding: cloakResult.blindingHex,
+                utxoMint: tokenMint.toBase58(),
+                utxoLeafIndex: cloakResult.leafIndex,
+                utxoCommitment: draft.invariants.commitment
+                  ? Array.from(draft.invariants.commitment)
+                      .map((b) => b.toString(16).padStart(2, "0"))
+                      .join("")
+                  : undefined,
+              }),
+            });
+          } catch {
+            // Non-fatal: UTXO storage failure should not block gatekeeper execution.
             console.warn("Failed to store UTXO data for claim");
           }
+          if (!cachedDeposit) {
+            writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
+          }
+        } else if (draft.recipient) {
+          // F1: withdraw directly to recipient, no claim needed.
+          if (cachedDeposit) {
+            // Deposit + withdraw already completed in a prior attempt.
+            // Skip fullWithdraw and proceed to execute_with_license below.
+          } else {
+            if (!cloakResult.outputUtxos || !cloakResult.merkleTree) {
+              throw new Error("Cloak deposit did not return withdrawal data.");
+            }
+            const recipientPubkey = new PublicKey(draft.recipient);
+            const withdrawResult = await fullWithdraw(cloakResult.outputUtxos, recipientPubkey, {
+              connection,
+              programId: CLOAK_PROGRAM_ID,
+              ...cloakDirectTransactOptions,
+              signTransaction: wallet.signTransaction as Parameters<
+                typeof fullWithdraw
+              >[2]["signTransaction"],
+              ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
+              depositorPublicKey: wallet.publicKey,
+              cachedMerkleTree: cloakResult.merkleTree,
+              onProgress: (s: string) => console.error(`[cloak] withdraw ${s}`),
+              onProofProgress: (p: number) => console.error(`[cloak] withdraw proof ${p}%`),
+            } as Parameters<typeof fullWithdraw>[2]);
+            setWithdrawSignature(withdrawResult.signature);
+            // Cache after successful withdraw so retries skip deposit+withdraw and only
+            // re-run execute_with_license (prevents double-deposit on operator retry).
+            writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
+          }
+        } else if (!cachedDeposit) {
+          writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
         }
       } catch (caught) {
         throw new Error(

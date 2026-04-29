@@ -2,8 +2,17 @@ import { createHash, randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { cloakDeposit } from "@cloak-squads/core/cloak-deposit";
-import { NATIVE_SOL_MINT } from "@cloak.dev/sdk-devnet";
+import {
+  CLOAK_PROGRAM_ID,
+  NATIVE_SOL_MINT,
+  calculateFeeBigint,
+  computeUtxoCommitment,
+  createUtxo,
+  createZeroUtxo,
+  fullWithdraw,
+  generateUtxoKeypair,
+  transact,
+} from "@cloak.dev/sdk-devnet";
 import {
   ComputeBudgetProgram,
   Connection,
@@ -233,12 +242,21 @@ async function main() {
     console.log("  fund tx:", fundSig);
   }
 
+  const outputKeypair = await generateUtxoKeypair();
+  const outputUtxo = await createUtxo(amount, outputKeypair, NATIVE_SOL_MINT);
+  const zeroIn0 = await createZeroUtxo(NATIVE_SOL_MINT);
+  const zeroIn1 = await createZeroUtxo(NATIVE_SOL_MINT);
+  const zeroOut = await createZeroUtxo(NATIVE_SOL_MINT);
+  const commitmentBigInt = await computeUtxoCommitment(outputUtxo);
+  const commitment = Uint8Array.from(
+    Buffer.from(commitmentBigInt.toString(16).padStart(64, "0"), "hex"),
+  );
   const nullifier = randomBytes(32);
-  const commitment = randomBytes(32);
-  const tokenMint = Keypair.generate().publicKey;
+  const tokenMint = NATIVE_SOL_MINT;
   const recipientVkPub = recipient.toBytes();
   const nonce = randomBytes(16);
   const ttlSecs = 3_600n;
+  const recipientBalanceBefore = await connection.getBalance(recipient);
 
   const payloadHash = computePayloadHash({
     nullifier,
@@ -257,6 +275,7 @@ async function main() {
   console.log("Payload hash:", `${Buffer.from(payloadHash).toString("hex").slice(0, 16)}...`);
   console.log("License PDA: ", licensePda.toBase58());
   console.log("Amount:      ", `${Number(amount) / LAMPORTS_PER_SOL} SOL`);
+  console.log("Recipient before:", `${recipientBalanceBefore / LAMPORTS_PER_SOL} SOL`);
 
   const multisigAccount = await Multisig.fromAccountAddress(connection, multisigPda);
   const transactionIndex = BigInt(multisigAccount.transactionIndex.toString()) + 1n;
@@ -355,7 +374,7 @@ async function main() {
     throw new Error(`Expected Active (0), got ${licenseStatus}`);
   }
 
-  console.log("\n[5/6] cloakDeposit (real SOL into shield pool)...");
+  console.log("\n[5/6] Cloak transact + fullWithdraw (operator delivers to recipient)...");
   const operatorBalance = await connection.getBalance(operator.publicKey);
   console.log(`Operator balance: ${operatorBalance / LAMPORTS_PER_SOL} SOL`);
   const minOperatorBalance = Number(amount) + 0.01 * LAMPORTS_PER_SOL;
@@ -377,15 +396,60 @@ async function main() {
   }
 
   try {
-    const depositResult = await cloakDeposit(connection, operator, amount, NATIVE_SOL_MINT);
+    const depositResult = await transact(
+      {
+        inputUtxos: [zeroIn0, zeroIn1],
+        outputUtxos: [outputUtxo, zeroOut],
+        externalAmount: amount,
+        depositor: operator.publicKey,
+      },
+      {
+        connection,
+        programId: CLOAK_PROGRAM_ID,
+        relayUrl: "https://api.devnet.cloak.ag",
+        enforceViewingKeyRegistration: false,
+        depositorKeypair: operator,
+        walletPublicKey: operator.publicKey,
+        onProgress: (s: string) => console.error(`[cloak] ${s}`),
+        onProofProgress: (p: number) => console.error(`[cloak] proof ${p}%`),
+      } as Parameters<typeof transact>[1],
+    );
     console.log("  Cloak deposit tx:", depositResult.signature);
-    console.log("  Leaf index:", depositResult.leafIndex);
-    console.log("  Spend key:", `${depositResult.spendKeyHex.slice(0, 16)}...`);
-    console.log("  Blinding:", `${depositResult.blindingHex.slice(0, 16)}...`);
+    console.log("  Leaf index:", depositResult.commitmentIndices[0]);
+    const depositedCommitment = depositResult.outputCommitments[0]
+      ?.toString(16)
+      .padStart(64, "0");
+    console.log(
+      "  Commitment match:",
+      depositedCommitment === Buffer.from(commitment).toString("hex"),
+    );
+
+    const withdrawResult = await fullWithdraw(depositResult.outputUtxos, recipient, {
+      connection,
+      programId: CLOAK_PROGRAM_ID,
+      relayUrl: "https://api.devnet.cloak.ag",
+      enforceViewingKeyRegistration: false,
+      depositorKeypair: operator,
+      walletPublicKey: operator.publicKey,
+      cachedMerkleTree: depositResult.merkleTree,
+      onProgress: (s: string) => console.error(`[cloak] withdraw ${s}`),
+      onProofProgress: (p: number) => console.error(`[cloak] withdraw proof ${p}%`),
+    } as Parameters<typeof fullWithdraw>[2]);
+    console.log("  Cloak withdraw tx:", withdrawResult.signature);
   } catch (err: unknown) {
-    console.error("\n  cloakDeposit FAILED");
+    console.error("\n  Cloak delivery FAILED");
     console.error("  message:", (err as Error).message);
     throw err;
+  }
+
+  const recipientBalanceAfter = await connection.getBalance(recipient);
+  const delivered = recipientBalanceAfter - recipientBalanceBefore;
+  const expectedNet = Number(amount - calculateFeeBigint(amount));
+  console.log(`  Recipient after: ${recipientBalanceAfter / LAMPORTS_PER_SOL} SOL`);
+  console.log(`  Delivered:       ${delivered / LAMPORTS_PER_SOL} SOL`);
+  console.log(`  Expected net:    ${expectedNet / LAMPORTS_PER_SOL} SOL`);
+  if (delivered < expectedNet) {
+    throw new Error(`Recipient balance increased by ${delivered}, expected at least ${expectedNet}`);
   }
 
   console.log("\n[6/6] execute_with_license (operator consumes)...");
@@ -401,7 +465,7 @@ async function main() {
     nonce,
   });
 
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  const { blockhash } = await connection.getLatestBlockhash();
   const txMessage = new TransactionMessage({
     payerKey: operator.publicKey,
     recentBlockhash: blockhash,
@@ -446,6 +510,11 @@ async function main() {
         licenseStatus: "Consumed",
         issueTx: executeSig,
         consumeTx: consumeSig,
+        recipient: recipient.toBase58(),
+        recipientBalanceBefore,
+        recipientBalanceAfter,
+        deliveredLamports: delivered,
+        expectedNetLamports: expectedNet,
         explorer: `https://explorer.solana.com/tx/${consumeSig}?cluster=devnet`,
       },
       null,

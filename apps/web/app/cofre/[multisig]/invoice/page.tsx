@@ -156,6 +156,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
 
       const transactionIndex = proposalResult.transactionIndex.toString();
       const claim = {
+        invoiceId: stealthData.id,
         amount: invariants.amount.toString(),
         keypairPrivateKey: keypair.privateKey.toString(16).padStart(64, "0"),
         keypairPublicKey: keypair.publicKey.toString(16).padStart(64, "0"),

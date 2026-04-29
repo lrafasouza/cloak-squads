@@ -1,4 +1,4 @@
 export const cloakDirectTransactOptions = {
-  relayUrl: "",
+  relayUrl: "https://api.devnet.cloak.ag",
   enforceViewingKeyRegistration: false,
 } as const;
