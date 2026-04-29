@@ -79,9 +79,9 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
     const params = new URLSearchParams(fragment);
     const version = params.get("v");
     const sk = params.get("sk");
-    const cofre = params.get("cofre");
+    const vault = params.get("vault") ?? params.get("cofre"); // support both for backward compat
 
-    if (version !== "1" || !sk || !cofre) {
+    if (version !== "1" || !sk || !vault) {
       setError("Invalid URL format. The link may be corrupted or incomplete.");
       setClaimState("invalid");
       return;
@@ -95,10 +95,10 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         return;
       }
 
-      new PublicKey(cofre); // validate cofre address
+      new PublicKey(vault); // validate vault address
       setSecretKey(secretKeyBytes);
     } catch {
-      setError("Invalid secret key or cofre address.");
+      setError("Invalid secret key or vault address.");
       setClaimState("invalid");
       return;
     }
@@ -111,14 +111,14 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
     const loadInvoice = async () => {
       try {
         const params = new URLSearchParams(window.location.hash.slice(1));
-        const cofre = params.get("cofre");
-        if (!cofre) {
-          setError("Missing cofre address in URL.");
+        const vault = params.get("vault") ?? params.get("cofre"); // support both for backward compat
+        if (!vault) {
+          setError("Missing vault address in URL.");
           setClaimState("invalid");
           return;
         }
 
-        const res = await fetch(`/api/stealth/${encodeURIComponent(cofre)}`);
+        const res = await fetch(`/api/stealth/${encodeURIComponent(vault)}`);
         if (!res.ok) {
           setError("Failed to load invoice data.");
           setClaimState("invalid");

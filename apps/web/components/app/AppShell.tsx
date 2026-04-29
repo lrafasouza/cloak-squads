@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const params = useParams<{ multisig: string }>();
   const pathname = usePathname();
   const multisig = params?.multisig ?? "";
-  const base = `/cofre/${multisig}`;
+  const base = `/vault/${multisig}`;
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 

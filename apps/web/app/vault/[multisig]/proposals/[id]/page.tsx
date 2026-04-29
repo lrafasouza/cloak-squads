@@ -272,7 +272,7 @@ export default function ProposalApprovalPage({
       <header className="border-b border-border/50 bg-bg/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
-            href={`/cofre/${multisigParam}`}
+            href={`/vault/${multisigParam}`}
             className="flex items-center gap-2 text-sm font-semibold text-ink hover:text-accent transition-colors"
           >
             <svg

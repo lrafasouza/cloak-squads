@@ -165,7 +165,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         throw new Error(body?.error ?? "Could not persist proposal draft.");
       }
 
-      router.push(`/cofre/${multisig}/proposals/${transactionIndex}`);
+      router.push(`/vault/${multisig}/proposals/${transactionIndex}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not create proposal.");
       setPending(false);
@@ -188,7 +188,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       <header className="border-b border-border bg-bg/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
-            href={`/cofre/${multisigAddress.toBase58()}`}
+            href={`/vault/${multisigAddress.toBase58()}`}
             className="text-sm font-semibold text-ink"
           >
             Cofre
@@ -262,7 +262,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
 
               <div className="flex gap-3">
                 <Link
-                  href={`/cofre/${multisigAddress.toBase58()}`}
+                  href={`/vault/${multisigAddress.toBase58()}`}
                   className="inline-flex items-center justify-center rounded-md border border-border-strong bg-transparent px-4 py-2 text-sm font-medium text-ink hover:bg-surface-2"
                 >
                   Back

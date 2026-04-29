@@ -336,7 +336,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                 ].map((action) => (
                   <Link
                     key={action.href}
-                    href={`/cofre/${multisigAddress.toBase58()}${action.href}`}
+                    href={`/vault/${multisigAddress.toBase58()}${action.href}`}
                     className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 ${
                       action.variant === "default"
                         ? "bg-emerald-500 text-white hover:bg-accent shadow-raise-1 shadow-accent/20"
@@ -578,7 +578,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                       {drafts.map((d) => (
                         <li key={d.id}>
                           <Link
-                            href={`/cofre/${multisigAddress.toBase58()}/proposals/${d.transactionIndex}`}
+                            href={`/vault/${multisigAddress.toBase58()}/proposals/${d.transactionIndex}`}
                             className="flex items-center justify-between rounded-lg border border-border/50 p-4 transition-all duration-200 hover:border-emerald-900/50 hover:bg-surface-2/50 group"
                           >
                             <div className="min-w-0">

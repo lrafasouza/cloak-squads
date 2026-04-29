@@ -351,7 +351,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         setStep("created");
         setPending(false);
       } else {
-        router.push(`/cofre/${multisigAddress.toBase58()}/proposals/${transactionIndex}`);
+        router.push(`/vault/${multisigAddress.toBase58()}/proposals/${transactionIndex}`);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not create payroll proposal.");
@@ -375,7 +375,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       <header className="border-b border-border bg-bg/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
-            href={`/cofre/${multisigAddress.toBase58()}`}
+            href={`/vault/${multisigAddress.toBase58()}`}
             className="text-sm font-semibold text-ink"
           >
             Cofre
@@ -619,7 +619,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
-                  href={`/cofre/${multisigAddress.toBase58()}/proposals/${createdPayroll.transactionIndex}`}
+                  href={`/vault/${multisigAddress.toBase58()}/proposals/${createdPayroll.transactionIndex}`}
                   className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-raise-1 shadow-accent/20 transition-all duration-200 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:scale-[0.98]"
                 >
                   View proposal

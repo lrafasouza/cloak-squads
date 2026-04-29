@@ -256,7 +256,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
       <header className="border-b border-border bg-bg/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
-            href={`/cofre/${multisigAddress.toBase58()}`}
+            href={`/vault/${multisigAddress.toBase58()}`}
             className="rounded-md text-sm font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           >
             Cofre

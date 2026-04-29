@@ -883,7 +883,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       <header className="border-b border-border bg-bg/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
-            href={`/cofre/${multisigAddress.toBase58()}`}
+            href={`/vault/${multisigAddress.toBase58()}`}
             className="text-sm font-semibold text-ink"
           >
             Cofre

@@ -21,7 +21,7 @@ function useRedirectParam() {
     if (target) {
       try {
         new PublicKey(target);
-        router.replace(`/cofre/${target}`);
+        router.replace(`/vault/${target}`);
         setRedirected(true);
       } catch {
         /* ignore invalid pubkey */
@@ -53,7 +53,7 @@ export default function VaultPage() {
     try {
       const pk = new PublicKey(trimmed);
       addToast("Opening vault...", "info", 2000);
-      router.push(`/cofre/${pk.toBase58()}`);
+      router.push(`/vault/${pk.toBase58()}`);
     } catch {
       setInputError("Invalid Solana address");
       addToast("Invalid Solana address", "error");
@@ -129,7 +129,7 @@ export default function VaultPage() {
 
           {/* Create new vault */}
           <CreateMultisigCard
-            onCreated={(multisigPda) => router.push(`/cofre/${multisigPda}`)}
+            onCreated={(multisigPda) => router.push(`/vault/${multisigPda}`)}
           />
         </div>
       </main>

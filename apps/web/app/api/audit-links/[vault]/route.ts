@@ -2,18 +2,18 @@ import { prisma } from "@/lib/prisma";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
-export async function GET(_request: Request, context: { params: Promise<{ cofre: string }> }) {
-  const { cofre } = await context.params;
+export async function GET(_request: Request, context: { params: Promise<{ vault: string }> }) {
+  const { vault } = await context.params;
 
   try {
-    new PublicKey(cofre);
+    new PublicKey(vault);
   } catch {
-    return NextResponse.json({ error: "Invalid cofre address." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid vault address." }, { status: 400 });
   }
 
   try {
     const links = await prisma.auditLink.findMany({
-      where: { cofreAddress: cofre },
+      where: { cofreAddress: vault },
       orderBy: { createdAt: "desc" },
       take: 100,
     });

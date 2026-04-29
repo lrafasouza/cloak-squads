@@ -246,7 +246,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         <header className="border-b border-border bg-bg/95">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
             <Link
-              href={`/cofre/${multisigAddress.toBase58()}`}
+              href={`/vault/${multisigAddress.toBase58()}`}
               className="text-sm font-semibold text-ink"
             >
               Cofre
@@ -303,7 +303,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                 type="button"
                 onClick={() =>
                   router.push(
-                    `/cofre/${multisigAddress.toBase58()}/proposals/${result.transactionIndex}`,
+                    `/vault/${multisigAddress.toBase58()}/proposals/${result.transactionIndex}`,
                   )
                 }
               >
@@ -321,7 +321,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       <header className="border-b border-border/50 bg-bg/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <Link
-            href={`/cofre/${multisigAddress.toBase58()}`}
+            href={`/vault/${multisigAddress.toBase58()}`}
             className="flex items-center gap-2 text-sm font-semibold text-ink hover:text-accent transition-colors"
           >
             <svg

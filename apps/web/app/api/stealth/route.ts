@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     });
 
     const secretBase64url = base64urlEncode(stealthKp.secretKey);
-    const claimUrl = `/claim/${invoice.id}#v=1&sk=${secretBase64url}&cofre=${cofreAddress}`;
+    const claimUrl = `/claim/${invoice.id}#v=1&sk=${secretBase64url}&vault=${cofreAddress}`;
 
     return NextResponse.json(
       {
