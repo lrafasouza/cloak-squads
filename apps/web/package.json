@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build && cp -r .next/static .next/standalone/apps/web/.next/ && cp -r public .next/standalone/apps/web/ 2>/dev/null || true",
-    "start": "node .next/standalone/apps/web/server.js",
+    "build": "prisma generate && next build",
+    "start": "cp -r .next/static .next/standalone/apps/web/.next/ 2>/dev/null; cp -r public .next/standalone/apps/web/ 2>/dev/null; node .next/standalone/apps/web/server.js",
     "postinstall": "prisma generate",
     "prisma": "prisma",
     "lint": "biome check .",
