@@ -47,7 +47,7 @@
     "vitest": "^1.6.1"
   },
   "dependencies": {
-    "@cloak.dev/sdk-devnet": "0.1.5-devnet.0",
+    "@cloak.dev/sdk-devnet": "0.1.5-devnet.1",
     "@sqds/multisig": "^2.1.4"
   }
 }

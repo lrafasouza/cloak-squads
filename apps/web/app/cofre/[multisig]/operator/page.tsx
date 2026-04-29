@@ -8,6 +8,12 @@ import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
+import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
+import {
+  canRunOperatorExecution,
+  operatorProposalStatusMessage,
+  type OperatorProposalStatus,
+} from "@cloak-squads/core/operator-readiness";
 import { cofrePda } from "@cloak-squads/core/pda";
 import * as squadsMultisig from "@sqds/multisig";
 import {
@@ -83,6 +89,34 @@ type ExecutionStep = {
   error?: string | undefined;
 };
 
+type CloakDepositCache = {
+  signature: string;
+  leafIndex: number;
+  spendKeyHex: string;
+  blindingHex: string;
+};
+
+function cloakDepositCacheKey(multisig: string, transactionIndex: string) {
+  return `cloak-deposit:${multisig}:${transactionIndex}`;
+}
+
+function readCloakDepositCache(multisig: string, transactionIndex: string): CloakDepositCache | null {
+  try {
+    const raw = sessionStorage.getItem(cloakDepositCacheKey(multisig, transactionIndex));
+    return raw ? (JSON.parse(raw) as CloakDepositCache) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCloakDepositCache(multisig: string, transactionIndex: string, value: CloakDepositCache) {
+  try {
+    sessionStorage.setItem(cloakDepositCacheKey(multisig, transactionIndex), JSON.stringify(value));
+  } catch {
+    // Best effort cache only; execution can continue without it.
+  }
+}
+
 async function cloakDepositBrowser(
   connection: Parameters<typeof transact>[1]["connection"],
   wallet: {
@@ -118,7 +152,9 @@ async function cloakDepositBrowser(
     {
       connection,
       programId: CLOAK_PROGRAM_ID,
-      relayUrl: "https://api.devnet.cloak.ag",
+      // Keep operator deposits independent from relay /health availability.
+      // The relay may return 503 and trigger duplicate-submit edge cases in the SDK fallback path.
+      ...cloakDirectTransactOptions,
       signTransaction: wallet.signTransaction,
       signMessage: wallet.signMessage,
       depositorPublicKey: wallet.publicKey,
@@ -163,7 +199,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const [executing, setExecuting] = useState(false);
   const [pendingDrafts, setPendingDrafts] = useState<DraftSummary[]>([]);
-  const [draftOnChainStatus, setDraftOnChainStatus] = useState<"approved" | "executed" | "other" | "loading" | "error">("loading");
+  const [draftOnChainStatus, setDraftOnChainStatus] = useState<OperatorProposalStatus>("loading");
   const autoLoadFiredRef = useRef(false);
 
   const multisigAddress = useMemo(() => {
@@ -358,14 +394,18 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         throw new Error("Wallet does not support signTransaction");
       }
       try {
-        const cloakResult = await cloakDepositBrowser(
-          connection,
-          { publicKey: wallet.publicKey, signTransaction: wallet.signTransaction, ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}) },
-          amount,
-          tokenMint,
-        );
+        const cachedDeposit = readCloakDepositCache(multisigAddress.toBase58(), txIndex);
+        const cloakResult = cachedDeposit ?? await cloakDepositBrowser(
+            connection,
+            { publicKey: wallet.publicKey, signTransaction: wallet.signTransaction, ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}) },
+            amount,
+            tokenMint,
+          );
         cloakSig = cloakResult.signature;
         setCloakSignature(cloakSig);
+        if (!cachedDeposit) {
+          writeCloakDepositCache(multisigAddress.toBase58(), txIndex, cloakResult);
+        }
 
         // Store UTXO data for future claim (linked by invoice if available)
         if (loadedDraft?.recipient) {
@@ -582,7 +622,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     !operatorMismatch &&
     !cofreMissing &&
     !lowOperatorSol &&
-    draftOnChainStatus === "approved";
+    canRunOperatorExecution(draftOnChainStatus);
+  const proposalStatusMessage = operatorProposalStatusMessage(draftOnChainStatus);
 
   if (!multisigAddress) {
     return (
@@ -706,6 +747,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                             );
                             if (singleResponse.ok) {
                               setLoadedDraft((await singleResponse.json()) as SingleDraft);
+                              void checkOnChainStatus(d.transactionIndex);
                               return;
                             }
                             const payrollResponse = await fetch(
@@ -715,6 +757,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                               const draft = (await payrollResponse.json()) as PayrollDraft;
                               setPayrollDraft(draft);
                               setExecutionSteps(draft.recipients.map((_, i) => ({ index: i, status: "pending" })));
+                              void checkOnChainStatus(d.transactionIndex);
                               return;
                             }
                             setError(`No persisted draft found for proposal #${d.transactionIndex}.`);
@@ -868,13 +911,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             </section>
           ) : null}
 
-          {(loadedDraft || payrollDraft) && draftOnChainStatus !== "approved" && draftOnChainStatus !== "loading" ? (
+          {(loadedDraft || payrollDraft) && proposalStatusMessage ? (
             <section className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
-              {draftOnChainStatus === "executed"
-                ? "This proposal has already been executed on-chain."
-                : draftOnChainStatus === "other"
-                  ? "This proposal is not yet approved on-chain. Wait for signers to reach the threshold before executing."
-                  : "Could not verify proposal status on-chain."}
+              {proposalStatusMessage}
             </section>
           ) : null}
 
@@ -884,7 +923,12 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           >
             <h2 className="mb-4 text-base font-semibold text-neutral-50">Execute</h2>
             <p className="mb-4 text-xs text-neutral-400">
-              Connect the operator wallet (different from the Squads member).
+              Connect the registered operator wallet for this cofre.
+              {registeredOperator ? (
+                <span className="mt-1 block break-all font-mono text-neutral-300">
+                  {registeredOperator}
+                </span>
+              ) : null}
             </p>
             <Button
               type="submit"
@@ -901,7 +945,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   : "Execute with license"}
             </Button>
             {!wallet.publicKey ? (
-              <p className="mt-2 text-xs text-amber-300">Connect an operator wallet first.</p>
+              <p className="mt-2 text-xs text-amber-300">Connect the registered operator wallet first.</p>
             ) : null}
             {operatorMismatch && wallet.publicKey ? (
               <p className="mt-2 text-xs text-amber-300">

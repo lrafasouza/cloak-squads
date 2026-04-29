@@ -1,13 +1,19 @@
 "use client";
 
 import { cofrePda, squadsVaultPda } from "@cloak-squads/core/pda";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
+import { vaultTopUpLamportsNeeded } from "@cloak-squads/core/vault-funding";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import * as sqdsMultisig from "@sqds/multisig";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast-provider";
 import { publicEnv } from "@/lib/env";
+import { buildInitCofreIxBrowser } from "@/lib/gatekeeper-instructions";
 import { lamportsToSol } from "@/lib/sol";
+import { createInitCofreProposal, proposalApprove, vaultTransactionExecute } from "@/lib/squads-sdk";
 import { AnimatedCard, StaggerContainer, StaggerItem } from "@/components/ui/animations";
 import { Spinner } from "@/components/ui/skeleton";
 
@@ -29,7 +35,9 @@ function truncateAddress(address: string) {
 
 export default function CofreDashboardPage({ params }: { params: Promise<{ multisig: string }> }) {
   const { multisig } = use(params);
+  const { connection } = useConnection();
   const wallet = useWallet();
+  const { addToast } = useToast();
   const gatekeeperProgram = useMemo(
     () => new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID),
     [],
@@ -59,6 +67,25 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
 
   const [drafts, setDrafts] = useState<DraftSummary[]>([]);
   const [draftsLoading, setDraftsLoading] = useState(true);
+  const [cofreStatus, setCofreStatus] = useState<"checking" | "initialized" | "missing" | "error">("checking");
+  const [bootstrapPending, setBootstrapPending] = useState(false);
+  const [bootstrapProposalIndex, setBootstrapProposalIndex] = useState<string | null>(null);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+
+  const refreshCofreStatus = useCallback(async () => {
+    if (!cofre) return;
+    setCofreStatus("checking");
+    try {
+      const account = await connection.getAccountInfo(cofre);
+      if (!account) {
+        setCofreStatus("missing");
+        return;
+      }
+      setCofreStatus(account.owner.equals(gatekeeperProgram) ? "initialized" : "error");
+    } catch {
+      setCofreStatus("error");
+    }
+  }, [cofre, connection, gatekeeperProgram]);
 
   const loadDrafts = useCallback(async () => {
     if (!multisigAddress) return;
@@ -97,6 +124,87 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
   useEffect(() => {
     void loadDrafts();
   }, [loadDrafts]);
+
+  useEffect(() => {
+    void refreshCofreStatus();
+  }, [refreshCofreStatus]);
+
+  async function initializeCofre() {
+    setBootstrapError(null);
+    setBootstrapPending(true);
+
+    try {
+      if (!wallet.publicKey || !wallet.sendTransaction || !multisigAddress || !vault) {
+        throw new Error("Connect a Squads member wallet to initialize this cofre.");
+      }
+
+      const vaultBalance = await connection.getBalance(vault, "confirmed");
+      const topUpLamports = vaultTopUpLamportsNeeded(BigInt(vaultBalance));
+      if (topUpLamports > 0n) {
+        addToast("Funding Squads vault for cofre rent...", "info");
+        const latestBlockhash = await connection.getLatestBlockhash();
+        const tx = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: wallet.publicKey,
+            toPubkey: vault,
+            lamports: Number(topUpLamports),
+          }),
+        );
+        tx.feePayer = wallet.publicKey;
+        tx.recentBlockhash = latestBlockhash.blockhash;
+        const signature = await wallet.sendTransaction(tx, connection);
+        await connection.confirmTransaction({ signature, ...latestBlockhash }, "confirmed");
+      }
+
+      addToast("Creating cofre bootstrap proposal...", "info");
+      const initCofre = await buildInitCofreIxBrowser({
+        multisig: multisigAddress,
+        operator: wallet.publicKey,
+      });
+      const bootstrap = await createInitCofreProposal({
+        connection,
+        wallet,
+        multisigPda: multisigAddress,
+        initCofreIx: initCofre.instruction,
+        memo: "Initialize Cloak Squads cofre",
+      });
+      setBootstrapProposalIndex(bootstrap.transactionIndex.toString());
+
+      const multisigAccount = await sqdsMultisig.accounts.Multisig.fromAccountAddress(
+        connection,
+        multisigAddress,
+      );
+      if (Number(multisigAccount.threshold) === 1) {
+        addToast("Approving and executing cofre bootstrap...", "info");
+        await proposalApprove({
+          connection,
+          wallet,
+          multisigPda: multisigAddress,
+          transactionIndex: bootstrap.transactionIndex,
+          memo: "Approve cofre bootstrap",
+        });
+        const signature = await vaultTransactionExecute({
+          connection,
+          wallet,
+          multisigPda: multisigAddress,
+          transactionIndex: bootstrap.transactionIndex,
+        });
+        const latestBlockhash = await connection.getLatestBlockhash();
+        await connection.confirmTransaction({ signature, ...latestBlockhash }, "confirmed");
+        addToast("Cofre initialized.", "success");
+      } else {
+        addToast(`Bootstrap proposal #${bootstrap.transactionIndex.toString()} created.`, "success");
+      }
+
+      await refreshCofreStatus();
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Could not initialize cofre.";
+      setBootstrapError(message);
+      addToast(message, "error");
+    } finally {
+      setBootstrapPending(false);
+    }
+  }
 
   if (!multisigAddress || !cofre || !vault) {
     return (
@@ -189,6 +297,41 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
               </div>
             </div>
           </StaggerItem>
+
+          {cofreStatus === "missing" || cofreStatus === "error" ? (
+            <StaggerItem>
+              <div className="mt-6 rounded-xl border border-amber-800/50 bg-amber-950/20 p-5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold text-amber-100">
+                      Cofre account is not initialized
+                    </h2>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-100/75">
+                      This Squads multisig exists, but the gatekeeper cofre PDA has not been
+                      created for the configured program. Initialize it before creating or executing
+                      private send proposals.
+                    </p>
+                    {bootstrapProposalIndex ? (
+                      <p className="mt-3 font-mono text-xs text-amber-200">
+                        Bootstrap proposal #{bootstrapProposalIndex}
+                      </p>
+                    ) : null}
+                    {bootstrapError ? (
+                      <p className="mt-3 text-sm text-red-300">{bootstrapError}</p>
+                    ) : null}
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={initializeCofre}
+                    disabled={bootstrapPending || !wallet.publicKey}
+                    className="shrink-0"
+                  >
+                    {bootstrapPending ? "Initializing..." : "Initialize cofre"}
+                  </Button>
+                </div>
+              </div>
+            </StaggerItem>
+          ) : null}
 
           <StaggerItem>
             <div className="mt-8 grid gap-4 md:grid-cols-3">

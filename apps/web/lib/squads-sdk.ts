@@ -1,6 +1,7 @@
 "use client";
 
 import { buildIssueLicenseProposal } from "@cloak-squads/core/squads-adapter";
+import { translateOnchainError } from "@cloak-squads/core/onchain-error";
 import type { Connection, PublicKey, SendOptions, Signer, TransactionInstruction } from "@solana/web3.js";
 import { Transaction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
@@ -13,6 +14,13 @@ function log(...args: unknown[]) {
 
 function logError(...args: unknown[]) {
   if (IS_DEV) console.error(...args);
+}
+
+function throwTranslatedOnchainError(prefix: string, err: unknown, logs?: string[] | null): never {
+  const raw = logs?.length
+    ? `${prefix}: ${JSON.stringify(err)} | logs: ${logs.join(" || ")}`
+    : `${prefix}: ${err instanceof Error ? err.message : JSON.stringify(err)}`;
+  throw new Error(translateOnchainError(raw));
 }
 
 export type BrowserSquadsWallet = {
@@ -149,13 +157,11 @@ export async function createIssueLicenseProposal(params: {
     if (sim.value.err) {
       logError("[squads-sdk] simulate error:", sim.value.err);
       logError("[squads-sdk] simulate logs:", sim.value.logs);
-      throw new Error(
-        `Simulation failed: ${JSON.stringify(sim.value.err)} | logs: ${(sim.value.logs ?? []).join(" || ")}`,
-      );
+      throwTranslatedOnchainError("Simulation failed", sim.value.err, sim.value.logs);
     }
   } catch (simErr) {
     logError("[squads-sdk] simulate threw:", simErr);
-    throw simErr;
+    throw new Error(translateOnchainError(simErr));
   }
 
   let signature: string;
@@ -169,7 +175,7 @@ export async function createIssueLicenseProposal(params: {
       logError("[squads-sdk]   .cause:", anyErr.cause);
       logError("[squads-sdk]   .message:", anyErr.message);
     }
-    throw sendErr;
+    throw new Error(translateOnchainError(sendErr));
   }
 
   log("[squads-sdk] awaiting confirmation:", signature);
@@ -232,13 +238,11 @@ export async function createBatchIssueLicenseProposal(params: {
     if (sim.value.err) {
       logError("[squads-sdk] batch simulate error:", sim.value.err);
       logError("[squads-sdk] batch simulate logs:", sim.value.logs);
-      throw new Error(
-        `Batch simulation failed: ${JSON.stringify(sim.value.err)} | logs: ${(sim.value.logs ?? []).join(" || ")}`,
-      );
+      throwTranslatedOnchainError("Batch simulation failed", sim.value.err, sim.value.logs);
     }
   } catch (simErr) {
     logError("[squads-sdk] batch simulate threw:", simErr);
-    throw simErr;
+    throw new Error(translateOnchainError(simErr));
   }
 
   let signature: string;
@@ -246,7 +250,7 @@ export async function createBatchIssueLicenseProposal(params: {
     signature = await params.wallet.sendTransaction(tx, params.connection);
   } catch (sendErr) {
     logError("[squads-sdk] batch sendTransaction error:", sendErr);
-    throw sendErr;
+    throw new Error(translateOnchainError(sendErr));
   }
 
   log("[squads-sdk] batch awaiting confirmation:", signature);
@@ -354,13 +358,11 @@ export async function vaultTransactionExecute(params: {
     if (sim.value.err) {
       logError("[squads-sdk] execute simulate error:", sim.value.err);
       logError("[squads-sdk] execute simulate logs:", sim.value.logs);
-      throw new Error(
-        `Execute simulation failed: ${JSON.stringify(sim.value.err)} | logs: ${(sim.value.logs ?? []).join(" || ")}`,
-      );
+      throwTranslatedOnchainError("Execute simulation failed", sim.value.err, sim.value.logs);
     }
   } catch (simErr) {
     logError("[squads-sdk] execute simulate threw:", simErr);
-    throw simErr;
+    throw new Error(translateOnchainError(simErr));
   }
 
   try {
@@ -373,7 +375,7 @@ export async function vaultTransactionExecute(params: {
       logError("[squads-sdk]   .cause:", anyErr.cause);
       logError("[squads-sdk]   .message:", anyErr.message);
     }
-    throw sendErr;
+    throw new Error(translateOnchainError(sendErr));
   }
 }
 

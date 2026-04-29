@@ -10,7 +10,9 @@ import { useToast } from "@/components/ui/toast-provider";
 import { StaggerContainer, StaggerItem } from "@/components/ui/animations";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
-import { solToLamports, lamportsToSol } from "@/lib/sol";
+import { publicEnv } from "@/lib/env";
+import { solAmountToLamports } from "@cloak-squads/core/amount";
+import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import {
@@ -82,8 +84,13 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       if (!wallet.publicKey || !multisigAddress) {
         throw new Error("Connect a wallet and open a valid multisig.");
       }
+      await assertCofreInitialized({
+        connection,
+        multisig: multisigAddress,
+        gatekeeperProgram: new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID),
+      });
 
-      const lamports = BigInt(solToLamports(amount));
+      const lamports = solAmountToLamports(amount);
 
       const recipientPubkey = new PublicKey(recipient.trim());
       setProofStep("generate-witness");
@@ -105,7 +112,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       const invariants: PayloadInvariants = {
         nullifier: randomBytes(32),
         commitment: hexToBytes(commitment),
-        amount: BigInt(amount),
+        amount: lamports,
         tokenMint: mint,
         recipientVkPub: recipientPubkey.toBytes(),
         nonce: randomBytes(16),
