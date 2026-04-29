@@ -2,7 +2,7 @@
 
 ## System Overview
 
-Cloak Squads is a private execution layer for Squads v4 multisig vaults. It adds a gatekeeper between the Squads vault and the Cloak privacy protocol, enforcing that only licensed, operator-gated transfers execute.
+Aegis is a private execution layer for Squads v4 multisig vaults. It adds a gatekeeper between the Squads vault and the Cloak privacy protocol, enforcing that only licensed, operator-gated transfers execute.
 
 ## Program Architecture
 

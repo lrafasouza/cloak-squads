@@ -1,4 +1,4 @@
-# Relatório de Investigação — Cloak Squads
+# Relatório de Investigação — Aegis
 
 **Data:** 2026-04-27
 **Status:** PARCIAL (interrompido)

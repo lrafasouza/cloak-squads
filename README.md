@@ -1,14 +1,14 @@
-# Cloak Squads
+# Aegis
 
 Private execution infrastructure for Squads multisig vaults on Solana, powered by Cloak Protocol.
 
-Cloak Squads lets a Squads multisig approve sensitive transfers without exposing the operational details to every public surface. Members approve execution through Squads, a gatekeeper program issues a single-use license, and a registered operator completes the private transfer through Cloak.
+Aegis lets a Squads multisig approve sensitive transfers without exposing the operational details to every public surface. Members approve execution through Squads, a gatekeeper program issues a single-use license, and a registered operator completes the private transfer through Cloak.
 
 The project is currently built for devnet demonstrations and technical validation. It is not mainnet-ready.
 
 ## What It Does
 
-Cloak Squads adds a privacy-aware execution layer around a Squads v4 multisig:
+Aegis adds a privacy-aware execution layer around a Squads v4 multisig:
 
 1. A multisig member prepares a private action, such as a send, payroll batch, audit scope, or stealth invoice.
 2. Squads members approve the proposal using the normal Squads threshold flow.
@@ -348,4 +348,4 @@ This is a devnet validation architecture. Before mainnet, the project needs deep
 
 ## Project Status
 
-Cloak Squads is a working devnet prototype for private Squads execution. The current focus is validating the product flows, hardening the gatekeeper, improving demo reliability, and preparing the path toward production-grade privacy execution.
+Aegis is a working devnet prototype for private Squads execution. The current focus is validating the product flows, hardening the gatekeeper, improving demo reliability, and preparing the path toward production-grade privacy execution.

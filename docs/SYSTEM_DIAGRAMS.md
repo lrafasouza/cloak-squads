@@ -1,9 +1,9 @@
-# Cloak Squads — Diagramas do Sistema
+# Aegis — Diagramas do Sistema
 
 Documento visual de toda a aplicação. Diagramas em **Mermaid** (renderizam direto no
 GitHub, no preview do VS Code e em qualquer visualizador Markdown moderno).
 
-> Cloak Squads = camada de **execução privada** para multisigs Squads v4. Membros
+> Aegis = camada de **execução privada** para multisigs Squads v4. Membros
 > aprovam um envio on-chain → o gatekeeper emite uma **licença** com hash do payload
 > → o **operador** consome a licença e executa o depósito privado no Cloak.
 
@@ -465,7 +465,7 @@ erDiagram
 
 ```mermaid
 mindmap
-  root((Cloak Squads))
+  root((Aegis))
     F1 Private Send
       /send (form)
       proposals/:id (approve / execute)
