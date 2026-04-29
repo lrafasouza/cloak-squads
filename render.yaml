@@ -27,6 +27,14 @@ services:
       - key: LOG_LEVEL
         value: info
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: aegis-db
+          property: connectionString
       - key: JWT_SIGNING_SECRET
         generateValue: true
+
+databases:
+  - name: aegis-db
+    plan: free
+    databaseName: aegis
+    user: aegis
