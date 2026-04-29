@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/toast-provider";
 import { StaggerContainer, StaggerItem } from "@/components/ui/animations";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
+import { solToLamports, lamportsToSol } from "@/lib/sol";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import {
@@ -82,9 +83,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         throw new Error("Connect a wallet and open a valid multisig.");
       }
 
-      if (!/^[0-9]+$/.test(amount) || BigInt(amount) <= 0n) {
-        throw new Error("Amount must be a positive integer in lamports.");
-      }
+      const lamports = BigInt(solToLamports(amount));
 
       const recipientPubkey = new PublicKey(recipient.trim());
       setProofStep("generate-witness");
@@ -92,7 +91,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       // Generate real Cloak UTXO commitment
       const keypair = await generateUtxoKeypair();
       const mint = NATIVE_SOL_MINT;
-      const utxo = await createUtxo(BigInt(amount), keypair, mint);
+      const utxo = await createUtxo(lamports, keypair, mint);
       const commitmentBigInt = await computeUtxoCommitment(utxo);
       const commitment = commitmentBigInt.toString(16).padStart(64, "0");
 
@@ -140,7 +139,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       const draft = {
         cofreAddress: multisigAddress.toBase58(),
         transactionIndex,
-        amount,
+        amount: lamports.toString(),
         recipient: recipientPubkey.toBase58(),
         memo,
         payloadHash: Array.from(hash),
@@ -243,16 +242,15 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                 <StaggerContainer className="grid gap-4" staggerDelay={0.05}>
                   <StaggerItem>
                     <div>
-                      <Label htmlFor="amount">Amount in lamports</Label>
+                      <Label htmlFor="amount">Amount in SOL</Label>
                       <Input
                         id="amount"
                         type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
+                        inputMode="decimal"
                         autoComplete="off"
                         value={amount}
                         onChange={(event) => setAmount(event.target.value)}
-                        placeholder="1000000"
+                        placeholder="0.001"
                         className="mt-1.5 font-mono"
                       />
                     </div>
@@ -331,7 +329,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       <ConfirmModal
         open={showConfirm}
         title="Create License Proposal"
-        description={`This will create a Squads proposal to issue a license for ${Number(amount).toLocaleString()} lamports. The transaction will require approval from the multisig members before execution.`}
+        description={`This will create a Squads proposal to issue a license for ${amount} SOL. The transaction will require approval from the multisig members before execution.`}
         confirmText="Create Proposal"
         cancelText="Cancel"
         onConfirm={executeProposal}

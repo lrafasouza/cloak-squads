@@ -7,6 +7,7 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
+import { lamportsToSol } from "@/lib/sol";
 import { AnimatedCard, StaggerContainer, StaggerItem } from "@/components/ui/animations";
 import { Spinner } from "@/components/ui/skeleton";
 
@@ -320,8 +321,8 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                               </p>
                               <p className="mt-1.5 text-xs text-neutral-400">
                                 {d.type === "payroll"
-                                  ? `${d.recipientCount} recipients, ${Number(d.totalAmount ?? d.amount).toLocaleString()} lamports total`
-                                  : `${Number(d.amount).toLocaleString()} lamports → ${truncateAddress(d.recipient)}`}
+                                  ? `${d.recipientCount} recipients, ${lamportsToSol(d.totalAmount ?? d.amount)} SOL total`
+                                  : `${lamportsToSol(d.amount)} SOL → ${truncateAddress(d.recipient)}`}
                               </p>
                             </div>
                             <span className="text-xs text-neutral-500 shrink-0 ml-4">

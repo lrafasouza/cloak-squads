@@ -38,14 +38,3 @@ export function truncateAddress(address: string, startChars = 4, endChars = 4): 
   }
   return `${address.slice(0, startChars)}...${address.slice(-endChars)}`;
 }
-
-export function formatLamports(lamports: string | number | bigint): string {
-  const value = typeof lamports === "string" ? BigInt(lamports) : BigInt(lamports);
-  return `${value.toLocaleString()} lamports`;
-}
-
-export function formatSOL(lamports: string | number | bigint): string {
-  const value = typeof lamports === "string" ? BigInt(lamports) : BigInt(lamports);
-  const sol = Number(value) / 1e9;
-  return `${sol.toFixed(9)} SOL`;
-}

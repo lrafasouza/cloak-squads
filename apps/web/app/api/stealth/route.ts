@@ -24,7 +24,7 @@ const stealthInvoiceCreateSchema = z.object({
   memo: z.string().max(256).optional(),
   amount: z.string().refine(
     (val) => /^[0-9]+$/.test(val) && BigInt(val) > 0n,
-    { message: "Amount must be a positive integer in lamports" },
+    { message: "Amount must be a positive integer in lamports (backend unit)" },
   ),
   recipientWallet: z.string().refine(
     (val) => {

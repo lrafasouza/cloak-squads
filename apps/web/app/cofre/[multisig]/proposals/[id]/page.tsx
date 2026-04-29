@@ -13,6 +13,7 @@ import { ExecuteButton } from "@/components/proposal/ExecuteButton";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { useToast } from "@/components/ui/toast-provider";
 import { AnimatedCard, StaggerContainer, StaggerItem } from "@/components/ui/animations";
+import { lamportsToSol } from "@/lib/sol";
 
 type ProposalStatusKind =
   | "draft"
@@ -348,7 +349,7 @@ export default function ProposalApprovalPage({
                             <td className="py-3 pr-4 text-right font-mono text-emerald-400">
                               {Number(payrollDraft.totalAmount).toLocaleString()}
                             </td>
-                            <td className="py-3 text-neutral-500">lamports</td>
+                            <td className="py-3 text-neutral-500">SOL</td>
                           </tr>
                         </tfoot>
                       </table>
@@ -375,7 +376,7 @@ export default function ProposalApprovalPage({
                   {draft ? (
                     <dl className="grid gap-4 text-sm">
                       {[
-                        { label: "Amount", value: `${Number(draft.amount).toLocaleString()} lamports` },
+                        { label: "Amount", value: `${lamportsToSol(draft.amount)} SOL` },
                         { label: "Recipient", value: draft.recipient, isMono: true },
                         { label: "Memo", value: draft.memo || "None" },
                       ].map((item) => (
