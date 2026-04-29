@@ -1,13 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false,
   transpilePackages: ["@cloak-squads/core"],
-  webpack: (config) => {
+  experimental: {
+    // Reduz workers baseado em memória disponível
+    memoryBasedWorkersCount: true,
+  },
+  // Limita workers do webpack
+  webpack: (config, { isServer }) => {
     config.ignoreWarnings = [
       ...(config.ignoreWarnings ?? []),
       { module: /node_modules\/pino\/lib\/tools\.js/ },
       { message: /Can't resolve 'pino-pretty'/ },
     ];
+    // Reduz paralelismo
+    config.parallelism = 2;
     return config;
   },
 };
