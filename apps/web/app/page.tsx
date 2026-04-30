@@ -27,7 +27,7 @@ const trustItems = [
   { icon: Lock, label: "End-to-end encrypted" },
   { icon: Users, label: "Multi-sig security" },
   { icon: ShieldCheck, label: "Auditable" },
-  { icon: Zap, label: "Solana L1" },
+  { icon: Zap, label: "Solana" },
 ];
 
 function TrustBar() {

@@ -13,7 +13,6 @@ import { type MemberVote, getMemberVote } from "@cloak-squads/core/proposal-vote
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
-import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 
 function StatusBadge({ status }: { status: ProposalStatusKind }) {
@@ -249,30 +248,6 @@ export default function ProposalApprovalPage({
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-bg via-bg to-surface">
-      <header className="border-b border-border/50 bg-bg/80 backdrop-blur-xl sticky top-0 z-40">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link
-            href="/vault"
-            className="flex items-center gap-2 text-sm font-semibold text-ink hover:text-accent transition-colors"
-          >
-            <svg
-              aria-hidden="true"
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-            Vault
-          </Link>
-        </div>
-      </header>
 
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <StaggerContainer staggerDelay={0.1}>

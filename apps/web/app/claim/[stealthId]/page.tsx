@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { lamportsToSol } from "@/lib/sol";
 import { statusBadge, statusLabel } from "@/lib/status-labels";
@@ -325,17 +324,6 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
   if (claimState === "loading") {
     return (
       <main className="min-h-screen bg-bg">
-        <header className="border-b border-border bg-bg/95">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-            <Link
-              href="/"
-              className="rounded-md text-sm font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-            >
-              Aegis
-            </Link>
-          </div>
-        </header>
-
         <section className="mx-auto max-w-6xl px-4 py-10">
           <p className="text-ink-muted">Loading invoice data...</p>
         </section>
@@ -346,17 +334,6 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
   if (claimState === "invalid") {
     return (
       <main className="min-h-screen bg-bg">
-        <header className="border-b border-border bg-bg/95">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-            <Link
-              href="/"
-              className="rounded-md text-sm font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-            >
-              Aegis
-            </Link>
-          </div>
-        </header>
-
         <section className="mx-auto max-w-3xl px-4 py-16 text-center">
           <div className="rounded-lg border border-red-800 bg-red-900/20 p-8">
             <h1 className="text-xl font-semibold text-red-200">Erro de Acesso</h1>
@@ -375,18 +352,6 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
 
   return (
     <main className="min-h-screen bg-bg">
-      <header className="border-b border-border bg-bg/95">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link
-            href="/"
-            className="rounded-md text-sm font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-          >
-            Aegis
-          </Link>
-          <ClientWalletButton />
-        </div>
-      </header>
-
       <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>

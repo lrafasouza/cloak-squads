@@ -156,17 +156,6 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
   if (error) {
     return (
       <main className="min-h-screen bg-bg">
-        <header className="border-b border-border bg-bg/95">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-            <Link
-              href="/"
-              className="rounded-md text-sm font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-            >
-              Aegis
-            </Link>
-          </div>
-        </header>
-
         <section className="mx-auto max-w-3xl px-4 py-16 text-center">
           <div className="rounded-lg border border-red-800 bg-red-900/20 p-8">
             <h1 className="text-xl font-semibold text-red-200">Access Error</h1>
@@ -186,17 +175,6 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
   if (loading || !metadata) {
     return (
       <main className="min-h-screen bg-bg">
-        <header className="border-b border-border bg-bg/95">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-            <Link
-              href="/"
-              className="rounded-md text-sm font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-            >
-              Aegis
-            </Link>
-          </div>
-        </header>
-
         <section className="mx-auto max-w-6xl px-4 py-10">
           <p className="text-ink-muted">Loading audit data...</p>
         </section>
@@ -206,17 +184,6 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
 
   return (
     <main className="min-h-screen bg-bg">
-      <header className="border-b border-border bg-bg/95">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link
-            href="/"
-            className="rounded-md text-sm font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-          >
-            Aegis
-          </Link>
-        </div>
-      </header>
-
       <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>

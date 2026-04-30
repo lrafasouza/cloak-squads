@@ -34,10 +34,10 @@ const navItems = [
   { label: "Overview", href: "", icon: LayoutDashboard },
   { label: "Send", href: "/send", icon: Send },
   { label: "Payroll", href: "/payroll", icon: Users },
-  { label: "Audit", href: "/audit", icon: Shield },
+  { label: "Operator", href: "/operator", icon: Key },
   { label: "Invoices", href: "/invoice", icon: FileText },
   { label: "Proposals", href: "/proposals", icon: List },
-  { label: "Operator", href: "/operator", icon: Key },
+  { label: "Audit", href: "/audit", icon: Shield },
   { label: "Settings", href: "#", icon: Settings },
 ];
 
