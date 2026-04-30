@@ -131,12 +131,12 @@ function TransactionModal({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-bg/80 px-4 py-6 backdrop-blur-md">
-      <dialog
-        open
+      <div
+        role="dialog"
         aria-modal="true"
         aria-labelledby="transaction-progress-title"
         aria-describedby="transaction-progress-description"
-        className="m-0 w-full max-w-2xl overflow-hidden rounded-xl border border-border bg-surface p-0 text-ink shadow-raise-2"
+        className="w-full max-w-2xl overflow-hidden rounded-xl border border-border bg-surface p-0 text-ink shadow-raise-2"
       >
         <div className="border-b border-border bg-bg/45 px-5 py-4 md:px-6">
           <div className="flex items-start justify-between gap-4">
@@ -266,7 +266,7 @@ function TransactionModal({
             Keep this tab open until the flow finishes. Wallet prompts may appear between steps.
           </p>
         </div>
-      </dialog>
+      </div>
     </div>
   );
 }
