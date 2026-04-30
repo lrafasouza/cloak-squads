@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useState } from "react";
+import { WalletGuard } from "@/components/wallet/WalletGuard";
 import { OperatorInboxSheet } from "./OperatorInboxSheet";
 
 const navItems = [
@@ -110,7 +111,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Content */}
         <main className="flex-1 p-4 md:p-6">
-          {children}
+          <WalletGuard>{children}</WalletGuard>
         </main>
       </div>
 

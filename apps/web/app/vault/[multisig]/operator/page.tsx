@@ -234,12 +234,30 @@ async function cloakDepositBrowser(
     throw new Error("Deposit returned no commitment indices.");
   }
 
+  const outputUtxos = result.outputUtxos?.length ? result.outputUtxos : [outputUtxo, zeroOut];
+  for (let i = 0; i < outputUtxos.length; i++) {
+    const utxo = outputUtxos[i];
+    if (!utxo) continue;
+
+    const index = result.commitmentIndices[i];
+    const commitment = result.outputCommitments[i];
+    const siblingCommitment = result.siblingCommitments[i];
+
+    if (index !== undefined) utxo.index = index;
+    if (commitment !== undefined) utxo.commitment = commitment;
+    if (siblingCommitment !== undefined) utxo.siblingCommitment = siblingCommitment;
+    if (i === 0 && result.preTransactionLeftSibling !== undefined) {
+      (utxo as Utxo & { leftSiblingCommitment?: bigint }).leftSiblingCommitment =
+        result.preTransactionLeftSibling;
+    }
+  }
+
   return {
     signature: result.signature,
     leafIndex,
     spendKeyHex: outputKeypair.privateKey.toString(16).padStart(64, "0"),
     blindingHex: outputUtxo.blinding.toString(16).padStart(64, "0"),
-    outputUtxos: result.outputUtxos,
+    outputUtxos,
     merkleTree: result.merkleTree,
   };
 }
@@ -653,11 +671,11 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             // Deposit + withdraw already completed in a prior attempt.
             // Skip fullWithdraw and proceed to execute_with_license below.
           } else {
-            if (!cloakResult.outputUtxos || !cloakResult.merkleTree) {
-              throw new Error("Cloak deposit did not return withdrawal data.");
+            if (!cloakResult.outputUtxos?.length) {
+              throw new Error("Cloak deposit did not return spendable UTXO data.");
             }
             const recipientPubkey = new PublicKey(draft.recipient);
-            const withdrawResult = await fullWithdraw(cloakResult.outputUtxos, recipientPubkey, {
+            const withdrawOptions = {
               connection,
               programId: CLOAK_PROGRAM_ID,
               ...cloakDirectTransactOptions,
@@ -666,10 +684,13 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               >[2]["signTransaction"],
               ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
               depositorPublicKey: wallet.publicKey,
-              cachedMerkleTree: cloakResult.merkleTree,
+              ...(cloakResult.merkleTree ? { cachedMerkleTree: cloakResult.merkleTree } : {}),
               onProgress: (s: string) => console.error(`[cloak] withdraw ${s}`),
               onProofProgress: (p: number) => console.error(`[cloak] withdraw proof ${p}%`),
-            } as Parameters<typeof fullWithdraw>[2]);
+            } as Parameters<typeof fullWithdraw>[2];
+            const withdrawResult = await fullWithdraw(cloakResult.outputUtxos, recipientPubkey, {
+              ...withdrawOptions,
+            });
             setWithdrawSignature(withdrawResult.signature);
             // Cache after successful withdraw so retries skip deposit+withdraw and only
             // re-run execute_with_license (prevents double-deposit on operator retry).
