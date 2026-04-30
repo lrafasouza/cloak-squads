@@ -315,33 +315,6 @@ export default function VaultDashboardPage({ params }: { params: Promise<{ multi
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-bg via-bg to-surface">
-      <header className="border-b border-border/50 bg-bg/80 backdrop-blur-xl sticky top-0 z-40">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link
-            href="/"
-            className="flex items-center gap-2 rounded-md text-sm font-semibold text-ink hover:text-accent transition-colors"
-          >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft">
-              <svg
-                aria-hidden="true"
-                className="h-5 w-5 text-accent"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                />
-              </svg>
-            </div>
-            Aegis
-          </Link>
-        </div>
-      </header>
-
       <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
         <StaggerContainer staggerDelay={0.1}>
           <StaggerItem>
