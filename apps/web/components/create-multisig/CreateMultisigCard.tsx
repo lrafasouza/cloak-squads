@@ -81,9 +81,9 @@ export function CreateMultisigCard({
       setError(null);
       addToast("Creating multisig...", "info");
       startTransaction({
-        title: "Creating multisig and cofre",
+        title: "Creating multisig and vault",
         description:
-          "Creating the Squads multisig, funding the vault, and preparing Aegis cofre initialization.",
+          "Creating the Squads multisig, funding the vault, and preparing Aegis vault initialization.",
         steps: [
           {
             id: "validate",
@@ -98,17 +98,17 @@ export function CreateMultisigCard({
           },
           {
             id: "bootstrap",
-            title: "Create cofre bootstrap proposal",
+            title: "Create vault bootstrap proposal",
             description: "Opening the proposal that initializes Aegis for this multisig.",
             status: "pending",
           },
           {
             id: "initialize",
-            title: "Initialize cofre",
+            title: "Initialize vault",
             description:
               threshold === 1
                 ? "Auto-approving and executing the bootstrap proposal."
-                : "Waiting for signer approvals before cofre initialization.",
+                : "Waiting for signer approvals before vault initialization.",
             status: "pending",
           },
         ],
@@ -191,7 +191,7 @@ export function CreateMultisigCard({
           description: "Squads multisig and vault funding confirmed.",
         });
 
-        addToast("Creating cofre bootstrap proposal...", "info");
+        addToast("Creating vault bootstrap proposal...", "info");
         updateStep("bootstrap", { status: "running" });
         const initCofre = await buildInitCofreIxBrowser({
           multisig: multisigPda,
@@ -202,7 +202,7 @@ export function CreateMultisigCard({
           wallet,
           multisigPda,
           initCofreIx: initCofre.instruction,
-          memo: "Initialize Aegis cofre",
+          memo: "Initialize Aegis vault",
         });
         setBootstrapProposalIndex(bootstrap.transactionIndex.toString());
         setBootstrapState("proposal-created");
@@ -213,14 +213,14 @@ export function CreateMultisigCard({
         });
 
         if (threshold === 1) {
-          addToast("Approving and executing cofre bootstrap...", "info");
+          addToast("Approving and executing vault bootstrap...", "info");
           updateStep("initialize", { status: "running" });
           await proposalApprove({
             connection,
             wallet,
             multisigPda,
             transactionIndex: bootstrap.transactionIndex,
-            memo: "Approve cofre bootstrap",
+            memo: "Approve vault bootstrap",
           });
           const executeSig = await vaultTransactionExecute({
             connection,
@@ -237,7 +237,7 @@ export function CreateMultisigCard({
           updateStep("initialize", {
             status: "success",
             signature: executeSig,
-            description: "Cofre initialized and ready for private execution.",
+            description: "Vault initialized and ready for private execution.",
           });
         } else {
           updateStep("initialize", {
@@ -251,16 +251,16 @@ export function CreateMultisigCard({
         localStorage.setItem(OPERATOR_PREFERENCE_KEY, operator.toBase58());
         setState("success");
         completeTransaction({
-          title: threshold === 1 ? "Multisig and cofre ready" : "Multisig created",
+          title: threshold === 1 ? "Multisig and vault ready" : "Multisig created",
           description:
             threshold === 1
-              ? "The cofre is initialized and ready to use."
+              ? "The vault is initialized and ready to use."
               : "The bootstrap proposal needs member approvals before private execution is active.",
         });
         addToast(
           threshold === 1
-            ? "Multisig and cofre initialized successfully!"
-            : "Multisig created. Cofre bootstrap proposal needs approvals.",
+            ? "Multisig and vault initialized successfully!"
+            : "Multisig created. Vault bootstrap proposal needs approvals.",
           "success",
         );
       } catch (err) {
@@ -323,7 +323,7 @@ export function CreateMultisigCard({
             {[
               { step: "1", text: "Connect your wallet above", icon: "wallet" },
               { step: "2", text: "Define members, threshold, and operator", icon: "users" },
-              { step: "3", text: "Create multisig and bootstrap the cofre", icon: "check" },
+              { step: "3", text: "Create multisig and bootstrap the vault", icon: "check" },
             ].map((item) => (
               <div
                 key={item.step}
@@ -373,7 +373,7 @@ export function CreateMultisigCard({
             {bootstrapProposalIndex && bootstrapState !== "initialized" && (
               <div className="rounded-lg border border-amber-900/50 bg-amber-950/30 p-4">
                 <p className="text-sm font-semibold text-amber-200">
-                  Cofre bootstrap proposal #{bootstrapProposalIndex} needs Squads approval.
+                  Vault bootstrap proposal #{bootstrapProposalIndex} needs Squads approval.
                 </p>
                 <p className="mt-1 text-xs text-amber-100/80">
                   Once approved and executed, this operator can run private executions.
@@ -521,7 +521,7 @@ export function CreateMultisigCard({
               isLoading={state === "pending"}
               className="w-full"
             >
-              {state === "pending" ? "Creating multisig..." : "Create multisig and cofre"}
+              {state === "pending" ? "Creating multisig..." : "Create multisig and vault"}
             </Button>
 
             {error && (

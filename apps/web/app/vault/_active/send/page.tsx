@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
@@ -79,7 +78,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         {
           id: "validate",
           title: "Validate transfer",
-          description: "Checking wallet, recipient, amount, and cofre readiness.",
+          description: "Checking wallet, recipient, amount, and vault readiness.",
         },
         {
           id: "commitment",
@@ -211,7 +210,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         title: "Private send proposal ready",
         description: `Proposal #${transactionIndex} is ready for signer approval.`,
       });
-      router.push(`/vault/${multisig}/proposals/${transactionIndex}`);
+      router.push(`/vault/proposals/${transactionIndex}`);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Could not create proposal.";
       setError(message);
@@ -233,18 +232,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
 
   return (
     <main className="min-h-screen">
-      <header className="border-b border-border bg-bg/95">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link
-            href={`/vault/${multisigAddress.toBase58()}`}
-            className="text-sm font-semibold text-ink"
-          >
-            Cofre
-          </Link>
-          <ClientWalletButton />
-        </div>
-      </header>
-
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
           <p className="text-sm font-medium text-accent">Private Send</p>
@@ -310,7 +297,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
 
               <div className="flex gap-3">
                 <Link
-                  href={`/vault/${multisigAddress.toBase58()}`}
+                  href="/vault"
                   className="inline-flex items-center justify-center rounded-md border border-border-strong bg-transparent px-4 py-2 text-sm font-medium text-ink hover:bg-surface-2"
                 >
                   Back

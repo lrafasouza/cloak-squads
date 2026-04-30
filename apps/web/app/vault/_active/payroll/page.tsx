@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import {
   type PayrollRecipientInput,
@@ -411,7 +410,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         setStep("created");
         setPending(false);
       } else {
-        router.push(`/vault/${multisigAddress.toBase58()}/proposals/${transactionIndex}`);
+        router.push(`/vault/proposals/${transactionIndex}`);
       }
     } catch (caught) {
       const message =
@@ -435,18 +434,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
   return (
     <main className="min-h-screen">
-      <header className="border-b border-border bg-bg/95">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link
-            href={`/vault/${multisigAddress.toBase58()}`}
-            className="text-sm font-semibold text-ink"
-          >
-            Cofre
-          </Link>
-          <ClientWalletButton />
-        </div>
-      </header>
-
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
           <p className="text-sm font-medium text-accent">Payroll</p>
@@ -677,7 +664,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
-                  href={`/vault/${multisigAddress.toBase58()}/proposals/${createdPayroll.transactionIndex}`}
+                  href={`/vault/proposals/${createdPayroll.transactionIndex}`}
                   className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-raise-1 shadow-accent/20 transition-all duration-200 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:scale-[0.98]"
                 >
                   View proposal

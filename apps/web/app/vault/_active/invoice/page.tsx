@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
@@ -91,7 +90,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         {
           id: "validate",
           title: "Validate invoice",
-          description: "Checking wallet, amount, recipient, and cofre readiness.",
+          description: "Checking wallet, amount, recipient, and vault readiness.",
         },
         {
           id: "invoice",
@@ -298,18 +297,6 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
     const fullClaimUrl = `${typeof window !== "undefined" ? window.location.origin : ""}${result.claimUrl}`;
     return (
       <main className="min-h-screen">
-        <header className="border-b border-border bg-bg/95">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-            <Link
-              href={`/vault/${multisigAddress.toBase58()}`}
-              className="text-sm font-semibold text-ink"
-            >
-              Cofre
-            </Link>
-            <ClientWalletButton />
-          </div>
-        </header>
-
         <section className="mx-auto max-w-xl px-4 py-12 md:px-6">
           <div className="rounded-xl border border-accent/20 bg-accent-soft p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -356,11 +343,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
 
               <Button
                 type="button"
-                onClick={() =>
-                  router.push(
-                    `/vault/${multisigAddress.toBase58()}/proposals/${result.transactionIndex}`,
-                  )
-                }
+                onClick={() => router.push(`/vault/proposals/${result.transactionIndex}`)}
               >
                 Go to proposal #{result.transactionIndex} →
               </Button>
@@ -373,32 +356,6 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-bg via-bg to-surface">
-      <header className="border-b border-border/50 bg-bg/80 backdrop-blur-xl sticky top-0 z-40">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link
-            href={`/vault/${multisigAddress.toBase58()}`}
-            className="flex items-center gap-2 text-sm font-semibold text-ink hover:text-accent transition-colors"
-          >
-            <svg
-              aria-hidden="true"
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-            Cofre
-          </Link>
-          <ClientWalletButton />
-        </div>
-      </header>
-
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft px-4 py-1.5 mb-3">

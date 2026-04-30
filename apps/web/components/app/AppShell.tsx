@@ -4,6 +4,7 @@ import { Logo } from "@/components/brand/Logo";
 import { Address } from "@/components/ui/aegis";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { WalletGuard } from "@/components/wallet/WalletGuard";
+import { useActiveVaultAddress } from "@/lib/active-vault";
 import {
   loadOnchainProposalSummaries,
   loadPersistedProposalSummaries,
@@ -26,7 +27,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type OperatorInboxItem, OperatorInboxSheet } from "./OperatorInboxSheet";
 
@@ -42,10 +43,9 @@ const navItems = [
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const params = useParams<{ multisig: string }>();
   const pathname = usePathname();
-  const multisig = params?.multisig ?? "";
-  const base = `/vault/${multisig}`;
+  const { activeVault: multisig } = useActiveVaultAddress();
+  const base = "/vault";
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -171,8 +171,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 /* ── Operator Inbox trigger (badge) ── */
 function OperatorInboxButton() {
   const [open, setOpen] = useState(false);
-  const params = useParams<{ multisig: string }>();
-  const multisig = params?.multisig ?? "";
+  const { activeVault: multisig } = useActiveVaultAddress();
   const { connection } = useConnection();
   const { fetchWithAuth } = useWalletAuth();
   const [items, setItems] = useState<OperatorInboxItem[]>([]);
@@ -249,13 +248,7 @@ function OperatorInboxButton() {
           </span>
         )}
       </button>
-      <OperatorInboxSheet
-        open={open}
-        onOpenChange={setOpen}
-        multisig={multisig}
-        items={items}
-        loading={loading}
-      />
+      <OperatorInboxSheet open={open} onOpenChange={setOpen} items={items} loading={loading} />
     </>
   );
 }

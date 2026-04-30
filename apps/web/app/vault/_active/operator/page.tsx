@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 
 import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { publicEnv } from "@/lib/env";
@@ -1031,18 +1030,6 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
   return (
     <main className="min-h-screen">
-      <header className="border-b border-border bg-bg/95">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link
-            href={`/vault/${multisigAddress.toBase58()}`}
-            className="text-sm font-semibold text-ink"
-          >
-            Cofre
-          </Link>
-          <ClientWalletButton />
-        </div>
-      </header>
-
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
           <p className="text-sm font-medium text-accent">Operator</p>
@@ -1096,7 +1083,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             </section>
           ) : cofreMissing ? (
             <section className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
-              <p className="font-semibold">Cofre is not initialized yet.</p>
+              <p className="font-semibold">Vault is not initialized yet.</p>
               <p className="mt-1">
                 Create, approve, and execute the bootstrap Squads proposal before using the operator
                 flow.
@@ -1363,7 +1350,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             ) : null}
             {cofreMissing ? (
               <p className="mt-2 text-xs text-amber-300">
-                Cofre bootstrap proposal must be executed before operator execution.
+                Vault bootstrap proposal must be executed before operator execution.
               </p>
             ) : null}
             {!loadedDraft && !payrollDraft ? (

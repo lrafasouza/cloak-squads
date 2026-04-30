@@ -29,7 +29,7 @@ import * as sqdsMultisig from "@sqds/multisig";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 
-export default function CofreDashboardPage({ params }: { params: Promise<{ multisig: string }> }) {
+export default function VaultDashboardPage({ params }: { params: Promise<{ multisig: string }> }) {
   const { multisig } = use(params);
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -121,13 +121,13 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
     setBootstrapError(null);
     setBootstrapPending(true);
     startTransaction({
-      title: "Initializing cofre",
+      title: "Initializing vault",
       description: "Preparing the Aegis bootstrap proposal for this Squads multisig.",
       steps: [
         {
           id: "readiness",
           title: "Check readiness",
-          description: "Checking wallet, multisig, vault funding, and cofre status.",
+          description: "Checking wallet, multisig, vault funding, and vault status.",
         },
         {
           id: "fund",
@@ -138,7 +138,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
         {
           id: "proposal",
           title: "Create bootstrap proposal",
-          description: "Your wallet signs the cofre initialization proposal.",
+          description: "Your wallet signs the vault initialization proposal.",
           status: "pending",
         },
         {
@@ -152,14 +152,14 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
 
     try {
       if (!wallet.publicKey || !wallet.sendTransaction || !multisigAddress || !vault) {
-        throw new Error("Connect a Squads member wallet to initialize this cofre.");
+        throw new Error("Connect a Squads member wallet to initialize this vault.");
       }
       updateStep("readiness", { status: "success" });
 
       const vaultBalance = await connection.getBalance(vault, "confirmed");
       const topUpLamports = vaultTopUpLamportsNeeded(BigInt(vaultBalance));
       if (topUpLamports > 0n) {
-        addToast("Funding Squads vault for cofre rent...", "info");
+        addToast("Funding Squads vault for rent...", "info");
         updateStep("fund", { status: "running" });
         const latestBlockhash = await connection.getLatestBlockhash();
         const tx = new Transaction().add(
@@ -185,7 +185,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
         });
       }
 
-      addToast("Creating cofre bootstrap proposal...", "info");
+      addToast("Creating vault bootstrap proposal...", "info");
       updateStep("proposal", { status: "running" });
       const initCofre = await buildInitCofreIxBrowser({
         multisig: multisigAddress,
@@ -196,7 +196,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
         wallet,
         multisigPda: multisigAddress,
         initCofreIx: initCofre.instruction,
-        memo: "Initialize Aegis cofre",
+        memo: "Initialize Aegis vault",
       });
       setBootstrapProposalIndex(bootstrap.transactionIndex.toString());
       updateStep("proposal", {
@@ -210,14 +210,14 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
         multisigAddress,
       );
       if (Number(multisigAccount.threshold) === 1) {
-        addToast("Approving and executing cofre bootstrap...", "info");
+        addToast("Approving and executing vault bootstrap...", "info");
         updateStep("execute", { status: "running" });
         await proposalApprove({
           connection,
           wallet,
           multisigPda: multisigAddress,
           transactionIndex: bootstrap.transactionIndex,
-          memo: "Approve cofre bootstrap",
+          memo: "Approve vault bootstrap",
         });
         const signature = await vaultTransactionExecute({
           connection,
@@ -230,9 +230,9 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
         updateStep("execute", {
           status: "success",
           signature,
-          description: "Cofre bootstrap executed.",
+          description: "Vault bootstrap executed.",
         });
-        addToast("Cofre initialized.", "success");
+        addToast("Vault initialized.", "success");
       } else {
         updateStep("execute", {
           status: "success",
@@ -246,14 +246,14 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
 
       await refreshCofreStatus();
       completeTransaction({
-        title: "Cofre bootstrap ready",
+        title: "Vault bootstrap ready",
         description:
           Number(multisigAccount.threshold) === 1
-            ? "The cofre is initialized."
+            ? "The vault is initialized."
             : "The bootstrap proposal is ready for approvals.",
       });
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "Could not initialize cofre.";
+      const message = caught instanceof Error ? caught.message : "Could not initialize vault.";
       setBootstrapError(message);
       failTransaction(message);
       addToast(message, "error");
@@ -304,7 +304,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
             <div>
               <h1 className="text-2xl font-semibold text-ink">Invalid multisig address</h1>
               <p className="mt-1 text-sm text-ink-muted">
-                Check the address and open the cofre again.
+                Check the address and try again.
               </p>
             </div>
           </div>
@@ -362,7 +362,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                       d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
                     />
                   </svg>
-                  <span className="text-sm font-medium text-accent">Cofre dashboard</span>
+                  <span className="text-sm font-medium text-accent">Vault dashboard</span>
                 </div>
                 <h1 className="text-3xl font-bold text-ink md:text-4xl tracking-tight">
                   {truncateAddress(multisigAddress.toBase58())}
@@ -373,29 +373,6 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { href: "/send", label: "Send", icon: "arrow-right", variant: "default" },
-                  { href: "/invoice", label: "Invoice", icon: "document", variant: "secondary" },
-                  { href: "/payroll", label: "Payroll", icon: "users", variant: "secondary" },
-                  { href: "/audit", label: "Audit", icon: "shield", variant: "outline" },
-                  { href: "/operator", label: "Operator", icon: "cog", variant: "outline" },
-                ].map((action) => (
-                  <Link
-                    key={action.href}
-                    href={`/vault/${multisigAddress.toBase58()}${action.href}`}
-                    className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 ${
-                      action.variant === "default"
-                        ? "bg-emerald-500 text-white hover:bg-accent shadow-raise-1 shadow-accent/20"
-                        : action.variant === "secondary"
-                          ? "bg-emerald-700 text-ink hover:bg-emerald-600"
-                          : "border-2 border-border-strong text-ink hover:bg-surface-2 hover:border-border-strong"
-                    }`}
-                  >
-                    {action.label}
-                  </Link>
-                ))}
-              </div>
             </div>
           </StaggerItem>
 
@@ -405,10 +382,10 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <h2 className="text-base font-semibold text-amber-100">
-                      Cofre account is not initialized
+                      Vault account is not initialized
                     </h2>
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-100/75">
-                      This Squads multisig exists, but the gatekeeper cofre PDA has not been created
+                      This Squads multisig exists, but the gatekeeper vault PDA has not been created
                       for the configured program. Initialize it before creating or executing private
                       send proposals.
                     </p>
@@ -427,7 +404,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                     disabled={bootstrapPending || !wallet.publicKey}
                     className="shrink-0"
                   >
-                    {bootstrapPending ? "Initializing..." : "Initialize cofre"}
+                    {bootstrapPending ? "Initializing..." : "Initialize vault"}
                   </Button>
                 </div>
               </div>
@@ -553,7 +530,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                 <dl className="space-y-4 p-4 text-sm">
                   {[
                     { label: "Multisig", value: multisigAddress.toBase58() },
-                    { label: "Cofre PDA", value: cofre.toBase58() },
+                    { label: "Vault PDA", value: cofre.toBase58() },
                     { label: "Vault PDA", value: vault.toBase58() },
                   ].map((item) => (
                     <div key={item.label} className="group">
@@ -623,7 +600,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                       {drafts.map((d) => (
                         <li key={d.id}>
                           <Link
-                            href={`/vault/${multisigAddress.toBase58()}/proposals/${d.transactionIndex}`}
+                            href={`/vault/proposals/${d.transactionIndex}`}
                             className="flex items-center justify-between rounded-lg border border-border/50 p-4 transition-all duration-200 hover:border-emerald-900/50 hover:bg-surface-2/50 group"
                           >
                             <div className="min-w-0">

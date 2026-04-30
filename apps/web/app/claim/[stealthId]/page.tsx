@@ -405,7 +405,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
           {invoice ? (
             <div className="flex flex-col gap-2 text-right">
               <p className="text-sm text-ink-subtle">
-                Cofre: {truncateAddress(invoice.cofreAddress)}
+                Vault: {truncateAddress(invoice.cofreAddress)}
               </p>
               <p className="text-sm text-ink-subtle">
                 Criado: {new Date(invoice.createdAt).toLocaleDateString()}

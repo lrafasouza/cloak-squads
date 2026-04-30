@@ -1,7 +1,6 @@
 "use client";
 
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { buildRevokeAuditIxBrowser } from "@/lib/gatekeeper-instructions";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
@@ -299,18 +298,6 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
 
   return (
     <main className="min-h-screen">
-      <header className="border-b border-border bg-bg/95">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-          <Link
-            href={`/vault/${multisigAddress.toBase58()}`}
-            className="rounded-md text-sm font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-          >
-            Cofre
-          </Link>
-          <ClientWalletButton />
-        </div>
-      </header>
-
       <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>

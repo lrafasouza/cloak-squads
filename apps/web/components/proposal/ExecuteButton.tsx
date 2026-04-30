@@ -38,8 +38,8 @@ export function ExecuteButton({
       steps: [
         {
           id: "readiness",
-          title: "Check cofre readiness",
-          description: "Verifying the cofre and proposal can execute.",
+          title: "Check vault readiness",
+          description: "Verifying the vault and proposal can execute.",
         },
         {
           id: "execute",

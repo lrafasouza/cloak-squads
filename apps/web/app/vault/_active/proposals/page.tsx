@@ -69,7 +69,7 @@ export default function ProposalsListPage({
       <main className="mx-auto max-w-3xl px-4 py-10">
         <div className="rounded-xl border border-signal-danger/30 bg-signal-danger/15 p-6">
           <h1 className="text-xl font-semibold text-ink">Invalid multisig address</h1>
-          <p className="mt-1 text-sm text-ink-muted">Check the address and open the cofre again.</p>
+          <p className="mt-1 text-sm text-ink-muted">Check the address and try again.</p>
         </div>
       </main>
     );
@@ -128,7 +128,7 @@ export default function ProposalsListPage({
                     {drafts.map((d) => (
                       <li key={d.id}>
                         <Link
-                          href={`/vault/${multisigAddress.toBase58()}/proposals/${d.transactionIndex}`}
+                          href={`/vault/proposals/${d.transactionIndex}`}
                           className="flex items-center justify-between rounded-lg border border-border/50 p-4 transition-all duration-200 hover:border-emerald-900/50 hover:bg-surface-2/50 group"
                         >
                           <div className="min-w-0">

@@ -236,7 +236,7 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
 
           <div className="flex flex-col gap-2 text-right">
             <p className="text-sm text-ink-subtle">
-              Cofre: {truncateAddress(metadata.cofreAddress)}
+              Vault: {truncateAddress(metadata.cofreAddress)}
             </p>
             <p className="text-sm text-ink-subtle">
               Issued by: {truncateAddress(metadata.issuedBy)}
