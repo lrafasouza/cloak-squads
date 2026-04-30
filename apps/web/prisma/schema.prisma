@@ -21,6 +21,18 @@ model AuditLink {
   @@index([cofreAddress])
 }
 
+model Vault {
+  id           String   @id @default(uuid())
+  cofreAddress String   @unique
+  name         String
+  description  String?
+  createdBy    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([cofreAddress])
+}
+
 model StealthInvoice {
   id                  String   @id @default(uuid())
   cofreAddress        String

@@ -51,6 +51,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
+  const [sendMode, setSendMode] = useState<"private" | "public">("private");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -234,12 +235,31 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
     <main className="min-h-screen">
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <div>
-          <p className="text-sm font-medium text-accent">Private Send</p>
-          <h1 className="mt-2 text-3xl font-semibold text-ink">Send SOL privately</h1>
-          <p className="mt-3 text-sm leading-6 text-neutral-300">
-            Enter a recipient wallet and amount. A Squads proposal will be created for signer
-            approval. Once executed, the operator delivers SOL directly to the recipient via the
-            shielded pool — no claim needed.
+          {/* Toggle */}
+          <div className="mb-4 inline-flex rounded-lg border border-border bg-surface p-1">
+            {(["private", "public"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setSendMode(mode)}
+                className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                  sendMode === mode
+                    ? "bg-accent-soft text-accent"
+                    : "text-ink-muted hover:text-ink"
+                }`}
+              >
+                {mode === "private" ? "Private Send" : "Public Send"}
+              </button>
+            ))}
+          </div>
+
+          <h1 className="text-3xl font-semibold text-ink">
+            {sendMode === "private" ? "Send SOL privately" : "Send SOL"}
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-ink-muted">
+            {sendMode === "private"
+              ? "Recipient sees an unlinkable note. Only your viewing key reveals the source. A Squads proposal will be created for signer approval. Once executed, the operator delivers SOL via the shielded pool."
+              : "Create a transparent transfer proposal. All signers see the recipient and amount on-chain."}
           </p>
         </div>
 
@@ -295,15 +315,21 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                 </p>
               ) : null}
 
+              {sendMode === "public" && (
+                <div className="rounded-md border border-border bg-surface-2 p-3 text-sm text-ink-muted">
+                  Public send creates a standard Squads vault transfer. This feature is being wired to the on-chain vault transaction API.
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <Link
-                  href="/vault"
+                  href={`/vault/${multisig}`}
                   className="inline-flex items-center justify-center rounded-md border border-border-strong bg-transparent px-4 py-2 text-sm font-medium text-ink hover:bg-surface-2"
                 >
                   Back
                 </Link>
-                <Button type="submit" disabled={pending || !wallet.publicKey}>
-                  {pending ? "Creating proposal..." : "Create send proposal"}
+                <Button type="submit" disabled={pending || !wallet.publicKey || sendMode === "public"}>
+                  {pending ? "Creating proposal..." : sendMode === "private" ? "Create private send" : "Create public send"}
                 </Button>
               </div>
 

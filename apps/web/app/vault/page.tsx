@@ -1,13 +1,12 @@
 "use client";
 
-import { CreateMultisigCard } from "@/components/create-multisig/CreateMultisigCard";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast-provider";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { LogIn } from "lucide-react";
+import { LogIn, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -121,11 +120,24 @@ export default function VaultPage() {
           </div>
 
           {/* Create new vault */}
-          <CreateMultisigCard
-            onCreated={(multisigPda) => {
-              router.push(`/vault/${multisigPda}`);
-            }}
-          />
+          <div className="rounded-xl border border-border bg-surface/80 p-6 shadow-raise-1 backdrop-blur-sm">
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft">
+              <Plus className="h-5 w-5 text-accent" />
+            </div>
+            <h2 className="text-lg font-semibold text-ink">Create new vault</h2>
+            <p className="mt-2 text-sm text-ink-muted">
+              Set up a new Aegis vault with a step-by-step wizard. Configure members, threshold,
+              and privacy settings.
+            </p>
+            <Button
+              onClick={() => router.push("/create")}
+              size="lg"
+              className="mt-6 w-full"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Create Vault
+            </Button>
+          </div>
         </div>
       </main>
     </div>

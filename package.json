@@ -35,7 +35,8 @@
     "test:f1-2ofn": "tsx scripts/test-f1-private-send-2ofn.ts",
     "test:f4": "tsx scripts/test-f4-stealth-invoice.ts",
     "demo:setup-2ofn": "tsx scripts/setup-demo-cofre-2ofn.ts",
-    "deploy:gk": "tsx scripts/deploy-gatekeeper.ts"
+    "deploy:gk": "tsx scripts/deploy-gatekeeper.ts",
+    "db:up": "docker compose up -d postgres"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
