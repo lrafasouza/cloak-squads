@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { lamportsToSol } from "@/lib/sol";
@@ -62,6 +63,8 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
   const { connection } = useConnection();
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
+  const { startTransaction, updateTransaction, updateStep, completeTransaction, failTransaction } =
+    useTransactionProgress();
 
   const [invoice, setInvoice] = useState<StealthInvoice | null>(null);
   const [claimState, setClaimState] = useState<ClaimState>("loading");
@@ -172,6 +175,31 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
 
     setClaiming(true);
     setError(null);
+    startTransaction({
+      title: "Claiming invoice",
+      description: invoice.amountHint
+        ? `Withdrawing ${lamportsToSol(invoice.amountHint)} SOL from Cloak to your connected wallet.`
+        : "Withdrawing the private invoice funds to your connected wallet.",
+      steps: [
+        {
+          id: "prepare",
+          title: "Prepare claim",
+          description: "Reconstructing the private UTXO from the invoice access key.",
+        },
+        {
+          id: "withdraw",
+          title: "Withdraw from Cloak",
+          description: "Generating the ZK proof and submitting the withdrawal transaction.",
+          status: "pending",
+        },
+        {
+          id: "record",
+          title: "Mark invoice claimed",
+          description: "Updating the invoice record after on-chain confirmation.",
+          status: "pending",
+        },
+      ],
+    });
 
     try {
       // Check if UTXO data is available for real claim
@@ -182,6 +210,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         invoice.utxoMint &&
         invoice.utxoCommitment
       ) {
+        updateStep("prepare", { status: "running" });
         // Reconstruct UTXO for fullWithdraw.
         // The stored privateKey is the raw field element from generateUtxoKeypair(),
         // NOT a wallet spend key — so we derive the publicKey directly instead of
@@ -197,6 +226,8 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         if (invoice.utxoLeafIndex !== null) {
           utxo.index = invoice.utxoLeafIndex;
         }
+        updateStep("prepare", { status: "success" });
+        updateStep("withdraw", { status: "running" });
 
         // Route circuit fetches through our same-origin proxy to bypass S3 CORS.
         ensureCircuitsProxy();
@@ -207,13 +238,31 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
           signTransaction: wallet.signTransaction,
           ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
           depositorPublicKey: wallet.publicKey,
-          onProgress: (s: string) => console.error(`[cloak-claim] ${s}`),
-          onProofProgress: (p: number) => console.error(`[cloak-claim] proof ${p}%`),
+          onProgress: (s: string) => {
+            console.error(`[cloak-claim] ${s}`);
+            updateTransaction({ detail: s });
+          },
+          onProofProgress: (p: number) => {
+            console.error(`[cloak-claim] proof ${p}%`);
+            updateTransaction({ proofProgress: p });
+          },
         } as Parameters<typeof fullWithdraw>[2]);
 
         console.log("Claim tx:", result.signature);
+        updateStep("withdraw", {
+          status: "success",
+          signature: result.signature,
+          description: "Claim withdrawal confirmed.",
+        });
+      } else {
+        updateStep("prepare", { status: "success" });
+        updateStep("withdraw", {
+          status: "success",
+          description: "No on-chain withdrawal was required for this invoice.",
+        });
       }
 
+      updateStep("record", { status: "running" });
       // Call API to mark invoice as claimed
       const response = await fetchWithAuth(`/api/stealth/${invoice.id}/claim`, {
         method: "POST",
@@ -226,9 +275,16 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         throw new Error(body?.error ?? "Failed to claim invoice");
       }
 
+      updateStep("record", { status: "success" });
+      completeTransaction({
+        title: "Invoice claimed",
+        description: "The invoice is marked claimed and the on-chain claim flow is complete.",
+      });
       setClaimState("claimed");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Claim failed.");
+      const message = caught instanceof Error ? caught.message : "Claim failed.";
+      setError(message);
+      failTransaction(message);
     } finally {
       setClaiming(false);
     }

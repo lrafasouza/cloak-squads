@@ -2,8 +2,17 @@
 
 import { Logo } from "@/components/brand/Logo";
 import { Address } from "@/components/ui/aegis";
-import { cn } from "@/lib/utils";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { WalletGuard } from "@/components/wallet/WalletGuard";
+import {
+  loadOnchainProposalSummaries,
+  loadPersistedProposalSummaries,
+  mergeProposalSummaries,
+} from "@/lib/proposals";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
+import { cn } from "@/lib/utils";
+import { useConnection } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import {
   FileText,
   Key,
@@ -18,9 +27,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { useState } from "react";
-import { WalletGuard } from "@/components/wallet/WalletGuard";
-import { OperatorInboxSheet } from "./OperatorInboxSheet";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { type OperatorInboxItem, OperatorInboxSheet } from "./OperatorInboxSheet";
 
 const navItems = [
   { label: "Overview", href: "", icon: LayoutDashboard },
@@ -94,13 +102,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
 
             <span className="hidden text-eyebrow text-ink-subtle md:inline">Vault</span>
-            {multisig && (
-              <Address
-                value={multisig}
-                chars={6}
-                className="text-sm"
-              />
-            )}
+            {multisig && <Address value={multisig} chars={6} className="text-sm" />}
           </div>
 
           <div className="flex items-center gap-3">
@@ -118,7 +120,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mobile nav drawer */}
       {mobileNavOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
-          <div
+          <button
+            type="button"
+            aria-label="Close navigation"
             className="absolute inset-0 bg-bg/80 backdrop-blur-sm"
             onClick={() => setMobileNavOpen(false)}
           />
@@ -167,7 +171,68 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 /* ── Operator Inbox trigger (badge) ── */
 function OperatorInboxButton() {
   const [open, setOpen] = useState(false);
-  const count = 0; // TODO: wire to pending licenses query
+  const params = useParams<{ multisig: string }>();
+  const multisig = params?.multisig ?? "";
+  const { connection } = useConnection();
+  const { fetchWithAuth } = useWalletAuth();
+  const [items, setItems] = useState<OperatorInboxItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const multisigAddress = useMemo(() => {
+    try {
+      return multisig ? new PublicKey(multisig) : null;
+    } catch {
+      return null;
+    }
+  }, [multisig]);
+
+  const refreshInbox = useCallback(
+    async (showLoading = false) => {
+      if (!multisigAddress) {
+        setItems([]);
+        return;
+      }
+      if (showLoading) setLoading(true);
+      try {
+        const [persisted, onchain] = await Promise.all([
+          loadPersistedProposalSummaries(fetchWithAuth, multisigAddress),
+          loadOnchainProposalSummaries({ connection, multisigAddress }),
+        ]);
+        const ready = mergeProposalSummaries(persisted, onchain)
+          .filter((proposal) => proposal.hasDraft && proposal.status === "executed")
+          .map(
+            (proposal): OperatorInboxItem => ({
+              id: proposal.id,
+              transactionIndex: proposal.transactionIndex,
+              amount: proposal.totalAmount ?? proposal.amount,
+              recipient: proposal.recipient,
+              type: proposal.type === "payroll" ? "payroll" : "single",
+              ...(proposal.recipientCount !== undefined
+                ? { recipientCount: proposal.recipientCount }
+                : {}),
+              status: "pending",
+            }),
+          );
+        setItems(ready);
+      } catch {
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [connection, fetchWithAuth, multisigAddress],
+  );
+
+  useEffect(() => {
+    void refreshInbox(true);
+  }, [refreshInbox]);
+
+  useEffect(() => {
+    const interval = setInterval(() => void refreshInbox(false), 5000);
+    return () => clearInterval(interval);
+  }, [refreshInbox]);
+
+  const count = items.length;
 
   return (
     <>
@@ -184,7 +249,13 @@ function OperatorInboxButton() {
           </span>
         )}
       </button>
-      <OperatorInboxSheet open={open} onOpenChange={setOpen} />
+      <OperatorInboxSheet
+        open={open}
+        onOpenChange={setOpen}
+        multisig={multisig}
+        items={items}
+        loading={loading}
+      />
     </>
   );
 }

@@ -5,7 +5,7 @@ import type { CommitmentCheckState } from "@/components/proposal/CommitmentCheck
 import { ExecuteButton } from "@/components/proposal/ExecuteButton";
 import { AnimatedCard, StaggerContainer, StaggerItem } from "@/components/ui/animations";
 import { useToast } from "@/components/ui/toast-provider";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { type ProposalStatusKind, readProposalStatus } from "@/lib/proposals";
 import { lamportsToSol } from "@/lib/sol";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import type { CommitmentClaim } from "@cloak-squads/core/commitment";
@@ -15,35 +15,6 @@ import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
-
-type ProposalStatusKind =
-  | "draft"
-  | "active"
-  | "approved"
-  | "rejected"
-  | "executing"
-  | "executed"
-  | "cancelled"
-  | "unknown";
-
-function readProposalStatus(status: unknown): ProposalStatusKind {
-  if (status && typeof status === "object") {
-    const kind = (status as { __kind?: unknown }).__kind;
-    const key = typeof kind === "string" ? kind.toLowerCase() : undefined;
-    if (
-      key === "draft" ||
-      key === "active" ||
-      key === "approved" ||
-      key === "rejected" ||
-      key === "executing" ||
-      key === "executed" ||
-      key === "cancelled"
-    ) {
-      return key;
-    }
-  }
-  return "unknown";
-}
 
 function StatusBadge({ status }: { status: ProposalStatusKind }) {
   const styles = {
@@ -186,7 +157,7 @@ export default function ProposalApprovalPage({
     return () => {
       cancelled = true;
     };
-  }, [multisigParam, id]);
+  }, [fetchWithAuth, multisigParam, id]);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -223,7 +194,14 @@ export default function ProposalApprovalPage({
   }, [refreshStatus]);
 
   useEffect(() => {
-    if (status !== "loading" && status !== "missing") return;
+    if (
+      status === "executed" ||
+      status === "cancelled" ||
+      status === "rejected" ||
+      status === "missing"
+    ) {
+      return;
+    }
     const interval = setInterval(() => void refreshStatus(), 3000);
     return () => clearInterval(interval);
   }, [status, refreshStatus]);
@@ -293,7 +271,6 @@ export default function ProposalApprovalPage({
             </svg>
             Cofre
           </Link>
-          <ClientWalletButton />
         </div>
       </header>
 
@@ -651,6 +628,7 @@ export default function ProposalApprovalPage({
                       transactionIndex={id}
                       onSubmitted={onExecuteSubmitted}
                       disabled={executeBlocked}
+                      requireCofreInitialized={draft !== null || payrollDraft !== null}
                     />
                     {!executeComplete && executeBlocked && status !== "loading" ? (
                       <p className="mt-3 text-xs text-ink-subtle">

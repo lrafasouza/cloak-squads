@@ -3,12 +3,13 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 
+import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { publicEnv } from "@/lib/env";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
-import { useWalletAuth } from "@/lib/use-wallet-auth";
 import {
   type OperatorExecutionBlockReason,
   type OperatorLicenseStatus,
@@ -17,8 +18,8 @@ import {
   normalizeLicenseStatus,
 } from "@/lib/operator-license-state";
 import { lamportsToSol } from "@/lib/sol";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
-import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import { cofrePda, licensePda } from "@cloak-squads/core/pda";
 import {
@@ -139,6 +140,11 @@ type CloakDepositCache = {
 
 type DraftInvariants = SingleDraft["invariants"];
 
+type CloakProgressCallbacks = {
+  onProgress?: (message: string) => void;
+  onProofProgress?: (progress: number) => void;
+};
+
 type DecodedLicense = {
   status?: unknown;
   expiresAt?: unknown;
@@ -185,6 +191,7 @@ async function cloakDepositBrowser(
   existingOutputUtxo?: Awaited<ReturnType<typeof createUtxo>> & {
     keypair: { privateKey: bigint; publicKey: bigint };
   },
+  callbacks?: CloakProgressCallbacks,
 ): Promise<CloakDepositCache> {
   if (!wallet.publicKey) {
     throw new Error("Wallet not connected");
@@ -224,8 +231,14 @@ async function cloakDepositBrowser(
       signTransaction: wallet.signTransaction,
       signMessage: wallet.signMessage,
       depositorPublicKey: wallet.publicKey,
-      onProgress: (s: string) => console.error(`[cloak] ${s}`),
-      onProofProgress: (p: number) => console.error(`[cloak] proof ${p}%`),
+      onProgress: (s: string) => {
+        console.error(`[cloak] ${s}`);
+        callbacks?.onProgress?.(s);
+      },
+      onProofProgress: (p: number) => {
+        console.error(`[cloak] proof ${p}%`);
+        callbacks?.onProofProgress?.(p);
+      },
     } as Parameters<typeof transact>[1],
   );
 
@@ -291,6 +304,16 @@ function bytesToHex(bytes: Uint8Array | number[]) {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function truncateSignature(signature: string) {
+  return `${signature.slice(0, 8)}...${signature.slice(-8)}`;
+}
+
+function transactionExplorerUrl(signature: string) {
+  const cluster = publicEnv.NEXT_PUBLIC_SOLANA_CLUSTER;
+  const clusterParam = cluster === "mainnet-beta" ? "" : `?cluster=${cluster}`;
+  return `https://explorer.solana.com/tx/${signature}${clusterParam}`;
+}
+
 function operatorStatusMessage(reason: OperatorExecutionBlockReason) {
   if (reason === "ready") return null;
   if (reason === "license-loading") return "Checking license status on-chain...";
@@ -312,6 +335,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const { connection } = useConnection();
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
+  const { startTransaction, updateTransaction, updateStep, completeTransaction, failTransaction } =
+    useTransactionProgress();
   const gatekeeperProgram = useMemo(
     () => new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID),
     [],
@@ -439,7 +464,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     } catch {
       // ignore
     }
-  }, [multisig]);
+  }, [fetchWithAuth, multisig]);
 
   useEffect(() => {
     void fetchPendingDrafts();
@@ -567,6 +592,43 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   ) {
     if (!wallet.publicKey || !multisigAddress) return;
 
+    const transferLabel = draft.recipient
+      ? ` to ${draft.recipient.slice(0, 4)}...${draft.recipient.slice(-4)}`
+      : invoiceId
+        ? " for invoice claim"
+        : "";
+    startTransaction({
+      title: isPayroll ? "Executing payroll transfer" : "Executing private transfer",
+      description: `${lamportsToSol(draft.invariants.amount)} SOL${transferLabel}. This may take longer while Merkle data and ZK proofs are prepared.`,
+      steps: [
+        {
+          id: "prepare",
+          title: "Prepare private execution",
+          description: "Reconstructing the approved Cloak commitment and checking cached work.",
+        },
+        {
+          id: "deposit",
+          title: "Deposit into Cloak",
+          description: "Submitting the shielded deposit transaction.",
+          status: "pending",
+        },
+        {
+          id: "deliver",
+          title: draft.recipient ? "Deliver to recipient" : "Store claim data",
+          description: draft.recipient
+            ? "Generating a fresh withdrawal proof and sending funds to the recipient."
+            : "Saving the private UTXO data so the invoice can be claimed.",
+          status: "pending",
+        },
+        {
+          id: "license",
+          title: "Consume license",
+          description: "Calling execute_with_license to finalize the approved intent.",
+          status: "pending",
+        },
+      ],
+    });
+
     const nullifier = Uint8Array.from(draft.invariants.nullifier);
     const commitment = Uint8Array.from(draft.invariants.commitment);
     const amount = BigInt(draft.invariants.amount);
@@ -581,11 +643,21 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         throw new Error("Wallet does not support signTransaction");
       }
       try {
+        updateStep("prepare", { status: "running" });
         const cachedDeposit = readCloakDepositCache(multisigAddress.toBase58(), depositCacheKey);
         let cloakResult: Awaited<ReturnType<typeof cloakDepositBrowser>>;
 
         if (cachedDeposit) {
           cloakResult = cachedDeposit;
+          updateStep("prepare", {
+            status: "success",
+            description: "Found completed Cloak work from a previous attempt.",
+          });
+          updateStep("deposit", {
+            status: "success",
+            signature: cachedDeposit.signature,
+            description: "Cloak deposit already confirmed.",
+          });
         } else if (draft.commitmentClaim) {
           // Reconstruct the original UTXO from the draft so the deposit matches the approved payload.
           const privateKey = BigInt(
@@ -603,6 +675,11 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           if (reconstructedCommitmentHex !== approvedCommitmentHex) {
             throw new Error("Approved commitment does not match reconstructed Cloak UTXO.");
           }
+          updateStep("prepare", {
+            status: "success",
+            description: "Approved commitment matches the reconstructed Cloak UTXO.",
+          });
+          updateStep("deposit", { status: "running" });
           // Attach keypair for the deposit function to use
           (reconstructedUtxo as typeof reconstructedUtxo & { keypair: typeof keypair }).keypair =
             keypair;
@@ -619,6 +696,10 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             reconstructedUtxo as Awaited<ReturnType<typeof createUtxo>> & {
               keypair: { privateKey: bigint; publicKey: bigint };
             },
+            {
+              onProgress: (message) => updateTransaction({ detail: message }),
+              onProofProgress: (progress) => updateTransaction({ proofProgress: progress }),
+            },
           );
         } else {
           throw new Error("Proposal draft is missing the Cloak UTXO claim. Create a new proposal.");
@@ -626,11 +707,17 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
         cloakSig = cloakResult.signature;
         setCloakSignature(cloakSig);
+        updateStep("deposit", {
+          status: "success",
+          signature: cloakSig,
+          description: "Shielded deposit confirmed.",
+        });
 
         // F4 invoice mode: use explicit invoiceId param or fall back to legacy commitmentClaim lookup
         const effectiveInvoiceId = invoiceId ?? draft.commitmentClaim?.invoiceId;
 
         if (effectiveInvoiceId) {
+          updateStep("deliver", { status: "running" });
           // F4: store UTXO data for recipient claim.
           try {
             const storeResponse = await fetchWithAuth(`/api/stealth/${effectiveInvoiceId}/utxo`, {
@@ -665,11 +752,20 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           if (!cachedDeposit) {
             writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
           }
+          updateStep("deliver", {
+            status: "success",
+            description: "Invoice claim data saved.",
+          });
         } else if (draft.recipient) {
+          updateStep("deliver", { status: "running" });
           // F1: withdraw directly to recipient, no claim needed.
           if (cachedDeposit) {
             // Deposit + withdraw already completed in a prior attempt.
             // Skip fullWithdraw and proceed to execute_with_license below.
+            updateStep("deliver", {
+              status: "success",
+              description: "Delivery already completed in a previous attempt.",
+            });
           } else {
             if (!cloakResult.outputUtxos?.length) {
               throw new Error("Cloak deposit did not return spendable UTXO data.");
@@ -685,27 +781,44 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
               depositorPublicKey: wallet.publicKey,
               ...(cloakResult.merkleTree ? { cachedMerkleTree: cloakResult.merkleTree } : {}),
-              onProgress: (s: string) => console.error(`[cloak] withdraw ${s}`),
-              onProofProgress: (p: number) => console.error(`[cloak] withdraw proof ${p}%`),
+              onProgress: (s: string) => {
+                console.error(`[cloak] withdraw ${s}`);
+                updateTransaction({ detail: s });
+              },
+              onProofProgress: (p: number) => {
+                console.error(`[cloak] withdraw proof ${p}%`);
+                updateTransaction({ proofProgress: p });
+              },
             } as Parameters<typeof fullWithdraw>[2];
             const withdrawResult = await fullWithdraw(cloakResult.outputUtxos, recipientPubkey, {
               ...withdrawOptions,
             });
             setWithdrawSignature(withdrawResult.signature);
+            updateStep("deliver", {
+              status: "success",
+              signature: withdrawResult.signature,
+              description: "Funds delivered to the recipient.",
+            });
             // Cache after successful withdraw so retries skip deposit+withdraw and only
             // re-run execute_with_license (prevents double-deposit on operator retry).
             writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
           }
         } else if (!cachedDeposit) {
           writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
+          updateStep("deliver", { status: "success", description: "Cloak deposit cached." });
         }
       } catch (caught) {
-        throw new Error(
-          `Cloak deposit failed: ${caught instanceof Error ? caught.message : String(caught)}`,
-        );
+        const message = `Cloak deposit failed: ${caught instanceof Error ? caught.message : String(caught)}`;
+        failTransaction(message);
+        throw new Error(message);
       }
+    } else {
+      updateStep("prepare", { status: "success" });
+      updateStep("deposit", { status: "success", description: "Cloak deposit not required." });
+      updateStep("deliver", { status: "success", description: "Delivery step not required." });
     }
 
+    updateStep("license", { status: "running" });
     const ix = await buildExecuteWithLicenseIxBrowser({
       multisig: multisigAddress,
       operator: wallet.publicKey,
@@ -734,6 +847,15 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       { signature: sig, blockhash, lastValidBlockHeight },
       "confirmed",
     );
+    updateStep("license", {
+      status: "success",
+      signature: sig,
+      description: "License consumed and private execution finalized.",
+    });
+    completeTransaction({
+      title: isPayroll ? "Payroll transfer complete" : "Private transfer complete",
+      description: "All required on-chain transactions for this transfer are confirmed.",
+    });
 
     return sig;
   }
@@ -759,7 +881,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         throw new Error("Load a proposal draft first.");
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not execute with license.");
+      const message = caught instanceof Error ? caught.message : "Could not execute with license.";
+      setError(message);
+      failTransaction(message);
     } finally {
       setPending(false);
       setExecuting(false);
@@ -925,8 +1049,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           <h1 className="mt-2 text-3xl font-semibold text-ink">Execute with license</h1>
           <p className="mt-3 text-sm leading-6 text-neutral-300">
             The operator wallet consumes an approved+executed license, calling
-            <code className="mx-1 text-accent">execute_with_license</code> on the gatekeeper.
-            Load a proposal draft created from the Send or Payroll page, then execute.
+            <code className="mx-1 text-accent">execute_with_license</code> on the gatekeeper. Load a
+            proposal draft created from the Send or Payroll page, then execute.
           </p>
         </div>
 
@@ -982,9 +1106,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
           {pendingDrafts.length > 0 && (
             <section className="rounded-lg border border-border bg-surface p-4">
-              <h2 className="mb-3 text-base font-semibold text-ink">
-                Proposals ready to execute
-              </h2>
+              <h2 className="mb-3 text-base font-semibold text-ink">Proposals ready to execute</h2>
               <ul className="grid gap-2">
                 {pendingDrafts.map((d) => (
                   <li
@@ -1097,9 +1219,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               <dl className="grid gap-2 text-sm">
                 <div>
                   <dt className="text-ink-muted">Amount</dt>
-                  <dd className="font-mono text-ink">
-                    {lamportsToSol(loadedDraft.amount)} SOL
-                  </dd>
+                  <dd className="font-mono text-ink">{lamportsToSol(loadedDraft.amount)} SOL</dd>
                 </div>
                 <div>
                   <dt className="text-ink-muted">Recipient</dt>
@@ -1207,10 +1327,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             </section>
           ) : null}
 
-          <form
-            onSubmit={execute}
-            className="rounded-lg border border-border bg-surface p-4"
-          >
+          <form onSubmit={execute} className="rounded-lg border border-border bg-surface p-4">
             <h2 className="mb-4 text-base font-semibold text-ink">Execute</h2>
             <p className="mb-4 text-xs text-ink-muted">
               Connect the registered operator wallet for this cofre.
@@ -1260,24 +1377,53 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             </section>
           ) : null}
 
-          {cloakSignature ? (
-            <section className="rounded-md border border-indigo-900 bg-indigo-950 p-3">
-              <p className="text-sm font-medium text-indigo-200">Cloak deposit confirmed</p>
-              <p className="mt-2 break-all font-mono text-xs text-indigo-100">{cloakSignature}</p>
-            </section>
-          ) : null}
-
-          {signature && !isPayroll ? (
-            <section className="rounded-md border border-emerald-900 bg-emerald-950 p-3">
-              <p className="text-sm font-medium text-accent">License consumed</p>
-              <p className="mt-2 break-all font-mono text-xs text-accent">{signature}</p>
-            </section>
-          ) : null}
-
-          {withdrawSignature ? (
-            <section className="rounded-md border border-teal-900 bg-teal-950 p-3">
-              <p className="text-sm font-medium text-teal-200">Transfer delivered</p>
-              <p className="mt-2 break-all font-mono text-xs text-teal-100">{withdrawSignature}</p>
+          {cloakSignature || signature || withdrawSignature ? (
+            <section className="rounded-lg border border-border bg-surface p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-ink">Latest confirmed transactions</p>
+                  <p className="mt-1 text-xs text-ink-muted">
+                    Each step is also available in the transaction modal with copy and explorer
+                    links.
+                  </p>
+                </div>
+                <span className="rounded border border-accent/25 bg-accent-soft px-2 py-1 text-xs font-semibold text-accent">
+                  Confirmed
+                </span>
+              </div>
+              <dl className="mt-4 grid gap-2">
+                {[
+                  cloakSignature ? { label: "Cloak deposit", value: cloakSignature } : null,
+                  withdrawSignature
+                    ? { label: "Recipient delivery", value: withdrawSignature }
+                    : null,
+                  signature && !isPayroll
+                    ? { label: "License consumption", value: signature }
+                    : null,
+                ]
+                  .filter((item): item is { label: string; value: string } => Boolean(item))
+                  .map((item) => (
+                    <div
+                      key={item.label}
+                      className="flex flex-col gap-2 rounded-md border border-border bg-bg px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <dt className="text-sm text-ink-muted">{item.label}</dt>
+                      <dd className="flex items-center gap-2">
+                        <code className="font-mono text-xs text-ink">
+                          {truncateSignature(item.value)}
+                        </code>
+                        <a
+                          href={transactionExplorerUrl(item.value)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft"
+                        >
+                          Explorer
+                        </a>
+                      </dd>
+                    </div>
+                  ))}
+              </dl>
             </section>
           ) : null}
         </div>

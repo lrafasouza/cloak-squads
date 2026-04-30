@@ -387,7 +387,14 @@ export async function vaultTransactionExecute(params: {
   }
 
   try {
-    return await params.wallet.sendTransaction(versionedTx, params.connection);
+    const signature = await params.wallet.sendTransaction(versionedTx, params.connection);
+    const { blockhash: confirmBh, lastValidBlockHeight } =
+      await params.connection.getLatestBlockhash();
+    await params.connection.confirmTransaction(
+      { signature, blockhash: confirmBh, lastValidBlockHeight },
+      "confirmed",
+    );
+    return signature;
   } catch (sendErr) {
     logError("[squads-sdk] execute sendTransaction error:", sendErr);
     if (sendErr && typeof sendErr === "object") {
@@ -430,7 +437,13 @@ async function sendSingleInstruction(
   }
 
   try {
-    return await wallet.sendTransaction(tx, connection);
+    const signature = await wallet.sendTransaction(tx, connection);
+    const { blockhash: confirmBh, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    await connection.confirmTransaction(
+      { signature, blockhash: confirmBh, lastValidBlockHeight },
+      "confirmed",
+    );
+    return signature;
   } catch (sendErr) {
     logError(`[squads-sdk] ${label} sendTransaction error:`, sendErr);
     if (sendErr && typeof sendErr === "object") {

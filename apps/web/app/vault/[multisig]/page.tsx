@@ -4,16 +4,23 @@ import { AnimatedCard, StaggerContainer, StaggerItem } from "@/components/ui/ani
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast-provider";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { publicEnv } from "@/lib/env";
 import { buildInitCofreIxBrowser } from "@/lib/gatekeeper-instructions";
+import {
+  type ProposalSummary,
+  loadOnchainProposalSummaries,
+  loadPersistedProposalSummaries,
+  mergeProposalSummaries,
+  truncateAddress,
+} from "@/lib/proposals";
 import { lamportsToSol } from "@/lib/sol";
-import { useWalletAuth } from "@/lib/use-wallet-auth";
 import {
   createInitCofreProposal,
   proposalApprove,
   vaultTransactionExecute,
 } from "@/lib/squads-sdk";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cofrePda, squadsVaultPda } from "@cloak-squads/core/pda";
 import { vaultTopUpLamportsNeeded } from "@cloak-squads/core/vault-funding";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -22,28 +29,14 @@ import * as sqdsMultisig from "@sqds/multisig";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 
-type DraftSummary = {
-  id: string;
-  transactionIndex: string;
-  amount: string;
-  recipient: string;
-  memo: string;
-  createdAt: string;
-  type: "single" | "payroll";
-  recipientCount?: number;
-  totalAmount?: string;
-};
-
-function truncateAddress(address: string) {
-  return `${address.slice(0, 6)}...${address.slice(-6)}`;
-}
-
 export default function CofreDashboardPage({ params }: { params: Promise<{ multisig: string }> }) {
   const { multisig } = use(params);
   const { connection } = useConnection();
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
   const { addToast } = useToast();
+  const { startTransaction, updateStep, completeTransaction, failTransaction } =
+    useTransactionProgress();
   const gatekeeperProgram = useMemo(
     () => new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID),
     [],
@@ -68,7 +61,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
     return squadsVaultPda(multisigAddress, squadsProgram)[0];
   }, [multisigAddress, squadsProgram]);
 
-  const [drafts, setDrafts] = useState<DraftSummary[]>([]);
+  const [drafts, setDrafts] = useState<ProposalSummary[]>([]);
   const [draftsLoading, setDraftsLoading] = useState(true);
   const [cofreStatus, setCofreStatus] = useState<"checking" | "initialized" | "missing" | "error">(
     "checking",
@@ -92,44 +85,32 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
     }
   }, [cofre, connection, gatekeeperProgram]);
 
-  const loadDrafts = useCallback(async () => {
-    if (!multisigAddress) return;
-    try {
-      const [singleRes, payrollRes] = await Promise.all([
-        fetchWithAuth(`/api/proposals/${encodeURIComponent(multisigAddress.toBase58())}`),
-        fetchWithAuth(`/api/payrolls/${encodeURIComponent(multisigAddress.toBase58())}`),
-      ]);
-
-      const singleDrafts: DraftSummary[] = singleRes.ok
-        ? ((await singleRes.json()) as DraftSummary[]).map((d) => ({
-            ...d,
-            type: "single" as const,
-          }))
-        : [];
-      const payrollDrafts: DraftSummary[] = payrollRes.ok
-        ? ((await payrollRes.json()) as DraftSummary[]).map((d) => ({
-            ...d,
-            type: "payroll" as const,
-            recipientCount: d.recipientCount ?? 0,
-            totalAmount: d.totalAmount ?? "0",
-            amount: d.totalAmount ?? "0",
-            recipient: `${d.recipientCount ?? 0} recipients`,
-          }))
-        : [];
-
-      const all = [...singleDrafts, ...payrollDrafts].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
-      setDrafts(all);
-    } catch {
-      // ignore
-    } finally {
-      setDraftsLoading(false);
-    }
-  }, [multisigAddress]);
+  const loadDrafts = useCallback(
+    async (showLoading = false) => {
+      if (!multisigAddress) return;
+      if (showLoading) setDraftsLoading(true);
+      try {
+        const [persisted, onchain] = await Promise.all([
+          loadPersistedProposalSummaries(fetchWithAuth, multisigAddress),
+          loadOnchainProposalSummaries({ connection, multisigAddress }),
+        ]);
+        setDrafts(mergeProposalSummaries(persisted, onchain));
+      } catch {
+        // ignore
+      } finally {
+        setDraftsLoading(false);
+      }
+    },
+    [connection, fetchWithAuth, multisigAddress],
+  );
 
   useEffect(() => {
-    void loadDrafts();
+    void loadDrafts(true);
+  }, [loadDrafts]);
+
+  useEffect(() => {
+    const interval = setInterval(() => void loadDrafts(false), 5000);
+    return () => clearInterval(interval);
   }, [loadDrafts]);
 
   useEffect(() => {
@@ -139,16 +120,47 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
   async function initializeCofre() {
     setBootstrapError(null);
     setBootstrapPending(true);
+    startTransaction({
+      title: "Initializing cofre",
+      description: "Preparing the Aegis bootstrap proposal for this Squads multisig.",
+      steps: [
+        {
+          id: "readiness",
+          title: "Check readiness",
+          description: "Checking wallet, multisig, vault funding, and cofre status.",
+        },
+        {
+          id: "fund",
+          title: "Fund vault rent",
+          description: "Adding SOL only if the Squads vault needs rent funding.",
+          status: "pending",
+        },
+        {
+          id: "proposal",
+          title: "Create bootstrap proposal",
+          description: "Your wallet signs the cofre initialization proposal.",
+          status: "pending",
+        },
+        {
+          id: "execute",
+          title: "Execute bootstrap",
+          description: "Auto-executing when this multisig has a 1-of-N threshold.",
+          status: "pending",
+        },
+      ],
+    });
 
     try {
       if (!wallet.publicKey || !wallet.sendTransaction || !multisigAddress || !vault) {
         throw new Error("Connect a Squads member wallet to initialize this cofre.");
       }
+      updateStep("readiness", { status: "success" });
 
       const vaultBalance = await connection.getBalance(vault, "confirmed");
       const topUpLamports = vaultTopUpLamportsNeeded(BigInt(vaultBalance));
       if (topUpLamports > 0n) {
         addToast("Funding Squads vault for cofre rent...", "info");
+        updateStep("fund", { status: "running" });
         const latestBlockhash = await connection.getLatestBlockhash();
         const tx = new Transaction().add(
           SystemProgram.transfer({
@@ -161,9 +173,20 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
         tx.recentBlockhash = latestBlockhash.blockhash;
         const signature = await wallet.sendTransaction(tx, connection);
         await connection.confirmTransaction({ signature, ...latestBlockhash }, "confirmed");
+        updateStep("fund", {
+          status: "success",
+          signature,
+          description: "Vault rent funding confirmed.",
+        });
+      } else {
+        updateStep("fund", {
+          status: "success",
+          description: "Vault already has enough SOL for rent.",
+        });
       }
 
       addToast("Creating cofre bootstrap proposal...", "info");
+      updateStep("proposal", { status: "running" });
       const initCofre = await buildInitCofreIxBrowser({
         multisig: multisigAddress,
         operator: wallet.publicKey,
@@ -176,6 +199,11 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
         memo: "Initialize Aegis cofre",
       });
       setBootstrapProposalIndex(bootstrap.transactionIndex.toString());
+      updateStep("proposal", {
+        status: "success",
+        signature: bootstrap.signature,
+        description: `Bootstrap proposal #${bootstrap.transactionIndex.toString()} confirmed.`,
+      });
 
       const multisigAccount = await sqdsMultisig.accounts.Multisig.fromAccountAddress(
         connection,
@@ -183,6 +211,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
       );
       if (Number(multisigAccount.threshold) === 1) {
         addToast("Approving and executing cofre bootstrap...", "info");
+        updateStep("execute", { status: "running" });
         await proposalApprove({
           connection,
           wallet,
@@ -198,8 +227,17 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
         });
         const latestBlockhash = await connection.getLatestBlockhash();
         await connection.confirmTransaction({ signature, ...latestBlockhash }, "confirmed");
+        updateStep("execute", {
+          status: "success",
+          signature,
+          description: "Cofre bootstrap executed.",
+        });
         addToast("Cofre initialized.", "success");
       } else {
+        updateStep("execute", {
+          status: "success",
+          description: "Bootstrap proposal is waiting for member approvals.",
+        });
         addToast(
           `Bootstrap proposal #${bootstrap.transactionIndex.toString()} created.`,
           "success",
@@ -207,9 +245,17 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
       }
 
       await refreshCofreStatus();
+      completeTransaction({
+        title: "Cofre bootstrap ready",
+        description:
+          Number(multisigAccount.threshold) === 1
+            ? "The cofre is initialized."
+            : "The bootstrap proposal is ready for approvals.",
+      });
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Could not initialize cofre.";
       setBootstrapError(message);
+      failTransaction(message);
       addToast(message, "error");
     } finally {
       setBootstrapPending(false);
@@ -293,7 +339,6 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
             </div>
             Aegis
           </Link>
-          <ClientWalletButton />
         </div>
       </header>
 
@@ -411,9 +456,7 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                   </div>
                   <p className="text-sm text-ink-muted">Shielded balance</p>
                 </div>
-                <p className="mt-2 font-mono text-2xl font-bold tabular-nums text-ink">
-                  -- SOL
-                </p>
+                <p className="mt-2 font-mono text-2xl font-bold tabular-nums text-ink">-- SOL</p>
                 <p className="mt-2 text-xs text-ink-subtle">
                   Cloak scan integration lands in the F1 operator flow.
                 </p>
@@ -605,11 +648,18 @@ export default function CofreDashboardPage({ params }: { params: Promise<{ multi
                                     payroll
                                   </span>
                                 )}
+                                {d.status && (
+                                  <span className="inline-flex rounded-full border border-border-strong bg-surface-2 px-2.5 py-0.5 text-xs text-ink-muted">
+                                    {d.status}
+                                  </span>
+                                )}
                               </p>
                               <p className="mt-1.5 text-xs text-ink-muted">
-                                {d.type === "payroll"
-                                  ? `${d.recipientCount} recipients, ${lamportsToSol(d.totalAmount ?? d.amount)} SOL total`
-                                  : `${lamportsToSol(d.amount)} SOL → ${truncateAddress(d.recipient)}`}
+                                {d.type === "onchain"
+                                  ? `${d.approvals ?? 0}/${d.threshold ?? "?"} approvals`
+                                  : d.type === "payroll"
+                                    ? `${d.recipientCount} recipients, ${lamportsToSol(d.totalAmount ?? d.amount)} SOL total`
+                                    : `${lamportsToSol(d.amount)} SOL → ${truncateAddress(d.recipient)}`}
                               </p>
                             </div>
                             <span className="text-xs text-ink-subtle shrink-0 ml-4">

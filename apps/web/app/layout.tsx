@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import "./globals.css";
-import { fontDisplay, fontMono, fontSans } from "./fonts";
 import { QueryProvider } from "@/components/QueryProvider";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { ToastProvider } from "@/components/ui/toast-provider";
+import { TransactionProgressProvider } from "@/components/ui/transaction-progress";
 import { WalletProviders } from "@/components/wallet/WalletProviders";
 import { Toaster } from "sonner";
+import { fontDisplay, fontMono, fontSans } from "./fonts";
 
 export const metadata = {
   title: "Aegis",
@@ -21,7 +22,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <QueryProvider>
             <WalletProviders>
               <ToastProvider>
-                {children}
+                <TransactionProgressProvider>{children}</TransactionProgressProvider>
                 <Toaster
                   position="bottom-right"
                   theme="dark"

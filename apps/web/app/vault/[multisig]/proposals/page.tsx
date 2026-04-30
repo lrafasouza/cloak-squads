@@ -2,27 +2,19 @@
 
 import { AnimatedCard, StaggerContainer, StaggerItem } from "@/components/ui/animations";
 import { Spinner } from "@/components/ui/skeleton";
-import { useWalletAuth } from "@/lib/use-wallet-auth";
+import {
+  type ProposalSummary,
+  loadOnchainProposalSummaries,
+  loadPersistedProposalSummaries,
+  mergeProposalSummaries,
+  truncateAddress,
+} from "@/lib/proposals";
 import { lamportsToSol } from "@/lib/sol";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
+import { useConnection } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
-import { PublicKey } from "@solana/web3.js";
-
-type DraftSummary = {
-  id: string;
-  transactionIndex: string;
-  amount: string;
-  recipient: string;
-  memo: string;
-  createdAt: string;
-  type: "single" | "payroll";
-  recipientCount?: number;
-  totalAmount?: string;
-};
-
-function truncateAddress(address: string) {
-  return `${address.slice(0, 6)}...${address.slice(-6)}`;
-}
 
 export default function ProposalsListPage({
   params,
@@ -31,6 +23,7 @@ export default function ProposalsListPage({
 }) {
   const { multisig } = use(params);
   const { fetchWithAuth } = useWalletAuth();
+  const { connection } = useConnection();
 
   const multisigAddress = useMemo(() => {
     try {
@@ -40,47 +33,35 @@ export default function ProposalsListPage({
     }
   }, [multisig]);
 
-  const [drafts, setDrafts] = useState<DraftSummary[]>([]);
+  const [drafts, setDrafts] = useState<ProposalSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadDrafts = useCallback(async () => {
-    if (!multisigAddress) return;
-    try {
-      const [singleRes, payrollRes] = await Promise.all([
-        fetchWithAuth(`/api/proposals/${encodeURIComponent(multisigAddress.toBase58())}`),
-        fetchWithAuth(`/api/payrolls/${encodeURIComponent(multisigAddress.toBase58())}`),
-      ]);
-
-      const singleDrafts: DraftSummary[] = singleRes.ok
-        ? ((await singleRes.json()) as DraftSummary[]).map((d) => ({
-            ...d,
-            type: "single" as const,
-          }))
-        : [];
-      const payrollDrafts: DraftSummary[] = payrollRes.ok
-        ? ((await payrollRes.json()) as DraftSummary[]).map((d) => ({
-            ...d,
-            type: "payroll" as const,
-            recipientCount: d.recipientCount ?? 0,
-            totalAmount: d.totalAmount ?? "0",
-            amount: d.totalAmount ?? "0",
-            recipient: `${d.recipientCount ?? 0} recipients`,
-          }))
-        : [];
-
-      const all = [...singleDrafts, ...payrollDrafts].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
-      setDrafts(all);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, [multisigAddress, fetchWithAuth]);
+  const loadDrafts = useCallback(
+    async (showLoading = false) => {
+      if (!multisigAddress) return;
+      if (showLoading) setLoading(true);
+      try {
+        const [persisted, onchain] = await Promise.all([
+          loadPersistedProposalSummaries(fetchWithAuth, multisigAddress),
+          loadOnchainProposalSummaries({ connection, multisigAddress }),
+        ]);
+        setDrafts(mergeProposalSummaries(persisted, onchain));
+      } catch {
+        // ignore
+      } finally {
+        setLoading(false);
+      }
+    },
+    [connection, multisigAddress, fetchWithAuth],
+  );
 
   useEffect(() => {
-    void loadDrafts();
+    void loadDrafts(true);
+  }, [loadDrafts]);
+
+  useEffect(() => {
+    const interval = setInterval(() => void loadDrafts(false), 5000);
+    return () => clearInterval(interval);
   }, [loadDrafts]);
 
   if (!multisigAddress) {
@@ -88,9 +69,7 @@ export default function ProposalsListPage({
       <main className="mx-auto max-w-3xl px-4 py-10">
         <div className="rounded-xl border border-signal-danger/30 bg-signal-danger/15 p-6">
           <h1 className="text-xl font-semibold text-ink">Invalid multisig address</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            Check the address and open the cofre again.
-          </p>
+          <p className="mt-1 text-sm text-ink-muted">Check the address and open the cofre again.</p>
         </div>
       </main>
     );
@@ -102,9 +81,7 @@ export default function ProposalsListPage({
         <StaggerContainer staggerDelay={0.1}>
           <StaggerItem>
             <div className="mb-6">
-              <h1 className="text-2xl font-bold text-ink md:text-3xl tracking-tight">
-                Proposals
-              </h1>
+              <h1 className="text-2xl font-bold text-ink md:text-3xl tracking-tight">Proposals</h1>
               <p className="mt-1 text-sm text-ink-muted">
                 All proposal drafts for {truncateAddress(multisigAddress.toBase58())}
               </p>
@@ -176,11 +153,18 @@ export default function ProposalsListPage({
                                   payroll
                                 </span>
                               )}
+                              {d.status && (
+                                <span className="inline-flex rounded-full border border-border-strong bg-surface-2 px-2.5 py-0.5 text-xs text-ink-muted">
+                                  {d.status}
+                                </span>
+                              )}
                             </p>
                             <p className="mt-1.5 text-xs text-ink-muted">
-                              {d.type === "payroll"
-                                ? `${d.recipientCount} recipients, ${lamportsToSol(d.totalAmount ?? d.amount)} SOL total`
-                                : `${lamportsToSol(d.amount)} SOL → ${truncateAddress(d.recipient)}`}
+                              {d.type === "onchain"
+                                ? `${d.approvals ?? 0}/${d.threshold ?? "?"} approvals`
+                                : d.type === "payroll"
+                                  ? `${d.recipientCount} recipients, ${lamportsToSol(d.totalAmount ?? d.amount)} SOL total`
+                                  : `${lamportsToSol(d.amount)} SOL → ${truncateAddress(d.recipient)}`}
                             </p>
                           </div>
                           <span className="text-xs text-ink-subtle shrink-0 ml-4">

@@ -6,11 +6,12 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
+import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
-import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
@@ -48,6 +49,8 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
   const { addToast } = useToast();
+  const { startTransaction, updateStep, completeTransaction, failTransaction } =
+    useTransactionProgress();
 
   const [invoiceRef, setInvoiceRef] = useState("");
   const [memo, setMemo] = useState("");
@@ -81,6 +84,41 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
     setResult(null);
     setPending(true);
     setProofStep("load-circuits");
+    startTransaction({
+      title: "Creating stealth invoice",
+      description: "Creating the private invoice record and opening a Squads proposal.",
+      steps: [
+        {
+          id: "validate",
+          title: "Validate invoice",
+          description: "Checking wallet, amount, recipient, and cofre readiness.",
+        },
+        {
+          id: "invoice",
+          title: "Create claim link",
+          description: "Creating the encrypted invoice record.",
+          status: "pending",
+        },
+        {
+          id: "commitment",
+          title: "Build private commitment",
+          description: "Creating the Cloak commitment signers will approve.",
+          status: "pending",
+        },
+        {
+          id: "proposal",
+          title: "Create Squads proposal",
+          description: "Your wallet signs the license proposal transaction.",
+          status: "pending",
+        },
+        {
+          id: "persist",
+          title: "Save execution draft",
+          description: "Saving the data needed by the operator and claimant.",
+          status: "pending",
+        },
+      ],
+    });
 
     try {
       if (!multisigAddress) throw new Error("Invalid multisig address.");
@@ -91,11 +129,13 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         multisig: multisigAddress,
         gatekeeperProgram: new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID),
       });
+      updateStep("validate", { status: "success" });
 
       const lamports = solAmountToLamports(amount);
       const recipientPubkey = new PublicKey(recipientWallet.trim());
 
       setProofStep("generate-witness");
+      updateStep("invoice", { status: "running" });
 
       // Step 1: Create StealthInvoice in DB (server generates nacl keypair + claim URL)
       const stealthRes = await fetchWithAuth("/api/stealth", {
@@ -118,6 +158,8 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         stealthPubkey: string;
         claimUrl: string;
       };
+      updateStep("invoice", { status: "success", description: "Claim link created." });
+      updateStep("commitment", { status: "running" });
 
       // Step 2: Generate Cloak UTXO commitment
       const keypair = await generateUtxoKeypair();
@@ -136,8 +178,10 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         recipientVkPub: recipientPubkey.toBytes(),
         nonce: randomBytes(16),
       };
+      updateStep("commitment", { status: "success" });
 
       setProofStep("prove");
+      updateStep("proposal", { status: "running" });
 
       // Step 3: Build gatekeeper instruction + Squads proposal
       const hash = computePayloadHash(invariants);
@@ -155,6 +199,11 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
           ? `stealth invoice: ${memo.trim()}`
           : `stealth invoice ${stealthData.id.slice(0, 8)}`,
       });
+      updateStep("proposal", {
+        status: "success",
+        signature: proposalResult.signature,
+        description: `Proposal #${proposalResult.transactionIndex.toString()} confirmed.`,
+      });
 
       const transactionIndex = proposalResult.transactionIndex.toString();
       const claim = {
@@ -168,6 +217,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         token_mint: mint.toBase58(),
       };
 
+      updateStep("persist", { status: "running" });
       // Step 4: Persist ProposalDraft (recipient = recipientWallet for operator lookup)
       const draftRes = await fetchWithAuth("/api/proposals", {
         method: "POST",
@@ -206,12 +256,18 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         /* sessionStorage full or unavailable */
       }
 
+      updateStep("persist", { status: "success" });
+      completeTransaction({
+        title: "Stealth invoice ready",
+        description: `Proposal #${transactionIndex} is ready and the claim link can be shared.`,
+      });
       addToast("Invoice + proposal created!", "success");
       setResult({ claimUrl: stealthData.claimUrl, transactionIndex });
     } catch (caught) {
       const message =
         caught instanceof Error ? caught.message : "Could not create stealth invoice.";
       setError(message);
+      failTransaction(message);
       addToast(message, "error");
     } finally {
       setPending(false);
@@ -229,10 +285,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Link
-          href="/"
-          className="text-sm text-accent hover:text-accent transition-colors"
-        >
+        <Link href="/" className="text-sm text-accent hover:text-accent transition-colors">
           Back to picker
         </Link>
         <h1 className="mt-6 text-2xl font-semibold text-ink">Invalid multisig address</h1>

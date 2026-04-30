@@ -1,9 +1,10 @@
 "use client";
 
+import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { buildRevokeAuditIxBrowser } from "@/lib/gatekeeper-instructions";
-import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import {
   type AuditScope,
   base64urlEncode,
@@ -34,6 +35,8 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
   const { connection } = useConnection();
+  const { startTransaction, updateStep, completeTransaction, failTransaction } =
+    useTransactionProgress();
 
   const multisigAddress = useMemo(() => {
     try {
@@ -58,7 +61,9 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
   const loadLinks = useCallback(async () => {
     if (!multisigAddress) return;
     try {
-      const res = await fetchWithAuth(`/api/audit-links/${encodeURIComponent(multisigAddress.toBase58())}`);
+      const res = await fetchWithAuth(
+        `/api/audit-links/${encodeURIComponent(multisigAddress.toBase58())}`,
+      );
       if (res.ok) {
         const data = await res.json();
         setLinks(data);
@@ -68,7 +73,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
     } finally {
       setLinksLoading(false);
     }
-  }, [multisigAddress]);
+  }, [fetchWithAuth, multisigAddress]);
 
   useEffect(() => {
     void loadLinks();
@@ -160,11 +165,37 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
       return;
     }
 
+    startTransaction({
+      title: "Creating audit revocation proposal",
+      description: "Signing the revocation request and opening a Squads proposal.",
+      steps: [
+        {
+          id: "authorize",
+          title: "Authorize revocation",
+          description: "Sign the wallet message proving you can revoke this audit link.",
+        },
+        {
+          id: "prepare",
+          title: "Prepare on-chain instruction",
+          description: "Building the gatekeeper revocation instruction.",
+          status: "pending",
+        },
+        {
+          id: "proposal",
+          title: "Create Squads proposal",
+          description: "Your wallet signs the proposal transaction.",
+          status: "pending",
+        },
+      ],
+    });
+
     try {
       const message = `revoke-audit-link:${linkId}:${publicKey.toBase58()}`;
       const messageBytes = new TextEncoder().encode(message);
       const signature = await signMessage(messageBytes);
+      updateStep("authorize", { status: "success" });
 
+      updateStep("prepare", { status: "running" });
       const res = await fetchWithAuth(`/api/audit/${linkId}/revoke`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -194,13 +225,24 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
         multisig: msAddress,
         diversifier,
       });
+      updateStep("prepare", { status: "success" });
 
+      updateStep("proposal", { status: "running" });
       const result = await createIssueLicenseProposal({
         connection,
         wallet,
         multisigPda: msAddress,
         issueLicenseIx: instruction,
         memo: `revoke audit: ${linkId}`,
+      });
+      updateStep("proposal", {
+        status: "success",
+        signature: result.signature,
+        description: `Revocation proposal #${result.transactionIndex.toString()} confirmed.`,
+      });
+      completeTransaction({
+        title: "Audit revocation proposal ready",
+        description: `Proposal #${result.transactionIndex.toString()} is ready for signer approval.`,
       });
 
       setRevokeSuccess(
@@ -209,7 +251,9 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
       void loadLinks();
     } catch (err) {
       console.error("Failed to revoke link:", err);
-      setRevokeError(err instanceof Error ? err.message : "Failed to revoke link");
+      const message = err instanceof Error ? err.message : "Failed to revoke link";
+      setRevokeError(message);
+      failTransaction(message);
     }
   };
 
@@ -408,10 +452,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
           ) : (
             <div className="mt-4 grid gap-4">
               {links.map((link) => (
-                <div
-                  key={link.id}
-                  className="rounded-lg border border-border bg-surface p-4"
-                >
+                <div key={link.id} className="rounded-lg border border-border bg-surface p-4">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
                       <div className="flex items-center gap-2">

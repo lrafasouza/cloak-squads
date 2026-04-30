@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
+import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { buildInitCofreIxBrowser } from "@/lib/gatekeeper-instructions";
 import {
   createInitCofreProposal,
@@ -31,6 +32,8 @@ export function CreateMultisigCard({
   const { connection } = useConnection();
   const wallet = useWallet();
   const { addToast } = useToast();
+  const { startTransaction, updateStep, completeTransaction, failTransaction } =
+    useTransactionProgress();
   const [threshold, setThreshold] = useState(1);
   const [memberInputs, setMemberInputs] = useState<string[]>([""]);
   const [operatorInput, setOperatorInput] = useState("");
@@ -77,6 +80,39 @@ export function CreateMultisigCard({
       setBootstrapProposalIndex(null);
       setError(null);
       addToast("Creating multisig...", "info");
+      startTransaction({
+        title: "Creating multisig and cofre",
+        description:
+          "Creating the Squads multisig, funding the vault, and preparing Aegis cofre initialization.",
+        steps: [
+          {
+            id: "validate",
+            title: "Validate setup",
+            description: "Checking members, threshold, operator, and Squads configuration.",
+          },
+          {
+            id: "multisig",
+            title: "Create Squads multisig",
+            description: "Your wallet signs the multisig creation and initial vault funding.",
+            status: "pending",
+          },
+          {
+            id: "bootstrap",
+            title: "Create cofre bootstrap proposal",
+            description: "Opening the proposal that initializes Aegis for this multisig.",
+            status: "pending",
+          },
+          {
+            id: "initialize",
+            title: "Initialize cofre",
+            description:
+              threshold === 1
+                ? "Auto-approving and executing the bootstrap proposal."
+                : "Waiting for signer approvals before cofre initialization.",
+            status: "pending",
+          },
+        ],
+      });
 
       try {
         const operator = new PublicKey(operatorInput.trim());
@@ -111,6 +147,7 @@ export function CreateMultisigCard({
         if (threshold < 1 || threshold > uniqueMembers.length) {
           throw new Error(`Threshold must be between 1 and ${uniqueMembers.length}`);
         }
+        updateStep("validate", { status: "success" });
 
         const memberPermissions = Permissions.fromPermissions([
           Permission.Initiate,
@@ -145,10 +182,17 @@ export function CreateMultisigCard({
         tx.recentBlockhash = latestBlockhash.blockhash;
         tx.partialSign(createKey);
 
+        updateStep("multisig", { status: "running" });
         const signature = await wallet.sendTransaction(tx, connection);
         await connection.confirmTransaction({ signature, ...latestBlockhash }, "confirmed");
+        updateStep("multisig", {
+          status: "success",
+          signature,
+          description: "Squads multisig and vault funding confirmed.",
+        });
 
         addToast("Creating cofre bootstrap proposal...", "info");
+        updateStep("bootstrap", { status: "running" });
         const initCofre = await buildInitCofreIxBrowser({
           multisig: multisigPda,
           operator,
@@ -162,9 +206,15 @@ export function CreateMultisigCard({
         });
         setBootstrapProposalIndex(bootstrap.transactionIndex.toString());
         setBootstrapState("proposal-created");
+        updateStep("bootstrap", {
+          status: "success",
+          signature: bootstrap.signature,
+          description: `Bootstrap proposal #${bootstrap.transactionIndex.toString()} confirmed.`,
+        });
 
         if (threshold === 1) {
           addToast("Approving and executing cofre bootstrap...", "info");
+          updateStep("initialize", { status: "running" });
           await proposalApprove({
             connection,
             wallet,
@@ -184,12 +234,29 @@ export function CreateMultisigCard({
             "confirmed",
           );
           setBootstrapState("initialized");
+          updateStep("initialize", {
+            status: "success",
+            signature: executeSig,
+            description: "Cofre initialized and ready for private execution.",
+          });
+        } else {
+          updateStep("initialize", {
+            status: "success",
+            description: "Bootstrap proposal is ready for member approvals.",
+          });
         }
 
         setCreatedPda(multisigPda.toBase58());
         setCreatedOperator(operator.toBase58());
         localStorage.setItem(OPERATOR_PREFERENCE_KEY, operator.toBase58());
         setState("success");
+        completeTransaction({
+          title: threshold === 1 ? "Multisig and cofre ready" : "Multisig created",
+          description:
+            threshold === 1
+              ? "The cofre is initialized and ready to use."
+              : "The bootstrap proposal needs member approvals before private execution is active.",
+        });
         addToast(
           threshold === 1
             ? "Multisig and cofre initialized successfully!"
@@ -201,10 +268,22 @@ export function CreateMultisigCard({
         setError(message);
         setState("error");
         setBootstrapState("error");
+        failTransaction(message);
         addToast(message, "error");
       }
     },
-    [wallet, connection, memberInputs, threshold, operatorInput, addToast],
+    [
+      wallet,
+      connection,
+      memberInputs,
+      threshold,
+      operatorInput,
+      addToast,
+      startTransaction,
+      updateStep,
+      completeTransaction,
+      failTransaction,
+    ],
   );
 
   const walletConnected = wallet.connected && !!wallet.publicKey && !!wallet.sendTransaction;

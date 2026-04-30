@@ -3,9 +3,9 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
-import { useWalletAuth } from "@/lib/use-wallet-auth";
 import {
   type PayrollRecipientInput,
   formatPayrollCsvTemplate,
@@ -13,6 +13,7 @@ import {
 } from "@/lib/payroll-csv";
 import { lamportsToSol } from "@/lib/sol";
 import { createBatchIssueLicenseProposal } from "@/lib/squads-sdk";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import {
@@ -86,6 +87,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   const { connection } = useConnection();
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
+  const { startTransaction, updateStep, completeTransaction, failTransaction } =
+    useTransactionProgress();
 
   const [csvText, setCsvText] = useState("");
   const [recipients, setRecipients] = useState<PayrollRecipientInput[]>([]);
@@ -222,6 +225,38 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     event.preventDefault();
     setError(null);
     setPending(true);
+    startTransaction({
+      title: "Creating payroll proposal",
+      description: `Preparing ${parsedNotes.length} private transfer license${parsedNotes.length === 1 ? "" : "s"} for signer approval.`,
+      steps: [
+        {
+          id: "validate",
+          title: "Validate payroll",
+          description: "Checking wallet, recipients, amounts, and prepared commitments.",
+        },
+        {
+          id: "squads",
+          title: "Create Squads proposal",
+          description: "Your wallet signs the batch proposal transaction.",
+          status: "pending",
+        },
+        {
+          id: "invoices",
+          title: mode === "invoice" ? "Create claim links" : "Confirm direct delivery mode",
+          description:
+            mode === "invoice"
+              ? "Creating one claim link per payroll recipient."
+              : "Direct deliveries will be handled by the operator after approval.",
+          status: "pending",
+        },
+        {
+          id: "persist",
+          title: "Save payroll draft",
+          description: "Saving the private data needed for operator execution.",
+          status: "pending",
+        },
+      ],
+    });
 
     try {
       if (!wallet.publicKey || !multisigAddress) {
@@ -231,6 +266,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       if (parsedNotes.length === 0) {
         throw new Error("No recipients prepared. Build notes first.");
       }
+      updateStep("validate", { status: "success" });
+      updateStep("squads", { status: "running" });
 
       const instructions = parsedNotes.map((n) => n.instruction);
       const result = await createBatchIssueLicenseProposal({
@@ -240,6 +277,11 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         issueLicenseIxs: instructions,
         memo: `payroll batch (${parsedNotes.length} recipients)`,
       });
+      updateStep("squads", {
+        status: "success",
+        signature: result.signature,
+        description: `Payroll proposal #${result.transactionIndex.toString()} confirmed.`,
+      });
 
       const transactionIndex = result.transactionIndex.toString();
       const totalAmountStr = totalAmount.toString();
@@ -247,6 +289,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       let notesWithInvoices: RecipientNote[] = parsedNotes;
       let claimLinks: PayrollClaimLink[] = [];
       if (mode === "invoice") {
+        updateStep("invoices", { status: "running" });
         const invoiceResults = await Promise.all(
           parsedNotes.map(async (n) => {
             const res = await fetchWithAuth("/api/stealth", {
@@ -286,8 +329,15 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
             invoiceId: invoice.id,
           };
         });
+        updateStep("invoices", {
+          status: "success",
+          description: `${claimLinks.length} claim link${claimLinks.length === 1 ? "" : "s"} created.`,
+        });
+      } else {
+        updateStep("invoices", { status: "success" });
       }
 
+      updateStep("persist", { status: "running" });
       // Persist payroll draft
       const draftPayload = {
         cofreAddress: multisigAddress.toBase58(),
@@ -325,6 +375,14 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         const body = (await draftResponse.json().catch(() => null)) as { error?: string } | null;
         throw new Error(body?.error ?? "Could not persist payroll draft.");
       }
+      updateStep("persist", { status: "success" });
+      completeTransaction({
+        title: "Payroll proposal ready",
+        description:
+          mode === "invoice"
+            ? "The payroll proposal and claim links are ready."
+            : `Proposal #${transactionIndex} is ready for signer approval.`,
+      });
 
       // Store claims in sessionStorage
       for (let i = 0; i < parsedNotes.length; i++) {
@@ -356,7 +414,10 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         router.push(`/vault/${multisigAddress.toBase58()}/proposals/${transactionIndex}`);
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not create payroll proposal.");
+      const message =
+        caught instanceof Error ? caught.message : "Could not create payroll proposal.";
+      setError(message);
+      failTransaction(message);
       setPending(false);
     }
   }
@@ -591,10 +652,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                         ? link.claimUrl
                         : `${window.location.origin}${link.claimUrl}`;
                     return (
-                      <div
-                        key={link.wallet}
-                        className="rounded-md border border-border bg-bg p-3"
-                      >
+                      <div key={link.wallet} className="rounded-md border border-border bg-bg p-3">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="text-sm font-medium text-ink">{link.name}</p>
@@ -610,9 +668,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                             Copy link
                           </Button>
                         </div>
-                        <p className="mt-2 break-all font-mono text-xs text-ink-muted">
-                          {fullUrl}
-                        </p>
+                        <p className="mt-2 break-all font-mono text-xs text-ink-muted">{fullUrl}</p>
                       </div>
                     );
                   })}

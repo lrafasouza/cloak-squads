@@ -3,11 +3,12 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
-import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
@@ -45,6 +46,8 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   const { connection } = useConnection();
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
+  const { startTransaction, updateStep, completeTransaction, failTransaction } =
+    useTransactionProgress();
 
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
@@ -69,6 +72,32 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
     event.preventDefault();
     setError(null);
     setPending(true);
+    startTransaction({
+      title: "Creating private send proposal",
+      description: "Preparing the encrypted transfer claim and opening a Squads proposal.",
+      steps: [
+        {
+          id: "validate",
+          title: "Validate transfer",
+          description: "Checking wallet, recipient, amount, and cofre readiness.",
+        },
+        {
+          id: "commitment",
+          title: "Build private commitment",
+          description: "Creating the Cloak UTXO and payload hash signers will approve.",
+        },
+        {
+          id: "squads",
+          title: "Create Squads proposal",
+          description: "Your wallet signs the transaction that opens the proposal.",
+        },
+        {
+          id: "persist",
+          title: "Save execution draft",
+          description: "Saving the private execution data needed by the operator.",
+        },
+      ],
+    });
 
     try {
       if (!wallet.publicKey || !multisigAddress) {
@@ -83,6 +112,8 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         multisig: multisigAddress,
         gatekeeperProgram,
       });
+      updateStep("validate", { status: "success" });
+      updateStep("commitment", { status: "running" });
 
       const keypair = await generateUtxoKeypair();
       const mint = NATIVE_SOL_MINT;
@@ -100,6 +131,8 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       };
 
       const payloadHash = computePayloadHash(invariants);
+      updateStep("commitment", { status: "success" });
+      updateStep("squads", { status: "running" });
 
       const { instruction } = await buildIssueLicenseIxBrowser({
         multisig: multisigAddress,
@@ -114,6 +147,12 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         issueLicenseIx: instruction,
         memo: "issue license",
       });
+      updateStep("squads", {
+        status: "success",
+        signature: result.signature,
+        description: `Proposal #${result.transactionIndex.toString()} created on-chain.`,
+      });
+      updateStep("persist", { status: "running" });
 
       const transactionIndex = result.transactionIndex.toString();
 
@@ -167,9 +206,16 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         throw new Error(body?.error ?? "Could not persist proposal draft.");
       }
 
+      updateStep("persist", { status: "success" });
+      completeTransaction({
+        title: "Private send proposal ready",
+        description: `Proposal #${transactionIndex} is ready for signer approval.`,
+      });
       router.push(`/vault/${multisig}/proposals/${transactionIndex}`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not create proposal.");
+      const message = caught instanceof Error ? caught.message : "Could not create proposal.";
+      setError(message);
+      failTransaction(message);
       setPending(false);
     }
   }
