@@ -2,7 +2,13 @@ import type { Prisma } from "@prisma/client";
 
 export type ProposalDraftRow = Prisma.ProposalDraftGetPayload<Record<string, never>>;
 
-export function serializeDraft(draft: ProposalDraftRow) {
+type SerializeDraftOptions = {
+  includeSensitive?: boolean;
+};
+
+export function serializeDraft(draft: ProposalDraftRow, options: SerializeDraftOptions = {}) {
+  const { includeSensitive = false } = options;
+
   return {
     id: draft.id,
     cofreAddress: draft.cofreAddress,
@@ -12,8 +18,11 @@ export function serializeDraft(draft: ProposalDraftRow) {
     memo: draft.memo ?? "",
     payloadHash: Array.from(Buffer.from(draft.payloadHash)),
     invariants: JSON.parse(draft.invariants),
-    commitmentClaim: draft.commitmentClaim !== null ? JSON.parse(draft.commitmentClaim) : undefined,
+    ...(includeSensitive && draft.commitmentClaim !== null
+      ? { commitmentClaim: JSON.parse(draft.commitmentClaim) }
+      : {}),
     signature: draft.signature ?? undefined,
     createdAt: new Date(draft.createdAt).toISOString(),
+    archivedAt: draft.archivedAt ? new Date(draft.archivedAt).toISOString() : null,
   };
 }

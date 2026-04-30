@@ -1,9 +1,10 @@
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
+import { requireWalletAuth } from "@/lib/wallet-auth";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ multisig: string; index: string }> },
 ) {
   const { multisig, index } = await params;
@@ -17,6 +18,13 @@ export async function GET(
 
   if (!isPrismaAvailable()) {
     return NextResponse.json({ error: "Database unavailable." }, { status: 503 });
+  }
+
+  const url = new URL(request.url);
+  const includeSensitive = url.searchParams.get("includeSensitive") === "true";
+  if (includeSensitive) {
+    const auth = await requireWalletAuth();
+    if (auth instanceof NextResponse) return auth;
   }
 
   try {
@@ -53,7 +61,10 @@ export async function GET(
         }
 
         try {
-          commitmentClaim = r.commitmentClaim !== null ? JSON.parse(r.commitmentClaim) : undefined;
+          commitmentClaim =
+            includeSensitive && r.commitmentClaim !== null
+              ? JSON.parse(r.commitmentClaim)
+              : undefined;
         } catch {
           commitmentClaim = undefined;
         }

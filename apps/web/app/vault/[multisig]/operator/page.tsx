@@ -487,7 +487,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     try {
       // Try single draft first
       const singleResponse = await fetchWithAuth(
-        `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(txIndex)}`,
+        `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(txIndex)}?includeSensitive=true`,
       );
       if (singleResponse.ok) {
         const draft = (await singleResponse.json()) as SingleDraft;
@@ -498,7 +498,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
       // Try payroll draft
       const payrollResponse = await fetchWithAuth(
-        `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(txIndex)}`,
+        `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(txIndex)}?includeSensitive=true`,
       );
       if (payrollResponse.ok) {
         const draft = (await payrollResponse.json()) as PayrollDraft;
@@ -1131,7 +1131,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                           setExecutionSteps([]);
                           try {
                             const singleResponse = await fetchWithAuth(
-                              `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
+                              `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}?includeSensitive=true`,
                             );
                             if (singleResponse.ok) {
                               const draft = (await singleResponse.json()) as SingleDraft;
@@ -1140,7 +1140,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                               return;
                             }
                             const payrollResponse = await fetchWithAuth(
-                              `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
+                              `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}?includeSensitive=true`,
                             );
                             if (payrollResponse.ok) {
                               const draft = (await payrollResponse.json()) as PayrollDraft;

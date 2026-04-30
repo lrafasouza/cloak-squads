@@ -7,25 +7,20 @@ import { useToast } from "@/components/ui/toast-provider";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { publicEnv } from "@/lib/env";
 import { buildInitCofreIxBrowser } from "@/lib/gatekeeper-instructions";
-import {
-  type ProposalSummary,
-  loadOnchainProposalSummaries,
-  loadPersistedProposalSummaries,
-  mergeProposalSummaries,
-  truncateAddress,
-} from "@/lib/proposals";
+import { truncateAddress } from "@/lib/proposals";
 import { lamportsToSol } from "@/lib/sol";
 import {
   createInitCofreProposal,
   proposalApprove,
   vaultTransactionExecute,
 } from "@/lib/squads-sdk";
-import { useWalletAuth } from "@/lib/use-wallet-auth";
+import { proposalSummariesQueryKey, useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { cofrePda, squadsVaultPda } from "@cloak-squads/core/pda";
 import { vaultTopUpLamportsNeeded } from "@cloak-squads/core/vault-funding";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import * as sqdsMultisig from "@sqds/multisig";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -33,7 +28,7 @@ export default function VaultDashboardPage({ params }: { params: Promise<{ multi
   const { multisig } = use(params);
   const { connection } = useConnection();
   const wallet = useWallet();
-  const { fetchWithAuth } = useWalletAuth();
+  const queryClient = useQueryClient();
   const { addToast } = useToast();
   const { startTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
@@ -61,8 +56,7 @@ export default function VaultDashboardPage({ params }: { params: Promise<{ multi
     return squadsVaultPda(multisigAddress, squadsProgram)[0];
   }, [multisigAddress, squadsProgram]);
 
-  const [drafts, setDrafts] = useState<ProposalSummary[]>([]);
-  const [draftsLoading, setDraftsLoading] = useState(true);
+  const { data: drafts = [], isLoading: draftsLoading } = useProposalSummaries(multisig);
   const [cofreStatus, setCofreStatus] = useState<"checking" | "initialized" | "missing" | "error">(
     "checking",
   );
@@ -84,34 +78,6 @@ export default function VaultDashboardPage({ params }: { params: Promise<{ multi
       setCofreStatus("error");
     }
   }, [cofre, connection, gatekeeperProgram]);
-
-  const loadDrafts = useCallback(
-    async (showLoading = false) => {
-      if (!multisigAddress) return;
-      if (showLoading) setDraftsLoading(true);
-      try {
-        const [persisted, onchain] = await Promise.all([
-          loadPersistedProposalSummaries(multisigAddress),
-          loadOnchainProposalSummaries({ connection, multisigAddress }),
-        ]);
-        setDrafts(mergeProposalSummaries(persisted, onchain));
-      } catch {
-        // ignore
-      } finally {
-        setDraftsLoading(false);
-      }
-    },
-    [connection, fetchWithAuth, multisigAddress],
-  );
-
-  useEffect(() => {
-    void loadDrafts(true);
-  }, [loadDrafts]);
-
-  useEffect(() => {
-    const interval = setInterval(() => void loadDrafts(false), 5000);
-    return () => clearInterval(interval);
-  }, [loadDrafts]);
 
   useEffect(() => {
     void refreshCofreStatus();
@@ -245,6 +211,7 @@ export default function VaultDashboardPage({ params }: { params: Promise<{ multi
       }
 
       await refreshCofreStatus();
+      await queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
       completeTransaction({
         title: "Vault bootstrap ready",
         description:
@@ -303,9 +270,7 @@ export default function VaultDashboardPage({ params }: { params: Promise<{ multi
             </svg>
             <div>
               <h1 className="text-2xl font-semibold text-ink">Invalid multisig address</h1>
-              <p className="mt-1 text-sm text-ink-muted">
-                Check the address and try again.
-              </p>
+              <p className="mt-1 text-sm text-ink-muted">Check the address and try again.</p>
             </div>
           </div>
         </div>
@@ -345,7 +310,6 @@ export default function VaultDashboardPage({ params }: { params: Promise<{ multi
                   execution state for this Squads vault.
                 </p>
               </div>
-
             </div>
           </StaggerItem>
 

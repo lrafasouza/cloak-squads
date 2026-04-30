@@ -4,15 +4,8 @@ import { Logo } from "@/components/brand/Logo";
 import { Address } from "@/components/ui/aegis";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { WalletGuard } from "@/components/wallet/WalletGuard";
-import {
-  loadOnchainProposalSummaries,
-  loadPersistedProposalSummaries,
-  mergeProposalSummaries,
-} from "@/lib/proposals";
-import { useWalletAuth } from "@/lib/use-wallet-auth";
+import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { cn } from "@/lib/utils";
-import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
 import {
   FileText,
   Key,
@@ -27,7 +20,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { type OperatorInboxItem, OperatorInboxSheet } from "./OperatorInboxSheet";
 
 const navItems = [
@@ -173,64 +166,26 @@ function OperatorInboxButton() {
   const [open, setOpen] = useState(false);
   const params = useParams<{ multisig: string }>();
   const multisig = params?.multisig ?? "";
-  const { connection } = useConnection();
-  const { fetchWithAuth } = useWalletAuth();
-  const [items, setItems] = useState<OperatorInboxItem[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const multisigAddress = useMemo(() => {
-    try {
-      return multisig ? new PublicKey(multisig) : null;
-    } catch {
-      return null;
-    }
-  }, [multisig]);
-
-  const refreshInbox = useCallback(
-    async (showLoading = false) => {
-      if (!multisigAddress) {
-        setItems([]);
-        return;
-      }
-      if (showLoading) setLoading(true);
-      try {
-        const [persisted, onchain] = await Promise.all([
-          loadPersistedProposalSummaries(multisigAddress),
-          loadOnchainProposalSummaries({ connection, multisigAddress }),
-        ]);
-        const ready = mergeProposalSummaries(persisted, onchain)
-          .filter((proposal) => proposal.hasDraft && proposal.status === "executed")
-          .map(
-            (proposal): OperatorInboxItem => ({
-              id: proposal.id,
-              transactionIndex: proposal.transactionIndex,
-              amount: proposal.totalAmount ?? proposal.amount,
-              recipient: proposal.recipient,
-              type: proposal.type === "payroll" ? "payroll" : "single",
-              ...(proposal.recipientCount !== undefined
-                ? { recipientCount: proposal.recipientCount }
-                : {}),
-              status: "pending",
-            }),
-          );
-        setItems(ready);
-      } catch {
-        setItems([]);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [connection, fetchWithAuth, multisigAddress],
+  const { data: proposals = [], isLoading: loading } = useProposalSummaries(multisig);
+  const items = useMemo(
+    () =>
+      proposals
+        .filter((proposal) => proposal.hasDraft && proposal.status === "executed")
+        .map(
+          (proposal): OperatorInboxItem => ({
+            id: proposal.id,
+            transactionIndex: proposal.transactionIndex,
+            amount: proposal.totalAmount ?? proposal.amount,
+            recipient: proposal.recipient,
+            type: proposal.type === "payroll" ? "payroll" : "single",
+            ...(proposal.recipientCount !== undefined
+              ? { recipientCount: proposal.recipientCount }
+              : {}),
+            status: "pending",
+          }),
+        ),
+    [proposals],
   );
-
-  useEffect(() => {
-    void refreshInbox(true);
-  }, [refreshInbox]);
-
-  useEffect(() => {
-    const interval = setInterval(() => void refreshInbox(false), 5000);
-    return () => clearInterval(interval);
-  }, [refreshInbox]);
 
   const count = items.length;
 
@@ -249,7 +204,13 @@ function OperatorInboxButton() {
           </span>
         )}
       </button>
-      <OperatorInboxSheet open={open} onOpenChange={setOpen} multisig={multisig} items={items} loading={loading} />
+      <OperatorInboxSheet
+        open={open}
+        onOpenChange={setOpen}
+        multisig={multisig}
+        items={items}
+        loading={loading}
+      />
     </>
   );
 }

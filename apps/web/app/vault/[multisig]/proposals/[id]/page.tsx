@@ -7,12 +7,14 @@ import { AnimatedCard, StaggerContainer, StaggerItem } from "@/components/ui/ani
 import { useToast } from "@/components/ui/toast-provider";
 import { type ProposalStatusKind, readProposalStatus } from "@/lib/proposals";
 import { lamportsToSol } from "@/lib/sol";
+import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import type { CommitmentClaim } from "@cloak-squads/core/commitment";
 import { type MemberVote, getMemberVote } from "@cloak-squads/core/proposal-vote";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
+import { useQueryClient } from "@tanstack/react-query";
 import { use, useCallback, useEffect, useState } from "react";
 
 function StatusBadge({ status }: { status: ProposalStatusKind }) {
@@ -79,6 +81,7 @@ export default function ProposalApprovalPage({
   const { connection } = useConnection();
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
+  const queryClient = useQueryClient();
   const { addToast } = useToast();
   const [commitmentState] = useState<CommitmentCheckState>("checking");
   const [signature, setSignature] = useState<string | null>(null);
@@ -121,7 +124,7 @@ export default function ProposalApprovalPage({
     setDraftLoading(true);
     async function loadDraft() {
       const singleResponse = await fetchWithAuth(
-        `/api/proposals/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
+        `/api/proposals/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}?includeSensitive=true`,
       );
       if (singleResponse.ok) {
         if (!cancelled) setDraft((await singleResponse.json()) as ProposalDraft);
@@ -130,7 +133,7 @@ export default function ProposalApprovalPage({
       }
 
       const payrollResponse = await fetchWithAuth(
-        `/api/payrolls/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
+        `/api/payrolls/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}?includeSensitive=true`,
       );
       if (payrollResponse.ok) {
         if (!cancelled) setPayrollDraft((await payrollResponse.json()) as PayrollDraft);
@@ -218,8 +221,9 @@ export default function ProposalApprovalPage({
         kind === "approve" ? "success" : "info",
       );
       setTimeout(() => void refreshStatus(), 1500);
+      void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisigParam) });
     },
-    [refreshStatus, addToast],
+    [refreshStatus, addToast, queryClient, multisigParam],
   );
 
   const onExecuteSubmitted = useCallback(
@@ -227,8 +231,9 @@ export default function ProposalApprovalPage({
       setExecuteSignature(sig);
       addToast("Transaction executed successfully!", "success");
       setTimeout(() => void refreshStatus(), 1500);
+      void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisigParam) });
     },
-    [refreshStatus, addToast],
+    [refreshStatus, addToast, queryClient, multisigParam],
   );
 
   const approveBlocked =
@@ -248,7 +253,6 @@ export default function ProposalApprovalPage({
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-bg via-bg to-surface">
-
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
         <StaggerContainer staggerDelay={0.1}>
           <StaggerItem>

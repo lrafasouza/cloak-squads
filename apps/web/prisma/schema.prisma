@@ -60,9 +60,11 @@ model ProposalDraft {
   commitmentClaim  String?
   signature        String?
   createdAt        DateTime @default(now())
+  archivedAt      DateTime?
 
   @@unique([cofreAddress, transactionIndex])
   @@index([cofreAddress])
+  @@index([cofreAddress, archivedAt])
 }
 
 model PayrollDraft {

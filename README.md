@@ -48,7 +48,7 @@ Sensitive client-side material (UTXO secrets, commitment claims) stays in the pr
 
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Next.js web app                              │
-│  Wallet adapter · Squads SDK · Prisma/SQLite · Cloak SDK wrappers    │
+│  Wallet adapter · Squads SDK · Prisma/PostgreSQL · Cloak SDK wrappers │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -61,7 +61,7 @@ Sensitive client-side material (UTXO secrets, commitment claims) stays in the pr
 | `cloak-squads-test-harness` | Anchor program used only by integration tests to invoke the gatekeeper without spinning up real Squads. |
 | Cloak devnet SDK | Privacy primitives + devnet transaction support (`@cloak.dev/sdk-devnet`). |
 | Web app | Next.js interface for cofre creation, sends, payroll, audit, invoices, approvals, and operator execution. |
-| Prisma + SQLite | Local persistence for proposal drafts, payroll drafts, audit links, and stealth invoice metadata. |
+| Prisma + PostgreSQL | Persistence for proposal drafts, payroll drafts, audit links, and stealth invoice metadata. |
 | `@cloak-squads/core` | Shared TypeScript package: PDAs, hashing, amount handling, view keys, audit helpers, gatekeeper utilities. |
 
 ## Tech Stack
@@ -73,7 +73,7 @@ Sensitive client-side material (UTXO secrets, commitment claims) stays in the pr
 | Wallets | Solana Wallet Adapter |
 | Multisig | `@sqds/multisig` v2.1.4 (Squads v4) |
 | Privacy | `@cloak.dev/sdk-devnet` |
-| Data | Prisma + SQLite (dev) — not Vercel-compatible; needs Postgres for any deployed instance |
+| Data | Prisma + PostgreSQL (local via Docker, production via Render/Supabase) |
 | Testing | Vitest unit, `anchor-bankrun` integration, optional devnet tests |
 | Monorepo | pnpm workspaces, Turborepo |
 | Formatting/Lint | Biome |
@@ -91,7 +91,7 @@ Sensitive client-side material (UTXO secrets, commitment claims) stays in the pr
 │       │   └── vault/[multisig]/    # Cofre dashboard, send, payroll, audit, invoice, operator, proposals
 │       ├── components/              # UI, wallet, proposal, and proof components
 │       ├── lib/                     # Web helpers and SDK integrations
-│       └── prisma/                  # SQLite schema and migrations
+│       └── prisma/                  # PostgreSQL schema and migrations
 ├── packages/
 │   └── core/                        # Shared TypeScript utilities
 ├── programs/
@@ -147,7 +147,7 @@ NEXT_PUBLIC_CLOAK_PROGRAM_ID=Zc1kHfp4rajSMeASFDwFFgkHRjv7dFQuLheJoQus27h
 NEXT_PUBLIC_CLOAK_RELAY_URL=https://api.devnet.cloak.ag
 NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID=AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq
 NEXT_PUBLIC_SQUADS_PROGRAM_ID=SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf
-DATABASE_URL=file:./dev.db
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/aegis_dev
 JWT_SIGNING_SECRET=dev-secret-replace-in-prod
 LOG_LEVEL=debug
 ```
@@ -162,11 +162,17 @@ Install dependencies:
 pnpm install
 ```
 
-Generate the Prisma client and prepare the local SQLite database:
+Start the local PostgreSQL database:
 
 ```bash
-pnpm -F web exec prisma generate
-pnpm -F web exec prisma migrate dev
+docker compose up -d postgres
+```
+
+Generate the Prisma client and apply migrations:
+
+```bash
+pnpm -F web prisma generate
+pnpm -F web prisma migrate dev
 ```
 
 Run the typecheck gate:
@@ -330,7 +336,7 @@ This is a devnet validation architecture. Before mainnet, the project needs deep
 - Devnet-focused; no mainnet deployment path validated.
 - Only 1-of-1 multisigs have been validated end-to-end; 2-of-N is implemented but untested (see [Multi-member status](#multi-member-status)).
 - The UI is primarily desktop-optimized.
-- Prisma uses SQLite — incompatible with serverless deploys (Vercel). Migrate to Postgres before any hosted deployment.
+- Prisma uses PostgreSQL (local dev via Docker). Ensure `docker compose up -d postgres` is running before `prisma migrate dev`.
 - Public devnet RPC endpoints rate-limit; demos should use a dedicated RPC.
 - Solana devnet resets can wipe program/account state.
 - Operator execution is self-service: the registered operator wallet must manually open `/vault/<multisig>/operator`.

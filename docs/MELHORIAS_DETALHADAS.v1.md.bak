@@ -1,0 +1,625 @@
+# Aegis — Melhorias e Ajustes Detalhados
+
+> Documento de referência com todas as melhorias planejadas para o Aegis.
+> Criado em 30/04/2026. Atualizar conforme progresso.
+
+---
+
+## Sumário
+
+- [1. Correções Funcionais (Alta Prioridade)](#1-correções-funcionais-alta-prioridade)
+- [2. Melhorias de Interface e UX (Média Prioridade)](#2-melhorias-de-interface-e-ux-média-prioridade)
+- [3. Audit — Revisão Completa](#3-audit--revisão-completa)
+- [4. Settings — Nova Página](#4-settings--nova-página)
+- [5. Addresses — Wallet do Operator](#5-addresses--wallet-do-operator)
+- [6. Header do Vault — Dropdown Multi-Vault](#6-header-do-vault--dropdown-multi-vault)
+- [7. Refinamento Geral de Todas as Páginas](#7-refinamento-geral-de-todas-as-páginas)
+- [8. Landing Page — Validação e Aprimoramento](#8-landing-page--validação-e-aprimoramento)
+- [9. Mobile — Responsividade Completa](#9-mobile--responsividade-completa)
+- [10. Git — Renomear Commits](#10-git--renomear-commits)
+- [11. Prisma/DB — Erro no Console](#11-prismadb--erro-no-console)
+- [Prioridades](#prioridades)
+
+---
+
+## 1. Correções Funcionais (Alta Prioridade)
+
+### 1.1 Múltiplas Proposals de Inicialização do Vault (2-of-2)
+
+**Problema:**
+- Ao criar uma multisig 2-of-2 e inicializar o Vault, clicar várias vezes cria múltiplas proposals de inicialização.
+
+**Causa raiz provável:**
+- `CreateMultisigCard.tsx` não verifica se já existe uma proposal de inicialização ativa antes de criar uma nova.
+- Não há lock/debounce no botão de criação.
+
+**Ajustes necessários:**
+- [ ] Verificar no backend/on-chain se já existe uma proposal de inicialização ativa para o Vault.
+- [ ] Bloquear ou ocultar o botão de criar proposal de inicialização se já houver uma pendente.
+- [ ] Exibir mensagem clara: "Initialization proposal created. Waiting for other members to sign."
+- [ ] Adicionar debounce no botão para evitar cliques múltiplos.
+- [ ] Garantir que existe no máximo **uma** proposal de inicialização ativa por Vault.
+
+**Arquivos envolvidos:**
+- `apps/web/components/create-multisig/CreateMultisigCard.tsx`
+- `apps/web/app/api/proposals/` (rota de criação)
+- Possivelmente hooks/lib que criam a proposal on-chain
+
+**Comportamento esperado:**
+1. Usuário cria a proposal de inicialização.
+2. Sistema exibe mensagem informando que os demais membros precisam assinar.
+3. Botão fica bloqueado/oculto enquanto existir proposal pendente.
+4. Se o usuário tentar criar outra, recebe aviso: "There is already a pending initialization proposal."
+
+---
+
+### 1.2 Sincronização e Status de Proposals
+
+**Problema:**
+- Proposals executadas/rejeitadas ainda aparecem como pendentes em diversas áreas.
+- Notificação numérica (badge) permanece mesmo sem proposals pendentes.
+- Proposals aprovadas/executadas aparecem em `operator/load` indevidamente.
+
+**Causa raiz provável:**
+- O estado das proposals é lido apenas uma vez ou não é invalidado após execução.
+- O contador de notificações não é reativo ao estado on-chain.
+- Filtros nas queries não consideram todos os status finais.
+
+**Ajustes necessários:**
+- [ ] Quando uma proposal muda de status (executada, rejeitada, concluída), remover de todas as listas de pendências.
+- [ ] Atualizar automaticamente o badge de notificação.
+- [ ] Se não houver proposals pendentes, o badge deve desaparecer.
+- [ ] Sincronizar estado em TODAS as páginas: Dashboard, Inbox, Operator, Proposals list.
+- [ ] Usar invalidação de cache (React Query / refetch) após mudança de status.
+- [ ] Garantir que `operator/load` filtra por `status === "active"` ou `"pending"` apenas.
+
+**Arquivos envolvidos:**
+- `apps/web/components/app/OperatorInboxSheet.tsx`
+- `apps/web/app/vault/[multisig]/page.tsx` (dashboard)
+- `apps/web/app/vault/[multisig]/operator/`
+- `apps/web/app/vault/[multisig]/proposals/`
+- `apps/web/app/api/proposals/[multisig]/route.ts`
+- Hooks de listagem de proposals
+
+**Comportamento esperado:**
+- Proposal executada → sai das pendências, vai para histórico.
+- Proposal rejeitada → sai das pendências, vai para histórico.
+- Proposal concluída → apenas no histórico.
+- Badge atualiza em tempo real.
+- Todas as páginas ficam sincronizadas.
+
+---
+
+### 1.3 Excluir / Cancelar Proposal
+
+**Problema:**
+- Não existe opção para excluir ou cancelar uma proposal.
+
+**Ajustes necessários:**
+- [ ] Implementar "Cancel Proposal" para proposals **pendentes**.
+- [ ] Implementar "Archive" ou "Hide" para proposals **finalizadas** (executadas/rejeitadas).
+- [ ] Definir regras de permissão: quem pode cancelar? (criador? qualquer membro?)
+- [ ] Proposals já executadas NÃO podem ser excluídas permanentemente (apenas arquivadas).
+- [ ] Proposals pendentes podem ser canceladas (se on-chain permitir, cancelar on-chain; caso contrário, marcar como cancelada no draft).
+
+**Decisões a tomar:**
+- Cancelamento é on-chain (via Squads) ou apenas no draft local?
+- Quem tem permissão: apenas o criador ou qualquer membro do multisig?
+- Permanente vs. soft-delete?
+
+**Sugestão de UX:**
+- Proposals pendentes: botão "Cancel Proposal" (vermelho/destrutivo).
+- Proposals finalizadas: botão "Archive" (sutil, sem destaque).
+
+---
+
+### 1.4 Shielded Balance Travado
+
+**Problema:**
+- O Shielded balance nunca muda, está travado em um valor fixo.
+
+**Causa raiz provável:**
+- O valor exibido pode ser hardcoded ou não estar conectado a dados reais.
+- A integração com Cloak SDK para leitura de saldo shielded pode estar incompleta.
+
+**Ajustes necessários:**
+- [ ] Verificar de onde o valor do shielded balance está vindo (hardcoded? sessionStorage? on-chain?).
+- [ ] Conectar ao dado real do Vault/Cloak se disponível.
+- [ ] Se a feature não estiver funcional ainda, exibir estado claro:
+  - "No shielded balance available"
+  - "Shielded balance not initialized"
+  - "Sync required"
+- [ ] Fazer o valor atualizar conforme depósitos, saques ou movimentações shielded.
+
+**Arquivos envolvidos:**
+- `apps/web/app/vault/[multisig]/page.tsx` (dashboard onde o balance aparece)
+- Lib/hooks que fazem fetch do shielded balance
+
+---
+
+### 1.5 Wallet Pede Aprovação em Páginas de Leitura
+
+**Problema:**
+- Ao acessar `/vault/[multisig]/operator/` e `/vault/[multisig]/audit/`, a wallet solicita aprovação/assinatura.
+
+**Causa raiz provável:**
+- Essas páginas podem estar usando hooks que assinam mensagens no mount (ex: wallet-auth middleware).
+- Verificar `use-wallet-auth.ts` que parece implementar autenticação por assinatura.
+
+**Ajustes necessários:**
+- [ ] Páginas de visualização (read-only) NÃO devem pedir assinatura.
+- [ ] Separar rotas que precisam de auth via assinatura das que são apenas leitura.
+- [ ] Se auth for necessário para a API, fazer de forma lazy (só quando o usuário executar uma ação).
+- [ ] Se alguma permissão for necessária, explicar o motivo claramente ao usuário.
+
+**Arquivos envolvidos:**
+- `apps/web/lib/use-wallet-auth.ts`
+- `apps/web/lib/wallet-auth.ts`
+- `apps/web/app/vault/[multisig]/operator/`
+- `apps/web/app/vault/[multisig]/audit/`
+- Layout do vault (`apps/web/app/vault/[multisig]/layout.tsx`)
+
+**Comportamento esperado:**
+- Wallet só pede aprovação quando o usuário for executar uma ação real (assinar, criar, executar).
+- Acesso a páginas de leitura é livre.
+
+---
+
+## 2. Melhorias de Interface e UX (Média Prioridade)
+
+### 2.1 Modais de Progresso — Textos Mais Humanos
+
+**Problema:**
+- Frases dos modais de progresso são técnicas demais.
+
+**Ajustes necessários:**
+- [ ] Mapear todas as frases atuais dos modais de transação.
+- [ ] Substituir por textos simples e amigáveis.
+- [ ] Padrão de tom:
+
+| Fase | Texto sugerido |
+|------|---------------|
+| Preparando | "Preparing transaction..." |
+| Aguardando assinatura | "Waiting for wallet signature..." |
+| Enviando | "Sending transaction..." |
+| Confirmando | "Waiting for confirmation..." |
+| Quase lá | "Almost done..." |
+| Sucesso | "Completed successfully!" |
+| Erro | "Something went wrong. Please try again." |
+
+**Arquivos envolvidos:**
+- `apps/web/components/ui/toast-provider.tsx`
+- Modais de confirmação e progresso em `components/`
+- Qualquer componente que exiba status de transação
+
+---
+
+### 2.2 Dashboard — Redesign
+
+**Problema:**
+- Dashboard precisa ser mais profissional. Cards e ícones genéricos, excesso de cor, baixa hierarquia.
+
+**Ajustes necessários:**
+- [ ] Refazer os cards principais com design limpo.
+- [ ] Trocar ícones por opções mais consistentes (manter Lucide, mas curar a seleção).
+- [ ] Remover "corzinhas" e fundos coloridos desnecessários.
+- [ ] Melhorar espaçamento, hierarquia e leitura.
+- [ ] Separar visualmente: proposal drafts vs. proposals executadas.
+- [ ] Adicionar novas seções úteis:
+
+**Header duplicado:**
+- O `AppShell.tsx` já exibe o endereço do vault na top bar e a navegação na sidebar.
+- O `page.tsx` do dashboard repete o endereço em um `<h1>` + badge "Dashboard" + descrição.
+- **Remover o header interno do dashboard.** O AppShell já cumpre essa função.
+
+**Seções propostas para o dashboard:**
+- **Vault Summary** — saldo disponível, shielded balance, status da multisig.
+- **Pending Proposals** — proposals que precisam de ação.
+- **Recent Activity** — últimas ações executadas.
+- **Operators** — operadores ativos.
+- **Alerts** — avisos importantes (ex: proposals pendentes de assinatura).
+- **Quick Actions** — atalhos para Send, Payroll, Audit, etc.
+
+**Decomposição do arquivo:**
+- `apps/web/app/vault/[multisig]/page.tsx` tem 632 linhas — lógica de negócio (initializeCofre com 143 linhas), data fetching, SVGs inline e UI misturados no mesmo arquivo.
+- Extrair em componentes menores: `CofreInitBanner`, `StatCards`, `AddressesCard`, `RecentProposals`, hooks `useCofreStatus`, `useInitializeCofre`.
+- Trocar SVGs inline por ícones Lucide (já é dependência do projeto).
+
+---
+
+### 2.3 Operator — Redesign
+
+**Problema:**
+- Página `operator/` difícil de ler, informações confusas, design não profissional.
+
+**Ajustes necessários:**
+- [ ] Melhorar hierarquia de informações.
+- [ ] Separar seções claramente.
+- [ ] Padronizar cards com o restante do sistema.
+
+**Seções propostas:**
+- **Operator Status** — ativo/inativo, wallet conectada.
+- **Wallet** — endereço conectado, copiar.
+- **Permissions** — o que o operator pode fazer.
+- **Pending Licenses** — licenças para executar.
+- **Recent Activity** — últimas execuções.
+- **Available Actions** — botões de ação contextuais.
+
+**Arquivo principal:**
+- `apps/web/app/vault/[multisig]/operator/`
+
+---
+
+### 2.4 Payroll — Redesign Completo
+
+**Problema:**
+- Design da página Payroll precisa ser refeito por completo.
+
+**Ajustes necessários:**
+- [ ] Aplicar mesma linha visual das demais páginas.
+- [ ] Melhorar cards, tabelas, botões, estados vazios.
+- [ ] Tornar a página clara e profissional.
+
+**Seções propostas:**
+- **Payment Summary** — total, próximos pagamentos.
+- **Recipients** — beneficiários cadastrados, tabela limpa.
+- **Payroll History** — histórico de pagamentos.
+- **Transaction Status** — status de cada batch.
+- **Quick Actions** — criar novo payroll, upload CSV.
+
+**Arquivo principal:**
+- `apps/web/app/vault/[multisig]/payroll/`
+
+---
+
+### 2.5 Proposal Detail — Redesign
+
+**Página:** `vault/[multisig]/proposals/[id]`
+
+**Problema:**
+- Página precisa de melhoria completa de design.
+
+**Ajustes necessários:**
+- [ ] Refazer estrutura visual.
+- [ ] Melhorar leitura e organização de informações.
+- [ ] Aplicar padrão visual consistente.
+
+**Seções propostas:**
+- **Proposal Header** — tipo, ID, status badge.
+- **Status** — estado atual com visual claro.
+- **Creator** — quem criou, quando.
+- **Signatures** — necessárias vs. feitas, com visual de progresso.
+- **Details** — valor, destinatário, memo.
+- **Available Actions** — aprovar, rejeitar, executar, cancelar.
+- **Timeline** — histórico da proposal (criada → assinada → executada).
+- **Technical Details** — área recolhível com payload hash, invariants, etc.
+
+**Arquivo principal:**
+- `apps/web/app/vault/[multisig]/proposals/`
+
+---
+
+## 3. Audit — Revisão Completa
+
+**Objetivo:**
+- Verificar totalmente o funcionamento da feature `/vault/[multisig]/audit/`.
+
+**Perguntas para validar:**
+- [ ] A página mostra todas as ações já realizadas no Vault?
+- [ ] O histórico está completo e confiável?
+- [ ] Diferencia status: pendente, concluída, rejeitada, executada?
+- [ ] Está sincronizada com o restante do sistema?
+- [ ] Os dados exibidos são úteis para auditoria real?
+
+**Informações que devem aparecer:**
+- Proposal criada (por quem, quando).
+- Proposal assinada (por quem, quando).
+- Proposal executada (por quem, quando).
+- Proposal rejeitada (por quem, quando).
+- Vault inicializado.
+- Operator adicionado/removido.
+- Pagamento criado/executado.
+- Alterações de configuração.
+- Data, wallet responsável e status de cada ação.
+
+**Comportamento esperado:**
+- Audit = log confiável e completo de tudo que aconteceu no Vault.
+- Eventos em ordem cronológica reversa (mais recente primeiro).
+- Filtros por tipo de evento, status, wallet.
+- Export de dados para compliance.
+
+**Arquivos envolvidos:**
+- `apps/web/app/vault/[multisig]/audit/`
+- `apps/web/app/api/audit/`
+- `apps/web/app/api/audit-links/`
+
+---
+
+## 4. Settings — Nova Página
+
+**Necessidade:**
+- Criar página de configurações para o sistema.
+
+**Seções propostas:**
+- **Vault Settings** — renomear vault, ver endereço, threshold info.
+- **Operator Settings** — gerenciar operadores, adicionar/remover.
+- **Wallet Settings** — wallets conectadas, gerenciar sessões.
+- **Notification Settings** — configurar notificações.
+- **Security** — threshold, permissões, viewing keys.
+- **Preferences** — tema (dark/light), idioma.
+- **Danger Zone** — remover vault, resetar configurações.
+
+**Rota sugerida:**
+- `apps/web/app/vault/[multisig]/settings/page.tsx`
+
+---
+
+## 5. Addresses — Wallet do Operator
+
+**Ideia:**
+- Adicionar a wallet do operator dentro da área `Addresses`.
+
+**Organização sugerida:**
+- **Vault Address** — endereço principal do vault.
+- **Multisig Address** — endereço do multisig Squads.
+- **Operator Wallet** — wallet registrada do operador.
+- **Treasury Address** — se aplicável.
+- **Shielded Address** — se existir.
+
+**Regras:**
+- Deixar claro qual endereço pertence ao Vault e qual ao operator.
+- Facilitar cópia, conferência e auditoria.
+- Cada endereço com label + botão de copiar + link para explorer.
+
+---
+
+## 6. Header do Vault — Dropdown Multi-Vault
+
+**Necessidade:**
+- Transformar o header do Vault em um seletor com dropdown.
+
+**Comportamento atual:**
+- Header mostra endereço do Vault + botão de copiar.
+
+**Comportamento proposto:**
+- Clicar no Vault atual abre um dropdown com:
+  - **Vault atual** — nome (se existir) + endereço resumido + status.
+  - **Outros Vaults** — lista de vaults salvos em sessionStorage/localStorage.
+  - **Add New Vault** — botão para adicionar/criar novo vault.
+  - **Remove Current Vault** — remover vault da lista local.
+  - **Copy Address** — copiar endereço atual.
+
+**Observação:**
+- O mecanismo de persistência de vaults já usa sessionStorage (`6095b85` commit).
+- Aproveitar isso para listar vaults anteriores.
+
+---
+
+## 7. Refinamento Geral de Todas as Páginas
+
+**Checklist para cada página:**
+- [ ] Essa informação é útil aqui?
+- [ ] O usuário entende o que precisa fazer?
+- [ ] Existe alguma ação importante faltando?
+- [ ] Existe informação técnica demais aparecendo cedo demais?
+- [ ] O layout ajuda ou confunde?
+- [ ] Os status estão claros?
+- [ ] Os dados estão sincronizados?
+- [ ] Existe um bom estado vazio (empty state)?
+- [ ] Existe feedback depois de cada ação?
+- [ ] A página parece parte do mesmo produto?
+
+**Diretrizes de design:**
+- Profissionalismo acima de tudo.
+- Reduzir ruído visual.
+- Padronizar: cards, tabelas, botões, badges, estados.
+- Menos cores, mais hierarquia.
+- Detalhes técnicos apenas quando necessário (áreas recolhíveis).
+- Clareza, consistência e controle.
+
+---
+
+## 8. Landing Page — Validação e Aprimoramento
+
+### 8.1 Validação: Landing reflete a app real?
+
+**Perguntas a validar:**
+- [ ] "Private Sends" — está funcional na app? **Sim** (devnet).
+- [ ] "Payroll Batches" — está funcional? **Sim** (devnet).
+- [ ] "Stealth Invoicing" — está funcional? **Sim** (devnet).
+- [ ] "Scoped Audit Links" — está funcional? **Sim** (devnet).
+- [ ] "Operator Flow" — está funcional? **Sim** (devnet).
+- [ ] "Commitment Checks" — está funcional? **Sim** (devnet).
+- [ ] "ZK Privacy" (trust bar) — parcialmente verdadeiro (usa Cloak, não ZK puro do lado do app).
+- [ ] "End-to-end encrypted" (trust bar) — **verificar** se é preciso. O sistema usa commitments e viewing keys, mas "E2E encrypted" pode ser impreciso.
+- [ ] "Multi-sig security" — **Sim**, usa Squads v4.
+- [ ] "Auditable" — **Sim**, audit links existem.
+
+**Ação:**
+- [ ] Revisar claims da landing para garantir que são 100% verdadeiros e vendíveis.
+- [ ] Ajustar qualquer texto que prometa algo que a app não entrega.
+
+### 8.2 Correção de texto: "aegis" → "Aegis"
+
+**Problema:**
+- No componente `Logo.tsx`, o wordmark está como `aegis` (lowercase).
+- Em alguns contextos faz sentido o lowercase estilístico, mas em textos corridos deve ser "Aegis".
+
+**Arquivos a verificar:**
+- `apps/web/components/brand/Logo.tsx` — wordmark: `aegis` (lowercase por design tipográfico, **manter se intencional**).
+- Todo texto corrido em componentes e landing — deve ser "Aegis" com A maiúsculo.
+
+### 8.3 Aprimorar Animações
+
+**Ajustes:**
+- [ ] Revisar animações atuais (framer-motion) — verificar performance e fluidez.
+- [ ] Melhorar transições de entrada de seções.
+- [ ] Adicionar parallax sutil ou scroll-triggered animations.
+- [ ] Garantir que animações não afetam performance mobile.
+- [ ] Testar em 60fps em dispositivos médios.
+
+---
+
+## 9. Mobile — Responsividade Completa
+
+**Requisito:**
+- TODAS as páginas devem funcionar e ficar bonitas em mobile.
+
+**Checklist mobile:**
+- [ ] Landing page — responsiva, animações leves, botões acessíveis.
+- [ ] Vault Dashboard — cards empilham, sidebar colapsa, ações acessíveis.
+- [ ] Send page — formulário adaptado, botões full-width.
+- [ ] Payroll — tabela scroll horizontal ou cards adaptados.
+- [ ] Operator — layout adaptado.
+- [ ] Audit — lista adaptada.
+- [ ] Invoice — formulário e claim adaptados.
+- [ ] Proposals list e detail — layout mobile-first.
+- [ ] Settings (nova) — responsiva desde o início.
+- [ ] Modais — full-screen ou bottom-sheet em mobile.
+- [ ] Header/Nav — hamburger menu ou bottom nav.
+- [ ] Wallet connection — funcional em mobile browsers.
+
+**Breakpoints a testar:**
+- 320px (iPhone SE)
+- 375px (iPhone standard)
+- 390px (iPhone 14)
+- 768px (iPad)
+- 1024px+ (desktop)
+
+---
+
+## 10. Git — Renomear Commits
+
+**Commits a renomear:**
+
+| SHA | Mensagem Atual | Nova Mensagem Sugerida |
+|-----|---------------|----------------------|
+| `f7bc345` | `git -C /Users/rafazaum/Desktop/cloak-squads add apps/web/app/vault/[multisig]/page.tsx && git -C /Users/rafazaum/Desktop/cloak-squads commit -m "fix(web): remove header duplicado do vault dashboard` | `fix(web): remove duplicate header from vault dashboard` |
+| `1b7e60e` | `fix` | `fix(web): minor bug fixes` |
+| `6095b85` | `Remove texts and implements session storage (vaults)` | `feat(web): implement vault session storage and clean up texts` |
+
+**Comando para renomear (interactive rebase):**
+```bash
+git rebase -i 6095b85~1
+```
+> **⚠️ ATENÇÃO:** rebase interativo reescreve o histórico. Se o branch já foi pushado, será necessário `git push --force-with-lease`. Coordenar com qualquer outro colaborador antes.
+
+---
+
+## 11. Prisma/DB — Erro no Console
+
+**Erro:**
+```
+Invalid `prisma.payrollDraft.findMany()` invocation:
+error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+```
+
+**Causa raiz:**
+- O schema Prisma (`apps/web/prisma/schema.prisma`) define `provider = "postgresql"`.
+- O `DATABASE_URL` no `.env.local` provavelmente ainda está como `file:./dev.db` (SQLite).
+- Houve uma migração do provider de `sqlite` para `postgresql`, mas o `.env.local` não foi atualizado.
+
+**Solução:**
+- **Opção A (usar PostgreSQL):** Atualizar `DATABASE_URL` no `.env.local` para uma URL PostgreSQL válida:
+  ```
+  DATABASE_URL=postgresql://user:password@localhost:5432/aegis_dev
+  ```
+  E rodar `pnpm -F web exec prisma migrate dev`.
+
+- **Opção B (voltar para SQLite):** Se está em desenvolvimento local, mudar o provider de volta para `sqlite` no schema:
+  ```prisma
+  datasource db {
+    provider = "sqlite"
+    url      = env("DATABASE_URL")
+  }
+  ```
+  E `DATABASE_URL=file:./dev.db`.
+
+**Recomendação:**
+- Para dev local: SQLite é mais simples.
+- Para deploy (Render/Vercel): PostgreSQL é obrigatório.
+- Considerar usar variável de ambiente para alternar, ou manter PostgreSQL e rodar local com Docker.
+
+**Arquivos envolvidos:**
+- `apps/web/prisma/schema.prisma` (linha 6-7)
+- `apps/web/.env.local` (DATABASE_URL)
+- `apps/web/lib/prisma.ts` (isPrismaAvailable apenas checa se var existe, não valida protocolo)
+
+**Melhoria na `isPrismaAvailable()`:**
+```typescript
+export function isPrismaAvailable(): boolean {
+  const url = process.env.DATABASE_URL;
+  if (!url) return false;
+  // Se o provider é postgresql, validar que a URL começa com postgresql:// ou postgres://
+  if (url.startsWith("file:")) return false; // SQLite URL com provider postgresql
+  return true;
+}
+```
+
+---
+
+## Prioridades
+
+### 🔴 Alta Prioridade
+1. **1.1** — Corrigir múltiplas proposals de inicialização.
+2. **1.2** — Corrigir sincronização de proposals (status, badge, listas).
+3. **1.2** — Corrigir contador de notificações.
+4. **1.5** — Investigar aprovação da wallet em páginas de leitura.
+5. **1.4** — Shielded balance funcionar ou exibir estado correto.
+6. **11** — Corrigir erro Prisma no console (DATABASE_URL).
+
+### 🟡 Média Prioridade
+1. **2.1** — Modais de progresso com textos humanos.
+2. **3** — Revisão completa da feature Audit.
+3. **2.2** — Redesign do Dashboard.
+4. **2.3** — Redesign da página Operator.
+5. **2.4** — Redesign da página Payroll.
+6. **2.5** — Redesign da página Proposal Detail.
+7. **8** — Landing page: validação + animações + "Aegis".
+8. **9** — Responsividade mobile completa.
+
+### 🟢 Baixa Prioridade
+1. **4** — Criar página Settings.
+2. **6** — Dropdown de gerenciamento de Vault no header.
+3. **5** — Adicionar wallet do operator em Addresses.
+4. **1.3** — Excluir/cancelar proposal.
+5. **7** — Refinamento geral (microcopy, estados vazios, detalhes técnicos).
+6. **10** — Renomear commits.
+
+---
+
+## Notas Técnicas
+
+### Estrutura atual relevante
+```
+apps/web/
+├── app/
+│   ├── page.tsx                           # Landing page (347 lines)
+│   ├── api/proposals/[multisig]/route.ts  # API proposals
+│   ├── api/payrolls/[multisig]/route.ts   # API payrolls (com erro Prisma)
+│   └── vault/[multisig]/
+│       ├── page.tsx                        # Dashboard (27KB — precisa decomposição)
+│       ├── audit/
+│       ├── operator/
+│       ├── payroll/
+│       ├── proposals/
+│       ├── send/
+│       └── invoice/
+├── components/
+│   ├── brand/Logo.tsx                     # "aegis" lowercase no wordmark
+│   ├── create-multisig/CreateMultisigCard.tsx
+│   ├── app/OperatorInboxSheet.tsx         # Badge de notificações
+│   ├── proposal/ApprovalButtons.tsx
+│   └── landing/                           # FAQ, HeroDiagram
+├── lib/
+│   ├── prisma.ts                          # isPrismaAvailable() — precisa melhorar
+│   ├── use-wallet-auth.ts                 # Pode causar pedido de assinatura indesejado
+│   └── wallet-auth.ts
+└── prisma/
+    └── schema.prisma                      # provider = "postgresql" ← causa do erro
+```
+
+### Database
+- Schema usa `provider = "postgresql"` mas `.env.local` pode ter URL SQLite.
+- Isso causa erro 500 em todas as rotas que usam Prisma.
+- Resolver PRIMEIRO antes de testar qualquer funcionalidade de proposals/payroll.

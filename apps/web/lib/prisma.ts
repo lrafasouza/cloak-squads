@@ -37,5 +37,7 @@ export const prisma = new Proxy({} as PrismaClient, {
  * Used to gracefully degrade read endpoints in local dev when DATABASE_URL is missing.
  */
 export function isPrismaAvailable(): boolean {
-  return Boolean(process.env.DATABASE_URL);
+  const url = process.env.DATABASE_URL;
+  if (!url) return false;
+  return url.startsWith("postgresql://") || url.startsWith("postgres://");
 }

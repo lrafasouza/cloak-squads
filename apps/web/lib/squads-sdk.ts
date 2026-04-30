@@ -310,6 +310,68 @@ export async function proposalApprove(params: {
   return sendSingleInstruction(params.connection, params.wallet, ix, "proposalApprove");
 }
 
+// ── TICKET #15b: Multisig info helper (read-only on-chain) ──────────────
+
+export type MultisigMember = {
+  publicKey: string;
+  permissions: {
+    initiate: boolean;
+    vote: boolean;
+    execute: boolean;
+  };
+};
+
+export type MultisigInfo = {
+  threshold: number;
+  timeLock: number;
+  members: MultisigMember[];
+  transactionIndex: string;
+  staleTransactionIndex: string;
+};
+
+export async function loadMultisigInfo(args: {
+  connection: Connection;
+  multisigPda: PublicKey;
+}): Promise<MultisigInfo> {
+  const { connection, multisigPda } = args;
+  const ms = await multisig.accounts.Multisig.fromAccountAddress(connection, multisigPda);
+
+  return {
+    threshold: ms.threshold,
+    timeLock: ms.timeLock,
+    transactionIndex: ms.transactionIndex.toString(),
+    staleTransactionIndex: ms.staleTransactionIndex.toString(),
+    members: ms.members.map((m) => ({
+      publicKey: m.key.toBase58(),
+      permissions: {
+        initiate: (m.permissions.mask & 1) !== 0,
+        vote: (m.permissions.mask & 2) !== 0,
+        execute: (m.permissions.mask & 4) !== 0,
+      },
+    })),
+  };
+}
+
+// ── TICKET #13a: proposalCancel wrapper (on-chain) ─────────────────────
+
+export async function proposalCancel(params: {
+  connection: Connection;
+  wallet: BrowserSquadsWallet;
+  multisigPda: PublicKey;
+  transactionIndex: bigint;
+  memo?: string;
+}) {
+  assertBrowserSquadsWallet(params.wallet);
+  const cancelParams: Parameters<typeof multisig.instructions.proposalCancel>[0] = {
+    multisigPda: params.multisigPda,
+    transactionIndex: params.transactionIndex,
+    member: params.wallet.publicKey,
+  };
+  if (params.memo) cancelParams.memo = params.memo;
+  const ix = multisig.instructions.proposalCancel(cancelParams);
+  return sendSingleInstruction(params.connection, params.wallet, ix, "proposalCancel");
+}
+
 export async function proposalReject(params: {
   connection: Connection;
   wallet: BrowserSquadsWallet;

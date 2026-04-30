@@ -147,7 +147,7 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json(serializeDraft(draft), { status: 201 });
+    return NextResponse.json(serializeDraft(draft, { includeSensitive: true }), { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json({ error: "Proposal draft already exists." }, { status: 409 });

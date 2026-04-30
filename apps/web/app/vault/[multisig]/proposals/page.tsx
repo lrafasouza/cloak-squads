@@ -2,19 +2,12 @@
 
 import { AnimatedCard, StaggerContainer, StaggerItem } from "@/components/ui/animations";
 import { Spinner } from "@/components/ui/skeleton";
-import {
-  type ProposalSummary,
-  loadOnchainProposalSummaries,
-  loadPersistedProposalSummaries,
-  mergeProposalSummaries,
-  truncateAddress,
-} from "@/lib/proposals";
+import { truncateAddress } from "@/lib/proposals";
 import { lamportsToSol } from "@/lib/sol";
-import { useWalletAuth } from "@/lib/use-wallet-auth";
-import { useConnection } from "@solana/wallet-adapter-react";
+import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
-import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { use, useMemo } from "react";
 
 export default function ProposalsListPage({
   params,
@@ -22,8 +15,6 @@ export default function ProposalsListPage({
   params: Promise<{ multisig: string }>;
 }) {
   const { multisig } = use(params);
-  const { fetchWithAuth } = useWalletAuth();
-  const { connection } = useConnection();
 
   const multisigAddress = useMemo(() => {
     try {
@@ -33,36 +24,7 @@ export default function ProposalsListPage({
     }
   }, [multisig]);
 
-  const [drafts, setDrafts] = useState<ProposalSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadDrafts = useCallback(
-    async (showLoading = false) => {
-      if (!multisigAddress) return;
-      if (showLoading) setLoading(true);
-      try {
-        const [persisted, onchain] = await Promise.all([
-          loadPersistedProposalSummaries(multisigAddress),
-          loadOnchainProposalSummaries({ connection, multisigAddress }),
-        ]);
-        setDrafts(mergeProposalSummaries(persisted, onchain));
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
-    },
-    [connection, multisigAddress, fetchWithAuth],
-  );
-
-  useEffect(() => {
-    void loadDrafts(true);
-  }, [loadDrafts]);
-
-  useEffect(() => {
-    const interval = setInterval(() => void loadDrafts(false), 5000);
-    return () => clearInterval(interval);
-  }, [loadDrafts]);
+  const { data: drafts = [], isLoading: loading } = useProposalSummaries(multisig);
 
   if (!multisigAddress) {
     return (
