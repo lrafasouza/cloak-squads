@@ -42,8 +42,6 @@ type ApiDraftSummary = {
   totalAmount?: string;
 };
 
-type AuthFetch = (input: string | URL, init?: RequestInit) => Promise<Response>;
-
 export function readProposalStatus(status: unknown): ProposalStatusKind {
   if (status && typeof status === "object") {
     const kind = (status as { __kind?: unknown }).__kind;
@@ -64,12 +62,11 @@ export function readProposalStatus(status: unknown): ProposalStatusKind {
 }
 
 export async function loadPersistedProposalSummaries(
-  fetchWithAuth: AuthFetch,
   multisigAddress: PublicKey,
 ): Promise<ProposalSummary[]> {
   const [singleRes, payrollRes] = await Promise.all([
-    fetchWithAuth(`/api/proposals/${encodeURIComponent(multisigAddress.toBase58())}`),
-    fetchWithAuth(`/api/payrolls/${encodeURIComponent(multisigAddress.toBase58())}`),
+    fetch(`/api/proposals/${encodeURIComponent(multisigAddress.toBase58())}`),
+    fetch(`/api/payrolls/${encodeURIComponent(multisigAddress.toBase58())}`),
   ]);
 
   const singleDrafts: ProposalSummary[] = singleRes.ok

@@ -91,7 +91,7 @@ export default function VaultDashboardPage({ params }: { params: Promise<{ multi
       if (showLoading) setDraftsLoading(true);
       try {
         const [persisted, onchain] = await Promise.all([
-          loadPersistedProposalSummaries(fetchWithAuth, multisigAddress),
+          loadPersistedProposalSummaries(multisigAddress),
           loadOnchainProposalSummaries({ connection, multisigAddress }),
         ]);
         setDrafts(mergeProposalSummaries(persisted, onchain));
@@ -530,8 +530,8 @@ export default function VaultDashboardPage({ params }: { params: Promise<{ multi
                 <dl className="space-y-4 p-4 text-sm">
                   {[
                     { label: "Multisig", value: multisigAddress.toBase58() },
-                    { label: "Vault PDA", value: cofre.toBase58() },
-                    { label: "Vault PDA", value: vault.toBase58() },
+                    { label: "Cofre PDA", value: cofre.toBase58() },
+                    { label: "Squads Vault PDA", value: vault.toBase58() },
                   ].map((item) => (
                     <div key={item.label} className="group">
                       <dt className="text-xs font-medium text-ink-subtle uppercase tracking-wider">
@@ -600,7 +600,7 @@ export default function VaultDashboardPage({ params }: { params: Promise<{ multi
                       {drafts.map((d) => (
                         <li key={d.id}>
                           <Link
-                            href={`/vault/proposals/${d.transactionIndex}`}
+                            href={`/vault/${multisig}/proposals/${d.transactionIndex}`}
                             className="flex items-center justify-between rounded-lg border border-border/50 p-4 transition-all duration-200 hover:border-emerald-900/50 hover:bg-surface-2/50 group"
                           >
                             <div className="min-w-0">

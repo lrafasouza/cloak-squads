@@ -410,7 +410,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         setStep("created");
         setPending(false);
       } else {
-        router.push(`/vault/proposals/${transactionIndex}`);
+        router.push(`/vault/${multisig}/proposals/${transactionIndex}`);
       }
     } catch (caught) {
       const message =
@@ -664,7 +664,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
-                  href={`/vault/proposals/${createdPayroll.transactionIndex}`}
+                  href={`/vault/${multisig}/proposals/${createdPayroll.transactionIndex}`}
                   className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-raise-1 shadow-accent/20 transition-all duration-200 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:scale-[0.98]"
                 >
                   View proposal

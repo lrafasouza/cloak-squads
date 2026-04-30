@@ -15,6 +15,7 @@ import Link from "next/link";
 interface OperatorInboxSheetProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  multisig: string;
   items: OperatorInboxItem[];
   loading: boolean;
 }
@@ -33,6 +34,7 @@ export type OperatorInboxItem = {
 export function OperatorInboxSheet({
   open,
   onOpenChange,
+  multisig,
   items,
   loading,
 }: OperatorInboxSheetProps) {
@@ -84,7 +86,7 @@ export function OperatorInboxSheet({
                   <div className="mt-1 font-mono text-xs text-ink-subtle num">{item.recipient}</div>
                   <Divider className="my-3" />
                   <Link
-                    href={`/vault/operator?proposal=${encodeURIComponent(item.transactionIndex)}`}
+                    href={`/vault/${multisig}/operator?proposal=${encodeURIComponent(item.transactionIndex)}`}
                     onClick={() => onOpenChange(false)}
                     className="inline-flex min-h-9 w-full items-center justify-center rounded-md bg-accent px-4 py-2 text-xs font-semibold text-accent-ink shadow-raise-1 transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                   >

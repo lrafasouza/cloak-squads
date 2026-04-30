@@ -42,7 +42,7 @@ export default function ProposalsListPage({
       if (showLoading) setLoading(true);
       try {
         const [persisted, onchain] = await Promise.all([
-          loadPersistedProposalSummaries(fetchWithAuth, multisigAddress),
+          loadPersistedProposalSummaries(multisigAddress),
           loadOnchainProposalSummaries({ connection, multisigAddress }),
         ]);
         setDrafts(mergeProposalSummaries(persisted, onchain));
@@ -128,7 +128,7 @@ export default function ProposalsListPage({
                     {drafts.map((d) => (
                       <li key={d.id}>
                         <Link
-                          href={`/vault/proposals/${d.transactionIndex}`}
+                          href={`/vault/${multisig}/proposals/${d.transactionIndex}`}
                           className="flex items-center justify-between rounded-lg border border-border/50 p-4 transition-all duration-200 hover:border-emerald-900/50 hover:bg-surface-2/50 group"
                         >
                           <div className="min-w-0">

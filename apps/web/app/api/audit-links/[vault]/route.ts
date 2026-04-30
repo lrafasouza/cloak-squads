@@ -1,18 +1,18 @@
-import { prisma } from "@/lib/prisma";
-import { requireWalletAuth } from "@/lib/wallet-auth";
+import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
 export async function GET(_request: Request, context: { params: Promise<{ vault: string }> }) {
-  const auth = await requireWalletAuth();
-  if (auth instanceof NextResponse) return auth;
-
   const { vault } = await context.params;
 
   try {
     new PublicKey(vault);
   } catch {
     return NextResponse.json({ error: "Invalid vault address." }, { status: 400 });
+  }
+
+  if (!isPrismaAvailable()) {
+    return NextResponse.json([]);
   }
 
   try {

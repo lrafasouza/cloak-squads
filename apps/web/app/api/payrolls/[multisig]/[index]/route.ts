@@ -1,5 +1,4 @@
-import { prisma } from "@/lib/prisma";
-import { requireWalletAuth } from "@/lib/wallet-auth";
+import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
@@ -7,9 +6,6 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ multisig: string; index: string }> },
 ) {
-  const auth = await requireWalletAuth();
-  if (auth instanceof NextResponse) return auth;
-
   const { multisig, index } = await params;
 
   try {
@@ -17,6 +13,10 @@ export async function GET(
     new PublicKey(multisig);
   } catch {
     return NextResponse.json({ error: "Invalid multisig address." }, { status: 400 });
+  }
+
+  if (!isPrismaAvailable()) {
+    return NextResponse.json({ error: "Database unavailable." }, { status: 503 });
   }
 
   try {

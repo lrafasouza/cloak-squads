@@ -4,7 +4,6 @@ import { Logo } from "@/components/brand/Logo";
 import { Address } from "@/components/ui/aegis";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { WalletGuard } from "@/components/wallet/WalletGuard";
-import { useActiveVaultAddress } from "@/lib/active-vault";
 import {
   loadOnchainProposalSummaries,
   loadPersistedProposalSummaries,
@@ -27,7 +26,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type OperatorInboxItem, OperatorInboxSheet } from "./OperatorInboxSheet";
 
@@ -43,9 +42,10 @@ const navItems = [
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const params = useParams<{ multisig: string }>();
   const pathname = usePathname();
-  const { activeVault: multisig } = useActiveVaultAddress();
-  const base = "/vault";
+  const multisig = params?.multisig ?? "";
+  const base = `/vault/${multisig}`;
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -171,7 +171,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 /* ── Operator Inbox trigger (badge) ── */
 function OperatorInboxButton() {
   const [open, setOpen] = useState(false);
-  const { activeVault: multisig } = useActiveVaultAddress();
+  const params = useParams<{ multisig: string }>();
+  const multisig = params?.multisig ?? "";
   const { connection } = useConnection();
   const { fetchWithAuth } = useWalletAuth();
   const [items, setItems] = useState<OperatorInboxItem[]>([]);
@@ -194,7 +195,7 @@ function OperatorInboxButton() {
       if (showLoading) setLoading(true);
       try {
         const [persisted, onchain] = await Promise.all([
-          loadPersistedProposalSummaries(fetchWithAuth, multisigAddress),
+          loadPersistedProposalSummaries(multisigAddress),
           loadOnchainProposalSummaries({ connection, multisigAddress }),
         ]);
         const ready = mergeProposalSummaries(persisted, onchain)
@@ -248,7 +249,7 @@ function OperatorInboxButton() {
           </span>
         )}
       </button>
-      <OperatorInboxSheet open={open} onOpenChange={setOpen} items={items} loading={loading} />
+      <OperatorInboxSheet open={open} onOpenChange={setOpen} multisig={multisig} items={items} loading={loading} />
     </>
   );
 }

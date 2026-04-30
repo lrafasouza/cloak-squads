@@ -343,7 +343,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
 
               <Button
                 type="button"
-                onClick={() => router.push(`/vault/proposals/${result.transactionIndex}`)}
+                onClick={() => router.push(`/vault/${multisig}/proposals/${result.transactionIndex}`)}
               >
                 Go to proposal #{result.transactionIndex} →
               </Button>

@@ -1,62 +1,42 @@
 "use client";
 
-import { AppShell } from "@/components/app/AppShell";
 import { CreateMultisigCard } from "@/components/create-multisig/CreateMultisigCard";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast-provider";
-import { setActiveVaultAddress, useActiveVaultAddress } from "@/lib/active-vault";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { LogIn } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import VaultDashboardPage from "./_active/page";
+import { useEffect, useState } from "react";
 
 /* ── Redirect ?multisig= param ── */
 function useRedirectParam() {
-  const [redirected, setRedirected] = useState(false);
   const router = useRouter();
   useEffect(() => {
     const url = new URL(window.location.href);
     const target = url.searchParams.get("multisig");
     if (target) {
       try {
-        setActiveVaultAddress(target);
-        router.replace("/vault");
-        setRedirected(true);
+        new PublicKey(target);
+        router.replace(`/vault/${target}`);
       } catch {
         /* ignore invalid pubkey */
       }
     }
   }, [router]);
-  return redirected;
 }
 
 export default function VaultPage() {
-  const redirected = useRedirectParam();
+  useRedirectParam();
   const router = useRouter();
   const { addToast } = useToast();
   const wallet = useWallet();
-  const { activeVault, setActiveVaultAddress } = useActiveVaultAddress();
 
   const [multisigInput, setMultisigInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
-  const dashboardParams = useMemo(
-    () => (activeVault ? Promise.resolve({ multisig: activeVault }) : null),
-    [activeVault],
-  );
-
-  if (redirected) return null;
-  if (dashboardParams) {
-    return (
-      <AppShell>
-        <VaultDashboardPage params={dashboardParams} />
-      </AppShell>
-    );
-  }
 
   function onOpenMultisig(e: React.FormEvent) {
     e.preventDefault();
@@ -67,9 +47,8 @@ export default function VaultPage() {
     setIsSubmitting(true);
     try {
       const pk = new PublicKey(trimmed);
-      setActiveVaultAddress(pk.toBase58());
       addToast("Opening vault...", "info", 2000);
-      router.push("/vault");
+      router.push(`/vault/${pk.toBase58()}`);
     } catch {
       setInputError("Invalid Solana address");
       addToast("Invalid Solana address", "error");
@@ -144,8 +123,7 @@ export default function VaultPage() {
           {/* Create new vault */}
           <CreateMultisigCard
             onCreated={(multisigPda) => {
-              setActiveVaultAddress(multisigPda);
-              router.push("/vault");
+              router.push(`/vault/${multisigPda}`);
             }}
           />
         </div>

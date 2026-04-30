@@ -210,7 +210,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         title: "Private send proposal ready",
         description: `Proposal #${transactionIndex} is ready for signer approval.`,
       });
-      router.push(`/vault/proposals/${transactionIndex}`);
+      router.push(`/vault/${multisig}/proposals/${transactionIndex}`);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Could not create proposal.";
       setError(message);
