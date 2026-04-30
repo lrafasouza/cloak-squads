@@ -2,9 +2,9 @@ import { describe, expect, test } from "vitest";
 import { cloakDirectTransactOptions } from "../../packages/core/src/cloak-direct-mode";
 
 describe("cloakDirectTransactOptions", () => {
-  test("disables relay and viewing-key registration for direct operator deposits", () => {
+  test("uses the same-origin relay proxy and skips viewing-key registration", () => {
     expect(cloakDirectTransactOptions).toEqual({
-      relayUrl: "",
+      relayUrl: "/api/cloak-relay",
       enforceViewingKeyRegistration: false,
     });
   });

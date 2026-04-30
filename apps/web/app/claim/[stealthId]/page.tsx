@@ -6,6 +6,7 @@ import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { lamportsToSol } from "@/lib/sol";
 import { statusBadge, statusLabel } from "@/lib/status-labels";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
+import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
 import {
   CLOAK_PROGRAM_ID,
   computeUtxoCommitment,
@@ -164,7 +165,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
     };
 
     void loadInvoice();
-  }, [stealthId, secretKey]);
+  }, [fetchWithAuth, stealthId, secretKey]);
 
   const handleClaim = async () => {
     if (!invoice || !wallet.publicKey) return;
@@ -202,7 +203,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         const result = await fullWithdraw([utxo], wallet.publicKey, {
           connection,
           programId: CLOAK_PROGRAM_ID,
-          relayUrl: "https://api.devnet.cloak.ag",
+          ...cloakDirectTransactOptions,
           signTransaction: wallet.signTransaction,
           ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
           depositorPublicKey: wallet.publicKey,
