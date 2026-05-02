@@ -17,6 +17,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       utxoMint,
       utxoLeafIndex,
       utxoCommitment,
+      utxoSiblingCommitment,
+      utxoLeftSiblingCommitment,
     } = body;
 
     const invoice = await prisma.stealthInvoice.update({
@@ -29,6 +31,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         utxoMint,
         utxoLeafIndex,
         utxoCommitment,
+        utxoSiblingCommitment,
+        utxoLeftSiblingCommitment,
       },
     });
 

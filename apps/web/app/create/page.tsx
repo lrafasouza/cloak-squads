@@ -22,6 +22,10 @@ const STEP_META = [
     subtitle: "Confirm the setup before signing and deploying on-chain.",
   },
 ];
+const FALLBACK_STEP_META = {
+  title: "Create vault",
+  subtitle: "Set up a private shared treasury.",
+};
 
 export default function CreateVaultPage() {
   const wallet = useWallet();
@@ -29,13 +33,20 @@ export default function CreateVaultPage() {
 
   const {
     state,
+    hasDraftToResume,
+    draft,
     setName,
     setDescription,
+    setAvatar,
     addMember,
     removeMember,
     updateMember,
     setThreshold,
     setOperator,
+    setCreatedMultisig,
+    setBootstrapIndex,
+    resumeDraft,
+    discardDraft,
     next,
     back,
   } = useWizardStore(myPubkey);
@@ -46,16 +57,42 @@ export default function CreateVaultPage() {
     }
   }, [myPubkey, state.operator, setOperator]);
 
-  const meta = STEP_META[state.step]!;
+  const meta = STEP_META[state.step] ?? FALLBACK_STEP_META;
 
   return (
     <WizardLayout step={state.step} title={meta.title} subtitle={meta.subtitle}>
+      {hasDraftToResume && draft ? (
+        <div className="mb-5 rounded-xl border border-accent/30 bg-accent-soft/40 p-4">
+          <p className="text-sm font-semibold text-ink">Resume previous draft?</p>
+          <p className="mt-1 text-xs text-ink-muted">
+            {draft.name || "Untitled vault"} has saved setup progress on this browser.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={resumeDraft}
+              className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
+            >
+              Resume
+            </button>
+            <button
+              type="button"
+              onClick={discardDraft}
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-ink-muted transition-colors hover:border-border-strong hover:text-ink"
+            >
+              Start fresh
+            </button>
+          </div>
+        </div>
+      ) : null}
       {state.step === 0 && (
         <Step1Details
           name={state.name}
           description={state.description}
+          avatarDataUrl={state.avatarDataUrl}
           onName={setName}
           onDescription={setDescription}
+          onAvatar={setAvatar}
           onNext={next}
         />
       )}
@@ -80,6 +117,12 @@ export default function CreateVaultPage() {
           members={state.members}
           threshold={state.threshold}
           operator={state.operator}
+          avatarDataUrl={state.avatarDataUrl}
+          createKeySecret={state.createKeySecret}
+          createdMultisig={state.createdMultisig}
+          bootstrapIndex={state.bootstrapIndex}
+          onCreatedMultisig={setCreatedMultisig}
+          onBootstrapIndex={setBootstrapIndex}
           onBack={back}
         />
       )}

@@ -2,10 +2,14 @@
 
 import { VaultSelector } from "@/components/app/VaultSelector";
 import { Logo } from "@/components/brand/Logo";
+import { Spinner } from "@/components/ui/skeleton";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
-import { WalletGuard } from "@/components/wallet/WalletGuard";
+import { isProposalPendingStatus } from "@/lib/proposals";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
+import { useVaultData } from "@/lib/use-vault-data";
 import { cn } from "@/lib/utils";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import {
   BookOpen,
   FileText,
@@ -17,12 +21,15 @@ import {
   Send,
   Settings,
   Shield,
+  ShieldAlert,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { AutoCloseIndicator } from "@/components/ui/auto-close-indicator";
 import { type OperatorInboxItem, OperatorInboxSheet } from "./OperatorInboxSheet";
 
 /* ── Nav structure ── */
@@ -193,15 +200,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const multisig = params?.multisig ?? "";
   const base = `/vault/${multisig}`;
+  const { publicKey } = useWallet();
+  const { data: vault, isLoading: vaultLoading } = useVaultData(multisig);
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [vaultName, setVaultName] = useState<string | undefined>();
-
   const { data: proposals = [], isLoading: proposalsLoading } = useProposalSummaries(multisig);
+
+  const pendingProposals = useMemo(
+    () => proposals.filter((proposal) => isProposalPendingStatus(proposal.status)),
+    [proposals],
+  );
+
   const inboxItems = useMemo(
     () =>
-      proposals
-        .filter((p) => p.hasDraft && p.status === "executed")
+      pendingProposals
+        .filter((p) => p.hasDraft)
         .map(
           (p): OperatorInboxItem => ({
             id: p.id,
@@ -213,10 +227,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             status: "pending",
           }),
         ),
-    [proposals],
+    [pendingProposals],
   );
 
   const [inboxOpen, setInboxOpen] = useState(false);
+  const executedCount = proposals.filter((proposal) => proposal.status === "executed").length;
+
+  /* Auto-close mobile nav after 10 seconds */
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const timer = setTimeout(() => {
+      setMobileNavOpen(false);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [mobileNavOpen]);
 
   useEffect(() => {
     if (!multisig) {
@@ -241,6 +265,80 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [multisig]);
 
+  useEffect(() => {
+    if (!multisig || executedCount === 0) return;
+    const key = `aegis:executed-count:${multisig}`;
+    const previous = Number(localStorage.getItem(key) ?? "0");
+    if (previous > 0 && executedCount > previous) {
+      // eslint-disable-next-line no-console
+      console.info(
+        `${executedCount - previous} signed proposal${
+          executedCount - previous === 1 ? " was" : "s were"
+        } executed by another member.`,
+      );
+    }
+    localStorage.setItem(key, String(executedCount));
+  }, [multisig, executedCount]);
+
+  /* ── Membership gate state (computed after all hooks) ── */
+  const walletAddress = publicKey?.toBase58();
+  const isBlocked =
+    !!multisig &&
+    (vaultLoading || !vault || !walletAddress || !vault.members.includes(walletAddress));
+
+  if (isBlocked) {
+    if (vaultLoading) {
+      return (
+        <div className="flex h-screen w-screen items-center justify-center bg-bg">
+          <Spinner className="h-8 w-8 text-ink-subtle" />
+        </div>
+      );
+    }
+    if (!vault) {
+      return (
+        <div className="flex h-screen w-screen flex-col items-center justify-center gap-5 bg-bg px-4 text-center">
+          <ShieldAlert className="h-10 w-10 text-signal-danger" />
+          <h2 className="text-lg font-semibold text-ink">Unable to verify access</h2>
+          <p className="max-w-xs text-sm text-ink-muted">
+            Could not load vault membership. Please check your connection and try again.
+          </p>
+        </div>
+      );
+    }
+    if (!walletAddress) {
+      return (
+        <div className="flex h-screen w-screen flex-col items-center justify-center gap-5 bg-bg px-4 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-border bg-surface shadow-raise-1">
+            <Wallet className="h-7 w-7 text-accent" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-ink">Connect your wallet</h2>
+            <p className="mt-1 max-w-xs text-sm text-ink-muted">
+              You need to connect a wallet to access this vault.
+            </p>
+          </div>
+          <div className="wallet-adapter-button-wrapper">
+            <WalletMultiButton />
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="flex h-screen w-screen flex-col items-center justify-center gap-5 bg-bg px-4 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-border bg-surface shadow-raise-1">
+          <ShieldAlert className="h-7 w-7 text-signal-danger" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-ink">Wallet not authorized</h2>
+          <p className="mt-1 max-w-xs text-sm text-ink-muted">
+            The connected wallet is not a member of this vault. Switch to a member wallet to
+            continue.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-bg">
       {/* Desktop sidebar */}
@@ -250,7 +348,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           vaultName={vaultName}
           pathname={pathname}
           base={base}
-          inboxCount={inboxItems.length}
+          inboxCount={pendingProposals.length}
         />
       </aside>
 
@@ -281,7 +379,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </header>
 
-        {/* Desktop topbar — just inbox */}
+        {/* Desktop topbar */}
         <header className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-3 border-b border-border bg-bg/90 px-6 backdrop-blur-xl md:flex">
           <OperatorInboxButton
             count={inboxItems.length}
@@ -292,9 +390,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto">
-          <WalletGuard>{children}</WalletGuard>
-        </main>
+        <main className="flex-1 overflow-auto">{children}</main>
       </div>
 
       {/* Mobile nav drawer */}
@@ -307,7 +403,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileNavOpen(false)}
           />
           <aside className="absolute left-0 top-0 h-full w-64 border-r border-border bg-surface shadow-raise-2">
-            <div className="absolute right-3 top-3">
+            <div className="absolute right-3 top-3 flex items-center gap-2">
+              <AutoCloseIndicator
+                durationMs={10000}
+                onComplete={() => setMobileNavOpen(false)}
+                paused={!mobileNavOpen}
+              />
               <button
                 type="button"
                 className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-surface-2"
@@ -322,7 +423,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               vaultName={vaultName}
               pathname={pathname}
               base={base}
-              inboxCount={inboxItems.length}
+              inboxCount={pendingProposals.length}
               onClose={() => setMobileNavOpen(false)}
             />
           </aside>

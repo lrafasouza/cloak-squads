@@ -7,6 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
+import {
+  InlineAlert,
+  Panel,
+  PanelBody,
+  PanelHeader,
+  WorkspaceHeader,
+  WorkspacePage,
+} from "@/components/ui/workspace";
+import { BookOpen, CheckCircle2, Copy, Link2 } from "lucide-react";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
@@ -25,7 +34,8 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, use, useMemo, useState } from "react";
+import QRCode from "qrcode";
+import { type FormEvent, use, useEffect, useMemo, useState } from "react";
 
 function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
@@ -59,6 +69,8 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   const [pending, setPending] = useState(false);
   const [proofStep, setProofStep] = useState<ProofStepId | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmChecked, setConfirmChecked] = useState(false);
+  const [claimQrDataUrl, setClaimQrDataUrl] = useState<string | null>(null);
   const [result, setResult] = useState<{
     claimUrl: string;
     transactionIndex: string;
@@ -79,6 +91,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
 
   async function executeCreate() {
     setShowConfirm(false);
+    setConfirmChecked(false);
     setError(null);
     setResult(null);
     setPending(true);
@@ -281,10 +294,33 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
     addToast("Claim link copied!", "success");
   };
 
+  useEffect(() => {
+    if (!result || typeof window === "undefined") {
+      setClaimQrDataUrl(null);
+      return;
+    }
+    const fullClaimUrl = `${window.location.origin}${result.claimUrl}`;
+    let cancelled = false;
+    void QRCode.toDataURL(fullClaimUrl, {
+      errorCorrectionLevel: "M",
+      margin: 2,
+      width: 180,
+      color: {
+        dark: "#0A0A0B",
+        light: "#FFFFFF",
+      },
+    }).then((dataUrl) => {
+      if (!cancelled) setClaimQrDataUrl(dataUrl);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [result]);
+
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Link href="/" className="text-sm text-accent hover:text-accent transition-colors">
+        <Link href="/" className="text-sm text-accent transition-colors hover:text-accent-hover">
           Back to picker
         </Link>
         <h1 className="mt-6 text-2xl font-semibold text-ink">Invalid multisig address</h1>
@@ -296,200 +332,175 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   if (result) {
     const fullClaimUrl = `${typeof window !== "undefined" ? window.location.origin : ""}${result.claimUrl}`;
     return (
-      <main className="min-h-screen">
-        <section className="mx-auto max-w-xl px-4 py-12 md:px-6">
-          <div className="rounded-xl border border-accent/20 bg-accent-soft p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <svg
-                aria-hidden="true"
-                className="h-6 w-6 text-accent"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-              <h1 className="text-lg font-semibold text-accent">Invoice created</h1>
-            </div>
+      <WorkspacePage>
+        <WorkspaceHeader
+          eyebrow="STEALTH INVOICE"
+          title="Invoice sealed"
+          description="Share the claim link before continuing — the recipient needs it after the proposal is executed."
+        />
 
-            <div className="grid gap-4">
-              <div className="rounded-lg bg-accent-soft p-4">
-                <p className="text-xs font-medium text-accent mb-1">
-                  Claim link — send to recipient
-                </p>
-                <p className="break-all font-mono text-xs text-accent leading-relaxed">
+        <div>
+          <Panel>
+            <PanelHeader
+              icon={CheckCircle2}
+              title={`Claim link ready · Proposal #${result.transactionIndex}`}
+            />
+            <PanelBody className="space-y-4">
+              {claimQrDataUrl ? (
+                <div className="flex justify-center">
+                  <img
+                    src={claimQrDataUrl}
+                    alt="Claim link QR code"
+                    className="h-[180px] w-[180px] rounded-md border border-border bg-white p-2"
+                  />
+                </div>
+              ) : null}
+              <div className="rounded-md border border-accent/20 bg-accent-soft px-3 py-2">
+                <p className="break-all font-mono text-xs leading-relaxed text-accent">
                   {fullClaimUrl}
                 </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={handleCopyClaimUrl}
-                >
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button type="button" variant="outline" onClick={handleCopyClaimUrl}>
+                  <Copy className="mr-2 h-4 w-4" />
                   Copy claim link
                 </Button>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    router.push(`/vault/${multisig}/proposals/${result.transactionIndex}`)
+                  }
+                >
+                  <Link2 className="mr-2 h-4 w-4" />
+                  Go to proposal #{result.transactionIndex}
+                </Button>
               </div>
-
-              <p className="text-sm text-ink-muted">
-                Copy the claim link before continuing. The recipient needs it to withdraw funds
-                after the proposal is executed.
-              </p>
-
-              <Button
-                type="button"
-                onClick={() => router.push(`/vault/${multisig}/proposals/${result.transactionIndex}`)}
-              >
-                Go to proposal #{result.transactionIndex} →
-              </Button>
-            </div>
-          </div>
-        </section>
-      </main>
+            </PanelBody>
+          </Panel>
+        </div>
+      </WorkspacePage>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-bg via-bg to-surface">
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
+    <WorkspacePage>
+      <div className="space-y-8">
+        <WorkspaceHeader
+          eyebrow="STEALTH INVOICE"
+          title="Create claim link"
+          description="Generate a private invoice and open a Squads proposal for signer approval."
+        />
+
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft px-4 py-1.5 mb-3">
-            <svg
-              aria-hidden="true"
-              className="h-4 w-4 text-accent"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            <span className="text-sm font-medium text-accent">F4 stealth invoice</span>
-          </div>
-          <h1 className="mt-2 text-3xl font-bold text-ink">Create payment request</h1>
-          <p className="mt-3 text-sm leading-relaxed text-ink-muted">
-            Creates a private invoice and a Squads proposal in one step. After approval and
-            execution, the recipient uses the claim link to withdraw funds privately.
-          </p>
-        </div>
-
-        <div className="grid gap-4">
-          <form
-            onSubmit={handleSubmit}
-            className="rounded-xl border border-border bg-surface/80 backdrop-blur-sm p-5 shadow-raise-1"
-          >
-            <div className="grid gap-4">
-              <div>
-                <Label htmlFor="invoiceRef">Invoice reference</Label>
-                <Input
-                  id="invoiceRef"
-                  type="text"
-                  autoComplete="off"
-                  value={invoiceRef}
-                  onChange={(e) => setInvoiceRef(e.target.value)}
-                  placeholder="Optional reference number"
-                  className="mt-1.5"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="memo">Memo</Label>
-                <Input
-                  id="memo"
-                  type="text"
-                  autoComplete="off"
-                  value={memo}
-                  onChange={(e) => setMemo(e.target.value)}
-                  placeholder="Optional description"
-                  className="mt-1.5"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="amount">Amount (SOL)</Label>
-                <Input
-                  id="amount"
-                  type="text"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.5"
-                  className="mt-1.5 font-mono"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="recipient">Recipient wallet</Label>
-                <Input
-                  id="recipient"
-                  type="text"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={recipientWallet}
-                  onChange={(e) => setRecipientWallet(e.target.value)}
-                  placeholder="Solana wallet address"
-                  className="mt-1.5 font-mono"
-                />
-              </div>
-
-              <Button
-                type="submit"
-                disabled={pending || !amount || !recipientWallet || !wallet.publicKey}
-                className="w-full"
-              >
-                {pending ? "Creating invoice..." : "Create invoice + proposal"}
-              </Button>
-
-              {!wallet.publicKey ? (
-                <p className="text-xs text-amber-300">Connect a multisig member wallet first.</p>
-              ) : null}
-            </div>
-
-            {error ? (
-              <div className="mt-4 flex items-center gap-2 rounded-lg border border-signal-danger/30 bg-signal-danger/15 px-4 py-3">
-                <svg
-                  aria-hidden="true"
-                  className="h-4 w-4 shrink-0 text-signal-danger"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          <Panel>
+            <PanelHeader
+              icon={BookOpen}
+              title="New invoice"
+              description="Set recipient, amount, and reference"
+            />
+            <PanelBody>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="invoiceRef">Invoice reference</Label>
+                  <Input
+                    id="invoiceRef"
+                    type="text"
+                    autoComplete="off"
+                    value={invoiceRef}
+                    onChange={(e) => setInvoiceRef(e.target.value)}
+                    placeholder="Optional reference number"
+                    className="mt-1.5"
                   />
-                </svg>
-                <p className="text-sm text-signal-danger">{error}</p>
-              </div>
-            ) : null}
-          </form>
+                </div>
 
-          <ProofGenerationState currentStep={proofStep} complete={false} error={error} />
+                <div>
+                  <Label htmlFor="memo">Memo</Label>
+                  <Input
+                    id="memo"
+                    type="text"
+                    autoComplete="off"
+                    value={memo}
+                    onChange={(e) => setMemo(e.target.value)}
+                    placeholder="Optional description"
+                    className="mt-1.5"
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-[160px_1fr]">
+                  <div>
+                    <Label htmlFor="amount">Amount (SOL)</Label>
+                    <Input
+                      id="amount"
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0.5"
+                      className="mt-1.5 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="recipient">Recipient wallet</Label>
+                    <Input
+                      id="recipient"
+                      type="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={recipientWallet}
+                      onChange={(e) => setRecipientWallet(e.target.value)}
+                      placeholder="Solana wallet address"
+                      className="mt-1.5 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <ProofGenerationState currentStep={proofStep} complete={false} error={error} />
+
+                <label className="flex items-start gap-2 text-sm text-ink-muted">
+                  <input
+                    type="checkbox"
+                    checked={confirmChecked}
+                    onChange={(e) => setConfirmChecked(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-border accent-accent"
+                  />
+                  I confirm the recipient and amount are correct before creating this invoice.
+                </label>
+
+                {!pending && (
+                  <Button
+                    type="submit"
+                    disabled={!confirmChecked || !amount || !recipientWallet || !wallet.publicKey}
+                    className="w-full"
+                  >
+                    Create invoice + proposal
+                  </Button>
+                )}
+
+                {!wallet.publicKey ? (
+                  <p className="text-xs text-signal-warn">
+                    Connect a multisig member wallet first.
+                  </p>
+                ) : null}
+
+                {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
+              </form>
+            </PanelBody>
+          </Panel>
         </div>
-      </section>
 
-      <ConfirmModal
-        open={showConfirm}
-        title="Create Invoice + Proposal"
-        description={`This will create a stealth invoice and a Squads proposal for ${amount} SOL. The proposal will require multisig approval before the operator can execute the private transfer.`}
-        confirmText="Create"
-        cancelText="Cancel"
-        onConfirm={executeCreate}
-        onCancel={() => setShowConfirm(false)}
-        isLoading={pending}
-      />
-    </main>
+        <ConfirmModal
+          open={showConfirm}
+          title="Create invoice"
+          description={`This creates a claim link and opens a proposal for ${amount} SOL.`}
+          confirmText="Create"
+          cancelText="Cancel"
+          onConfirm={executeCreate}
+          onCancel={() => setShowConfirm(false)}
+          isLoading={pending}
+        />
+      </div>
+    </WorkspacePage>
   );
 }

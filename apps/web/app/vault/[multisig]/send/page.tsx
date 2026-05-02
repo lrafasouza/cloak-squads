@@ -3,10 +3,19 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  InlineAlert,
+  Panel,
+  PanelBody,
+  PanelHeader,
+  WorkspaceHeader,
+  WorkspacePage,
+} from "@/components/ui/workspace";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
+import { ArrowLeft, Send } from "lucide-react";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
-import { createIssueLicenseProposal } from "@/lib/squads-sdk";
+import { createIssueLicenseProposal, createVaultProposal } from "@/lib/squads-sdk";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
@@ -19,7 +28,8 @@ import {
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
+import * as multisigSdk from "@sqds/multisig";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, use, useMemo, useState } from "react";
@@ -54,6 +64,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   const [sendMode, setSendMode] = useState<"private" | "public">("private");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmChecked, setConfirmChecked] = useState(false);
 
   const multisigAddress = useMemo(() => {
     try {
@@ -71,6 +82,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setConfirmChecked(false);
     setPending(true);
     startTransaction({
       title: "Creating private send proposal",
@@ -220,10 +232,68 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
     }
   }
 
+  async function handlePublicSend(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setConfirmChecked(false);
+    setPending(true);
+    startTransaction({
+      title: "Creating public send proposal",
+      description: "Opening a standard Squads vault transfer proposal.",
+      steps: [
+        { id: "validate", title: "Validate transfer", description: "Checking wallet and recipient." },
+        { id: "squads", title: "Create Squads proposal", description: "Your wallet signs the vault transaction." },
+      ],
+    });
+
+    try {
+      if (!wallet.publicKey || !multisigAddress || !wallet.sendTransaction) {
+        throw new Error("Connect a wallet and open a valid multisig.");
+      }
+
+      const recipientPubkey = new PublicKey(recipient);
+      const lamports = solAmountToLamports(amount);
+      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
+
+      updateStep("validate", { status: "success" });
+      updateStep("squads", { status: "running" });
+
+      const transferIx = SystemProgram.transfer({
+        fromPubkey: vaultPda,
+        toPubkey: recipientPubkey,
+        lamports,
+      });
+
+      const result = await createVaultProposal({
+        connection,
+        wallet,
+        multisigPda: multisigAddress,
+        instructions: [transferIx],
+        memo: memo || "Public send",
+      });
+
+      updateStep("squads", {
+        status: "success",
+        signature: result.signature,
+        description: `Proposal #${result.transactionIndex.toString()} created.`,
+      });
+      completeTransaction({
+        title: "Public send proposal ready",
+        description: `Proposal #${result.transactionIndex.toString()} is ready for signer approval.`,
+      });
+      router.push(`/vault/${multisig}/proposals/${result.transactionIndex.toString()}`);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Could not create proposal.";
+      setError(message);
+      failTransaction(message);
+      setPending(false);
+    }
+  }
+
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Link href="/" className="text-sm text-accent">
+        <Link href="/" className="text-sm text-accent transition-colors hover:text-accent-hover">
           Back to picker
         </Link>
         <h1 className="mt-6 text-2xl font-semibold text-ink">Invalid multisig address</h1>
@@ -232,11 +302,17 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   }
 
   return (
-    <main className="min-h-screen">
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
+    <WorkspacePage>
+      <div className="space-y-8">
+        <WorkspaceHeader
+          eyebrow="PRIVATE SEND"
+          title="Settle privately"
+          description="Create a sealed transfer through your Squads vault. The recipient address stays unlinkable on-chain."
+        />
+
         <div>
-          {/* Toggle */}
-          <div className="mb-4 inline-flex rounded-lg border border-border bg-surface p-1">
+          {/* Mode toggle */}
+          <div className="inline-flex rounded-lg border border-border bg-surface p-1">
             {(["private", "public"] as const).map((mode) => (
               <button
                 key={mode}
@@ -253,93 +329,111 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
             ))}
           </div>
 
-          <h1 className="text-3xl font-semibold text-ink">
-            {sendMode === "private" ? "Send SOL privately" : "Send SOL"}
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-ink-muted">
-            {sendMode === "private"
-              ? "Recipient sees an unlinkable note. Only your viewing key reveals the source. A Squads proposal will be created for signer approval. Once executed, the operator delivers SOL via the shielded pool."
-              : "Create a transparent transfer proposal. All signers see the recipient and amount on-chain."}
-          </p>
+          <Panel className="mt-4">
+            <PanelHeader
+              icon={Send}
+              title="Transfer details"
+              description={
+                sendMode === "private"
+                  ? "Funds are routed through the shielded pool — the recipient address stays unlinkable on-chain."
+                  : "Public send creates a standard Squads vault transfer visible to all signers on-chain."
+              }
+            />
+            <PanelBody>
+              <form onSubmit={sendMode === "private" ? handleSubmit : handlePublicSend} className="space-y-4">
+                <div>
+                  <Label htmlFor="recipient">Recipient</Label>
+                  <Input
+                    id="recipient"
+                    type="text"
+                    placeholder="Solana wallet address"
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}
+                    className="mt-1.5 font-mono"
+                    required
+                    disabled={pending}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="amount">Amount (SOL)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.000000001"
+                    min="0.000000001"
+                    placeholder="0.1"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="mt-1.5 font-mono"
+                    required
+                    disabled={pending}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="memo">Memo (optional)</Label>
+                  <Input
+                    id="memo"
+                    type="text"
+                    placeholder="Internal reference"
+                    value={memo}
+                    onChange={(e) => setMemo(e.target.value)}
+                    className="mt-1.5"
+                    disabled={pending}
+                  />
+                </div>
+
+                {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
+
+                {sendMode === "public" && (
+                  <InlineAlert tone="info">
+                    Creates a standard Squads vault transfer. The recipient and amount will be visible on-chain.
+                  </InlineAlert>
+                )}
+
+                <label className="flex items-start gap-2 text-sm text-ink-muted">
+                  <input
+                    type="checkbox"
+                    checked={confirmChecked}
+                    onChange={(e) => setConfirmChecked(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-border accent-accent"
+                  />
+                  I confirm the recipient and amount are correct before creating this proposal.
+                </label>
+
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Link
+                    href={`/vault/${multisig}`}
+                    className="inline-flex shrink-0 items-center justify-center rounded-md border border-border-strong bg-transparent px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back
+                  </Link>
+                  {!pending && (
+                    <Button
+                      type="submit"
+                      disabled={!confirmChecked || !wallet.publicKey}
+                      className="w-full sm:w-auto"
+                    >
+                      {sendMode === "private"
+                        ? "Create private send"
+                        : "Create public send"}
+                    </Button>
+                  )}
+                </div>
+
+                {!wallet.publicKey ? (
+                  <p className="text-xs text-signal-warn">
+                    Connect a wallet to create a proposal.
+                  </p>
+                ) : null}
+              </form>
+            </PanelBody>
+          </Panel>
         </div>
 
-        <form onSubmit={handleSubmit} className="grid gap-4">
-          <div className="rounded-lg border border-border bg-surface p-4 md:p-5">
-            <div className="grid gap-4">
-              <div>
-                <Label htmlFor="recipient">Recipient</Label>
-                <Input
-                  id="recipient"
-                  type="text"
-                  placeholder="Solana wallet address"
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  className="mt-1 font-mono"
-                  required
-                  disabled={pending}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="amount">Amount (SOL)</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  step="0.000000001"
-                  min="0.000000001"
-                  placeholder="0.1"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="mt-1 font-mono"
-                  required
-                  disabled={pending}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="memo">Memo (optional)</Label>
-                <Input
-                  id="memo"
-                  type="text"
-                  placeholder="Internal reference"
-                  value={memo}
-                  onChange={(e) => setMemo(e.target.value)}
-                  className="mt-1"
-                  disabled={pending}
-                />
-              </div>
-
-              {error ? (
-                <p className="rounded-md border border-red-900 bg-red-950 p-3 text-sm text-red-200">
-                  {error}
-                </p>
-              ) : null}
-
-              {sendMode === "public" && (
-                <div className="rounded-md border border-border bg-surface-2 p-3 text-sm text-ink-muted">
-                  Public send creates a standard Squads vault transfer. This feature is being wired to the on-chain vault transaction API.
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                <Link
-                  href={`/vault/${multisig}`}
-                  className="inline-flex items-center justify-center rounded-md border border-border-strong bg-transparent px-4 py-2 text-sm font-medium text-ink hover:bg-surface-2"
-                >
-                  Back
-                </Link>
-                <Button type="submit" disabled={pending || !wallet.publicKey || sendMode === "public"}>
-                  {pending ? "Creating proposal..." : sendMode === "private" ? "Create private send" : "Create public send"}
-                </Button>
-              </div>
-
-              {!wallet.publicKey ? (
-                <p className="text-xs text-amber-300">Connect a wallet to create a proposal.</p>
-              ) : null}
-            </div>
-          </div>
-        </form>
-      </section>
-    </main>
+      </div>
+    </WorkspacePage>
   );
 }

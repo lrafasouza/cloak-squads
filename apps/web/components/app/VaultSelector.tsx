@@ -4,7 +4,7 @@ import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import { truncateAddress } from "@/lib/proposals";
 import { cn } from "@/lib/utils";
 import { PublicKey } from "@solana/web3.js";
-import { Check, ChevronsUpDown, LogOut, Plus, Search } from "lucide-react";
+import { Check, ChevronsUpDown, Download, LogOut, Plus, Search, Settings } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -214,6 +214,26 @@ export function VaultSelector({ multisig, name, className }: VaultSelectorProps)
                 <Plus className="h-3.5 w-3.5 text-accent" />
               </div>
               <span>Create new vault</span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => inputRef.current?.focus()}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+            >
+              <div className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface">
+                <Download className="h-3.5 w-3.5" />
+              </div>
+              <span>Import existing vault</span>
+            </button>
+            <Link
+              href={`/vault/${multisig}/settings`}
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+            >
+              <div className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface">
+                <Settings className="h-3.5 w-3.5" />
+              </div>
+              <span>Manage vaults</span>
             </Link>
           </div>
         </div>

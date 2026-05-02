@@ -13,6 +13,7 @@ const serverEnvSchema = z.object({
   DATABASE_URL: z.string().min(1),
   JWT_SIGNING_SECRET: z.string().min(16),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
+  FALLBACK_RPC_URL: z.string().url().optional(),
 });
 
 export const publicEnv = publicEnvSchema.parse({
@@ -29,6 +30,7 @@ export function getServerEnv() {
     DATABASE_URL: process.env.DATABASE_URL,
     JWT_SIGNING_SECRET: process.env.JWT_SIGNING_SECRET,
     LOG_LEVEL: process.env.LOG_LEVEL,
+    FALLBACK_RPC_URL: process.env.FALLBACK_RPC_URL,
   });
 }
 

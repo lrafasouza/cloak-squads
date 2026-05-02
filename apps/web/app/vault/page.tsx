@@ -1,12 +1,13 @@
 "use client";
 
+import { ImportVaultsModal } from "@/components/app/ImportVaultsModal";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast-provider";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { LogIn, Plus } from "lucide-react";
+import { Download, LogIn, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -36,6 +37,7 @@ export default function VaultPage() {
   const [multisigInput, setMultisigInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   function onOpenMultisig(e: React.FormEvent) {
     e.preventDefault();
@@ -75,9 +77,9 @@ export default function VaultPage() {
           </p>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-2 md:items-start">
+        <div className="grid gap-8 md:grid-cols-2 md:items-stretch">
           {/* Open existing vault */}
-          <div className="rounded-xl border border-border bg-surface/80 p-6 shadow-raise-1 backdrop-blur-sm">
+          <div className="flex flex-col rounded-xl border border-border bg-surface/80 p-6 shadow-raise-1 backdrop-blur-sm">
             <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft">
               <LogIn className="h-5 w-5 text-accent" />
             </div>
@@ -112,6 +114,17 @@ export default function VaultPage() {
               </Button>
             </form>
 
+            {wallet.connected && (
+              <button
+                type="button"
+                onClick={() => setImportOpen(true)}
+                className="mt-4 flex items-center gap-2 text-xs text-ink-muted transition-colors hover:text-ink"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Find my Squads vaults
+              </button>
+            )}
+
             {!wallet.connected && (
               <p className="mt-4 text-xs text-ink-subtle">
                 You&apos;ll need a Solana wallet to interact with Aegis.
@@ -120,7 +133,7 @@ export default function VaultPage() {
           </div>
 
           {/* Create new vault */}
-          <div className="rounded-xl border border-border bg-surface/80 p-6 shadow-raise-1 backdrop-blur-sm">
+          <div className="flex flex-col rounded-xl border border-border bg-surface/80 p-6 shadow-raise-1 backdrop-blur-sm">
             <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft">
               <Plus className="h-5 w-5 text-accent" />
             </div>
@@ -129,17 +142,21 @@ export default function VaultPage() {
               Set up a new Aegis vault with a step-by-step wizard. Configure members, threshold,
               and privacy settings.
             </p>
-            <Button
-              onClick={() => router.push("/create")}
-              size="lg"
-              className="mt-6 w-full"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Create Vault
-            </Button>
+            <div className="mt-auto pt-6">
+              <Button
+                onClick={() => router.push("/create")}
+                size="lg"
+                className="w-full"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create Vault
+              </Button>
+            </div>
           </div>
         </div>
       </main>
+
+      <ImportVaultsModal open={importOpen} onOpenChange={setImportOpen} />
     </div>
   );
 }

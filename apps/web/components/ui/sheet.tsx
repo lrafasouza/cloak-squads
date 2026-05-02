@@ -2,8 +2,9 @@
 
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
-import { type HTMLAttributes, type ReactNode, createContext, useContext, useState } from "react";
+import { type HTMLAttributes, type ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { Drawer } from "vaul";
+import { AutoCloseIndicator } from "./auto-close-indicator";
 
 interface SheetContextValue {
   open: boolean;
@@ -65,12 +66,28 @@ export function SheetContent({
   className,
   children,
   side = "right",
+  autoClose = true,
 }: {
   className?: string;
   children: ReactNode;
   side?: "right" | "bottom";
+  autoClose?: boolean;
 }) {
-  const { setOpen } = useSheet();
+  const { open, setOpen } = useSheet();
+  const [autoCloseKey, setAutoCloseKey] = useState(0);
+
+  /* Auto-close after 10 seconds (opt-out with autoClose={false}) */
+  useEffect(() => {
+    if (!autoClose) return;
+    if (!open) {
+      setAutoCloseKey((k) => k + 1);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setOpen(false);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [open, setOpen, autoClose]);
 
   const sideClasses = {
     right: "inset-y-0 right-0 h-full w-full max-w-[480px] border-l border-border",
@@ -90,14 +107,24 @@ export function SheetContent({
         {side === "bottom" && <div className="mx-auto mt-4 h-1.5 w-12 rounded-full bg-border-strong" />}
         <div className="flex items-center justify-between p-5">
           <div />
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {autoClose && (
+              <AutoCloseIndicator
+                key={autoCloseKey}
+                durationMs={10000}
+                onComplete={() => setOpen(false)}
+                paused={!open}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-5">
           {children}
@@ -113,7 +140,11 @@ export function SheetHeader({ className, ...props }: HTMLAttributes<HTMLDivEleme
 }
 
 export function SheetTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 className={cn("font-display text-lg font-semibold text-ink", className)} {...props} />;
+  return (
+    <Drawer.Title asChild>
+      <h2 className={cn("font-display text-lg font-semibold text-ink", className)} {...props} />
+    </Drawer.Title>
+  );
 }
 
 export function SheetDescription({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {

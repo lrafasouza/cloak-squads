@@ -37,6 +37,41 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Invalid claimedBy address." }, { status: 400 });
     }
 
+    if (claimedBy !== auth.publicKey) {
+      return NextResponse.json(
+        { error: "claimedBy must match the authenticated wallet." },
+        { status: 403 },
+      );
+    }
+
+    const existing = await prisma.stealthInvoice.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
+    }
+
+    if (existing.recipientWallet !== auth.publicKey) {
+      return NextResponse.json(
+        { error: "Connected wallet is not the invoice recipient." },
+        { status: 403 },
+      );
+    }
+
+    if (
+      !existing.utxoAmount ||
+      !existing.utxoPrivateKey ||
+      !existing.utxoBlinding ||
+      !existing.utxoMint ||
+      !existing.utxoCommitment
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Invoice UTXO data is missing. The invoice cannot be marked claimed before it is funded on-chain.",
+        },
+        { status: 409 },
+      );
+    }
+
     const invoice = await prisma.stealthInvoice.update({
       where: { id },
       data: { status: "claimed", claimedAt: new Date(), claimedBy },

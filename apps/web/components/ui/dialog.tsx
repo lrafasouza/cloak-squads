@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { type HTMLAttributes, type ReactNode, createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { AutoCloseIndicator } from "./auto-close-indicator";
 
 interface DialogContextValue {
   open: boolean;
@@ -66,18 +67,34 @@ export function DialogContent({
   className,
   children,
   size = "md",
+  autoClose = true,
 }: {
   className?: string;
   children: ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
+  autoClose?: boolean;
 }) {
   const { open, setOpen, dialogId } = useDialog();
   const contentRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
+  const [autoCloseKey, setAutoCloseKey] = useState(0);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  /* Auto-close after 10 seconds (opt-out with autoClose={false}) */
+  useEffect(() => {
+    if (!autoClose) return;
+    if (!open) {
+      setAutoCloseKey((k) => k + 1);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setOpen(false);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [open, setOpen, autoClose]);
 
   /* ESC */
   useEffect(() => {
@@ -107,23 +124,22 @@ export function DialogContent({
   const node = (
     <AnimatePresence>
       {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-bg/80 backdrop-blur-md"
-            onPointerDown={onPointerDown}
-            aria-hidden="true"
-          />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-md p-4"
+          onPointerDown={onPointerDown}
+          aria-hidden="true"
+        >
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
             className={cn(
-              "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2",
+              "relative w-full",
               "rounded-xl border border-border bg-surface shadow-raise-2",
               sizes[size],
               className,
@@ -133,18 +149,29 @@ export function DialogContent({
             aria-modal="true"
             aria-labelledby={`${dialogId}-title`}
             aria-describedby={`${dialogId}-desc`}
+            onPointerDown={(e) => e.stopPropagation()}
           >
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="absolute right-4 top-4 flex items-center gap-2">
+              {autoClose && (
+                <AutoCloseIndicator
+                  key={autoCloseKey}
+                  durationMs={10000}
+                  onComplete={() => setOpen(false)}
+                  paused={!open}
+                />
+              )}
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
             {children}
           </motion.div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>
   );

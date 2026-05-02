@@ -22,7 +22,7 @@ export function useToast() {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [activeIds] = useState<Set<string>>(new Set());
 
-  const addToast = useCallback((message: string, type: ToastType, duration = 5000) => {
+  const addToast = useCallback((message: string, type: ToastType, duration = 10000) => {
     const id = `aegis-${Date.now().toString(36)}`;
     activeIds.add(id);
 

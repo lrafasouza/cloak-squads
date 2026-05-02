@@ -3,7 +3,19 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  InlineAlert,
+  Panel,
+  PanelBody,
+  PanelHeader,
+  WorkspaceHeader,
+  WorkspacePage,
+} from "@/components/ui/workspace";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
+import { ArrowLeft, CheckCircle2, FileText, PlayCircle, Upload } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { type ChangeEvent, type FormEvent, use, useCallback, useMemo, useState } from "react";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import {
   type PayrollRecipientInput,
@@ -23,9 +35,6 @@ import {
 } from "@cloak.dev/sdk-devnet";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { type ChangeEvent, type FormEvent, use, useMemo, useState } from "react";
 
 function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
@@ -52,6 +61,8 @@ type PayrollClaimLink = {
   wallet: string;
   claimUrl: string;
 };
+
+type UploadTab = "input" | "preview";
 
 type RecipientNote = {
   name: string;
@@ -94,7 +105,9 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   const [parsedNotes, setParsedNotes] = useState<RecipientNote[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [step, setStep] = useState<"upload" | "preview" | "created">("upload");
+  const [confirmChecked, setConfirmChecked] = useState(false);
+  const [dryRunStatus, setDryRunStatus] = useState<"idle" | "running" | "ready" | "error">("idle");
+  const [uploadTab, setUploadTab] = useState<UploadTab>("input");
   const [mode, setMode] = useState<PayrollMode>("direct");
   const [createdPayroll, setCreatedPayroll] = useState<{
     transactionIndex: string;
@@ -113,6 +126,27 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     return recipients.reduce((sum, r) => sum + BigInt(r.amount), 0n);
   }, [recipients]);
 
+  const duplicateWallets = useMemo(() => {
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const recipient of recipients) {
+      if (seen.has(recipient.wallet)) duplicates.add(recipient.wallet);
+      seen.add(recipient.wallet);
+    }
+    return duplicates;
+  }, [recipients]);
+
+  const dryRunRows = useMemo(
+    () =>
+      recipients.map((recipient, index) => ({
+        ...recipient,
+        index,
+        duplicate: duplicateWallets.has(recipient.wallet),
+        estimatedCommitment: true,
+      })),
+    [duplicateWallets, recipients],
+  );
+
   function handleCsvChange(event: ChangeEvent<HTMLTextAreaElement>) {
     const text = event.target.value;
     setCsvText(text);
@@ -120,7 +154,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     setRecipients([]);
     setParsedNotes([]);
     setCreatedPayroll(null);
-    setStep("upload");
+    setUploadTab("input");
+    setDryRunStatus("idle");
 
     if (!text.trim()) return;
 
@@ -131,6 +166,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     }
     if (data) {
       setRecipients(data);
+      setDryRunStatus("idle");
       if (errors.length > 0) {
         setError(errors.join("\n"));
       }
@@ -150,11 +186,16 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     reader.readAsText(file);
   }
 
-  async function buildNotes() {
+  const buildNotes = useCallback(async () => {
     if (!multisigAddress) return;
     setError(null);
     setPending(true);
-    setStep("preview");
+    setDryRunStatus("running");
+
+    // Yield once so the running state paints before the expensive note build starts.
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
 
     try {
       const notes: RecipientNote[] = [];
@@ -212,17 +253,19 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         });
       }
       setParsedNotes(notes);
+      setDryRunStatus("ready");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not build notes.");
-      setStep("upload");
+      setDryRunStatus("error");
     } finally {
       setPending(false);
     }
-  }
+  }, [multisigAddress, recipients]);
 
   async function submitPayroll(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setConfirmChecked(false);
     setPending(true);
     startTransaction({
       title: "Creating payroll proposal",
@@ -407,7 +450,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
           /* sessionStorage full or unavailable */
         }
         setCreatedPayroll({ transactionIndex, claimLinks });
-        setStep("created");
         setPending(false);
       } else {
         router.push(`/vault/${multisig}/proposals/${transactionIndex}`);
@@ -424,7 +466,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Link href="/" className="text-sm text-accent">
+        <Link href="/" className="text-sm text-accent transition-colors hover:text-accent-hover">
           Back to picker
         </Link>
         <h1 className="mt-6 text-2xl font-semibold text-ink">Invalid multisig address</h1>
@@ -432,261 +474,378 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     );
   }
 
-  return (
-    <main className="min-h-screen">
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
-        <div>
-          <p className="text-sm font-medium text-accent">Payroll</p>
-          <h1 className="mt-2 text-3xl font-semibold text-ink">Batch private send</h1>
-          <p className="mt-3 text-sm leading-6 text-neutral-300">
-            Upload a CSV with recipient names, wallet addresses, and amounts. One Squads proposal
-            will contain all {recipients.length > 0 && `(${recipients.length}) `}private transfer
-            instructions for signer approval.
-          </p>
-          <p className="mt-3 text-xs text-ink-muted">Max 10 recipients per batch in V1.</p>
-        </div>
+  // Success state — show claim links card
+  if (createdPayroll) {
+    return (
+      <WorkspacePage>
+        <WorkspaceHeader
+          eyebrow="PAYROLL"
+          title="Claim links ready"
+          description="Share each link with the matching recipient. These secret links are only shown in this browser session."
+          action={
+            <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
+              Max 10
+            </span>
+          }
+        />
 
-        <div className="grid gap-4">
-          {step === "upload" && (
-            <div className="grid gap-4">
-              <div className="rounded-lg border border-border bg-surface p-4 md:p-5">
-                <div className="grid gap-4">
-                  <div>
-                    <Label htmlFor="csv-file">Upload CSV file</Label>
-                    <Input
-                      id="csv-file"
-                      type="file"
-                      accept=".csv,text/csv"
-                      onChange={handleFileUpload}
-                      className="mt-1"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="csv-text">Or paste CSV content</Label>
-                    <textarea
-                      id="csv-text"
-                      value={csvText}
-                      onChange={handleCsvChange}
-                      placeholder={formatPayrollCsvTemplate()}
-                      rows={6}
-                      className="mt-1 w-full rounded-md border border-border-strong bg-bg px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                    />
-                  </div>
-
-                  <fieldset className="grid gap-2">
-                    <legend className="text-sm font-medium text-ink">Delivery mode</legend>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <button
-                        type="button"
-                        onClick={() => setMode("direct")}
-                        aria-pressed={mode === "direct"}
-                        className={`min-h-16 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                          mode === "direct"
-                            ? "border-accent/20 bg-emerald-950 text-accent"
-                            : "border-border-strong bg-bg text-ink-muted hover:border-border-strong"
-                        }`}
-                      >
-                        <span className="font-semibold">Direct send</span>
-                        <span className="mt-0.5 block text-xs opacity-80">
-                          Funds arrive automatically. No claim needed.
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMode("invoice")}
-                        aria-pressed={mode === "invoice"}
-                        className={`min-h-16 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                          mode === "invoice"
-                            ? "border-accent/20 bg-emerald-950 text-accent"
-                            : "border-border-strong bg-bg text-ink-muted hover:border-border-strong"
-                        }`}
-                      >
-                        <span className="font-semibold">Invoice / Claim</span>
-                        <span className="mt-0.5 block text-xs opacity-80">
-                          Create one claim link per recipient.
-                        </span>
-                      </button>
-                    </div>
-                  </fieldset>
-
-                  {recipients.length > 0 && (
-                    <Button onClick={buildNotes} disabled={pending}>
-                      {pending
-                        ? "Preparing notes..."
-                        : `Preview ${recipients.length} recipient${recipients.length !== 1 ? "s" : ""}`}
-                    </Button>
-                  )}
-                </div>
-
-                {error ? (
-                  <pre className="mt-4 rounded-md border border-red-900 bg-red-950 p-3 text-xs text-red-200 whitespace-pre-wrap">
-                    {error}
-                  </pre>
-                ) : null}
-              </div>
-            </div>
-          )}
-
-          {step === "preview" && parsedNotes.length > 0 && (
-            <form onSubmit={submitPayroll} className="grid gap-4">
-              <div className="rounded-lg border border-border bg-surface p-4">
-                <h2 className="text-base font-semibold text-ink">Preview</h2>
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left">
-                        <th className="pb-2 pr-4 text-ink-muted">Name</th>
-                        <th className="pb-2 pr-4 text-ink-muted">Wallet</th>
-                        <th className="pb-2 pr-4 text-ink-muted text-right">Amount</th>
-                        <th className="pb-2 text-ink-muted">Memo</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-800">
-                      {parsedNotes.map((n) => (
-                        <tr key={n.name + n.wallet}>
-                          <td className="py-2 pr-4 text-ink">{n.name}</td>
-                          <td className="py-2 pr-4 font-mono text-xs text-neutral-300">
-                            {n.wallet.slice(0, 8)}...{n.wallet.slice(-8)}
-                          </td>
-                          <td className="py-2 pr-4 text-right font-mono text-ink">
-                            {lamportsToSol(n.amount)} SOL
-                          </td>
-                          <td className="py-2 text-ink-muted">{n.memo || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t border-border-strong font-semibold">
-                        <td colSpan={2} className="py-2 pr-4 text-ink">
-                          Total
-                        </td>
-                        <td className="py-2 pr-4 text-right font-mono text-accent">
-                          {lamportsToSol(totalAmount)} SOL
-                        </td>
-                        <td />
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between text-xs text-ink-muted">
-                  <span>Recipients: {parsedNotes.length}/10</span>
-                  <span>
-                    {mode === "invoice" ? "Delivery: claim links" : "Delivery: direct send"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setStep("upload");
-                    setParsedNotes([]);
-                  }}
-                  disabled={pending}
-                >
-                  Back
-                </Button>
-                <Button type="submit" disabled={pending}>
-                  {pending
-                    ? mode === "invoice"
-                      ? "Creating invoices..."
-                      : "Creating proposal..."
-                    : "Create payroll proposal"}
-                </Button>
-              </div>
-
-              {error ? (
-                <p className="rounded-md border border-red-900 bg-red-950 p-3 text-sm text-red-200">
-                  {error}
-                </p>
-              ) : null}
-            </form>
-          )}
-
-          {step === "created" && createdPayroll ? (
-            <div className="grid gap-4">
-              <div className="rounded-lg border border-border bg-surface p-4">
-                <h2 className="text-base font-semibold text-ink">Claim links created</h2>
-                <p className="mt-2 text-sm text-neutral-300">
-                  Share each link with the matching recipient. These secret links are only shown in
-                  this browser session.
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => {
-                    const lines = createdPayroll.claimLinks.map((link) => {
-                      const fullUrl =
-                        typeof window === "undefined"
-                          ? link.claimUrl
-                          : `${window.location.origin}${link.claimUrl}`;
-                      return `${link.name},${link.wallet},${fullUrl}`;
-                    });
-                    navigator.clipboard.writeText(["name,wallet,claim_url", ...lines].join("\n"));
-                  }}
-                >
-                  Copy all links
-                </Button>
-                <div className="mt-4 grid gap-3">
-                  {createdPayroll.claimLinks.map((link) => {
+        <Panel>
+          <PanelHeader
+            icon={CheckCircle2}
+            title={`Claim links created · Proposal #${createdPayroll.transactionIndex}`}
+          />
+          <PanelBody>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => {
+                  const lines = createdPayroll.claimLinks.map((link) => {
                     const fullUrl =
                       typeof window === "undefined"
                         ? link.claimUrl
                         : `${window.location.origin}${link.claimUrl}`;
-                    return (
-                      <div key={link.wallet} className="rounded-md border border-border bg-bg p-3">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-ink">{link.name}</p>
-                            <p className="font-mono text-xs text-ink-muted">
-                              {link.wallet.slice(0, 8)}...{link.wallet.slice(-8)}
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => navigator.clipboard.writeText(fullUrl)}
-                          >
-                            Copy link
-                          </Button>
-                        </div>
-                        <p className="mt-2 break-all font-mono text-xs text-ink-muted">{fullUrl}</p>
+                    return `${link.name},${link.wallet},${fullUrl}`;
+                  });
+                  navigator.clipboard.writeText(["name,wallet,claim_url", ...lines].join("\n"));
+                }}
+                className="inline-flex min-h-9 items-center rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+              >
+                Copy all links
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              {createdPayroll.claimLinks.map((link) => {
+                const fullUrl =
+                  typeof window === "undefined"
+                    ? link.claimUrl
+                    : `${window.location.origin}${link.claimUrl}`;
+                return (
+                  <div key={link.wallet} className="rounded-md border border-border bg-bg p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-ink">{link.name}</p>
+                        <p className="font-mono text-xs text-ink-muted">
+                          {link.wallet.slice(0, 8)}...{link.wallet.slice(-8)}
+                        </p>
                       </div>
-                    );
-                  })}
-                </div>
+                      <button
+                        type="button"
+                        onClick={() => navigator.clipboard.writeText(fullUrl)}
+                        className="inline-flex min-h-9 items-center rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+                      >
+                        Copy link
+                      </button>
+                    </div>
+                    <p className="mt-2 break-all font-mono text-xs text-ink-muted">{fullUrl}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href={`/vault/${multisig}/proposals/${createdPayroll.transactionIndex}`}
+                className="inline-flex min-h-11 items-center justify-center rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-raise-1 transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:scale-[0.98]"
+              >
+                View proposal
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreatedPayroll(null);
+                  setParsedNotes([]);
+                  setRecipients([]);
+                  setCsvText("");
+                  setUploadTab("input");
+                  setDryRunStatus("idle");
+                }}
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-border-strong px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-2"
+              >
+                Create another payroll
+              </button>
+            </div>
+          </PanelBody>
+        </Panel>
+      </WorkspacePage>
+    );
+  }
+
+  return (
+    <WorkspacePage>
+      <WorkspaceHeader
+        eyebrow="PAYROLL"
+        title="Batch private settle"
+        description="Upload CSV, build private notes, then submit for vault approval."
+        action={
+          <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
+            Max 10
+          </span>
+        }
+      />
+
+      <div className="space-y-6">
+        {/* Tab bar */}
+        <div className="flex items-center gap-0.5 border-b border-border pb-1">
+          <button
+            type="button"
+            onClick={() => setUploadTab("input")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              uploadTab === "input"
+                ? "bg-accent-soft text-accent"
+                : "text-ink-muted hover:bg-surface-2 hover:text-ink"
+            }`}
+          >
+            <Upload className="h-3.5 w-3.5" />
+            CSV Input
+          </button>
+        </div>
+
+        {/* CSV INPUT TAB */}
+        {uploadTab === "input" && (
+          <Panel>
+            <PanelHeader icon={Upload} title="Upload recipients" />
+            <PanelBody className="space-y-5">
+              <div>
+                <Label htmlFor="csv-file">Upload CSV file</Label>
+                <Input
+                  id="csv-file"
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleFileUpload}
+                  className="mt-1"
+                />
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href={`/vault/${multisig}/proposals/${createdPayroll.transactionIndex}`}
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-raise-1 shadow-accent/20 transition-all duration-200 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:scale-[0.98]"
-                >
-                  View proposal
-                </Link>
+              <div>
+                <Label htmlFor="csv-text">Or paste CSV content</Label>
+                <textarea
+                  id="csv-text"
+                  value={csvText}
+                  onChange={handleCsvChange}
+                  placeholder={formatPayrollCsvTemplate()}
+                  rows={6}
+                  className="mt-1 w-full rounded-md border border-border-strong bg-bg px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                />
+              </div>
+
+              {error && <InlineAlert tone="danger">{error}</InlineAlert>}
+
+              <div>
                 <Button
                   type="button"
-                  variant="outline"
+                  disabled={recipients.length === 0}
                   onClick={() => {
-                    setCreatedPayroll(null);
-                    setParsedNotes([]);
-                    setRecipients([]);
-                    setCsvText("");
-                    setStep("upload");
+                    setUploadTab("preview");
+                    setConfirmChecked(false);
+                    if (!pending && recipients.length > 0 && parsedNotes.length === 0) {
+                      void buildNotes();
+                    }
                   }}
                 >
-                  Create another payroll
+                  Next: Review →
                 </Button>
               </div>
-            </div>
-          ) : null}
-        </div>
-      </section>
-    </main>
+            </PanelBody>
+          </Panel>
+        )}
+
+        {/* REVIEW TAB */}
+        {uploadTab === "preview" && (
+          <Panel>
+            <PanelHeader icon={FileText} title="Review & build" />
+            <PanelBody>
+              <form onSubmit={submitPayroll} className="space-y-5">
+                {recipients.length === 0 && (
+                  <div className="py-12 text-center">
+                    <p className="text-sm text-ink-muted">No items yet</p>
+                  </div>
+                )}
+
+                {dryRunStatus === "running" && (
+                  <div className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-ink-muted">
+                    Preparing review…
+                  </div>
+                )}
+
+                {dryRunStatus === "ready" && parsedNotes.length > 0 && (
+                  <div className="rounded-md border border-signal-positive/20 bg-signal-positive/10 px-3 py-2 text-sm text-signal-positive">
+                    Review ready — all notes built.
+                  </div>
+                )}
+
+                {recipients.length > 0 && (
+                  <>
+                    {/* 3-stat row */}
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-md border border-border bg-bg px-3 py-2">
+                        <p className="text-xs text-ink-subtle">Recipients</p>
+                        <p className="mt-1 font-mono text-lg font-semibold text-ink">
+                          {recipients.length}/10
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-border bg-bg px-3 py-2">
+                        <p className="text-xs text-ink-subtle">Total</p>
+                        <p className="mt-1 font-mono text-lg font-semibold text-ink">
+                          {lamportsToSol(totalAmount)} SOL
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-border bg-bg px-3 py-2">
+                        <p className="text-xs text-ink-subtle">Commitments</p>
+                        <p className="mt-1 font-mono text-lg font-semibold text-ink">
+                          {recipients.length}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Delivery mode */}
+                    <fieldset className="grid gap-2">
+                      <legend className="text-sm font-medium text-ink">Delivery mode</legend>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={() => setMode("direct")}
+                          aria-pressed={mode === "direct"}
+                          className={`min-h-16 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                            mode === "direct"
+                              ? "border-accent/25 bg-accent-soft text-accent"
+                              : "border-border-strong bg-bg text-ink-muted hover:border-border-strong"
+                          }`}
+                        >
+                          <span className="font-semibold">Direct send</span>
+                          <span className="mt-0.5 block text-xs opacity-80">
+                            Funds arrive automatically. No claim needed.
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMode("invoice")}
+                          aria-pressed={mode === "invoice"}
+                          className={`min-h-16 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                            mode === "invoice"
+                              ? "border-accent/25 bg-accent-soft text-accent"
+                              : "border-border-strong bg-bg text-ink-muted hover:border-border-strong"
+                          }`}
+                        >
+                          <span className="font-semibold">Invoice / Claim</span>
+                          <span className="mt-0.5 block text-xs opacity-80">
+                            Create one claim link per recipient.
+                          </span>
+                        </button>
+                      </div>
+                    </fieldset>
+
+                    {/* Recipients table */}
+                    <div className="overflow-x-auto rounded-md border border-border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border bg-bg text-left">
+                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                              Row
+                            </th>
+                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                              Recipient
+                            </th>
+                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                              Wallet
+                            </th>
+                            <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                              Amount
+                            </th>
+                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                              Status
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/70">
+                          {dryRunRows.map((row) => (
+                            <tr key={`${row.wallet}-${row.index}`}>
+                              <td className="px-3 py-2 font-mono text-xs text-ink-subtle">
+                                {row.index + 1}
+                              </td>
+                              <td className="px-3 py-2 font-medium text-ink">{row.name}</td>
+                              <td className="px-3 py-2 font-mono text-xs text-ink-muted">
+                                {row.wallet.slice(0, 8)}...{row.wallet.slice(-8)}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono text-ink">
+                                {lamportsToSol(row.amount)} SOL
+                              </td>
+                              <td className="px-3 py-2">
+                                <span
+                                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                                    row.duplicate
+                                      ? "bg-signal-warn/10 text-signal-warn"
+                                      : "bg-accent-soft text-accent"
+                                  }`}
+                                >
+                                  {row.duplicate ? "Duplicate wallet" : "Ready"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Build notes button */}
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setUploadTab("input")}
+                        disabled={pending}
+                        className="inline-flex min-h-9 items-center rounded-md border border-border-strong px-3 py-1.5 text-sm font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-50"
+                      >
+                        <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void buildNotes()}
+                        disabled={pending || duplicateWallets.size > 0}
+                        className="inline-flex min-h-9 items-center gap-2 rounded-md bg-surface-2 px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <PlayCircle className="h-4 w-4" />
+                        {pending
+                          ? "Preparing notes..."
+                          : `Build ${recipients.length} private note${recipients.length !== 1 ? "s" : ""}`}
+                      </button>
+                    </div>
+
+                    <label className="flex items-start gap-2 text-sm text-ink-muted">
+                      <input
+                        type="checkbox"
+                        checked={confirmChecked}
+                        onChange={(e) => setConfirmChecked(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-border accent-accent"
+                      />
+                      I confirm the recipient list and amounts are correct before creating this payroll.
+                    </label>
+
+                    {/* Submit button */}
+                    {!pending && (
+                      <div className="flex gap-3">
+                        <Button
+                          type="submit"
+                          disabled={!confirmChecked || parsedNotes.length === 0}
+                        >
+                          Create payroll proposal
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Error display */}
+                {error && (
+                  <pre className="whitespace-pre-wrap rounded-md border border-signal-danger/30 bg-signal-danger/15 p-3 text-xs text-signal-danger">
+                    {error}
+                  </pre>
+                )}
+              </form>
+            </PanelBody>
+          </Panel>
+        )}
+      </div>
+    </WorkspacePage>
   );
 }

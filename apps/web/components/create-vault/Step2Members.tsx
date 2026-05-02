@@ -68,7 +68,7 @@ export function Step2Members({
   return (
     <div className="flex flex-col gap-4">
       {/* Members card */}
-      <div className="rounded-xl border border-border bg-surface p-5 shadow-raise-1">
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-raise-1 md:p-8">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ink">Members</h2>
           <span className="text-xs text-ink-subtle tabular-nums">{totalCount}/10</span>
@@ -150,7 +150,7 @@ export function Step2Members({
       </div>
 
       {/* Threshold card */}
-      <div className="rounded-xl border border-border bg-surface p-5 shadow-raise-1">
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-raise-1 md:p-8">
         <h2 className="mb-1 text-sm font-semibold text-ink">Approval threshold</h2>
         <p className="mb-4 text-xs text-ink-muted">
           How many members must approve a proposal for it to execute.
@@ -197,7 +197,7 @@ export function Step2Members({
       </div>
 
       {/* Operator card */}
-      <div className="rounded-xl border border-border bg-surface p-5 shadow-raise-1">
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-raise-1 md:p-8">
         <div className="mb-1 flex items-center gap-2">
           <Key className="h-4 w-4 text-accent" />
           <h2 className="text-sm font-semibold text-ink">Operator wallet</h2>

@@ -1,7 +1,7 @@
 "use client";
 
 import type { Connection, PublicKey } from "@solana/web3.js";
-import * as multisig from "@sqds/multisig";
+import * as squadsMultisig from "@sqds/multisig";
 
 export type ProposalStatusKind =
   | "draft"
@@ -30,6 +30,16 @@ export type ProposalSummary = {
   threshold?: number;
   hasDraft: boolean;
 };
+
+export function isProposalPendingStatus(status: ProposalStatusKind | undefined): boolean {
+  return (
+    status === undefined ||
+    status === "draft" ||
+    status === "active" ||
+    status === "approved" ||
+    status === "executing"
+  );
+}
 
 type ApiDraftSummary = {
   id: string;
@@ -98,7 +108,10 @@ export async function loadOnchainProposalSummaries(params: {
   limit?: number;
 }): Promise<ProposalSummary[]> {
   const { connection, multisigAddress, limit = 25 } = params;
-  const account = await multisig.accounts.Multisig.fromAccountAddress(connection, multisigAddress);
+  const account = await squadsMultisig.accounts.Multisig.fromAccountAddress(
+    connection,
+    multisigAddress,
+  );
   const latestIndex = BigInt(account.transactionIndex.toString());
   const threshold = Number(account.threshold);
   if (latestIndex === 0n) return [];
@@ -110,12 +123,9 @@ export async function loadOnchainProposalSummaries(params: {
 
   const proposals: Array<ProposalSummary | null> = await Promise.all(
     indexes.map(async (index) => {
-      const [proposalPda] = multisig.getProposalPda({
-        multisigPda: multisigAddress,
-        transactionIndex: index,
-      });
+      const proposalPda = getProposalPdaForIndex(multisigAddress, index);
       try {
-        const proposal = await multisig.accounts.Proposal.fromAccountAddress(
+        const proposal = await squadsMultisig.accounts.Proposal.fromAccountAddress(
           connection,
           proposalPda,
         );
@@ -139,6 +149,14 @@ export async function loadOnchainProposalSummaries(params: {
   );
 
   return proposals.filter((proposal): proposal is ProposalSummary => proposal !== null);
+}
+
+export function getProposalPdaForIndex(multisigAddress: PublicKey, transactionIndex: bigint) {
+  const [proposalPda] = squadsMultisig.getProposalPda({
+    multisigPda: multisigAddress,
+    transactionIndex,
+  });
+  return proposalPda;
 }
 
 export function mergeProposalSummaries(

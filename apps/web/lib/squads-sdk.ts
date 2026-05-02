@@ -22,13 +22,6 @@ function logError(...args: unknown[]) {
   if (IS_DEV) console.error(...args);
 }
 
-function throwTranslatedOnchainError(prefix: string, err: unknown, logs?: string[] | null): never {
-  const raw = logs?.length
-    ? `${prefix}: ${JSON.stringify(err)} | logs: ${logs.join(" || ")}`
-    : `${prefix}: ${err instanceof Error ? err.message : JSON.stringify(err)}`;
-  throw new Error(translateOnchainError(raw));
-}
-
 export type BrowserSquadsWallet = {
   publicKey: PublicKey | null;
   sendTransaction?: (
@@ -172,17 +165,12 @@ export async function createVaultProposal(params: {
   tx.feePayer = params.wallet.publicKey;
   tx.recentBlockhash = latestBlockhash.blockhash;
 
-  try {
-    const sim = await params.connection.simulateTransaction(tx, undefined, true);
-    log("[squads-sdk] simulate result:", sim);
-    if (sim.value.err) {
-      logError("[squads-sdk] simulate error:", sim.value.err);
-      logError("[squads-sdk] simulate logs:", sim.value.logs);
-      throwTranslatedOnchainError("Simulation failed", sim.value.err, sim.value.logs);
-    }
-  } catch (simErr) {
-    logError("[squads-sdk] simulate threw:", simErr);
-    throw new Error(translateOnchainError(simErr));
+  // Simulate first to surface real RPC errors before the wallet swallows them.
+  const simResult = await params.connection.simulateTransaction(tx, []);
+  if (simResult.value.err) {
+    const logs = simResult.value.logs?.join("\n") ?? "";
+    const raw = `${JSON.stringify(simResult.value.err)}\n${logs}`.trim();
+    throw new Error(translateOnchainError(raw));
   }
 
   let signature: string;
@@ -253,19 +241,6 @@ export async function createBatchIssueLicenseProposal(params: {
   const tx = new Transaction().add(createVaultIx, createProposalIx);
   tx.feePayer = params.wallet.publicKey;
   tx.recentBlockhash = latestBlockhash.blockhash;
-
-  try {
-    const sim = await params.connection.simulateTransaction(tx, undefined, true);
-    log("[squads-sdk] batch simulate result:", sim);
-    if (sim.value.err) {
-      logError("[squads-sdk] batch simulate error:", sim.value.err);
-      logError("[squads-sdk] batch simulate logs:", sim.value.logs);
-      throwTranslatedOnchainError("Batch simulation failed", sim.value.err, sim.value.logs);
-    }
-  } catch (simErr) {
-    logError("[squads-sdk] batch simulate threw:", simErr);
-    throw new Error(translateOnchainError(simErr));
-  }
 
   let signature: string;
   try {
@@ -432,20 +407,12 @@ export async function vaultTransactionExecute(params: {
   }).compileToV0Message(lookupTableAccounts);
   const versionedTx = new VersionedTransaction(message);
 
-  try {
-    const sim = await params.connection.simulateTransaction(versionedTx, {
-      sigVerify: false,
-      replaceRecentBlockhash: true,
-    });
-    log("[squads-sdk] execute simulate result:", sim);
-    if (sim.value.err) {
-      logError("[squads-sdk] execute simulate error:", sim.value.err);
-      logError("[squads-sdk] execute simulate logs:", sim.value.logs);
-      throwTranslatedOnchainError("Execute simulation failed", sim.value.err, sim.value.logs);
-    }
-  } catch (simErr) {
-    logError("[squads-sdk] execute simulate threw:", simErr);
-    throw new Error(translateOnchainError(simErr));
+  // Simulate first to surface real RPC errors — wallet adapters often swallow them.
+  const sim = await params.connection.simulateTransaction(versionedTx, { replaceRecentBlockhash: true });
+  if (sim.value.err) {
+    const logs = sim.value.logs?.join("\n") ?? "";
+    const raw = `${JSON.stringify(sim.value.err)}\n${logs}`.trim();
+    throw new Error(translateOnchainError(raw));
   }
 
   try {
@@ -469,6 +436,130 @@ export async function vaultTransactionExecute(params: {
   }
 }
 
+// ── Config proposals (add member, remove member, change threshold) ──────────
+
+export async function createAddMemberProposal(params: {
+  connection: Connection;
+  wallet: BrowserSquadsWallet;
+  multisigPda: PublicKey;
+  newMember: PublicKey;
+  memo?: string;
+}): Promise<{ signature: string; transactionIndex: bigint }> {
+  assertBrowserSquadsWallet(params.wallet);
+  const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
+
+  const memberPerms = multisig.types.Permissions.fromPermissions([
+    multisig.types.Permission.Initiate,
+    multisig.types.Permission.Vote,
+    multisig.types.Permission.Execute,
+  ]);
+
+  const configIx = multisig.instructions.configTransactionCreate({
+    multisigPda: params.multisigPda,
+    transactionIndex,
+    creator: params.wallet.publicKey,
+    actions: [
+      {
+        __kind: "AddMember",
+        newMember: { key: params.newMember, permissions: memberPerms },
+      },
+    ],
+    memo: params.memo ?? "Add member",
+  });
+
+  const proposalIx = multisig.instructions.proposalCreate({
+    multisigPda: params.multisigPda,
+    creator: params.wallet.publicKey,
+    rentPayer: params.wallet.publicKey,
+    transactionIndex,
+  });
+
+  return sendConfigTransaction(params.connection, params.wallet, [configIx, proposalIx], transactionIndex);
+}
+
+export async function createRemoveMemberProposal(params: {
+  connection: Connection;
+  wallet: BrowserSquadsWallet;
+  multisigPda: PublicKey;
+  memberToRemove: PublicKey;
+  memo?: string;
+}): Promise<{ signature: string; transactionIndex: bigint }> {
+  assertBrowserSquadsWallet(params.wallet);
+  const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
+
+  const configIx = multisig.instructions.configTransactionCreate({
+    multisigPda: params.multisigPda,
+    transactionIndex,
+    creator: params.wallet.publicKey,
+    actions: [{ __kind: "RemoveMember", oldMember: params.memberToRemove }],
+    memo: params.memo ?? "Remove member",
+  });
+
+  const proposalIx = multisig.instructions.proposalCreate({
+    multisigPda: params.multisigPda,
+    creator: params.wallet.publicKey,
+    rentPayer: params.wallet.publicKey,
+    transactionIndex,
+  });
+
+  return sendConfigTransaction(params.connection, params.wallet, [configIx, proposalIx], transactionIndex);
+}
+
+export async function createChangeThresholdProposal(params: {
+  connection: Connection;
+  wallet: BrowserSquadsWallet;
+  multisigPda: PublicKey;
+  newThreshold: number;
+  memo?: string;
+}): Promise<{ signature: string; transactionIndex: bigint }> {
+  assertBrowserSquadsWallet(params.wallet);
+  const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
+
+  const configIx = multisig.instructions.configTransactionCreate({
+    multisigPda: params.multisigPda,
+    transactionIndex,
+    creator: params.wallet.publicKey,
+    actions: [{ __kind: "ChangeThreshold", newThreshold: params.newThreshold }],
+    memo: params.memo ?? `Change threshold to ${params.newThreshold}`,
+  });
+
+  const proposalIx = multisig.instructions.proposalCreate({
+    multisigPda: params.multisigPda,
+    creator: params.wallet.publicKey,
+    rentPayer: params.wallet.publicKey,
+    transactionIndex,
+  });
+
+  return sendConfigTransaction(params.connection, params.wallet, [configIx, proposalIx], transactionIndex);
+}
+
+async function sendConfigTransaction(
+  connection: Connection,
+  wallet: BrowserSquadsWallet & {
+    publicKey: PublicKey;
+    sendTransaction: NonNullable<BrowserSquadsWallet["sendTransaction"]>;
+  },
+  instructions: TransactionInstruction[],
+  transactionIndex: bigint,
+): Promise<{ signature: string; transactionIndex: bigint }> {
+  const latestBlockhash = await connection.getLatestBlockhash();
+  const tx = new Transaction().add(...instructions);
+  tx.feePayer = wallet.publicKey;
+  tx.recentBlockhash = latestBlockhash.blockhash;
+
+  let signature: string;
+  try {
+    signature = await wallet.sendTransaction(tx, connection);
+  } catch (sendErr) {
+    logError("[squads-sdk] config sendTransaction error:", sendErr);
+    throw new Error(translateOnchainError(sendErr));
+  }
+
+  const { blockhash: confirmBh, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  await connection.confirmTransaction({ signature, blockhash: confirmBh, lastValidBlockHeight }, "confirmed");
+  return { signature, transactionIndex };
+}
+
 async function sendSingleInstruction(
   connection: Connection,
   wallet: BrowserSquadsWallet & {
@@ -482,21 +573,6 @@ async function sendSingleInstruction(
   const tx = new Transaction().add(instruction);
   tx.feePayer = wallet.publicKey;
   tx.recentBlockhash = latestBlockhash.blockhash;
-
-  try {
-    const sim = await connection.simulateTransaction(tx, undefined, true);
-    log(`[squads-sdk] ${label} simulate result:`, sim);
-    if (sim.value.err) {
-      logError(`[squads-sdk] ${label} simulate error:`, sim.value.err);
-      logError(`[squads-sdk] ${label} simulate logs:`, sim.value.logs);
-      throw new Error(
-        `${label} simulation failed: ${JSON.stringify(sim.value.err)} | logs: ${(sim.value.logs ?? []).join(" || ")}`,
-      );
-    }
-  } catch (simErr) {
-    logError(`[squads-sdk] ${label} simulate threw:`, simErr);
-    throw simErr;
-  }
 
   try {
     const signature = await wallet.sendTransaction(tx, connection);

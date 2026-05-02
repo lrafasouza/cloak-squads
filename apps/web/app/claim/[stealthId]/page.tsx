@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { lamportsToSol } from "@/lib/sol";
-import { statusBadge, statusLabel } from "@/lib/status-labels";
+import { statusBadge } from "@/lib/status-labels";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
 import {
@@ -32,12 +32,22 @@ type StealthInvoice = {
   createdAt: string;
   // UTXO data for claim
   utxoAmount: string | null;
-  utxoPrivateKey: string | null;
   utxoPublicKey: string | null;
   utxoBlinding: string | null;
   utxoMint: string | null;
   utxoLeafIndex: number | null;
   utxoCommitment: string | null;
+};
+
+type ClaimUtxoData = {
+  utxoAmount: string;
+  utxoPrivateKey: string;
+  utxoBlinding: string;
+  utxoMint: string;
+  utxoLeafIndex: number | null;
+  utxoCommitment: string;
+  utxoSiblingCommitment: string | null;
+  utxoLeftSiblingCommitment: string | null;
 };
 
 type ClaimState = "loading" | "invalid" | "expired" | "claimed" | "voided" | "ready";
@@ -55,6 +65,13 @@ function base64urlDecode(str: string): Uint8Array {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
+}
+
+function base64urlEncode(bytes: Uint8Array): string {
+  const binary = Array.from(bytes)
+    .map((b) => String.fromCharCode(b))
+    .join("");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
 export default function ClaimPage({ params }: { params: Promise<{ stealthId: string }> }) {
@@ -170,7 +187,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
   }, [fetchWithAuth, stealthId, secretKey]);
 
   const handleClaim = async () => {
-    if (!invoice || !wallet.publicKey) return;
+    if (!invoice || !wallet.publicKey || !secretKey) return;
 
     setClaiming(true);
     setError(null);
@@ -188,7 +205,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         {
           id: "withdraw",
           title: "Withdraw from Cloak",
-          description: "Generating the ZK proof and submitting the withdrawal transaction.",
+          description: "Securing the transfer and submitting the withdrawal transaction.",
           status: "pending",
         },
         {
@@ -201,65 +218,80 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
     });
 
     try {
-      // Check if UTXO data is available for real claim
-      if (
-        invoice.utxoAmount &&
-        invoice.utxoPrivateKey &&
-        invoice.utxoBlinding &&
-        invoice.utxoMint &&
-        invoice.utxoCommitment
-      ) {
-        updateStep("prepare", { status: "running" });
-        // Reconstruct UTXO for fullWithdraw.
-        // The stored privateKey is the raw field element from generateUtxoKeypair(),
-        // NOT a wallet spend key — so we derive the publicKey directly instead of
-        // using deriveUtxoKeypairFromSpendKey (which applies a blake3 domain-hash).
-        const privateKey = BigInt(`0x${invoice.utxoPrivateKey.padStart(64, "0")}`);
-        const publicKey = await derivePublicKey(privateKey);
-        const keypair = { privateKey, publicKey };
-        const mint = new PublicKey(invoice.utxoMint);
-        const amount = BigInt(invoice.utxoAmount);
-        const utxo = await createUtxo(amount, keypair, mint);
-        utxo.blinding = BigInt(`0x${invoice.utxoBlinding}`);
-        utxo.commitment = await computeUtxoCommitment(utxo);
-        if (invoice.utxoLeafIndex !== null) {
-          utxo.index = invoice.utxoLeafIndex;
-        }
-        updateStep("prepare", { status: "success" });
-        updateStep("withdraw", { status: "running" });
-
-        // Route circuit fetches through our same-origin proxy to bypass S3 CORS.
-        ensureCircuitsProxy();
-        const result = await fullWithdraw([utxo], wallet.publicKey, {
-          connection,
-          programId: CLOAK_PROGRAM_ID,
-          ...cloakDirectTransactOptions,
-          signTransaction: wallet.signTransaction,
-          ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
-          depositorPublicKey: wallet.publicKey,
-          onProgress: (s: string) => {
-            console.error(`[cloak-claim] ${s}`);
-            updateTransaction({ detail: s });
-          },
-          onProofProgress: (p: number) => {
-            console.error(`[cloak-claim] proof ${p}%`);
-            updateTransaction({ proofProgress: p });
-          },
-        } as Parameters<typeof fullWithdraw>[2]);
-
-        console.log("Claim tx:", result.signature);
-        updateStep("withdraw", {
-          status: "success",
-          signature: result.signature,
-          description: "Claim withdrawal confirmed.",
-        });
-      } else {
-        updateStep("prepare", { status: "success" });
-        updateStep("withdraw", {
-          status: "success",
-          description: "No on-chain withdrawal was required for this invoice.",
-        });
+      updateStep("prepare", { status: "running" });
+      const utxoResponse = await fetchWithAuth(`/api/stealth/${invoice.id}/claim-data`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessKey: base64urlEncode(secretKey) }),
+      });
+      if (!utxoResponse.ok) {
+        const body = (await utxoResponse.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Invoice UTXO data is missing.");
       }
+
+      const claimUtxo = (await utxoResponse.json()) as ClaimUtxoData;
+      if (
+        !claimUtxo.utxoAmount ||
+        !claimUtxo.utxoPrivateKey ||
+        !claimUtxo.utxoBlinding ||
+        !claimUtxo.utxoMint ||
+        !claimUtxo.utxoCommitment
+      ) {
+        throw new Error(
+          "Invoice UTXO data is missing. The invoice may not have been funded on-chain yet. Please verify the deposit was completed before claiming.",
+        );
+      }
+
+      // Reconstruct UTXO for fullWithdraw. The stored privateKey is the raw
+      // field element from generateUtxoKeypair(), not a wallet spend key.
+      const privateKey = BigInt(`0x${claimUtxo.utxoPrivateKey.padStart(64, "0")}`);
+      const publicKey = await derivePublicKey(privateKey);
+      const keypair = { privateKey, publicKey };
+      const mint = new PublicKey(claimUtxo.utxoMint);
+      const amount = BigInt(claimUtxo.utxoAmount);
+      const utxo = await createUtxo(amount, keypair, mint);
+      utxo.blinding = BigInt(`0x${claimUtxo.utxoBlinding}`);
+      utxo.commitment = await computeUtxoCommitment(utxo);
+      if (claimUtxo.utxoLeafIndex !== null) {
+        utxo.index = claimUtxo.utxoLeafIndex;
+      }
+      if (claimUtxo.utxoSiblingCommitment) {
+        utxo.siblingCommitment = BigInt(`0x${claimUtxo.utxoSiblingCommitment}`);
+      }
+      if (claimUtxo.utxoLeftSiblingCommitment) {
+        (utxo as typeof utxo & { leftSiblingCommitment?: bigint }).leftSiblingCommitment = BigInt(
+          `0x${claimUtxo.utxoLeftSiblingCommitment}`,
+        );
+      }
+      updateStep("prepare", { status: "success" });
+      updateStep("withdraw", { status: "running" });
+
+      // Route circuit fetches through our same-origin proxy to bypass S3 CORS.
+      ensureCircuitsProxy();
+      const result = await fullWithdraw([utxo], wallet.publicKey, {
+        connection,
+        programId: CLOAK_PROGRAM_ID,
+        ...cloakDirectTransactOptions,
+        relayUrl: `${window.location.origin}/api/cloak-relay`,
+        signTransaction: wallet.signTransaction,
+        ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
+        depositorPublicKey: wallet.publicKey,
+        onProgress: (s: string) => {
+          console.info(`[cloak-claim] ${s}`);
+          updateTransaction({ detail: s });
+        },
+        onProofProgress: (p: number) => {
+          console.info(`[cloak-claim] proof ${p}%`);
+          updateTransaction({ proofProgress: p });
+        },
+      } as Parameters<typeof fullWithdraw>[2]);
+
+      console.log("Claim tx:", result.signature);
+      updateStep("withdraw", {
+        status: "success",
+        signature: result.signature,
+        description: "Claim withdrawal confirmed.",
+      });
 
       updateStep("record", { status: "running" });
       // Call API to mark invoice as claimed
@@ -292,17 +324,34 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
   const getStateMessage = () => {
     switch (claimState) {
       case "loading":
-        return "Carregando dados do invoice...";
+        return "Loading invoice data...";
       case "invalid":
-        return "Link inválido ou corrompido";
+        return "Invalid or corrupted link";
       case "expired":
-        return "Este invoice expirou";
+        return "This invoice has expired";
       case "claimed":
-        return "Este invoice já foi resgatado";
+        return "This invoice has already been claimed";
       case "voided":
-        return "Este invoice foi anulado";
+        return "This invoice has been voided";
       case "ready":
-        return "Pronto para resgate";
+        return "Ready to claim";
+    }
+  };
+
+  const getStateLabel = () => {
+    switch (claimState) {
+      case "loading":
+        return "Loading";
+      case "invalid":
+        return "Invalid";
+      case "expired":
+        return "Expired";
+      case "claimed":
+        return "Claimed";
+      case "voided":
+        return "Voided";
+      case "ready":
+        return "Ready";
     }
   };
 
@@ -336,7 +385,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
       <main className="min-h-screen bg-bg">
         <section className="mx-auto max-w-3xl px-4 py-16 text-center">
           <div className="rounded-lg border border-red-800 bg-red-900/20 p-8">
-            <h1 className="text-xl font-semibold text-red-200">Erro de Acesso</h1>
+            <h1 className="text-xl font-semibold text-red-200">Access Error</h1>
             <p className="mt-4 text-neutral-300">{error ?? "Invalid or corrupted link."}</p>
             <Link
               href="/"
@@ -356,14 +405,14 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <p className="text-sm font-medium text-accent">Resgate de Pagamento</p>
+              <p className="text-sm font-medium text-accent">Payment Claim</p>
               <span
                 className={`rounded px-2 py-0.5 text-xs font-medium ${statusBadge(claimState).bg} ${statusBadge(claimState).text}`}
               >
-                {statusLabel(claimState).label}
+                {getStateLabel()}
               </span>
             </div>
-            <h1 className="mt-2 text-3xl font-semibold text-ink">Resgatar Invoice</h1>
+            <h1 className="mt-2 text-3xl font-semibold text-ink">Claim Invoice</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-300">{getStateMessage()}</p>
           </div>
 
@@ -373,10 +422,10 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                 Vault: {truncateAddress(invoice.cofreAddress)}
               </p>
               <p className="text-sm text-ink-subtle">
-                Criado: {new Date(invoice.createdAt).toLocaleDateString()}
+                Created: {new Date(invoice.createdAt).toLocaleDateString()}
               </p>
               <p className="text-sm text-ink-subtle">
-                Expira: {new Date(invoice.expiresAt).toLocaleDateString()}
+                Expires: {new Date(invoice.expiresAt).toLocaleDateString()}
               </p>
             </div>
           ) : null}
@@ -385,7 +434,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         {invoice ? (
           <>
             <section className="mt-8 rounded-lg border border-border bg-surface p-6">
-              <h3 className="font-semibold text-ink">Detalhes do Invoice</h3>
+              <h3 className="font-semibold text-ink">Invoice Details</h3>
               <dl className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
                   <dt className="text-xs text-ink-subtle">Invoice ID</dt>
@@ -393,25 +442,25 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                 </div>
                 {invoice.invoiceRef ? (
                   <div>
-                    <dt className="text-xs text-ink-subtle">Referência</dt>
+                    <dt className="text-xs text-ink-subtle">Reference</dt>
                     <dd className="mt-1 text-sm text-neutral-300">{invoice.invoiceRef}</dd>
                   </div>
                 ) : null}
                 <div>
-                  <dt className="text-xs text-ink-subtle">Valor</dt>
+                  <dt className="text-xs text-ink-subtle">Amount</dt>
                   <dd className="mt-1 font-mono text-sm text-neutral-300">
                     {invoice.amountHint ? `${lamportsToSol(invoice.amountHint)} SOL` : "Hidden"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-ink-subtle">Chave do Destinatário</dt>
+                  <dt className="text-xs text-ink-subtle">Recipient Key</dt>
                   <dd className="mt-1 break-all font-mono text-xs text-neutral-300">
                     {invoice.stealthPubkey}
                   </dd>
                 </div>
                 {invoice.memo ? (
                   <div className="md:col-span-2">
-                    <dt className="text-xs text-ink-subtle">Mensagem</dt>
+                    <dt className="text-xs text-ink-subtle">Message</dt>
                     <dd className="mt-1 text-sm text-neutral-300">{invoice.memo}</dd>
                   </div>
                 ) : null}
@@ -420,27 +469,27 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
 
             {claimState === "ready" ? (
               <section className="mt-8 rounded-lg border border-border bg-surface p-6">
-                <h3 className="font-semibold text-ink">Resgatar Fundos</h3>
+                <h3 className="font-semibold text-ink">Claim Funds</h3>
                 <p className="mt-2 text-sm text-neutral-300">
-                  Conecte sua wallet e clique no botão abaixo para resgatar os fundos.
+                  Connect your wallet and use the button below to claim the funds.
                 </p>
 
                 {!wallet.publicKey ? (
-                  <p className="mt-4 text-sm text-amber-300">Conecte sua wallet para continuar.</p>
+                  <p className="mt-4 text-sm text-amber-300">Connect your wallet to continue.</p>
                 ) : invoice.recipientWallet !== wallet.publicKey.toBase58() ? (
                   <div className="mt-4 rounded-md border border-red-900 bg-red-950 p-3 text-sm text-red-200">
-                    <p className="font-medium">Wallet incorreta</p>
+                    <p className="font-medium">Wrong wallet</p>
                     <p className="mt-1 text-xs text-signal-danger">
-                      Este invoice foi criado para a wallet{" "}
+                      This invoice was created for wallet{" "}
                       <span className="font-mono">{truncateAddress(invoice.recipientWallet)}</span>.
-                      Conecte essa wallet para resgatar.
+                      Connect that wallet to claim.
                     </p>
                   </div>
                 ) : (
                   <div className="mt-4">
-                    <p className="mb-3 text-sm text-accent">Wallet correta conectada ✓</p>
+                    <p className="mb-3 text-sm text-accent">Correct wallet connected</p>
                     <Button onClick={handleClaim} disabled={claiming}>
-                      {claiming ? "Processando resgate..." : "Resgatar fundos"}
+                      {claiming ? "Claiming funds..." : "Claim funds"}
                     </Button>
                   </div>
                 )}
@@ -456,14 +505,14 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                 <p className={`text-lg font-medium ${getStateColor()}`}>{getStateMessage()}</p>
                 {claimState === "expired" ? (
                   <p className="mt-2 text-sm text-ink-muted">
-                    Este invoice expirou em {new Date(invoice.expiresAt).toLocaleString()}.
+                    This invoice expired on {new Date(invoice.expiresAt).toLocaleString()}.
                   </p>
                 ) : null}
                 <Link
                   href="/"
                   className="mt-4 inline-block rounded-md bg-surface-2 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:bg-surface-3"
                 >
-                  Voltar para Home
+                  Return Home
                 </Link>
               </section>
             )}

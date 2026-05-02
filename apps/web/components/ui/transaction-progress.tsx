@@ -12,7 +12,9 @@ import {
   WalletCards,
   XCircle,
 } from "lucide-react";
-import { type ReactNode, createContext, useCallback, useContext, useMemo, useState } from "react";
+import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { AutoCloseIndicator } from "./auto-close-indicator";
 
 export type TransactionStepStatus = "pending" | "running" | "success" | "error";
 
@@ -123,13 +125,27 @@ function TransactionModal({
   transaction: TransactionState;
   onClose: () => void;
 }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const canClose = transaction.status !== "running";
+
+  /* Auto-close after 10 seconds once finished */
+  useEffect(() => {
+    if (!canClose) return;
+    const timer = setTimeout(() => {
+      onClose();
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [canClose, onClose]);
   const completedSteps = transaction.steps.filter((step) => step.status === "success").length;
   const progress = transaction.steps.length
     ? Math.round((completedSteps / transaction.steps.length) * 100)
     : 0;
 
-  return (
+  const node = (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-bg/80 px-4 py-6 backdrop-blur-md">
       <div
         role="dialog"
@@ -182,9 +198,12 @@ function TransactionModal({
               </div>
             </div>
             {canClose ? (
-              <Button type="button" variant="ghost" onClick={onClose}>
-                Close
-              </Button>
+              <div className="flex items-center gap-2">
+                <AutoCloseIndicator durationMs={10000} onComplete={onClose} paused={!canClose} />
+                <Button type="button" variant="ghost" onClick={onClose}>
+                  Close
+                </Button>
+              </div>
             ) : null}
           </div>
 
@@ -219,7 +238,7 @@ function TransactionModal({
           {typeof transaction.proofProgress === "number" && transaction.status === "running" ? (
             <div className="mb-4 rounded-lg border border-border bg-bg px-3 py-3">
               <div className="flex items-center justify-between text-xs text-ink-muted">
-                <span>Zero-knowledge proof</span>
+                <span>Privacy shield</span>
                 <span className="font-mono tabular-nums">{transaction.proofProgress}%</span>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
@@ -269,6 +288,9 @@ function TransactionModal({
       </div>
     </div>
   );
+
+  if (!mounted) return null;
+  return createPortal(node, document.body);
 }
 
 export function TransactionProgressProvider({ children }: { children: ReactNode }) {

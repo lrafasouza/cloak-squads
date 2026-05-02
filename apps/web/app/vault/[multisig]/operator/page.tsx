@@ -4,11 +4,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
+import {
+  DetailRow,
+  InlineAlert,
+  ProgressBar,
+  StatusPill,
+  WorkspaceHeader,
+  WorkspacePage,
+} from "@/components/ui/workspace";
+import { DirectSendModal } from "@/components/vault/DirectSendModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { publicEnv } from "@/lib/env";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
+import {
+  type ExecutionHistoryItem,
+  markProposalExecuted,
+  readExecutionHistory,
+  writeExecutionHistory,
+} from "@/lib/operator-execution-history";
 import {
   type OperatorExecutionBlockReason,
   type OperatorLicenseStatus,
@@ -17,6 +38,7 @@ import {
   normalizeLicenseStatus,
 } from "@/lib/operator-license-state";
 import { lamportsToSol } from "@/lib/sol";
+import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
@@ -227,6 +249,7 @@ async function cloakDepositBrowser(
       // Keep operator deposits independent from relay /health availability.
       // The relay may return 503 and trigger duplicate-submit edge cases in the SDK fallback path.
       ...cloakDirectTransactOptions,
+      relayUrl: `${window.location.origin}/api/cloak-relay`,
       signTransaction: wallet.signTransaction,
       signMessage: wallet.signMessage,
       depositorPublicKey: wallet.publicKey,
@@ -315,16 +338,16 @@ function transactionExplorerUrl(signature: string) {
 
 function operatorStatusMessage(reason: OperatorExecutionBlockReason) {
   if (reason === "ready") return null;
-  if (reason === "license-loading") return "Checking license status on-chain...";
+  if (reason === "license-loading") return "Checking whether this transfer is ready...";
   if (reason === "execute-vault-transaction") {
-    return "Execute the Squads vault transaction first to issue the license, then run operator execution.";
+    return "The vault approval is complete. Execute the proposal before running the transfer.";
   }
   if (reason === "proposal-not-approved") {
-    return "This proposal is not ready yet. Wait for approvals, then execute the Squads vault transaction.";
+    return "This proposal is still waiting for approvals.";
   }
-  if (reason === "license-consumed") return "This license has already been consumed.";
-  if (reason === "license-expired") return "This license has expired. Create a new proposal.";
-  if (reason === "license-error") return "Could not verify the license account on-chain.";
+  if (reason === "license-consumed") return "This transfer has already been executed.";
+  if (reason === "license-expired") return "This transfer expired. Create a new proposal.";
+  if (reason === "license-error") return "Could not verify this transfer on-chain.";
   return null;
 }
 
@@ -353,10 +376,26 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const [operatorBalanceLamports, setOperatorBalanceLamports] = useState<number | null>(null);
   const [operatorBalanceLoading, setOperatorBalanceLoading] = useState(false);
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
+  const [executionHistory, setExecutionHistory] = useState<ExecutionHistoryItem[]>([]);
   const [executing, setExecuting] = useState(false);
   const [pendingDrafts, setPendingDrafts] = useState<DraftSummary[]>([]);
   const [draftOnChainStatus, setDraftOnChainStatus] = useState<ProposalStatus>("loading");
   const [licenseStatus, setLicenseStatus] = useState<OperatorLicenseStatus>("idle");
+  const { data: proposals = [] } = useProposalSummaries(multisig);
+
+  const queueDrafts = useMemo(() => {
+    return pendingDrafts
+      .map((d) => {
+        const proposal = proposals.find((p) => p.transactionIndex === d.transactionIndex);
+        return { ...d, proposalStatus: proposal?.status ?? "unknown" };
+      })
+      .filter(
+        (d) =>
+          d.proposalStatus !== "executed" &&
+          d.proposalStatus !== "rejected" &&
+          d.proposalStatus !== "cancelled",
+      );
+  }, [pendingDrafts, proposals]);
   const autoLoadFiredRef = useRef(false);
 
   const multisigAddress = useMemo(() => {
@@ -466,8 +505,51 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   }, [fetchWithAuth, multisig]);
 
   useEffect(() => {
-    void fetchPendingDrafts();
+    const proposalCount = proposals.length;
+    if (proposalCount >= 0) {
+      void fetchPendingDrafts();
+    }
+  }, [fetchPendingDrafts, proposals]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void fetchPendingDrafts();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [fetchPendingDrafts]);
+
+  useEffect(() => {
+    setExecutionHistory(readExecutionHistory(multisig));
+  }, [multisig]);
+
+  // Auto-mark as executed if license is already consumed (backfill for lost history)
+  useEffect(() => {
+    if (licenseStatus === "consumed" && txIndex) {
+      markProposalExecuted(multisig, txIndex);
+    }
+  }, [licenseStatus, txIndex, multisig]);
+
+  const recordExecution = useCallback(
+    (item: Omit<ExecutionHistoryItem, "id" | "createdAt">) => {
+      const nextItem: ExecutionHistoryItem = {
+        ...item,
+        id: `${Date.now()}-${item.transactionIndex}-${item.status}`,
+        createdAt: new Date().toISOString(),
+      };
+      setExecutionHistory((current) => {
+        const next = [nextItem, ...current].slice(0, 20);
+        writeExecutionHistory(multisig, next);
+        return next;
+      });
+    },
+    [multisig],
+  );
 
   const operatorMismatch = useMemo(() => {
     if (!registeredOperator || !wallet.publicKey) return false;
@@ -598,7 +680,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         : "";
     startTransaction({
       title: isPayroll ? "Executing payroll transfer" : "Executing private transfer",
-      description: `${lamportsToSol(draft.invariants.amount)} SOL${transferLabel}. This may take longer while Merkle data and ZK proofs are prepared.`,
+      description: `${lamportsToSol(draft.invariants.amount)} SOL${transferLabel}. This may take longer while the privacy shield is prepared.`,
       steps: [
         {
           id: "prepare",
@@ -615,14 +697,14 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           id: "deliver",
           title: draft.recipient ? "Deliver to recipient" : "Store claim data",
           description: draft.recipient
-            ? "Generating a fresh withdrawal proof and sending funds to the recipient."
+            ? "Securing the withdrawal and sending funds to the recipient."
             : "Saving the private UTXO data so the invoice can be claimed.",
           status: "pending",
         },
         {
           id: "license",
-          title: "Consume license",
-          description: "Calling execute_with_license to finalize the approved intent.",
+          title: "Finalize transfer",
+          description: "Submitting the approved transfer on-chain.",
           status: "pending",
         },
       ],
@@ -734,6 +816,16 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                       .map((b) => b.toString(16).padStart(2, "0"))
                       .join("")
                   : undefined,
+                utxoSiblingCommitment: cloakResult.outputUtxos?.[0]?.siblingCommitment
+                  ?.toString(16)
+                  .padStart(64, "0"),
+                utxoLeftSiblingCommitment: (
+                  cloakResult.outputUtxos?.[0] as
+                    | (Utxo & { leftSiblingCommitment?: bigint })
+                    | undefined
+                )?.leftSiblingCommitment
+                  ?.toString(16)
+                  .padStart(64, "0"),
               }),
             });
             if (!storeResponse.ok) {
@@ -774,6 +866,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               connection,
               programId: CLOAK_PROGRAM_ID,
               ...cloakDirectTransactOptions,
+              relayUrl: `${window.location.origin}/api/cloak-relay`,
               signTransaction: wallet.signTransaction as Parameters<
                 typeof fullWithdraw
               >[2]["signTransaction"],
@@ -832,13 +925,6 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     tx.feePayer = wallet.publicKey;
     tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
-    const sim = await connection.simulateTransaction(tx, undefined, true);
-    if (sim.value.err) {
-      throw new Error(
-        `Simulation failed: ${JSON.stringify(sim.value.err)} | ${(sim.value.logs ?? []).join(" || ")}`,
-      );
-    }
-
     const sig = await wallet.sendTransaction(tx, connection);
 
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
@@ -873,6 +959,17 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       if (loadedDraft) {
         const sig = await executeSingle(loadedDraft, true);
         setSignature(sig ?? null);
+        recordExecution({
+          transactionIndex: txIndex,
+          type: "single",
+          recipient: loadedDraft.recipient,
+          amount: loadedDraft.amount,
+          status: "success",
+          ...(sig ? { signature: sig } : {}),
+          ...(cloakSignature ? { cloakSignature } : {}),
+          ...(withdrawSignature ? { withdrawSignature } : {}),
+        });
+        markProposalExecuted(multisig, txIndex);
       } else if (payrollDraft) {
         // Chained execution
         await executePayroll();
@@ -880,8 +977,17 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         throw new Error("Load a proposal draft first.");
       }
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "Could not execute with license.";
+      const message = caught instanceof Error ? caught.message : "Could not execute transfer.";
       setError(message);
+      recordExecution({
+        transactionIndex: txIndex,
+        type: payrollDraft ? "payroll" : "single",
+        ...(loadedDraft?.recipient ? { recipient: loadedDraft.recipient } : {}),
+        ...(payrollDraft?.recipientCount ? { recipientCount: payrollDraft.recipientCount } : {}),
+        amount: loadedDraft?.amount ?? payrollDraft?.totalAmount ?? "0",
+        status: "error",
+        error: message,
+      });
       failTransaction(message);
     } finally {
       setPending(false);
@@ -895,6 +1001,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     setExecuting(true);
     const steps = payrollDraft.recipients.map((_, i) => ({ index: i, status: "pending" as const }));
     setExecutionSteps(steps);
+    let completed = 0;
+    let lastError: string | undefined;
 
     for (let i = 0; i < payrollDraft.recipients.length; i++) {
       // Update current step to running
@@ -927,8 +1035,10 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         setExecutionSteps((prev) =>
           prev.map((s) => (s.index === i ? { ...s, status: "success", signature: sig } : s)),
         );
+        completed += 1;
       } catch (caught) {
         const errorMsg = caught instanceof Error ? caught.message : "Execution failed";
+        lastError = errorMsg;
         setExecutionSteps((prev) =>
           prev.map((s) => (s.index === i ? { ...s, status: "error", error: errorMsg } : s)),
         );
@@ -937,6 +1047,22 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     }
 
     setExecuting(false);
+    const payrollStatus = completed === payrollDraft.recipientCount ? "success" : "error";
+    recordExecution({
+      transactionIndex: txIndex,
+      type: "payroll",
+      recipientCount: payrollDraft.recipientCount,
+      amount: payrollDraft.totalAmount,
+      status: payrollStatus,
+      ...(completed === payrollDraft.recipientCount
+        ? {}
+        : {
+            error: lastError ?? `Executed ${completed}/${payrollDraft.recipientCount} recipients.`,
+          }),
+    });
+    if (payrollStatus === "success") {
+      markProposalExecuted(multisig, txIndex);
+    }
   }
 
   function retryFromStep(stepIndex: number) {
@@ -1005,6 +1131,25 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const successCount = executionSteps.filter((s) => s.status === "success").length;
   const isPayroll = payrollDraft !== null;
   const lowOperatorSol = operatorBalanceLamports !== null && operatorBalanceLamports < 10_000_000;
+
+  // Budget calculation: total SOL needed for all pending drafts
+  const totalNeededLamports = queueDrafts.reduce((sum, draft) => {
+    const amt = BigInt(
+      draft.type === "payroll" ? (draft.totalAmount ?? "0") : (draft.amount ?? "0"),
+    );
+    return sum + amt;
+  }, 0n);
+  const operatorBalBigInt = BigInt(operatorBalanceLamports ?? 0);
+  const deficitLamports = totalNeededLamports > operatorBalBigInt
+    ? totalNeededLamports - operatorBalBigInt
+    : 0n;
+  const hasDeficit = deficitLamports > 0n;
+
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const topUpRecipient = registeredOperator ?? wallet.publicKey?.toBase58() ?? "";
+  const topUpAmount = hasDeficit ? lamportsToSol(deficitLamports) : "";
+
   const executionState = getOperatorExecutionState({
     hasDraft: !!(loadedDraft || payrollDraft),
     walletConnected: !!wallet.publicKey,
@@ -1028,394 +1173,612 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     );
   }
 
+  const statusDot = (status: string) => {
+    if (status === "active" || status === "approved") return "bg-accent";
+    if (status === "executed") return "bg-signal-positive";
+    if (status === "rejected" || status === "cancelled") return "bg-signal-danger";
+    return "bg-ink-subtle";
+  };
+
+  const statusLabel = (status: string) => {
+    if (status === "active") return "Awaiting";
+    if (status === "approved") return "Ready";
+    if (status === "executed") return "Executed";
+    if (status === "rejected") return "Rejected";
+    if (status === "cancelled") return "Cancelled";
+    return status;
+  };
+
   return (
-    <main className="min-h-screen">
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6">
-        <div>
-          <p className="text-sm font-medium text-accent">Operator</p>
-          <h1 className="mt-2 text-3xl font-semibold text-ink">Execute with license</h1>
-          <p className="mt-3 text-sm leading-6 text-neutral-300">
-            The operator wallet consumes an approved+executed license, calling
-            <code className="mx-1 text-accent">execute_with_license</code> on the gatekeeper. Load a
-            proposal draft created from the Send or Payroll page, then execute.
-          </p>
+    <WorkspacePage>
+      <div className="space-y-8">
+        <WorkspaceHeader
+          eyebrow="Operator"
+          title="Execution queue"
+          description="Run private transfers after the vault has approved them. Load an approved proposal, review the intent, then execute."
+          action={
+            <div className="flex items-center gap-2">
+              <StatusPill tone="accent">{queueDrafts.length} ready</StatusPill>
+              <button
+                type="button"
+                onClick={() => setHelpOpen(true)}
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-surface-2 text-xs font-bold text-ink-subtle transition-colors hover:border-border-strong hover:text-ink"
+                aria-label="How operator budget works"
+              >
+                ?
+              </button>
+            </div>
+          }
+        />
+
+        {/* Minimal stats bar */}
+        <div className="flex flex-wrap items-center gap-6 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-ink-muted">Balance</span>
+            <span className={`font-semibold ${hasDeficit ? "text-signal-danger" : "text-ink"}`}>
+              {operatorBalanceLoading
+                ? "..."
+                : operatorBalanceLamports === null
+                  ? "—"
+                  : `${lamportsToSol(operatorBalanceLamports)} SOL`}
+            </span>
+          </div>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-2">
+            <span className="text-ink-muted">Needed</span>
+            <span className="font-semibold text-ink">
+              {totalNeededLamports > 0n ? `${lamportsToSol(totalNeededLamports)} SOL` : "—"}
+            </span>
+          </div>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-2">
+            <span className="text-ink-muted">Vault</span>
+            <span className={`font-semibold ${cofreMissing ? "text-signal-warn" : "text-accent"}`}>
+              {cofreMissing ? "Needs setup" : "Ready"}
+            </span>
+          </div>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-2">
+            <span className="text-ink-muted">Queue</span>
+            <span className="font-semibold text-ink">{queueDrafts.length}</span>
+          </div>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-2">
+            <span className="text-ink-muted">Wallet</span>
+            <span
+              className={`font-semibold ${operatorMismatch ? "text-signal-danger" : "text-accent"}`}
+            >
+              {operatorMismatch ? "Mismatch" : "Matched"}
+            </span>
+          </div>
         </div>
 
-        <div className="grid gap-4">
-          {registeredOperator ? (
-            <section
-              className={`rounded-lg border p-4 ${operatorMismatch ? "border-amber-900 bg-amber-950" : "border-emerald-900 bg-emerald-950"}`}
-            >
-              <dl className="grid gap-3 text-sm">
-                <div>
-                  <dt className="text-ink-muted">Registered operator</dt>
-                  <dd className="break-all font-mono text-ink">{registeredOperator}</dd>
-                </div>
-                <div>
-                  <dt className="text-ink-muted">Connected wallet</dt>
-                  <dd className="break-all font-mono text-ink">
-                    {wallet.publicKey ? wallet.publicKey.toBase58() : "Not connected"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-ink-muted">Operator balance</dt>
-                  <dd className="font-mono text-ink">
-                    {operatorBalanceLoading
-                      ? "Loading..."
-                      : operatorBalanceLamports === null
-                        ? "Unavailable"
-                        : `${lamportsToSol(operatorBalanceLamports)} SOL`}
-                  </dd>
-                </div>
-                {operatorMismatch && wallet.publicKey ? (
-                  <p className="mt-2 text-amber-200">
-                    Connected wallet{" "}
-                    <span className="font-mono">{wallet.publicKey.toBase58()}</span> does not match
-                    the registered operator. Switch wallets.
-                  </p>
-                ) : null}
-                {lowOperatorSol ? (
-                  <p className="rounded-md border border-signal-warn/30 bg-amber-900/40 px-3 py-2 text-amber-100">
-                    Operator balance is below 0.01 SOL. Airdrop devnet SOL before executing.
-                  </p>
-                ) : null}
-              </dl>
-            </section>
-          ) : cofreMissing ? (
-            <section className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
-              <p className="font-semibold">Vault is not initialized yet.</p>
-              <p className="mt-1">
-                Create, approve, and execute the bootstrap Squads proposal before using the operator
-                flow.
-              </p>
-            </section>
-          ) : null}
-
-          {pendingDrafts.length > 0 && (
-            <section className="rounded-lg border border-border bg-surface p-4">
-              <h2 className="mb-3 text-base font-semibold text-ink">Proposals ready to execute</h2>
-              <ul className="grid gap-2">
-                {pendingDrafts.map((d) => (
-                  <li
-                    key={d.id}
-                    className="flex items-center justify-between gap-3 rounded-md border border-border bg-bg px-3 py-2 text-sm"
-                  >
-                    <div className="min-w-0">
-                      <span className="font-mono text-ink">#{d.transactionIndex}</span>
-                      {d.type === "payroll" ? (
-                        <span className="ml-2 rounded bg-accent-soft px-1.5 py-0.5 text-xs text-accent">
-                          payroll
-                        </span>
-                      ) : (
-                        <span className="ml-2 rounded bg-surface-2 px-1.5 py-0.5 text-xs text-neutral-300">
-                          single
-                        </span>
-                      )}
-                      <p className="mt-0.5 truncate text-xs text-ink-muted">
-                        {d.type === "payroll"
-                          ? `${d.recipientCount ?? 0} recipients · ${lamportsToSol(d.totalAmount ?? d.amount)} SOL`
-                          : `${lamportsToSol(d.amount)} SOL`}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="shrink-0 text-xs px-3 py-1 h-auto"
-                      onClick={() => {
-                        setTxIndex(d.transactionIndex);
-                        void (async () => {
-                          setLoadedDraft(null);
-                          setPayrollDraft(null);
-                          setError(null);
-                          setSignature(null);
-                          setExecutionSteps([]);
-                          try {
-                            const singleResponse = await fetchWithAuth(
-                              `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}?includeSensitive=true`,
-                            );
-                            if (singleResponse.ok) {
-                              const draft = (await singleResponse.json()) as SingleDraft;
-                              setLoadedDraft(draft);
-                              void checkOnChainStatus(d.transactionIndex, draft);
-                              return;
-                            }
-                            const payrollResponse = await fetchWithAuth(
-                              `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}?includeSensitive=true`,
-                            );
-                            if (payrollResponse.ok) {
-                              const draft = (await payrollResponse.json()) as PayrollDraft;
-                              setPayrollDraft(draft);
-                              setExecutionSteps(
-                                draft.recipients.map((_, i) => ({ index: i, status: "pending" })),
-                              );
-                              void checkOnChainStatus(d.transactionIndex, draft);
-                              return;
-                            }
-                            setError(
-                              `No persisted draft found for proposal #${d.transactionIndex}.`,
-                            );
-                          } catch (caught) {
-                            setError(
-                              caught instanceof Error
-                                ? caught.message
-                                : "Could not load proposal draft.",
-                            );
-                          }
-                        })();
-                      }}
-                    >
-                      Load
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          <section className="rounded-lg border border-border bg-surface p-4">
-            <h2 className="mb-4 text-base font-semibold text-ink">Load proposal draft</h2>
-            <div className="flex items-end gap-3">
-              <div className="flex-1">
-                <Label htmlFor="txIndex">Proposal # (transaction index)</Label>
-                <Input
-                  id="txIndex"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  autoComplete="off"
-                  value={txIndex}
-                  onChange={(e) => setTxIndex(e.target.value)}
-                  placeholder="4"
-                  className="mt-1 font-mono"
-                />
-              </div>
-              <Button
+        {hasDeficit && !operatorBalanceLoading && (
+          <InlineAlert tone="warning">
+            <div className="flex items-center justify-between gap-4">
+              <span>
+                Insufficient balance — need{" "}
+                <span className="font-semibold">{lamportsToSol(deficitLamports)} SOL</span> more
+                to execute all pending transfers. Request a top-up from the vault.
+              </span>
+              <button
                 type="button"
-                variant="secondary"
-                onClick={() => void loadDraft()}
-                disabled={!txIndex}
+                onClick={() => setTopUpOpen(true)}
+                className="shrink-0 rounded-md border border-signal-warn/40 bg-signal-warn/10 px-3 py-1 text-xs font-semibold text-signal-warn transition-colors hover:bg-signal-warn/20"
               >
-                Load
-              </Button>
+                Request top-up
+              </button>
             </div>
-          </section>
+          </InlineAlert>
+        )}
+        {operatorMismatch && wallet.publicKey ? (
+          <InlineAlert tone="warning">
+            Switch to the registered operator wallet before executing.
+          </InlineAlert>
+        ) : null}
+        {lowOperatorSol && !hasDeficit ? (
+          <InlineAlert tone="warning">
+            Add a little SOL to the operator wallet for network fees.
+          </InlineAlert>
+        ) : null}
+        {cofreMissing ? (
+          <InlineAlert tone="warning">
+            Private vault is not ready yet. Finish the vault setup proposal before running private
+            transfers.
+          </InlineAlert>
+        ) : null}
 
-          {loadedDraft ? (
-            <section className="rounded-lg border border-border bg-surface p-4">
-              <h2 className="mb-3 text-base font-semibold text-ink">Draft invariants</h2>
-              <dl className="grid gap-2 text-sm">
+        {/* Main execution card */}
+        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-raise-1">
+          {!loadedDraft && !payrollDraft ? (
+            <>
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
                 <div>
-                  <dt className="text-ink-muted">Amount</dt>
-                  <dd className="font-mono text-ink">{lamportsToSol(loadedDraft.amount)} SOL</dd>
+                  <h2 className="text-sm font-semibold text-ink">Execution queue</h2>
+                  <p className="text-xs text-ink-muted">
+                    Load an approved proposal to execute the private transfer.
+                  </p>
                 </div>
-                <div>
-                  <dt className="text-ink-muted">Recipient</dt>
-                  <dd className="break-all font-mono text-ink">{loadedDraft.recipient}</dd>
-                </div>
-                <div>
-                  <dt className="text-ink-muted">Nullifier</dt>
-                  <dd className="break-all font-mono text-xs text-neutral-300">
-                    {Uint8Array.from(loadedDraft.invariants.nullifier).reduce(
-                      (s, b) => s + b.toString(16).padStart(2, "0"),
-                      "",
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-ink-muted">Payload hash</dt>
-                  <dd className="break-all font-mono text-xs text-neutral-300">
-                    {Uint8Array.from(loadedDraft.payloadHash).reduce(
-                      (s, b) => s + b.toString(16).padStart(2, "0"),
-                      "",
-                    )}
-                  </dd>
-                </div>
-              </dl>
-            </section>
-          ) : null}
-
-          {isPayroll && payrollDraft ? (
-            <section className="rounded-lg border border-border bg-surface p-4">
-              <h2 className="mb-3 text-base font-semibold text-ink">
-                Payroll batch — {payrollDraft.recipientCount} recipients
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left">
-                      <th className="pb-2 pr-4 text-ink-muted">#</th>
-                      <th className="pb-2 pr-4 text-ink-muted">Name</th>
-                      <th className="pb-2 pr-4 text-ink-muted text-right">Amount</th>
-                      <th className="pb-2 text-ink-muted">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-800">
-                    {payrollDraft.recipients.map((r, i) => {
-                      const step = executionSteps[i];
-                      return (
-                        <tr key={r.id}>
-                          <td className="py-2 pr-4 text-ink-muted">{i + 1}</td>
-                          <td className="py-2 pr-4 text-ink">{r.name}</td>
-                          <td className="py-2 pr-4 text-right font-mono tabular-nums text-ink">
-                            {lamportsToSol(r.amount)} SOL
-                          </td>
-                          <td className="py-2">
-                            {!step || step.status === "pending" ? (
-                              <span className="text-ink-muted">Pending</span>
-                            ) : step.status === "running" ? (
-                              <span className="text-amber-300">Running…</span>
-                            ) : step.status === "success" ? (
-                              <span className="text-accent">Done</span>
-                            ) : (
-                              <div>
-                                <span className="text-signal-danger">Failed</span>
-                                <button
-                                  type="button"
-                                  onClick={() => retryFromStep(i)}
-                                  disabled={executing}
-                                  className="ml-2 text-xs text-accent hover:text-accent disabled:text-ink-subtle"
-                                >
-                                  Retry
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {executionSteps.length > 0 && (
-                <div className="mt-4">
-                  <div className="flex items-center justify-between text-xs text-ink-muted">
-                    <span>Progress</span>
-                    <span>
-                      {successCount}/{payrollDraft.recipientCount}
-                    </span>
-                  </div>
-                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-2">
-                    <div
-                      className="h-full bg-emerald-400 transition-all"
-                      style={{
-                        width: `${(successCount / payrollDraft.recipientCount) * 100}%`,
-                      }}
+                <div className="flex items-end gap-2">
+                  <div>
+                    <Label htmlFor="txIndex" className="text-xs">
+                      Proposal #
+                    </Label>
+                    <Input
+                      id="txIndex"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      autoComplete="off"
+                      value={txIndex}
+                      onChange={(e) => setTxIndex(e.target.value)}
+                      placeholder="4"
+                      className="mt-1 w-24 font-mono"
                     />
                   </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => void loadDraft()}
+                    disabled={!txIndex}
+                    className="mt-1"
+                  >
+                    Load
+                  </Button>
                 </div>
-              )}
-            </section>
-          ) : null}
+              </div>
 
-          {(loadedDraft || payrollDraft) && proposalStatusMessage ? (
-            <section className="rounded-lg border border-amber-900 bg-amber-950 p-4 text-sm text-amber-100">
-              {proposalStatusMessage}
-            </section>
-          ) : null}
-
-          <form onSubmit={execute} className="rounded-lg border border-border bg-surface p-4">
-            <h2 className="mb-4 text-base font-semibold text-ink">Execute</h2>
-            <p className="mb-4 text-xs text-ink-muted">
-              Connect the registered operator wallet for this cofre.
-              {registeredOperator ? (
-                <span className="mt-1 block break-all font-mono text-neutral-300">
-                  {registeredOperator}
-                </span>
-              ) : null}
-            </p>
-            <Button type="submit" disabled={!canExecute}>
-              {pending
-                ? isPayroll
-                  ? "Executing batch…"
-                  : "Executing…"
-                : isPayroll
-                  ? "Execute batch"
-                  : "Execute with license"}
-            </Button>
-            {!wallet.publicKey ? (
-              <p className="mt-2 text-xs text-amber-300">
-                Connect the registered operator wallet first.
-              </p>
-            ) : null}
-            {operatorMismatch && wallet.publicKey ? (
-              <p className="mt-2 text-xs text-amber-300">
-                Wrong wallet. Switch to the registered operator.
-              </p>
-            ) : null}
-            {lowOperatorSol ? (
-              <p className="mt-2 text-xs text-amber-300">
-                Operator needs at least 0.01 SOL on devnet before execution.
-              </p>
-            ) : null}
-            {cofreMissing ? (
-              <p className="mt-2 text-xs text-amber-300">
-                Vault bootstrap proposal must be executed before operator execution.
-              </p>
-            ) : null}
-            {!loadedDraft && !payrollDraft ? (
-              <p className="mt-2 text-xs text-amber-300">Load a proposal draft above.</p>
-            ) : null}
-          </form>
-
-          {error ? (
-            <section className="rounded-md border border-red-900 bg-red-950 p-3 text-sm text-red-200">
-              {error}
-            </section>
-          ) : null}
-
-          {cloakSignature || signature || withdrawSignature ? (
-            <section className="rounded-lg border border-border bg-surface p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-ink">Latest confirmed transactions</p>
-                  <p className="mt-1 text-xs text-ink-muted">
-                    Each step is also available in the transaction modal with copy and explorer
-                    links.
+              {queueDrafts.length === 0 ? (
+                <div className="py-16 text-center">
+                  <p className="text-sm text-ink-muted">No pending drafts</p>
+                  <p className="mt-1 text-xs text-ink-subtle">
+                    Approved proposals will appear here.
                   </p>
                 </div>
-                <span className="rounded border border-accent/25 bg-accent-soft px-2 py-1 text-xs font-semibold text-accent">
-                  Confirmed
-                </span>
-              </div>
-              <dl className="mt-4 grid gap-2">
-                {[
-                  cloakSignature ? { label: "Cloak deposit", value: cloakSignature } : null,
-                  withdrawSignature
-                    ? { label: "Recipient delivery", value: withdrawSignature }
-                    : null,
-                  signature && !isPayroll
-                    ? { label: "License consumption", value: signature }
-                    : null,
-                ]
-                  .filter((item): item is { label: string; value: string } => Boolean(item))
-                  .map((item) => (
-                    <div
-                      key={item.label}
-                      className="flex flex-col gap-2 rounded-md border border-border bg-bg px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <dt className="text-sm text-ink-muted">{item.label}</dt>
-                      <dd className="flex items-center gap-2">
-                        <code className="font-mono text-xs text-ink">
-                          {truncateSignature(item.value)}
-                        </code>
-                        <a
-                          href={transactionExplorerUrl(item.value)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft"
+              ) : (
+                <>
+                  <div
+                    className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
+                    style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 6rem 5rem" }}
+                  >
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      #
+                    </span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      Type
+                    </span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      Details
+                    </span>
+                    <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      Amount
+                    </span>
+                    <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      Status
+                    </span>
+                    <span />
+                  </div>
+                  <div className="divide-y divide-border/40">
+                    {queueDrafts.map((d) => (
+                      <div
+                        key={d.id}
+                        className="grid items-center gap-4 px-5 py-3"
+                        style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 6rem 5rem" }}
+                      >
+                        <span className="font-mono text-sm text-ink-subtle">
+                          #{d.transactionIndex}
+                        </span>
+                        <span
+                          className={`inline-flex w-fit items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                            d.type === "payroll"
+                              ? "bg-accent-soft text-accent"
+                              : "bg-surface-2 text-ink-muted"
+                          }`}
                         >
-                          Explorer
-                        </a>
-                      </dd>
+                          {d.type}
+                        </span>
+                        <p className="truncate text-sm text-ink">
+                          {d.type === "payroll"
+                            ? `${d.recipientCount ?? 0} recipients`
+                            : d.recipient
+                              ? `${d.recipient.slice(0, 8)}...${d.recipient.slice(-8)}`
+                              : "Transfer"}
+                        </p>
+                        <p className="text-right font-mono text-sm text-ink">
+                          {lamportsToSol(d.totalAmount ?? d.amount)} SOL
+                        </p>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${statusDot((d as unknown as { proposalStatus?: string }).proposalStatus ?? "unknown")}`}
+                          />
+                          <span className="text-xs text-ink-muted">
+                            {statusLabel(
+                              (d as unknown as { proposalStatus?: string }).proposalStatus ??
+                                "unknown",
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="text-xs px-2 py-1 h-auto"
+                            onClick={() => {
+                              setTxIndex(d.transactionIndex);
+                              void (async () => {
+                                setLoadedDraft(null);
+                                setPayrollDraft(null);
+                                setError(null);
+                                setSignature(null);
+                                setExecutionSteps([]);
+                                try {
+                                  const singleResponse = await fetchWithAuth(
+                                    `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}?includeSensitive=true`,
+                                  );
+                                  if (singleResponse.ok) {
+                                    const draft = (await singleResponse.json()) as SingleDraft;
+                                    setLoadedDraft(draft);
+                                    void checkOnChainStatus(d.transactionIndex, draft);
+                                    return;
+                                  }
+                                  const payrollResponse = await fetchWithAuth(
+                                    `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}?includeSensitive=true`,
+                                  );
+                                  if (payrollResponse.ok) {
+                                    const draft = (await payrollResponse.json()) as PayrollDraft;
+                                    setPayrollDraft(draft);
+                                    setExecutionSteps(
+                                      draft.recipients.map((_, i) => ({
+                                        index: i,
+                                        status: "pending",
+                                      })),
+                                    );
+                                    void checkOnChainStatus(d.transactionIndex, draft);
+                                    return;
+                                  }
+                                  setError(
+                                    `No persisted draft found for proposal #${d.transactionIndex}.`,
+                                  );
+                                } catch (caught) {
+                                  setError(
+                                    caught instanceof Error
+                                      ? caught.message
+                                      : "Could not load proposal draft.",
+                                  );
+                                }
+                              })();
+                            }}
+                          >
+                            Load
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-ink">Proposal #{txIndex}</h2>
+                  <p className="text-xs text-ink-muted">
+                    {isPayroll
+                      ? `${payrollDraft?.recipientCount} recipients`
+                      : `${lamportsToSol(loadedDraft?.amount ?? "0")} SOL`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoadedDraft(null);
+                    setPayrollDraft(null);
+                    setTxIndex("");
+                    setError(null);
+                    setSignature(null);
+                    setCloakSignature(null);
+                    setWithdrawSignature(null);
+                    setExecutionSteps([]);
+                  }}
+                  className="text-xs font-semibold text-accent transition-colors hover:text-accent-hover"
+                >
+                  Back to queue
+                </button>
+              </div>
+              <div className="p-5 space-y-5">
+                {/* Transfer details / Payroll table */}
+                {loadedDraft && !isPayroll && (
+                  <dl className="grid gap-2 text-sm">
+                    <DetailRow label="Amount" value={`${lamportsToSol(loadedDraft.amount)} SOL`} />
+                    <DetailRow label="Recipient" value={loadedDraft.recipient} mono />
+                    <DetailRow label="Status" value={proposalStatusMessage ?? "Ready to execute"} />
+                  </dl>
+                )}
+
+                {isPayroll && payrollDraft && (
+                  <div>
+                    <div className="overflow-x-auto rounded-md border border-border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border bg-bg text-left">
+                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                              #
+                            </th>
+                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                              Name
+                            </th>
+                            <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                              Amount
+                            </th>
+                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                              Status
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/70">
+                          {payrollDraft.recipients.map((r, i) => {
+                            const step = executionSteps[i];
+                            return (
+                              <tr key={r.id}>
+                                <td className="px-3 py-2 text-ink-muted">{i + 1}</td>
+                                <td className="px-3 py-2 text-ink">{r.name}</td>
+                                <td className="px-3 py-2 text-right font-mono tabular-nums text-ink">
+                                  {lamportsToSol(r.amount)} SOL
+                                </td>
+                                <td className="px-3 py-2">
+                                  {!step || step.status === "pending" ? (
+                                    <span className="text-ink-muted">Pending</span>
+                                  ) : step.status === "running" ? (
+                                    <span className="text-signal-warn">Running…</span>
+                                  ) : step.status === "success" ? (
+                                    <span className="text-accent">Done</span>
+                                  ) : (
+                                    <div>
+                                      <span className="text-signal-danger">Failed</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => retryFromStep(i)}
+                                        disabled={executing}
+                                        className="ml-2 text-xs text-accent hover:text-accent disabled:text-ink-subtle"
+                                      >
+                                        Retry
+                                      </button>
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
-                  ))}
-              </dl>
-            </section>
-          ) : null}
+
+                    {executionSteps.length > 0 && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between text-xs text-ink-muted">
+                          <span>Progress</span>
+                          <span>
+                            {successCount}/{payrollDraft.recipientCount}
+                          </span>
+                        </div>
+                        <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-2">
+                          <ProgressBar value={successCount} max={payrollDraft.recipientCount} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Execute form */}
+                <form onSubmit={execute} className="space-y-2">
+                  <Button type="submit" disabled={!canExecute}>
+                    {pending
+                      ? isPayroll
+                        ? "Executing batch…"
+                        : "Executing…"
+                      : isPayroll
+                        ? "Execute batch"
+                        : "Execute transfer"}
+                  </Button>
+                  {!wallet.publicKey ? (
+                    <p className="text-xs text-signal-warn">
+                      Connect the registered operator wallet.
+                    </p>
+                  ) : null}
+                  {operatorMismatch && wallet.publicKey ? (
+                    <p className="text-xs text-signal-warn">
+                      Switch to the registered operator wallet.
+                    </p>
+                  ) : null}
+                  {lowOperatorSol ? (
+                    <p className="text-xs text-signal-warn">Add SOL to cover network fees.</p>
+                  ) : null}
+                  {cofreMissing ? (
+                    <p className="text-xs text-signal-warn">Finish private vault setup first.</p>
+                  ) : null}
+                </form>
+
+                {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
+
+                {/* Latest confirmed transactions */}
+                {(cloakSignature || signature || withdrawSignature) && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-ink">Latest confirmed transactions</p>
+                    {[
+                      cloakSignature ? { label: "Cloak deposit", value: cloakSignature } : null,
+                      withdrawSignature
+                        ? { label: "Recipient delivery", value: withdrawSignature }
+                        : null,
+                      signature && !isPayroll
+                        ? { label: "License consumption", value: signature }
+                        : null,
+                    ]
+                      .filter((item): item is { label: string; value: string } => Boolean(item))
+                      .map((item) => (
+                        <div
+                          key={item.label}
+                          className="flex flex-col gap-2 rounded-md border border-border bg-bg px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <dt className="text-sm text-ink-muted">{item.label}</dt>
+                          <dd className="flex items-center gap-2">
+                            <code className="font-mono text-xs text-ink">
+                              {truncateSignature(item.value)}
+                            </code>
+                            <a
+                              href={transactionExplorerUrl(item.value)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft"
+                            >
+                              Explorer
+                            </a>
+                          </dd>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
-      </section>
-    </main>
+
+        {/* Execution history */}
+        {executionHistory.length > 0 && (
+          <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-raise-1">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div>
+                <h2 className="text-sm font-semibold text-ink">Execution history</h2>
+                <p className="text-xs text-ink-muted">
+                  Browser-local record of recent operator runs.
+                </p>
+              </div>
+            </div>
+            <div
+              className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
+              style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 5rem" }}
+            >
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                #
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                Status
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                Details
+              </span>
+              <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                Amount
+              </span>
+              <span />
+            </div>
+            <div className="divide-y divide-border/40">
+              {executionHistory.map((item) => (
+                <div
+                  key={item.id}
+                  className="grid items-center gap-4 px-5 py-3"
+                  style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 5rem" }}
+                >
+                  <span className="font-mono text-sm text-ink-subtle">
+                    #{item.transactionIndex}
+                  </span>
+                  <StatusPill tone={item.status === "success" ? "success" : "danger"}>
+                    {item.status}
+                  </StatusPill>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-ink">
+                      {item.type === "payroll"
+                        ? `${item.recipientCount ?? 0} recipients`
+                        : item.recipient
+                          ? `${item.recipient.slice(0, 8)}...${item.recipient.slice(-8)}`
+                          : "single transfer"}
+                    </p>
+                    <p className="text-xs text-ink-muted">
+                      {new Date(item.createdAt).toLocaleString()}
+                      {item.error ? ` · ${item.error}` : ""}
+                    </p>
+                  </div>
+                  <p className="text-right font-mono text-sm text-ink">
+                    {lamportsToSol(item.amount)} SOL
+                  </p>
+                  <div className="flex justify-end">
+                    {item.signature ? (
+                      <a
+                        href={transactionExplorerUrl(item.signature)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft"
+                      >
+                        Explorer
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Help modal */}
+      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+        <DialogContent size="md" autoClose={false}>
+          <DialogHeader>
+            <DialogTitle>How operator budget works</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 p-6 pt-4 text-sm text-ink-muted">
+            <div className="space-y-2">
+              <p className="font-semibold text-ink">Why does the operator need SOL?</p>
+              <p>
+                Private transfers use <span className="font-medium text-ink">Cloak</span> — a
+                privacy-shielded pool. The Cloak protocol requires a wallet with a private
+                key to sign deposits. Because the vault PDA has no private key, the{" "}
+                <span className="font-medium text-ink">operator's wallet</span> deposits into
+                Cloak on behalf of the vault. This also severs the on-chain link between the
+                vault and the payment.
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-border bg-surface-2 p-4 font-mono text-xs leading-relaxed">
+              <p className="text-ink-subtle">Private payment flow:</p>
+              <p className="mt-2 text-ink">Operator wallet → Cloak pool</p>
+              <p className="text-ink-subtle">↓ (privacy shield keeps amount and recipient hidden)</p>
+              <p className="text-ink">Cloak pool → Recipient</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="font-semibold text-ink">What the operator actually pays</p>
+              <p>
+                The operator's wallet covers{" "}
+                <span className="font-medium text-ink">everything</span>: the full transfer
+                amount deposited into Cloak, plus transaction fees. The vault PDA is not the
+                direct source of funds for Cloak deposits.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="font-semibold text-ink">How to pre-fund the operator</p>
+              <p>
+                Use <span className="font-medium text-ink">Request top-up</span> to propose a
+                direct transfer from the vault to the operator wallet. Members approve it like
+                any other proposal. Once executed, the operator has the SOL needed to run
+                private transfers.
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {topUpRecipient && (
+        <DirectSendModal
+          multisig={multisig}
+          open={topUpOpen}
+          onOpenChange={setTopUpOpen}
+          defaultRecipient={topUpRecipient}
+          defaultAmount={topUpAmount}
+        />
+      )}
+    </WorkspacePage>
   );
 }
 

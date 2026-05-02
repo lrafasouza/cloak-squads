@@ -1,5 +1,18 @@
 "use client";
 
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  EmptyPanel,
+  Panel,
+  PanelBody,
+  PanelHeader,
+  StatusPill,
+  WorkspaceHeader,
+  WorkspacePage,
+} from "@/components/ui/workspace";
+import { lamportsToSol } from "@/lib/sol";
 import {
   type AuditScope,
   type FilteredAuditTransaction,
@@ -9,8 +22,24 @@ import {
   generateDeterministicMockData,
   validateAuditFragment,
 } from "@cloak-squads/core/audit";
+import { ArrowDownLeft, ArrowRightLeft, ArrowUpRight, Download, FileJson, ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
+
+function TxTypeLabel({ type }: { type: FilteredAuditTransaction["type"] }) {
+  const config = {
+    deposit: { icon: ArrowDownLeft, label: "Deposit", color: "text-accent" },
+    transfer: { icon: ArrowRightLeft, label: "Transfer", color: "text-ink-muted" },
+    withdraw: { icon: ArrowUpRight, label: "Withdraw", color: "text-ink-muted" },
+  };
+  const { icon: Icon, label, color } = config[type];
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-ink">
+      <Icon className={cn("h-3.5 w-3.5", color)} />
+      {label}
+    </span>
+  );
+}
 
 type AuditLinkMetadata = {
   id: string;
@@ -22,8 +51,28 @@ type AuditLinkMetadata = {
   createdAt: string;
 };
 
+type AuditTab = "transactions" | "scope";
+type TypeFilter = "all" | FilteredAuditTransaction["type"];
+type StatusFilter = "all" | FilteredAuditTransaction["status"];
+
 function truncateAddress(address: string) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
+}
+
+function downloadText(filename: string, body: string, type: string) {
+  const blob = new Blob([body], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function scopeTone(scope: AuditScope): "accent" | "neutral" | "warning" {
+  if (scope === "full") return "accent";
+  if (scope === "time_ranged") return "warning";
+  return "neutral";
 }
 
 export default function PublicAuditPage({ params }: { params: Promise<{ linkId: string }> }) {
@@ -35,6 +84,9 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
   const [fragmentValid, setFragmentValid] = useState(false);
   const [secretKey, setSecretKey] = useState<Uint8Array | null>(null);
   const [transactions, setTransactions] = useState<FilteredAuditTransaction[]>([]);
+  const [activeTab, setActiveTab] = useState<AuditTab>("transactions");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   // Parse fragment from URL
   useEffect(() => {
@@ -106,7 +158,7 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
       endDate: BigInt((scopeParams.endDate as number | undefined) ?? Date.now()),
     });
 
-    console.log("Derived view key:", Buffer.from(viewKey).toString("hex"));
+    void viewKey;
 
     // TODO: Fetch actual transactions from Cloak scan using viewKey
     // For now, show deterministic mock data based on linkId
@@ -120,15 +172,50 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
     setTransactions(filtered);
   }, [metadata, secretKey]);
 
+  const filteredTransactions = useMemo(
+    () =>
+      transactions.filter((tx) => {
+        const typeMatch = typeFilter === "all" || tx.type === typeFilter;
+        const statusMatch = statusFilter === "all" || tx.status === statusFilter;
+        return typeMatch && statusMatch;
+      }),
+    [statusFilter, transactions, typeFilter],
+  );
+
+  const totals = useMemo(() => {
+    const visibleAmount = filteredTransactions.reduce((sum, tx) => {
+      if (!tx.amount) return sum;
+      return sum + BigInt(tx.amount);
+    }, 0n);
+    return {
+      visibleAmount,
+      deposits: filteredTransactions.filter((tx) => tx.type === "deposit").length,
+      transfers: filteredTransactions.filter((tx) => tx.type === "transfer").length,
+      withdraws: filteredTransactions.filter((tx) => tx.type === "withdraw").length,
+      pending: filteredTransactions.filter((tx) => tx.status === "pending").length,
+    };
+  }, [filteredTransactions]);
+
   const handleExportCSV = () => {
-    const csv = exportAuditToCSV(transactions);
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `audit-${linkId}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadText(`audit-${linkId}.csv`, exportAuditToCSV(filteredTransactions), "text/csv");
+  };
+
+  const handleExportJSON = () => {
+    downloadText(
+      `audit-${linkId}.json`,
+      JSON.stringify(
+        {
+          linkId,
+          exportedAt: new Date().toISOString(),
+          filters: { type: typeFilter, status: statusFilter },
+          metadata,
+          transactions: filteredTransactions,
+        },
+        null,
+        2,
+      ),
+      "application/json",
+    );
   };
 
   const getScopeDescription = (scope: AuditScope) => {
@@ -142,29 +229,18 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
     }
   };
 
-  const getScopeBadge = (scope: AuditScope) => {
-    switch (scope) {
-      case "full":
-        return "bg-accent-soft text-accent";
-      case "amounts_only":
-        return "bg-blue-900 text-blue-200";
-      case "time_ranged":
-        return "bg-amber-900 text-amber-200";
-    }
-  };
-
   if (error) {
     return (
       <main className="min-h-screen bg-bg">
         <section className="mx-auto max-w-3xl px-4 py-16 text-center">
-          <div className="rounded-lg border border-red-800 bg-red-900/20 p-8">
-            <h1 className="text-xl font-semibold text-red-200">Access Error</h1>
-            <p className="mt-4 text-neutral-300">{error}</p>
+          <div className="rounded-lg border border-border-strong p-8">
+            <h1 className="text-xl font-semibold text-ink">Access error</h1>
+            <p className="mt-4 text-ink-muted">{error}</p>
             <Link
               href="/"
-              className="mt-6 inline-block rounded-md bg-surface-2 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:bg-surface-3"
+              className="mt-6 inline-block rounded-md bg-surface-2 px-4 py-2 text-sm font-semibold text-ink transition hover:bg-surface-3"
             >
-              Return Home
+              Return home
             </Link>
           </div>
         </section>
@@ -174,156 +250,277 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
 
   if (loading || !metadata) {
     return (
-      <main className="min-h-screen bg-bg">
-        <section className="mx-auto max-w-6xl px-4 py-10">
-          <p className="text-ink-muted">Loading audit data...</p>
-        </section>
-      </main>
+      <WorkspacePage>
+        <p className="text-ink-muted">Loading audit data...</p>
+      </WorkspacePage>
     );
   }
 
   return (
-    <main className="min-h-screen bg-bg">
-      <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <p className="text-sm font-medium text-accent">Public Audit View</p>
-              <span
-                className={`rounded px-2 py-0.5 text-xs font-medium ${getScopeBadge(metadata.scope)}`}
+    <WorkspacePage>
+      <WorkspaceHeader
+        eyebrow="Public audit view"
+        title="Audit report"
+        description={getScopeDescription(metadata.scope)}
+        action={<StatusPill tone={scopeTone(metadata.scope)}>{metadata.scope}</StatusPill>}
+      />
+
+      <div className="grid gap-4">
+        <Panel>
+          <PanelBody>
+            <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                  Vault
+                </dt>
+                <dd className="mt-1 font-mono text-ink">
+                  {truncateAddress(metadata.cofreAddress)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                  Issued by
+                </dt>
+                <dd className="mt-1 font-mono text-ink">{truncateAddress(metadata.issuedBy)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                  Visible amount
+                </dt>
+                <dd className="mt-1 font-mono text-ink">
+                  {metadata.scope === "amounts_only"
+                    ? "Redacted"
+                    : `${lamportsToSol(totals.visibleAmount)} SOL`}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                  Expires
+                </dt>
+                <dd className="mt-1 text-ink">{new Date(metadata.expiresAt).toLocaleString()}</dd>
+              </div>
+            </dl>
+          </PanelBody>
+        </Panel>
+
+        <Tabs
+          defaultValue="transactions"
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as AuditTab)}
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <TabsList>
+              <TabsTrigger value="transactions">Transactions</TabsTrigger>
+              <TabsTrigger value="scope">Scope</TabsTrigger>
+            </TabsList>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleExportCSV}
+                disabled={filteredTransactions.length === 0}
               >
-                {metadata.scope}
-              </span>
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleExportJSON}
+                disabled={filteredTransactions.length === 0}
+              >
+                <FileJson className="mr-2 h-4 w-4" />
+                Export JSON
+              </Button>
             </div>
-            <h1 className="mt-2 text-3xl font-semibold text-ink">Audit Report</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-300">
-              {getScopeDescription(metadata.scope)}
-            </p>
           </div>
 
-          <div className="flex flex-col gap-2 text-right">
-            <p className="text-sm text-ink-subtle">
-              Vault: {truncateAddress(metadata.cofreAddress)}
-            </p>
-            <p className="text-sm text-ink-subtle">
-              Issued by: {truncateAddress(metadata.issuedBy)}
-            </p>
-            <p className="text-sm text-ink-subtle">
-              Expires: {new Date(metadata.expiresAt).toLocaleDateString()}
-            </p>
-          </div>
-        </div>
+          <TabsContent value="transactions">
+            <Panel>
+              <PanelHeader
+                icon={ShieldCheck}
+                title="Transactions"
+                description={`${filteredTransactions.length} of ${transactions.length} transactions visible with the current filters.`}
+                action={
+                  <div className="flex flex-wrap gap-2">
+                    <select
+                      value={typeFilter}
+                      onChange={(event) => setTypeFilter(event.target.value as TypeFilter)}
+                      className="min-h-9 rounded-md border border-border bg-surface px-2 text-xs font-medium text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                    >
+                      <option value="all">All types</option>
+                      <option value="deposit">Deposits</option>
+                      <option value="transfer">Transfers</option>
+                      <option value="withdraw">Withdraws</option>
+                    </select>
+                    <select
+                      value={statusFilter}
+                      onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+                      className="min-h-9 rounded-md border border-border bg-surface px-2 text-xs font-medium text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                    >
+                      <option value="all">All statuses</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="pending">Pending</option>
+                    </select>
+                  </div>
+                }
+              />
+              <PanelBody>
+                <div className="mb-6 grid gap-4 sm:grid-cols-4">
+                  <div>
+                    <p className="text-xs font-medium text-ink-subtle">Deposits</p>
+                    <p className="mt-1 font-mono text-xl font-semibold text-ink">
+                      {totals.deposits}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-ink-subtle">Transfers</p>
+                    <p className="mt-1 font-mono text-xl font-semibold text-ink">
+                      {totals.transfers}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-ink-subtle">Withdraws</p>
+                    <p className="mt-1 font-mono text-xl font-semibold text-ink">
+                      {totals.withdraws}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-ink-subtle">Pending</p>
+                    <p className="mt-1 font-mono text-xl font-semibold text-ink">
+                      {totals.pending}
+                    </p>
+                  </div>
+                </div>
 
-        {/* Transactions Table */}
-        <section className="mt-8">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-ink">Transactions</h2>
-            <button
-              type="button"
-              onClick={handleExportCSV}
-              disabled={transactions.length === 0}
-              className="rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-xs font-semibold text-neutral-300 transition hover:bg-surface-3 disabled:opacity-50"
-            >
-              Export CSV
-            </button>
-          </div>
+                {filteredTransactions.length === 0 ? (
+                  <EmptyPanel
+                    title="No transactions match these filters"
+                    description="Clear the type or status filter to widen the audit view."
+                  />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border/50">
+                          <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
+                            Date
+                          </th>
+                          <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
+                            Type
+                          </th>
+                          <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
+                            Amount
+                          </th>
+                          <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
+                            Nullifier
+                          </th>
+                          <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTransactions.map((tx) => (
+                          <tr
+                            key={tx.nullifier}
+                            className="border-b border-border/20 transition-colors last:border-b-0 hover:bg-surface-2/30"
+                          >
+                            <td className="px-5 py-3.5 whitespace-nowrap text-ink">
+                              {new Date(tx.timestamp).toLocaleDateString(undefined, {
+                                year: "numeric",
+                                month: "short",
+                                day: "2-digit",
+                              })}{" "}
+                              <span className="text-ink-subtle">
+                                {new Date(tx.timestamp).toLocaleTimeString(undefined, {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <TxTypeLabel type={tx.type} />
+                            </td>
+                            <td className="px-5 py-3.5 font-mono text-ink">
+                              {tx.amount ? `${lamportsToSol(tx.amount)} SOL` : "Redacted"}
+                            </td>
+                            <td className="px-5 py-3.5 font-mono text-xs text-ink-subtle">
+                              {tx.nullifier.slice(0, 12)}...{tx.nullifier.slice(-6)}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <StatusPill
+                                tone={tx.status === "confirmed" ? "success" : "warning"}
+                              >
+                                {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
+                              </StatusPill>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </PanelBody>
+            </Panel>
+          </TabsContent>
 
-          {transactions.length === 0 ? (
-            <div className="mt-4 rounded-lg border border-border bg-surface p-8 text-center">
-              <p className="text-ink-muted">No transactions found for this audit scope.</p>
-            </div>
-          ) : (
-            <div className="mt-4 overflow-hidden rounded-lg border border-border bg-surface">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-bg">
-                    <th className="px-4 py-3 text-left font-medium text-ink-muted">Date</th>
-                    <th className="px-4 py-3 text-left font-medium text-ink-muted">Type</th>
-                    <th className="px-4 py-3 text-left font-medium text-ink-muted">Amount</th>
-                    <th className="px-4 py-3 text-left font-medium text-ink-muted">Nullifier</th>
-                    <th className="px-4 py-3 text-left font-medium text-ink-muted">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-800">
-                  {transactions.map((tx) => (
-                    <tr key={tx.nullifier} className="hover:bg-surface-2/50">
-                      <td className="px-4 py-3 text-neutral-300">
-                        {new Date(tx.timestamp).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`rounded px-2 py-0.5 text-xs font-medium ${
-                            tx.type === "deposit"
-                              ? "bg-accent-soft/50 text-accent"
-                              : tx.type === "withdraw"
-                                ? "bg-signal-danger/15 text-red-200"
-                                : "bg-blue-900/50 text-blue-200"
-                          }`}
-                        >
-                          {tx.type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-neutral-300">
-                        {tx.amount ?? "REDACTED"}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-ink-subtle">
-                        {tx.nullifier}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`rounded px-2 py-0.5 text-xs font-medium ${
-                            tx.status === "confirmed"
-                              ? "bg-accent-soft/50 text-accent"
-                              : "bg-amber-900/50 text-amber-200"
-                          }`}
-                        >
-                          {tx.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+          <TabsContent value="scope">
+            <Panel>
+              <PanelHeader
+                title="Scope and link metadata"
+                description="This view is derived client-side from the secret fragment in the URL."
+              />
+              <PanelBody>
+                <dl className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                      Audit link ID
+                    </dt>
+                    <dd className="mt-1 break-all font-mono text-sm text-ink">{metadata.id}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                      Created
+                    </dt>
+                    <dd className="mt-1 text-sm text-ink">
+                      {new Date(metadata.createdAt).toLocaleString()}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                      Scope
+                    </dt>
+                    <dd className="mt-1 text-sm text-ink">{metadata.scope}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                      Transaction counts
+                    </dt>
+                    <dd className="mt-1 text-sm text-ink">
+                      {transactions.length} total, {filteredTransactions.length} after filters
+                    </dd>
+                  </div>
+                </dl>
 
-        {/* Info Box */}
-        <section className="mt-8 rounded-lg border border-border bg-surface p-6">
-          <h3 className="font-semibold text-ink">About This Audit</h3>
-          <dl className="mt-4 grid gap-4 md:grid-cols-2">
-            <div>
-              <dt className="text-xs text-ink-subtle">Audit Link ID</dt>
-              <dd className="mt-1 font-mono text-sm text-neutral-300">{metadata.id}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-ink-subtle">Created</dt>
-              <dd className="mt-1 text-sm text-neutral-300">
-                {new Date(metadata.createdAt).toLocaleString()}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-ink-subtle">Expires</dt>
-              <dd className="mt-1 text-sm text-neutral-300">
-                {new Date(metadata.expiresAt).toLocaleString()}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-ink-subtle">Issued By</dt>
-              <dd className="mt-1 font-mono text-sm text-neutral-300">{metadata.issuedBy}</dd>
-            </div>
-          </dl>
-
-          {metadata.scopeParams && (
-            <div className="mt-4">
-              <dt className="text-xs text-ink-subtle">Scope Parameters</dt>
-              <dd className="mt-1 rounded bg-bg p-3 font-mono text-xs text-ink-muted">
-                {metadata.scopeParams}
-              </dd>
-            </div>
-          )}
-        </section>
-      </section>
-    </main>
+                {metadata.scopeParams ? (
+                  <div className="mt-4">
+                    <dt className="text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                      Scope parameters
+                    </dt>
+                    <dd className="mt-1 rounded-md border border-border bg-bg p-3 font-mono text-xs text-ink-muted">
+                      {metadata.scopeParams}
+                    </dd>
+                  </div>
+                ) : null}
+              </PanelBody>
+            </Panel>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </WorkspacePage>
   );
 }

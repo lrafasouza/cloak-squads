@@ -1,9 +1,11 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { AlertTriangle, HelpCircle } from "lucide-react";
+import { AlertTriangle, HelpCircle, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AutoCloseIndicator } from "./auto-close-indicator";
 import { Button } from "./button";
 
 interface ConfirmModalProps {
@@ -30,6 +32,12 @@ export function ConfirmModal({
   isLoading = false,
 }: ConfirmModalProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const [autoCloseKey, setAutoCloseKey] = useState(0);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -37,7 +45,19 @@ export function ConfirmModal({
     }
   }, [open]);
 
-  return (
+  /* Auto-close after 10 seconds */
+  useEffect(() => {
+    if (!open) {
+      setAutoCloseKey((k) => k + 1);
+      return;
+    }
+    const timer = setTimeout(() => {
+      onCancel();
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [open, onCancel]);
+
+  const node = (
     <AnimatePresence>
       {open && (
         <>
@@ -49,17 +69,18 @@ export function ConfirmModal({
             className="fixed inset-0 z-50 bg-bg/80 backdrop-blur-sm"
             onClick={onCancel}
           />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 10 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className={cn(
-              "fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2",
-              "rounded-xl border border-border bg-surface p-6 shadow-raise-2",
-            )}
-          >
-            <div className="flex items-start gap-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className={cn(
+                "pointer-events-auto w-[calc(100%-2rem)] max-w-md",
+                "rounded-xl border border-border bg-surface p-6 shadow-raise-2",
+              )}
+            >
+            <div className="relative flex items-start gap-4">
               <div
                 className={cn(
                   "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
@@ -75,7 +96,7 @@ export function ConfirmModal({
                 )}
               </div>
 
-              <div className="flex-1">
+              <div className="flex-1 pr-10">
                 <h3 className="font-display text-lg font-semibold text-ink">{title}</h3>
                 <p className="mt-2 text-sm text-ink-muted leading-relaxed">{description}</p>
 
@@ -94,10 +115,31 @@ export function ConfirmModal({
                   </Button>
                 </div>
               </div>
+
+              <div className="absolute right-0 top-0 flex items-center gap-2">
+                <AutoCloseIndicator
+                  key={autoCloseKey}
+                  durationMs={10000}
+                  onComplete={onCancel}
+                  paused={!open}
+                />
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>
   );
+
+  if (!mounted) return null;
+  return createPortal(node, document.body);
 }

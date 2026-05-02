@@ -1,5 +1,6 @@
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { requireWalletAuth } from "@/lib/wallet-auth";
+import { Prisma } from "@prisma/client";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -18,6 +19,7 @@ const vaultMetadataSchema = z.object({
   ),
   name: z.string().trim().min(1).max(32),
   description: z.string().trim().max(64).optional(),
+  avatarUrl: z.string().trim().max(350_000).optional(),
 });
 
 export async function POST(request: Request) {
@@ -50,17 +52,27 @@ export async function POST(request: Request) {
         cofreAddress: parsed.data.cofreAddress,
         name: parsed.data.name,
         description: parsed.data.description || null,
+        avatarUrl: parsed.data.avatarUrl || null,
         createdBy: auth.publicKey,
       },
       update: {
         name: parsed.data.name,
         description: parsed.data.description || null,
+        avatarUrl: parsed.data.avatarUrl || null,
       },
     });
 
     return NextResponse.json(vault, { status: 201 });
   } catch (error) {
     console.error("[api/vaults] upsert failed:", error);
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P1001") {
+      return NextResponse.json(
+        { error: "Database unavailable.", details: "Could not reach the local Postgres server." },
+        { status: 503 },
+      );
+    }
+
     return NextResponse.json({ error: "Could not save vault metadata." }, { status: 500 });
   }
 }

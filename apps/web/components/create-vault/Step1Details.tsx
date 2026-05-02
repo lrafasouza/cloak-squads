@@ -1,53 +1,46 @@
 "use client";
 
-import { VaultIdenticon } from "@/components/ui/vault-identicon";
+import { VaultAvatarPicker } from "@/components/create-vault/VaultAvatarPicker";
 import { cn } from "@/lib/utils";
-import { ImagePlus } from "lucide-react";
 import { useRef } from "react";
 
 interface Step1DetailsProps {
   name: string;
   description: string;
+  avatarDataUrl: string;
   onName: (v: string) => void;
   onDescription: (v: string) => void;
+  onAvatar: (v: string) => void;
   onNext: () => void;
 }
 
-export function Step1Details({ name, description, onName, onDescription, onNext }: Step1DetailsProps) {
+export function Step1Details({
+  name,
+  description,
+  avatarDataUrl,
+  onName,
+  onDescription,
+  onAvatar,
+  onNext,
+}: Step1DetailsProps) {
   const nameRef = useRef<HTMLInputElement>(null);
   const isValid = name.trim().length > 0;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       {/* Card */}
-      <div className="rounded-xl border border-border bg-surface p-6 shadow-raise-1">
-        <h2 className="mb-5 text-sm font-semibold text-ink-muted uppercase tracking-wider">
+      <div className="rounded-xl border border-border bg-surface p-8 shadow-raise-1">
+        <h2 className="mb-6 text-sm font-semibold text-ink-muted uppercase tracking-wider">
           Vault identity
         </h2>
 
         {/* Avatar + Name row */}
-        <div className="flex items-center gap-4">
-          {/* Identicon slot */}
-          <div className="relative flex-shrink-0">
-            <div
-              className={cn(
-                "h-14 w-14 overflow-hidden rounded-xl border border-border-strong",
-                !name && "bg-surface-2",
-              )}
-            >
-              {name ? (
-                <VaultIdenticon seed={name} size={56} className="h-14 w-14" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center">
-                  <ImagePlus className="h-5 w-5 text-ink-subtle" />
-                </div>
-              )}
-            </div>
-          </div>
+        <div className="flex items-center gap-5">
+          <VaultAvatarPicker seed={name} avatarDataUrl={avatarDataUrl} onAvatar={onAvatar} />
 
           {/* Name input */}
           <div className="flex-1">
-            <label htmlFor="vault-name" className="mb-1.5 block text-xs font-medium text-ink-muted">
+            <label htmlFor="vault-name" className="mb-2 block text-sm font-medium text-ink">
               Vault name <span className="text-signal-danger">*</span>
             </label>
             <input
@@ -61,7 +54,7 @@ export function Step1Details({ name, description, onName, onDescription, onNext 
               onChange={(e) => onName(e.target.value)}
               placeholder="My Treasury"
               className={cn(
-                "w-full rounded-lg border bg-surface-2 px-3 py-2.5 text-sm text-ink placeholder:text-ink-subtle",
+                "w-full rounded-lg border bg-surface-2 px-4 py-3 text-base text-ink placeholder:text-ink-subtle",
                 "focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-border-strong",
                 "transition-colors",
                 name.length === 32
@@ -69,13 +62,13 @@ export function Step1Details({ name, description, onName, onDescription, onNext 
                   : "border-border hover:border-border-strong",
               )}
             />
-            <div className="mt-1 flex justify-between">
-              <span className="text-xs text-ink-subtle">
+            <div className="mt-1.5 flex justify-between">
+              <span className="text-sm text-ink-subtle">
                 Your identicon is generated from the name
               </span>
               <span
                 className={cn(
-                  "text-xs tabular-nums",
+                  "text-sm tabular-nums",
                   name.length > 28 ? "text-signal-warn" : "text-ink-subtle",
                 )}
               >
@@ -86,13 +79,9 @@ export function Step1Details({ name, description, onName, onDescription, onNext 
         </div>
 
         {/* Description */}
-        <div className="mt-5">
-          <label
-            htmlFor="vault-desc"
-            className="mb-1.5 block text-xs font-medium text-ink-muted"
-          >
-            Description{" "}
-            <span className="text-ink-subtle font-normal">(optional)</span>
+        <div className="mt-6">
+          <label htmlFor="vault-desc" className="mb-2 block text-sm font-medium text-ink">
+            Description <span className="text-ink-subtle font-normal">(optional)</span>
           </label>
           <input
             id="vault-desc"
@@ -103,15 +92,15 @@ export function Step1Details({ name, description, onName, onDescription, onNext 
             onChange={(e) => onDescription(e.target.value)}
             placeholder="e.g. Protocol team treasury"
             className={cn(
-              "w-full rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-sm text-ink placeholder:text-ink-subtle",
+              "w-full rounded-lg border border-border bg-surface-2 px-4 py-3 text-base text-ink placeholder:text-ink-subtle",
               "focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-border-strong",
               "hover:border-border-strong transition-colors",
             )}
           />
-          <div className="mt-1 flex justify-end">
+          <div className="mt-1.5 flex justify-end">
             <span
               className={cn(
-                "text-xs tabular-nums",
+                "text-sm tabular-nums",
                 description.length > 56 ? "text-signal-warn" : "text-ink-subtle",
               )}
             >
@@ -128,7 +117,7 @@ export function Step1Details({ name, description, onName, onDescription, onNext 
           disabled={!isValid}
           onClick={onNext}
           className={cn(
-            "inline-flex min-h-10 items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold transition-all",
+            "inline-flex min-h-11 items-center gap-2 rounded-lg px-8 py-3 text-base font-semibold transition-all",
             "shadow-raise-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
             isValid
               ? "bg-accent text-accent-ink hover:bg-accent-hover cursor-pointer"

@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import { Shield, Zap } from "lucide-react";
 
 /**
- * Animated protocol diagram: Squads → Gatekeeper → Operator
- * A golden "License" token travels from Gatekeeper to Operator in a loop.
+ * Animated protocol diagram: Squads → Cloak Engine → Operator
+ * A golden "License" token travels from Cloak Engine to Operator in a loop.
  */
 export function HeroDiagram() {
   return (
@@ -26,10 +26,10 @@ export function HeroDiagram() {
           />
         </div>
 
-        {/* Node 2: Gatekeeper */}
-        <Node label="Gatekeeper" sub="license">
+        {/* Node 2: Cloak Engine */}
+        <Node label="Cloak Engine" sub="privacy">
           <div className="flex h-5 w-5 items-center justify-center rounded-sm border border-accent/40 bg-accent-soft">
-            <span className="text-[10px] font-bold text-accent">GK</span>
+            <span className="text-[10px] font-bold text-accent">CE</span>
           </div>
         </Node>
 
@@ -54,7 +54,7 @@ export function HeroDiagram() {
       {/* Bottom labels */}
       <div className="mt-3 flex justify-between text-eyebrow text-ink-subtle">
         <span>Approve</span>
-        <span>Issue license</span>
+        <span>Issue permission</span>
         <span>Execute</span>
       </div>
     </div>

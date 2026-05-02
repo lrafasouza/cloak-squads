@@ -49,13 +49,13 @@ export function Logo({ variant = "full", className, href = "/", size = "md" }: L
       {variant !== "monogram" && (
         <span
           className={cn(
-            "font-display font-semibold leading-none lowercase",
+            "font-display font-semibold leading-none",
             "text-ink",
             s.word,
           )}
           style={{ letterSpacing: "-0.02em" }}
         >
-          aegis
+          Aegis
         </span>
       )}
     </span>

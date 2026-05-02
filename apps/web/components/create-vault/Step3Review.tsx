@@ -1,8 +1,13 @@
 "use client";
 
+import { DeployFeeBreakdown } from "@/components/create-vault/DeployFeeBreakdown";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import { WarningCallout } from "@/components/ui/warning-callout";
+import {
+  type DeployFeeBreakdown as DeployFeeBreakdownValue,
+  estimateDeployFee,
+} from "@/lib/deploy-fee";
 import { buildInitCofreIxBrowser } from "@/lib/gatekeeper-instructions";
 import { lamportsToSol } from "@/lib/sol";
 import {
@@ -26,20 +31,22 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const { Permission, Permissions } = multisigSdk.types;
-
-const VAULT_FUND_LAMPORTS = 20_000_000; // 0.02 SOL
-const PLATFORM_FEE_LAMPORTS = 1_000; // 0.001 SOL
-const AEGIS_FEE_LAMPORTS = 1_000; // 0.001 SOL
 
 interface Step3ReviewProps {
   name: string;
   description: string;
+  avatarDataUrl: string;
   members: string[];
   threshold: number;
   operator: string;
+  createKeySecret: number[];
+  createdMultisig: string;
+  bootstrapIndex: string;
+  onCreatedMultisig: (value: string) => void;
+  onBootstrapIndex: (value: string) => void;
   onBack: () => void;
 }
 
@@ -79,12 +86,26 @@ function describeTransactionError(err: unknown) {
   return details.join("\n");
 }
 
+function readProposalStatus(status: unknown): string {
+  if (status && typeof status === "object") {
+    const kind = (status as { __kind?: unknown }).__kind;
+    if (typeof kind === "string") return kind.toLowerCase();
+  }
+  return "unknown";
+}
+
 export function Step3Review({
   name,
   description,
+  avatarDataUrl,
   members,
   threshold,
   operator,
+  createKeySecret,
+  createdMultisig,
+  bootstrapIndex: savedBootstrapIndex,
+  onCreatedMultisig,
+  onBootstrapIndex,
   onBack,
 }: Step3ReviewProps) {
   const { connection } = useConnection();
@@ -99,6 +120,7 @@ export function Step3Review({
   const [bootstrapIndex, setBootstrapIndex] = useState<string | null>(null);
   const [steps, setSteps] = useState<CreationStep[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [deployFee, setDeployFee] = useState<DeployFeeBreakdownValue | null>(null);
   const submittingRef = useRef(false);
 
   const myPubkey = wallet.publicKey?.toBase58() ?? "";
@@ -108,9 +130,25 @@ export function Step3Review({
     return extra.length > 0 ? extra : [myPubkey];
   })();
 
-  const totalFeeSOL = lamportsToSol(
-    String(VAULT_FUND_LAMPORTS + PLATFORM_FEE_LAMPORTS + AEGIS_FEE_LAMPORTS),
+  const createKey = useMemo(
+    () => Keypair.fromSecretKey(Uint8Array.from(createKeySecret)),
+    [createKeySecret],
   );
+  const totalFeeSOL = deployFee ? lamportsToSol(String(deployFee.totalLamports)) : "0.020";
+
+  useEffect(() => {
+    let cancelled = false;
+    estimateDeployFee(connection)
+      .then((fee) => {
+        if (!cancelled) setDeployFee(fee);
+      })
+      .catch(() => {
+        if (!cancelled) setDeployFee(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connection]);
 
   const updateLocalStep = useCallback((id: string, update: Partial<CreationStep>) => {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...update } : s)));
@@ -159,7 +197,6 @@ export function Step3Review({
 
     try {
       const operatorPk = new PublicKey(operator.trim());
-      const createKey = Keypair.generate();
       const [multisigPda] = multisigSdk.getMultisigPda({ createKey: createKey.publicKey });
       const [vaultPda] = multisigSdk.getVaultPda({ multisigPda, index: 0 });
 
@@ -191,98 +228,158 @@ export function Step3Review({
       updateLocalStep("validate", { status: "success" });
       updateStep("validate", { status: "success" });
 
-      const createIx = multisigSdk.instructions.multisigCreateV2({
-        treasury,
-        createKey: createKey.publicKey,
-        creator: wallet.publicKey,
-        multisigPda,
-        configAuthority: null,
-        threshold,
-        members: parsedMembers.map((key) => ({ key, permissions: memberPerms })),
-        timeLock: 0,
-        rentCollector: null,
-        memo: "Created via Aegis",
-      });
+      const existingMultisig =
+        createdMultisig ||
+        (await connection
+          .getAccountInfo(multisigPda)
+          .then((account) => (account ? multisigPda.toBase58() : "")));
+      if (existingMultisig) {
+        onCreatedMultisig(existingMultisig);
+        updateLocalStep("multisig", { status: "success" });
+        updateStep("multisig", {
+          status: "success",
+          description: "Existing multisig found for this draft. Skipping creation.",
+        });
+      } else {
+        const createIx = multisigSdk.instructions.multisigCreateV2({
+          treasury,
+          createKey: createKey.publicKey,
+          creator: wallet.publicKey,
+          multisigPda,
+          configAuthority: null,
+          threshold,
+          members: parsedMembers.map((key) => ({ key, permissions: memberPerms })),
+          timeLock: 0,
+          rentCollector: null,
+          memo: "Created via Aegis",
+        });
 
-      const blockhash = await connection.getLatestBlockhash();
-      const fundIx = SystemProgram.transfer({
-        fromPubkey: wallet.publicKey,
-        toPubkey: vaultPda,
-        lamports: VAULT_FUND_LAMPORTS,
-      });
-      const tx = new Transaction().add(createIx, fundIx);
-      tx.feePayer = wallet.publicKey;
-      tx.recentBlockhash = blockhash.blockhash;
-      tx.partialSign(createKey);
+        const blockhash = await connection.getLatestBlockhash();
+        const fundIx = SystemProgram.transfer({
+          fromPubkey: wallet.publicKey,
+          toPubkey: vaultPda,
+          lamports: deployFee?.vaultRentReserveLamports ?? 20_000_000,
+        });
+        const tx = new Transaction().add(createIx, fundIx);
+        tx.feePayer = wallet.publicKey;
+        tx.recentBlockhash = blockhash.blockhash;
+        tx.partialSign(createKey);
 
-      updateLocalStep("multisig", { status: "running" });
-      updateStep("multisig", { status: "running" });
-      const simulation = await connection.simulateTransaction(tx, undefined, false);
-      if (simulation.value.err) {
-        console.error("[create-vault] multisig create simulation failed", simulation.value);
-        throw new Error(
-          [
-            `Create Squads multisig simulation failed: ${JSON.stringify(simulation.value.err)}`,
-            ...(simulation.value.logs ?? []),
-          ].join("\n"),
-        );
+        updateLocalStep("multisig", { status: "running" });
+        updateStep("multisig", { status: "running" });
+
+        let sig: string;
+        try {
+          sig = await wallet.sendTransaction(tx, connection);
+        } catch (sendErr) {
+          console.error("[create-vault] multisig create send failed", sendErr);
+          throw new Error(describeTransactionError(sendErr));
+        }
+        await connection.confirmTransaction({ signature: sig, ...blockhash }, "confirmed");
+        onCreatedMultisig(multisigPda.toBase58());
+        updateLocalStep("multisig", { status: "success", signature: sig });
+        updateStep("multisig", { status: "success", signature: sig });
       }
-
-      let sig: string;
-      try {
-        sig = await wallet.sendTransaction(tx, connection);
-      } catch (sendErr) {
-        console.error("[create-vault] multisig create send failed", sendErr);
-        throw new Error(describeTransactionError(sendErr));
-      }
-      await connection.confirmTransaction({ signature: sig, ...blockhash }, "confirmed");
-      updateLocalStep("multisig", { status: "success", signature: sig });
-      updateStep("multisig", { status: "success", signature: sig });
 
       updateLocalStep("bootstrap", { status: "running" });
       updateStep("bootstrap", { status: "running" });
-      const initCofre = await buildInitCofreIxBrowser({
-        multisig: multisigPda,
-        operator: operatorPk,
-      });
-      const bootstrap = await createInitCofreProposal({
-        connection,
-        wallet,
-        multisigPda,
-        initCofreIx: initCofre.instruction,
-        memo: "Initialize Aegis vault",
-      });
-      setBootstrapIndex(bootstrap.transactionIndex.toString());
+      let transactionIndex: bigint | null = savedBootstrapIndex
+        ? BigInt(savedBootstrapIndex)
+        : null;
+      let bootstrapSignature: string | undefined;
+      if (!transactionIndex) {
+        // Dedup: for newly created vaults the init proposal is always index 1.
+        // If it already exists and is still active/approved, reuse it instead of creating a duplicate.
+        try {
+          const [existingProposalPda] = multisigSdk.getProposalPda({
+            multisigPda,
+            transactionIndex: 1n,
+          });
+          const existingProposal = await multisigSdk.accounts.Proposal.fromAccountAddress(
+            connection,
+            existingProposalPda,
+          );
+          const existingStatus = readProposalStatus(existingProposal.status);
+          if (existingStatus === "active" || existingStatus === "approved") {
+            transactionIndex = 1n;
+            onBootstrapIndex("1");
+          }
+        } catch {
+          // No existing proposal — will create below.
+        }
+      }
+      if (!transactionIndex) {
+        const initCofre = await buildInitCofreIxBrowser({
+          multisig: multisigPda,
+          operator: operatorPk,
+        });
+        const bootstrap = await createInitCofreProposal({
+          connection,
+          wallet,
+          multisigPda,
+          initCofreIx: initCofre.instruction,
+          memo: "Initialize Aegis vault",
+        });
+        transactionIndex = bootstrap.transactionIndex;
+        bootstrapSignature = bootstrap.signature;
+        onBootstrapIndex(bootstrap.transactionIndex.toString());
+      }
+      setBootstrapIndex(transactionIndex.toString());
       updateLocalStep("bootstrap", {
         status: "success",
-        signature: bootstrap.signature,
+        ...(bootstrapSignature ? { signature: bootstrapSignature } : {}),
       });
       updateStep("bootstrap", {
         status: "success",
-        signature: bootstrap.signature,
-        description: `Proposal #${bootstrap.transactionIndex.toString()} confirmed.`,
+        ...(bootstrapSignature ? { signature: bootstrapSignature } : {}),
+        description:
+          savedBootstrapIndex || !bootstrapSignature
+            ? `Existing bootstrap proposal #${transactionIndex.toString()} found. Skipping creation.`
+            : `Proposal #${transactionIndex.toString()} confirmed.`,
       });
 
       updateLocalStep("initialize", { status: "running" });
       updateStep("initialize", { status: "running" });
       if (threshold === 1) {
-        await proposalApprove({
-          connection,
-          wallet,
+        const [proposalPda] = multisigSdk.getProposalPda({
           multisigPda,
-          transactionIndex: bootstrap.transactionIndex,
-          memo: "Approve vault bootstrap",
+          transactionIndex,
         });
-        const execSig = await vaultTransactionExecute({
+        const proposal = await multisigSdk.accounts.Proposal.fromAccountAddress(
           connection,
-          wallet,
-          multisigPda,
-          transactionIndex: bootstrap.transactionIndex,
-        });
-        const execBlockhash = await connection.getLatestBlockhash();
-        await connection.confirmTransaction({ signature: execSig, ...execBlockhash }, "confirmed");
-        updateLocalStep("initialize", { status: "success", signature: execSig });
-        updateStep("initialize", { status: "success", signature: execSig });
+          proposalPda,
+        );
+        const proposalStatus = readProposalStatus(proposal.status);
+        if (proposalStatus === "executed") {
+          updateLocalStep("initialize", { status: "success" });
+          updateStep("initialize", {
+            status: "success",
+            description: "Bootstrap proposal was already executed.",
+          });
+        } else {
+          if (proposalStatus === "active") {
+            await proposalApprove({
+              connection,
+              wallet,
+              multisigPda,
+              transactionIndex,
+              memo: "Approve vault bootstrap",
+            });
+          }
+          const execSig = await vaultTransactionExecute({
+            connection,
+            wallet,
+            multisigPda,
+            transactionIndex,
+          });
+          const execBlockhash = await connection.getLatestBlockhash();
+          await connection.confirmTransaction(
+            { signature: execSig, ...execBlockhash },
+            "confirmed",
+          );
+          updateLocalStep("initialize", { status: "success", signature: execSig });
+          updateStep("initialize", { status: "success", signature: execSig });
+        }
       } else {
         updateLocalStep("initialize", { status: "success" });
         updateStep("initialize", {
@@ -298,6 +395,7 @@ export function Step3Review({
           cofreAddress: multisigPda.toBase58(),
           name: name.trim(),
           description: description.trim() || undefined,
+          avatarUrl: avatarDataUrl || undefined,
         }),
       });
       if (!metadataResponse.ok) {
@@ -329,8 +427,15 @@ export function Step3Review({
     allMembers,
     threshold,
     operator,
+    createKey,
+    createdMultisig,
+    savedBootstrapIndex,
     name,
     description,
+    avatarDataUrl,
+    deployFee,
+    onCreatedMultisig,
+    onBootstrapIndex,
     fetchWithAuth,
     updateLocalStep,
     startTransaction,
@@ -372,7 +477,7 @@ export function Step3Review({
   if (isPending) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="rounded-xl border border-border bg-surface p-6 shadow-raise-1">
+        <div className="rounded-xl border border-border bg-surface p-6 shadow-raise-1 md:p-8">
           <h2 className="mb-5 text-sm font-semibold text-ink">Creating vault…</h2>
           <div className="flex flex-col gap-3">
             {steps.map((s) => (
@@ -428,9 +533,14 @@ export function Step3Review({
   return (
     <div className="flex flex-col gap-4">
       {/* Vault identity header */}
-      <div className="rounded-xl border border-border bg-surface p-5 shadow-raise-1">
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-raise-1 md:p-8">
         <div className="flex items-center gap-3">
-          <VaultIdenticon seed={name} size={44} className="rounded-lg" />
+          {avatarDataUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatarDataUrl} alt="" className="h-11 w-11 rounded-lg object-cover" />
+          ) : (
+            <VaultIdenticon seed={name} size={44} className="rounded-lg" />
+          )}
           <div>
             <h2 className="text-base font-semibold text-ink">{name}</h2>
             {description && <p className="mt-0.5 text-xs text-ink-muted">{description}</p>}
@@ -459,12 +569,7 @@ export function Step3Review({
           ))}
         </div>
 
-        {/* Fee breakdown */}
-        <div className="mt-4 rounded-lg border border-border bg-surface-2 px-3.5 py-3 text-xs text-ink-muted leading-relaxed">
-          <span className="font-medium text-ink-subtle">Fee breakdown: </span>
-          0.001 SOL Squads protocol · 0.001 SOL Aegis registration · 0.02 SOL deposited into your
-          vault (withdrawable) · ~0.002 SOL network rent
-        </div>
+        <DeployFeeBreakdown fee={deployFee} />
       </div>
 
       {/* What will be created */}
@@ -483,7 +588,7 @@ export function Step3Review({
               {[
                 `Squads multisig — ${allMembers.length} members, ${threshold}-of-${allMembers.length} threshold`,
                 "Squads vault PDA (index 0)",
-                "Aegis Cofre PDA — private execution gatekeeper",
+                "Aegis Cofre PDA — private execution layer",
                 `Initialization proposal${threshold > 1 ? ` (needs ${threshold} signatures)` : " (auto-executed)"}`,
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2">
@@ -497,7 +602,7 @@ export function Step3Review({
       </div>
 
       {/* Members preview */}
-      <div className="rounded-xl border border-border bg-surface p-5">
+      <div className="rounded-xl border border-border bg-surface p-6 md:p-8">
         <p className="mb-3 text-xs font-medium text-ink-subtle uppercase tracking-wider">
           Members ({allMembers.length})
         </p>

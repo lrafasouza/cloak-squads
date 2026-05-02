@@ -1,8 +1,20 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
+import {
+  InlineAlert,
+  Panel,
+  PanelBody,
+  PanelHeader,
+  WorkspaceHeader,
+  WorkspacePage,
+} from "@/components/ui/workspace";
 import { buildRevokeAuditIxBrowser } from "@/lib/gatekeeper-instructions";
+import { truncateAddress } from "@/lib/proposals";
+import { lamportsToSol } from "@/lib/sol";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
+import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import {
   type AuditScope,
@@ -13,6 +25,21 @@ import {
 } from "@cloak-squads/core/audit";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
+import { AutoCloseIndicator } from "@/components/ui/auto-close-indicator";
+import {
+  ArrowRightLeft,
+  CheckCircle2,
+  Download,
+  Link2,
+  List,
+  Send,
+  Settings,
+  Shield,
+  Trash2,
+  Users,
+  X,
+  XCircle,
+} from "lucide-react";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -25,8 +52,28 @@ type AuditLinkSummary = {
   createdAt: string;
 };
 
-function truncateAddress(address: string) {
-  return `${address.slice(0, 4)}...${address.slice(-4)}`;
+type AuditAdminTab = "activity" | "links" | "export" | "settings";
+type ActivityFilter = "all" | "proposals" | "vault" | "operator" | "privacy";
+type LinkScopeFilter = "all" | AuditScope;
+
+
+function downloadText(filename: string, body: string, type: string) {
+  const blob = new Blob([body], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function parseScopeParams(scopeParams: string | null): { startDate?: number; endDate?: number } {
+  if (!scopeParams) return {};
+  try {
+    return JSON.parse(scopeParams) as { startDate?: number; endDate?: number };
+  } catch {
+    return {};
+  }
 }
 
 export default function AuditAdminPage({ params }: { params: Promise<{ multisig: string }> }) {
@@ -50,6 +97,20 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [lastCreatedUrl, setLastCreatedUrl] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<AuditAdminTab>("activity");
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
+  const [scopeFilter, setScopeFilter] = useState<LinkScopeFilter>("all");
+
+  const { data: proposals = [] } = useProposalSummaries(multisig);
+
+  const activityEvents = useMemo(() => {
+    const finalized = proposals.filter(
+      (p) => p.status === "executed" || p.status === "rejected" || p.status === "cancelled",
+    );
+    if (activityFilter === "proposals") return finalized;
+    if (activityFilter === "vault" || activityFilter === "operator" || activityFilter === "privacy") return [];
+    return finalized;
+  }, [proposals, activityFilter]);
 
   // Form state
   const [scope, setScope] = useState<AuditScope>("full");
@@ -149,6 +210,17 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
   const [revokeError, setRevokeError] = useState<string | null>(null);
   const [revokeSuccess, setRevokeSuccess] = useState<string | null>(null);
 
+  /* Auto-close revoke confirmation after 10 seconds */
+  useEffect(() => {
+    if (!showRevokeConfirm) return;
+    const timer = setTimeout(() => {
+      setShowRevokeConfirm(null);
+      setRevokeError(null);
+      setRevokeSuccess(null);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [showRevokeConfirm]);
+
   const handleRevokeLink = async (linkId: string) => {
     if (!wallet.publicKey || !wallet.signMessage || !connection) return;
     setShowRevokeConfirm(linkId);
@@ -176,7 +248,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
         {
           id: "prepare",
           title: "Prepare on-chain instruction",
-          description: "Building the gatekeeper revocation instruction.",
+          description: "Preparing the revocation proposal.",
           status: "pending",
         },
         {
@@ -258,36 +330,60 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
 
   const exportToCSV = (link: AuditLinkSummary) => {
     // Generate deterministic mock data based on linkId
-    const scopeParams = link.scopeParams ? JSON.parse(link.scopeParams) : undefined;
+    const scopeParams = parseScopeParams(link.scopeParams);
     const mockData = generateDeterministicMockData(link.id, 8);
 
     // Filter by scope (time_ranged only; full/amounts_only pass through)
     let filtered = mockData;
-    if (link.scope === "time_ranged" && scopeParams?.startDate && scopeParams?.endDate) {
+    const { startDate: exportStartDate, endDate: exportEndDate } = scopeParams;
+    if (link.scope === "time_ranged" && exportStartDate && exportEndDate) {
       filtered = mockData.filter(
-        (tx) => tx.timestamp >= scopeParams.startDate && tx.timestamp <= scopeParams.endDate,
+        (tx) => tx.timestamp >= exportStartDate && tx.timestamp <= exportEndDate,
       );
     }
     if (link.scope === "amounts_only") {
       filtered = filtered.map((tx) => ({ ...tx, amount: undefined }));
     }
 
-    const csv = exportAuditToCSV(filtered);
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `audit-${link.id}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadText(`audit-${link.id}.csv`, exportAuditToCSV(filtered), "text/csv");
   };
+
+  const exportToJSON = (link: AuditLinkSummary) => {
+    const scopeParams = parseScopeParams(link.scopeParams);
+    const mockData = generateDeterministicMockData(link.id, 8);
+    let filtered = mockData;
+    const { startDate: exportStartDate, endDate: exportEndDate } = scopeParams;
+    if (link.scope === "time_ranged" && exportStartDate && exportEndDate) {
+      filtered = mockData.filter(
+        (tx) => tx.timestamp >= exportStartDate && tx.timestamp <= exportEndDate,
+      );
+    }
+    if (link.scope === "amounts_only") {
+      filtered = filtered.map((tx) => ({ ...tx, amount: undefined }));
+    }
+
+    downloadText(
+      `audit-${link.id}.json`,
+      JSON.stringify(
+        { link, exportedAt: new Date().toISOString(), transactions: filtered },
+        null,
+        2,
+      ),
+      "application/json",
+    );
+  };
+
+  const filteredLinks = useMemo(
+    () => links.filter((link) => scopeFilter === "all" || link.scope === scopeFilter),
+    [links, scopeFilter],
+  );
 
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
         <Link
           href="/"
-          className="text-sm text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="text-sm text-accent transition-colors hover:text-accent-hover"
         >
           Back to picker
         </Link>
@@ -297,264 +393,503 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
   }
 
   return (
-    <main className="min-h-screen">
-      <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-sm font-medium text-accent">Audit Admin</p>
-            <h1 className="mt-2 text-3xl font-semibold text-ink">
-              {truncateAddress(multisigAddress.toBase58())}
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-300">
-              Create and manage scoped audit links for compliance and transparency.
-            </p>
-          </div>
+    <WorkspacePage>
+      <WorkspaceHeader
+        eyebrow="AUDIT"
+        title="Scoped access"
+        description="Manage time-bound audit links for external reviewers. Each link exposes only the data scope you choose."
+      />
+
+      <div className="space-y-6">
+        {/* Tab bar */}
+        <div className="flex items-center gap-0.5 border-b border-border pb-1">
+          {(["activity", "links", "export", "settings"] as AuditAdminTab[]).map((tab) => {
+            const labels: Record<AuditAdminTab, string> = {
+              activity: "Activity",
+              links: "Links",
+              export: "Exports",
+              settings: "Settings",
+            };
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  activeTab === tab
+                    ? "bg-accent-soft text-accent"
+                    : "text-ink-muted hover:bg-surface-2 hover:text-ink"
+                }`}
+              >
+                {labels[tab]}
+                {tab === "links" && links.length > 0 && (
+                  <span className="text-xs text-ink-subtle tabular-nums">
+                    {links.length}
+                  </span>
+                )}
+                {tab === "activity" && activityEvents.length > 0 && (
+                  <span className="text-xs text-ink-subtle tabular-nums">
+                    {activityEvents.length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Create Link Form */}
-        <section className="mt-8 rounded-lg border border-border bg-surface p-6">
-          <h2 className="text-lg font-semibold text-ink">Create Audit Link</h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Generate a shareable link with view-only access to transaction history.
-          </p>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div>
-              <label htmlFor="scope" className="block text-sm font-medium text-neutral-300">
-                Scope
-              </label>
-              <select
-                id="scope"
-                value={scope}
-                onChange={(e) => setScope(e.target.value as AuditScope)}
-                className="mt-1 block w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-ink focus:border-emerald-500 focus:outline-none"
-              >
-                <option value="full">Full (all data)</option>
-                <option value="amounts_only">Amounts Only (no addresses)</option>
-                <option value="time_ranged">Time Ranged (date filter)</option>
-              </select>
-              <p className="mt-1 text-xs text-ink-subtle">
-                {scope === "full" &&
-                  "View all transaction details including amounts and addresses."}
-                {scope === "amounts_only" && "View only transaction amounts (addresses redacted)."}
-                {scope === "time_ranged" && "View transactions within a specific date range."}
-              </p>
-            </div>
-
-            <div>
-              <label htmlFor="expiresInDays" className="block text-sm font-medium text-neutral-300">
-                Expires in (days)
-              </label>
-              <input
-                id="expiresInDays"
-                type="number"
-                min={1}
-                max={365}
-                value={expiresInDays}
-                onChange={(e) => setExpiresInDays(Number(e.target.value))}
-                className="mt-1 block w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-ink focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
-
-            {scope === "time_ranged" && (
-              <>
-                <div>
-                  <label htmlFor="startDate" className="block text-sm font-medium text-neutral-300">
-                    Start Date
-                  </label>
-                  <input
-                    id="startDate"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-ink focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="endDate" className="block text-sm font-medium text-neutral-300">
-                    End Date
-                  </label>
-                  <input
-                    id="endDate"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-ink focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-              </>
-            )}
-          </div>
-
-          {createError && (
-            <div className="mt-4 rounded-md bg-red-900/30 border border-red-700 px-4 py-3 text-sm text-red-200">
-              {createError}
-            </div>
-          )}
-
-          {lastCreatedUrl && (
-            <div className="mt-4 rounded-md bg-accent-soft border border-emerald-700 px-4 py-3">
-              <p className="text-sm font-medium text-accent">Audit link created!</p>
-              <div className="mt-2 flex items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={lastCreatedUrl}
-                  className="flex-1 rounded-md bg-bg px-3 py-2 text-xs font-mono text-neutral-300"
-                />
+        {/* ACTIVITY TAB */}
+        {activeTab === "activity" && (
+          <div className="space-y-4">
+            {/* Sub-filters */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(["all", "proposals", "vault", "operator", "privacy"] as ActivityFilter[]).map((f) => (
                 <button
+                  key={f}
                   type="button"
-                  onClick={() => navigator.clipboard.writeText(lastCreatedUrl)}
-                  className="rounded-md bg-emerald-700 px-3 py-2 text-xs font-semibold text-ink hover:bg-emerald-600"
+                  onClick={() => setActivityFilter(f)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
+                    activityFilter === f
+                      ? "bg-accent-soft text-accent"
+                      : "border border-border text-ink-muted hover:bg-surface-2 hover:text-ink"
+                  }`}
                 >
-                  Copy
+                  {f}
                 </button>
-              </div>
-              <p className="mt-2 text-xs text-accent/70">
-                Share this URL carefully. Anyone with the link can view the scoped audit data.
-              </p>
-            </div>
-          )}
-
-          <div className="mt-6">
-            <button
-              type="button"
-              onClick={handleCreateLink}
-              disabled={isCreating || !wallet.publicKey}
-              className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isCreating ? "Creating..." : "Create Audit Link"}
-            </button>
-          </div>
-        </section>
-
-        {/* Links List */}
-        <section className="mt-8">
-          <h2 className="text-lg font-semibold text-ink">Active Audit Links</h2>
-
-          {linksLoading ? (
-            <p className="mt-4 text-sm text-ink-muted">Loading...</p>
-          ) : links.length === 0 ? (
-            <p className="mt-4 text-sm text-ink-muted">No audit links created yet.</p>
-          ) : (
-            <div className="mt-4 grid gap-4">
-              {links.map((link) => (
-                <div key={link.id} className="rounded-lg border border-border bg-surface p-4">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm text-ink" title={link.id}>
-                          {link.id.slice(0, 8)}...{link.id.slice(-4)}
-                        </span>
-                        <span
-                          className={`rounded px-2 py-0.5 text-xs font-medium ${
-                            link.scope === "full"
-                              ? "bg-accent-soft text-accent"
-                              : link.scope === "amounts_only"
-                                ? "bg-blue-900 text-blue-200"
-                                : "bg-amber-900 text-amber-200"
-                          }`}
-                        >
-                          {link.scope}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-ink-subtle">
-                        Created {new Date(link.createdAt).toLocaleDateString()} · Expires{" "}
-                        {new Date(link.expiresAt).toLocaleDateString()}
-                      </p>
-                      {link.scopeParams && (
-                        <p className="mt-1 text-xs text-ink-subtle">
-                          {(() => {
-                            try {
-                              const params = JSON.parse(link.scopeParams) as Record<
-                                string,
-                                string | number
-                              >;
-                              const entries = Object.entries(params);
-                              if (entries.length === 0) return null;
-                              const formatted = entries
-                                .map(([key, value]) => {
-                                  if (typeof value === "number" && value > 1000000000) {
-                                    return `${key}: ${new Date(value).toLocaleDateString()}`;
-                                  }
-                                  return `${key}: ${value}`;
-                                })
-                                .join(" · ");
-                              return `Filter: ${formatted}`;
-                            } catch {
-                              return null;
-                            }
-                          })()}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => exportToCSV(link)}
-                        className="rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-neutral-300 transition hover:bg-surface-2"
-                      >
-                        Export CSV
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRevokeLink(link.id)}
-                        className="rounded-md bg-signal-danger/15 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-900"
-                      >
-                        Revoke
-                      </button>
-                    </div>
-                  </div>
-                </div>
               ))}
             </div>
-          )}
-        </section>
 
-        {/* Revoke Confirmation Dialog */}
-        {showRevokeConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="w-full max-w-md rounded-lg border border-border-strong bg-surface p-6">
-              <h3 className="text-lg font-semibold text-ink">Confirm Revoke</h3>
-              <p className="mt-2 text-sm text-ink-muted">
-                This will create a Squads proposal to revoke the audit link on-chain.
-              </p>
-              {revokeError && (
-                <p className="mt-3 rounded-md border border-red-900 bg-red-950 p-2 text-xs text-red-200">
-                  {revokeError}
+            {activityFilter !== "all" && activityFilter !== "proposals" ? (
+              <div className="rounded-xl border border-border bg-surface p-8 text-center">
+                <List className="mx-auto mb-3 h-8 w-8 text-ink-subtle" />
+                <p className="text-sm font-medium text-ink-muted">
+                  {activityFilter.charAt(0).toUpperCase() + activityFilter.slice(1)} events not yet available
                 </p>
-              )}
-              {revokeSuccess && (
-                <p className="mt-3 rounded-md border border-emerald-900 bg-emerald-950 p-2 text-xs text-accent">
-                  {revokeSuccess}
+                <p className="mt-1 text-xs text-ink-subtle">
+                  On-chain event indexing for this category is coming soon.
                 </p>
-              )}
-              <div className="mt-6 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRevokeConfirm(null);
-                    setRevokeError(null);
-                    setRevokeSuccess(null);
-                  }}
-                  className="flex-1 rounded-md border border-border-strong bg-surface-2 px-4 py-2 text-sm font-semibold text-ink transition hover:bg-surface-3"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void confirmRevoke(showRevokeConfirm)}
-                  disabled={Boolean(revokeSuccess)}
-                  className="flex-1 rounded-md bg-signal-danger/15 px-4 py-2 text-sm font-semibold text-red-200 transition hover:bg-red-900 disabled:opacity-50"
-                >
-                  Revoke
-                </button>
               </div>
-            </div>
+            ) : activityEvents.length === 0 ? (
+              <div className="rounded-xl border border-border bg-surface p-8 text-center">
+                <Shield className="mx-auto mb-3 h-8 w-8 text-ink-subtle" />
+                <p className="text-sm font-medium text-ink-muted">No activity recorded yet</p>
+                <p className="mt-1 text-xs text-ink-subtle">
+                  Executed, rejected, and cancelled proposals will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-border bg-surface">
+                <div className="divide-y divide-border/40">
+                  {activityEvents.map((p) => {
+                    const isExecuted = p.status === "executed";
+                    const isCancelled = p.status === "cancelled";
+                    const description =
+                      p.type === "payroll"
+                        ? `Payroll · ${p.recipientCount ?? "?"} recipients · ${lamportsToSol(p.totalAmount ?? "0")} SOL`
+                        : p.amount && p.amount !== "0"
+                          ? `${lamportsToSol(p.amount)} SOL → ${truncateAddress(p.recipient)}`
+                          : p.memo || "Configuration change";
+                    const KindIcon =
+                      p.type === "payroll" ? Users : p.type === "single" ? Send : ArrowRightLeft;
+                    return (
+                      <Link
+                        key={p.id}
+                        href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
+                        className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-surface-2"
+                      >
+                        <div
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${
+                            isExecuted
+                              ? "border-border text-ink-subtle"
+                              : isCancelled
+                                ? "border-ink-subtle/30 text-ink-subtle"
+                                : "border-signal-danger/30 text-signal-danger"
+                          }`}
+                        >
+                          {isExecuted ? (
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          ) : (
+                            <XCircle className="h-3.5 w-3.5" />
+                          )}
+                        </div>
+                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                          <KindIcon className="h-3.5 w-3.5 shrink-0 text-ink-subtle" />
+                          <span className="truncate text-sm text-ink">
+                            #{p.transactionIndex} — {description}
+                          </span>
+                        </div>
+                        <span className="shrink-0 text-xs font-medium text-ink-muted">
+                          {(p.status ?? "").charAt(0).toUpperCase() + (p.status ?? "").slice(1)}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
-      </section>
-    </main>
+
+        {/* LINKS TAB */}
+        {activeTab === "links" && (
+          <div className="space-y-6">
+            <Panel>
+              <PanelHeader icon={Link2} title="Create audit link" />
+              <PanelBody className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label htmlFor="scope" className="block text-sm font-medium text-ink">
+                      Scope
+                    </label>
+                    <select
+                      id="scope"
+                      value={scope}
+                      onChange={(e) => setScope(e.target.value as AuditScope)}
+                      className="mt-1 block w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      <option value="full">Full (all data)</option>
+                      <option value="amounts_only">Amounts Only (no addresses)</option>
+                      <option value="time_ranged">Time Ranged (date filter)</option>
+                    </select>
+                    <p className="mt-1 text-xs text-ink-subtle">
+                      {scope === "full" &&
+                        "View all transaction details including amounts and addresses."}
+                      {scope === "amounts_only" &&
+                        "View only transaction amounts (addresses redacted)."}
+                      {scope === "time_ranged" && "View transactions within a specific date range."}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="expiresInDays" className="block text-sm font-medium text-ink">
+                      Expires in (days)
+                    </label>
+                    <input
+                      id="expiresInDays"
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={expiresInDays}
+                      onChange={(e) => setExpiresInDays(Number(e.target.value))}
+                      className="mt-1 block w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    />
+                  </div>
+
+                  {scope === "time_ranged" && (
+                    <>
+                      <div>
+                        <label htmlFor="startDate" className="block text-sm font-medium text-ink">
+                          Start Date
+                        </label>
+                        <input
+                          id="startDate"
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="mt-1 block w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="endDate" className="block text-sm font-medium text-ink">
+                          End Date
+                        </label>
+                        <input
+                          id="endDate"
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="mt-1 block w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {createError && <InlineAlert tone="danger">{createError}</InlineAlert>}
+
+                {lastCreatedUrl && (
+                  <div className="rounded-md border border-accent/25 bg-accent-soft px-4 py-3">
+                    <p className="text-sm font-medium text-accent">Audit link created!</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={lastCreatedUrl}
+                        className="flex-1 rounded-md border border-border bg-bg px-3 py-2 font-mono text-xs text-ink-muted"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => navigator.clipboard.writeText(lastCreatedUrl)}
+                        className="min-h-9 rounded-md bg-accent px-3 py-2 text-xs font-semibold text-accent-ink hover:bg-accent-hover"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <p className="mt-2 text-xs text-accent/70">
+                      Share this URL carefully. Anyone with the link can view the scoped audit data.
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleCreateLink}
+                  disabled={isCreating || !wallet.publicKey}
+                  className="inline-flex min-h-10 items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isCreating ? "Creating..." : "Create Audit Link"}
+                </button>
+              </PanelBody>
+            </Panel>
+
+            <Panel>
+              <PanelHeader
+                icon={Shield}
+                title="Active links"
+                action={
+                  <select
+                    value={scopeFilter}
+                    onChange={(event) => setScopeFilter(event.target.value as LinkScopeFilter)}
+                    className="min-h-8 rounded-md border border-border-strong bg-bg px-2 text-xs font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    <option value="all">All scopes</option>
+                    <option value="full">Full</option>
+                    <option value="amounts_only">Amounts only</option>
+                    <option value="time_ranged">Time ranged</option>
+                  </select>
+                }
+              />
+              <PanelBody>
+                {linksLoading ? (
+                  <p className="text-sm text-ink-muted">Loading...</p>
+                ) : filteredLinks.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <p className="text-sm font-semibold text-ink">No audit links yet</p>
+                    <p className="mt-1 text-sm text-ink-muted">
+                      Create a scoped link to share audit access with external reviewers.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/60">
+                    {filteredLinks.map((link) =>(
+                      <div key={link.id} className="py-4 first:pt-0 last:pb-0">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-sm text-ink" title={link.id}>
+                                {link.id.slice(0, 8)}...{link.id.slice(-4)}
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-subtle">
+                                <span className={cn(
+                                  "h-1.5 w-1.5 rounded-full",
+                                  link.scope === "full" ? "bg-accent" :
+                                  link.scope === "amounts_only" ? "bg-ink-subtle" :
+                                  "bg-signal-warn"
+                                )} />
+                                {link.scope === "full" ? "Full" : link.scope === "amounts_only" ? "Amounts only" : "Time ranged"}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 text-xs text-ink-subtle">
+                              Created {new Date(link.createdAt).toLocaleDateString()} · Expires{" "}
+                              {new Date(link.expiresAt).toLocaleDateString()}
+                            </p>
+                            {link.scopeParams && (
+                              <p className="mt-1 text-xs text-ink-subtle">
+                                {(() => {
+                                  try {
+                                    const params = JSON.parse(link.scopeParams) as Record<
+                                      string,
+                                      string | number
+                                    >;
+                                    const entries = Object.entries(params);
+                                    if (entries.length === 0) return null;
+                                    const formatted = entries
+                                      .map(([key, value]) => {
+                                        if (typeof value === "number" && value > 1000000000) {
+                                          return `${key}: ${new Date(value).toLocaleDateString()}`;
+                                        }
+                                        return `${key}: ${value}`;
+                                      })
+                                      .join(" · ");
+                                    return `Filter: ${formatted}`;
+                                  } catch {
+                                    return null;
+                                  }
+                                })()}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => exportToCSV(link)}
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+                            >
+                              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                              CSV
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => exportToJSON(link)}
+                              className="inline-flex min-h-9 items-center rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+                            >
+                              JSON
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeLink(link.id)}
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink-muted transition hover:border-signal-danger/30 hover:text-signal-danger"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Revoke
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </PanelBody>
+            </Panel>
+          </div>
+        )}
+
+        {/* EXPORTS TAB */}
+        {activeTab === "export" && (
+          <Panel>
+            <PanelHeader icon={Download} title="Exports" />
+            <PanelBody>
+              {filteredLinks.length === 0 ? (
+                <div className="py-12 text-center">
+                  <p className="text-sm text-ink-muted">No items yet</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border/60">
+                  {filteredLinks.map((link) => (
+                    <div
+                      key={link.id}
+                      className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="font-mono text-sm text-ink">{link.id}</p>
+                        <p className="mt-0.5 text-xs text-ink-subtle">
+                          {link.scope === "full" ? "Full" : link.scope === "amounts_only" ? "Amounts only" : "Time ranged"} · expires{" "}
+                          {new Date(link.expiresAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => exportToCSV(link)}
+                          className="inline-flex min-h-8 items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-ink-subtle transition hover:bg-surface-2 hover:text-ink"
+                        >
+                          CSV
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => exportToJSON(link)}
+                          className="inline-flex min-h-8 items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-ink-subtle transition hover:bg-surface-2 hover:text-ink"
+                        >
+                          JSON
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </PanelBody>
+          </Panel>
+        )}
+
+        {/* SETTINGS TAB */}
+        {activeTab === "settings" && (
+          <Panel>
+            <PanelHeader icon={Settings} title="Settings" />
+            <PanelBody>
+              <dl className="grid gap-6 text-sm sm:grid-cols-3">
+                <div>
+                  <dt className="text-xs font-medium text-ink-subtle">Default scope</dt>
+                  <dd className="mt-1 text-ink">{scope}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-ink-subtle">Expiry</dt>
+                  <dd className="mt-1 text-ink">{expiresInDays} days</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-ink-subtle">Links</dt>
+                  <dd className="mt-1 text-ink">{links.length}</dd>
+                </div>
+              </dl>
+            </PanelBody>
+          </Panel>
+        )}
+      </div>
+
+      {/* Revoke Confirmation Dialog */}
+      {showRevokeConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-md p-4">
+          <div className="relative w-full max-w-md rounded-xl border border-border-strong bg-surface p-6 shadow-raise-2">
+            <div className="absolute right-4 top-4 flex items-center gap-2">
+              <AutoCloseIndicator
+                durationMs={10000}
+                onComplete={() => {
+                  setShowRevokeConfirm(null);
+                  setRevokeError(null);
+                  setRevokeSuccess(null);
+                }}
+                paused={!showRevokeConfirm}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRevokeConfirm(null);
+                  setRevokeError(null);
+                  setRevokeSuccess(null);
+                }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <h3 className="pr-16 text-lg font-semibold text-ink">Confirm Revoke</h3>
+            <p className="mt-2 text-sm text-ink-muted">
+              This will create a Squads proposal to revoke the audit link on-chain.
+            </p>
+            {revokeError && (
+              <InlineAlert tone="danger" className="mt-3">
+                {revokeError}
+              </InlineAlert>
+            )}
+            {revokeSuccess && (
+              <InlineAlert tone="success" className="mt-3">
+                {revokeSuccess}
+              </InlineAlert>
+            )}
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRevokeConfirm(null);
+                  setRevokeError(null);
+                  setRevokeSuccess(null);
+                }}
+                className="flex-1 rounded-md border border-border-strong bg-surface-2 px-4 py-2 text-sm font-semibold text-ink transition hover:bg-surface-3"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmRevoke(showRevokeConfirm)}
+                disabled={Boolean(revokeSuccess)}
+                className="flex-1 rounded-md border border-border-strong px-4 py-2 text-sm font-semibold text-ink-muted transition hover:border-signal-danger/30 hover:text-signal-danger disabled:opacity-50"
+              >
+                Revoke
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </WorkspacePage>
   );
 }

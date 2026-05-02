@@ -1,0 +1,1 @@
+ALTER TABLE "Vault" ADD COLUMN "avatarUrl" TEXT;
