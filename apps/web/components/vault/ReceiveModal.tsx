@@ -92,7 +92,7 @@ export function ReceiveModal({
 
           <p className="text-center text-xs text-ink-subtle">
             For private payments use{" "}
-            <span className="font-medium text-ink">Invoices</span> — those are unlinkable on-chain.
+            <span className="font-medium text-ink">Invoices</span>, those are unlinkable on-chain.
           </p>
         </div>
       </DialogContent>

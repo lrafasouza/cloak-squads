@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog";
 import { truncateAddress } from "@/lib/proposals";
 import { useMyVaults } from "@/lib/use-my-vaults";
-import { useWallet } from "@solana/wallet-adapter-react";
 import { ArrowRight, SearchX, Vault } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -21,14 +20,13 @@ interface ImportVaultsModalProps {
 
 export function ImportVaultsModal({ open, onOpenChange }: ImportVaultsModalProps) {
   const router = useRouter();
-  const { publicKey } = useWallet();
   const { vaults, loading, error, search } = useMyVaults();
 
   useEffect(() => {
-    if (open && publicKey) {
-      search(publicKey.toBase58());
+    if (open) {
+      search();
     }
-  }, [open, publicKey, search]);
+  }, [open, search]);
 
   function handleSelect(addr: string) {
     onOpenChange(false);
@@ -76,17 +74,17 @@ export function ImportVaultsModal({ open, onOpenChange }: ImportVaultsModalProps
 
           {!loading && vaults.length > 0 && (
             <div className="space-y-2">
-              {vaults.map((addr) => (
+              {vaults.map((vault) => (
                 <button
-                  key={addr}
+                  key={vault.cofreAddress}
                   type="button"
-                  onClick={() => handleSelect(addr)}
+                  onClick={() => handleSelect(vault.cofreAddress)}
                   className="group flex w-full items-center gap-3 rounded-xl border border-border bg-surface/80 px-4 py-3 text-left transition-all hover:border-accent/40 hover:bg-surface-2 hover:shadow-raise-1"
                 >
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft">
                     <Vault className="h-4 w-4 text-accent" />
                   </div>
-                  <span className="flex-1 font-mono text-sm text-ink">{truncateAddress(addr)}</span>
+                  <span className="flex-1 font-mono text-sm text-ink">{vault.name || truncateAddress(vault.cofreAddress)}</span>
                   <ArrowRight className="h-3.5 w-3.5 text-ink-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-accent" />
                 </button>
               ))}

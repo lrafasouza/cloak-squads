@@ -1,13 +1,16 @@
 "use client";
 
-import { ImportVaultsModal } from "@/components/app/ImportVaultsModal";
-import { SiteHeader } from "@/components/site/SiteHeader";
+import { VaultSelectionGrid } from "@/components/vault/VaultSelectionGrid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/toast-provider";
+import { Spinner } from "@/components/ui/skeleton";
+import { useMyVaults } from "@/lib/use-my-vaults";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { PublicKey } from "@solana/web3.js";
-import { Download, LogIn, Plus } from "lucide-react";
+import { ArrowRight, Search, Wallet, X } from "lucide-react";
+import { motion } from "framer-motion";
+import { Logo } from "@/components/brand/Logo";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -28,135 +31,232 @@ function useRedirectParam() {
   }, [router]);
 }
 
-export default function VaultPage() {
-  useRedirectParam();
+/* ── Import by address inline form ── */
+function ImportAddressForm({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const { addToast } = useToast();
-  const wallet = useWallet();
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  const [multisigInput, setMultisigInput] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [inputError, setInputError] = useState<string | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
-
-  function onOpenMultisig(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setInputError(null);
-    const trimmed = multisigInput.trim();
+    setError(null);
+    const trimmed = value.trim();
     if (!trimmed) return;
-
-    setIsSubmitting(true);
     try {
       const pk = new PublicKey(trimmed);
-      addToast("Opening vault...", "info", 2000);
       router.push(`/vault/${pk.toBase58()}`);
     } catch {
-      setInputError("Invalid Solana address");
-      addToast("Invalid Solana address", "error");
-      setIsSubmitting(false);
+      setError("Invalid Solana address");
     }
   }
+
+  return (
+    <motion.form
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+      onSubmit={handleSubmit}
+      className="mx-auto flex max-w-lg items-center gap-2"
+    >
+      <div className="relative flex-1">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
+        <Input
+          type="text"
+          autoFocus
+          placeholder="Paste Squads multisig address…"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setError(null);
+          }}
+          className="h-12 border-border-strong bg-surface-2 pl-10 font-mono text-sm"
+        />
+      </div>
+      <Button
+        type="submit"
+        disabled={!value.trim()}
+        size="icon"
+        className="h-12 w-12 shrink-0"
+      >
+        <ArrowRight className="h-4 w-4" />
+      </Button>
+      <button
+        type="button"
+        onClick={onClose}
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-border-strong text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+        aria-label="Cancel"
+      >
+        <X className="h-4 w-4" />
+      </button>
+      {error && (
+        <p className="absolute -bottom-6 left-0 text-xs text-signal-danger">{error}</p>
+      )}
+    </motion.form>
+  );
+}
+
+export default function VaultPage() {
+  useRedirectParam();
+  const wallet = useWallet();
+  const { publicKey, connected } = wallet;
+
+  const { vaults, loading, error, search } = useMyVaults();
+  const [showImport, setShowImport] = useState(false);
+
+  /* Auto-search Aegis vaults from DB when wallet connects */
+  useEffect(() => {
+    if (connected) {
+      search();
+    }
+  }, [connected, search]);
+
+  const hasVaults = vaults.length > 0;
+  const isReady = connected && !loading;
 
   return (
     <div className="relative min-h-screen bg-bg text-ink">
       {/* Background */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-radial-fade" />
-        <div className="absolute inset-0 bg-grid-faint bg-grid-md opacity-30" />
+        <div className="absolute inset-0 bg-grid-faint bg-grid-md opacity-[0.18]" />
       </div>
 
-      <SiteHeader />
+      {/* Minimal header — logo + wallet only */}
+      <header className="relative z-10 flex items-center justify-between px-4 py-5 md:px-6">
+        <Logo size="sm" />
+        <ClientWalletButton />
+      </header>
 
-      <main className="relative z-10 mx-auto max-w-5xl px-4 pt-24 pb-20 md:px-6 md:pt-32 md:pb-28">
-        <div className="mb-12 text-center">
-          <h1 className="font-display text-display font-bold text-ink">
-            Access your <span className="text-accent">Vault</span>
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl text-lg text-ink-muted">
-            Open an existing Squads multisig or create a new one to start using private execution.
-          </p>
-        </div>
-
-        <div className="grid gap-8 md:grid-cols-2 md:items-stretch">
-          {/* Open existing vault */}
-          <div className="flex flex-col rounded-xl border border-border bg-surface/80 p-6 shadow-raise-1 backdrop-blur-sm">
-            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft">
-              <LogIn className="h-5 w-5 text-accent" />
+      <main className="relative z-10 mx-auto max-w-6xl px-4 pt-6 pb-20 md:px-6 md:pt-10 md:pb-28">
+        {/* ── Wallet not connected ── */}
+        {!connected && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="flex min-h-[60vh] flex-col items-center justify-center text-center"
+          >
+            <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-2xl border border-border bg-surface shadow-raise-1">
+              <Wallet className="h-9 w-9 text-accent" strokeWidth={1.5} />
             </div>
-            <h2 className="text-lg font-semibold text-ink">Open existing vault</h2>
-            <p className="mt-2 text-sm text-ink-muted">
-              Enter your Squads multisig address to access an existing vault.
+            <h1 className="font-display text-display font-bold text-ink">
+              Connect your <span className="text-accent">wallet</span>
+            </h1>
+            <p className="mt-3 max-w-md text-lg leading-relaxed text-ink-muted">
+              Link your Solana wallet to discover vaults you have access to.
             </p>
+            <div className="mt-8">
+              <ClientWalletButton />
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowImport(true)}
+              className="mt-6 text-sm text-accent underline-offset-4 transition-colors hover:text-accent-hover hover:underline"
+            >
+              or enter a vault address manually
+            </button>
 
-            <form onSubmit={onOpenMultisig} className="mt-6 space-y-3">
-              <div>
-                <Input
-                  type="text"
-                  placeholder="Squads multisig address..."
-                  value={multisigInput}
-                  onChange={(e) => {
-                    setMultisigInput(e.target.value);
-                    setInputError(null);
-                  }}
-                  className="h-12 font-mono"
-                />
-                {inputError && <p className="mt-2 text-sm text-signal-danger">{inputError}</p>}
+            {showImport && (
+              <div className="mt-6 w-full">
+                <ImportAddressForm onClose={() => setShowImport(false)} />
               </div>
-              <Button
-                type="submit"
-                disabled={isSubmitting || !multisigInput.trim()}
-                isLoading={isSubmitting}
-                size="lg"
-                className="w-full"
-              >
-                <LogIn className="mr-2 h-4 w-4" />
-                Open Vault
-              </Button>
-            </form>
-
-            {wallet.connected && (
-              <button
-                type="button"
-                onClick={() => setImportOpen(true)}
-                className="mt-4 flex items-center gap-2 text-xs text-ink-muted transition-colors hover:text-ink"
-              >
-                <Download className="h-3.5 w-3.5" />
-                Find my Squads vaults
-              </button>
             )}
+          </motion.div>
+        )}
 
-            {!wallet.connected && (
-              <p className="mt-4 text-xs text-ink-subtle">
-                You&apos;ll need a Solana wallet to interact with Aegis.
+        {/* ── Loading ── */}
+        {connected && loading && (
+          <div className="flex min-h-[50vh] flex-col items-center justify-center gap-5 text-center">
+            <Spinner size="lg" />
+            <div>
+              <p className="text-sm font-medium text-ink">Scanning on-chain…</p>
+              <p className="mt-1 text-xs text-ink-subtle">
+                Searching your Squads vaults on mainnet
               </p>
-            )}
-          </div>
-
-          {/* Create new vault */}
-          <div className="flex flex-col rounded-xl border border-border bg-surface/80 p-6 shadow-raise-1 backdrop-blur-sm">
-            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft">
-              <Plus className="h-5 w-5 text-accent" />
             </div>
-            <h2 className="text-lg font-semibold text-ink">Create new vault</h2>
-            <p className="mt-2 text-sm text-ink-muted">
-              Set up a new Aegis vault with a step-by-step wizard. Configure members, threshold,
-              and privacy settings.
-            </p>
-            <div className="mt-auto pt-6">
-              <Button
-                onClick={() => router.push("/create")}
-                size="lg"
-                className="w-full"
+          </div>
+        )}
+
+        {/* ── Error ── */}
+        {connected && !loading && error && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center"
+          >
+            <p className="text-sm text-signal-danger">{error}</p>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => search()}
+            >
+              Retry
+            </Button>
+          </motion.div>
+        )}
+
+        {/* ── Vault selection grid ── */}
+        {isReady && !error && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className="mb-12 text-center md:mb-16">
+              <motion.p
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.05 }}
+                className="text-eyebrow mb-3"
               >
-                <Plus className="mr-2 h-4 w-4" />
-                Create Vault
-              </Button>
+                {publicKey ? `${publicKey.toBase58().slice(0, 6)}…${publicKey.toBase58().slice(-6)}` : ""}
+              </motion.p>
+              <motion.h1
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+                className="font-display text-display font-bold text-ink"
+              >
+                Select your <span className="text-accent">vault</span>
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="mx-auto mt-3 max-w-lg text-ink-muted"
+              >
+                Choose a vault to manage private payments, payroll, and treasury operations.
+              </motion.p>
             </div>
-          </div>
-        </div>
-      </main>
 
-      <ImportVaultsModal open={importOpen} onOpenChange={setImportOpen} />
+            {!hasVaults && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="mb-8 text-center text-sm text-ink-subtle"
+              >
+                No vaults found yet — create one or import an existing vault.
+              </motion.p>
+            )}
+
+            <VaultSelectionGrid
+              vaults={vaults}
+              onImportClick={() => setShowImport(true)}
+            />
+
+            {showImport && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mx-auto mt-10 max-w-xl"
+              >
+                <ImportAddressForm onClose={() => setShowImport(false)} />
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+      </main>
     </div>
   );
 }

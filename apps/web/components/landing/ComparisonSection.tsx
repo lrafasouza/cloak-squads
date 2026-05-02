@@ -279,23 +279,13 @@ function MobileStack() {
 function BottomLine() {
   return (
     <ScrollReveal delay={0.15}>
-      <div className="mt-12 md:mt-16 max-w-2xl mx-auto">
-        <div className="relative overflow-hidden rounded-xl border border-accent/20 bg-accent/[0.03] p-6 md:p-8 text-center">
-          <div className="absolute -top-20 left-1/2 -translate-x-1/2 h-40 w-40 rounded-full bg-accent/10 blur-[80px]" />
-          <div className="relative">
-            <div className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-accent-soft border border-accent/30 mb-4">
-              <Sparkles className="h-5 w-5 text-accent" />
-            </div>
-            <h3 className="font-display text-xl md:text-2xl font-semibold text-ink mb-2">
-              Squads stays. Privacy arrives.
-            </h3>
-            <p className="text-sm text-ink-muted leading-relaxed max-w-md mx-auto">
-              We do not replace your treasury. We wrap it with private execution,
-              payroll workflows, invoicing, and scoped audit — all while keeping
-              your existing approval layer intact.
-            </p>
-          </div>
-        </div>
+      <div className="mt-14 md:mt-20 max-w-xl mx-auto text-center">
+        <div className="h-px w-16 bg-border mx-auto mb-8" />
+        <p className="text-sm text-ink-muted leading-relaxed">
+          We do not replace your treasury. We wrap it with private execution,
+          payroll workflows, invoicing, and scoped audit, all while keeping
+          your existing Squads approval layer intact.
+        </p>
       </div>
     </ScrollReveal>
   );

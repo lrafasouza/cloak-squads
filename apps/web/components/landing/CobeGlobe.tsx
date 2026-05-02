@@ -14,6 +14,7 @@ export function CobeGlobe() {
   const phiRef = useRef(0);
   const frameRef = useRef(0);
   const visibleRef = useRef(true);
+  const runningRef = useRef(false);
   const widthRef = useRef(0);
 
   useEffect(() => {
@@ -62,18 +63,21 @@ export function CobeGlobe() {
     globeRef.current = globe;
 
     const animate = () => {
+      if (!runningRef.current) return;
       phiRef.current += 0.003;
       globe.update({ phi: phiRef.current, theta: 0.2 });
       frameRef.current = requestAnimationFrame(animate);
     };
 
     const startAnimation = () => {
-      if (!frameRef.current) {
+      if (!runningRef.current) {
+        runningRef.current = true;
         frameRef.current = requestAnimationFrame(animate);
       }
     };
 
     const stopAnimation = () => {
+      runningRef.current = false;
       if (frameRef.current) {
         cancelAnimationFrame(frameRef.current);
         frameRef.current = 0;

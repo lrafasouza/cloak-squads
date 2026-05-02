@@ -5,6 +5,34 @@ import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+/* ── GET: list Aegis vaults belonging to the authenticated wallet ── */
+export async function GET() {
+  const auth = await requireWalletAuth();
+  if (auth instanceof NextResponse) return auth;
+
+  if (!isPrismaAvailable()) {
+    return NextResponse.json({ vaults: [] });
+  }
+
+  try {
+    const vaults = await prisma.vault.findMany({
+      where: { createdBy: auth.publicKey },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    return NextResponse.json({ vaults });
+  } catch (error) {
+    console.error("[api/vaults] list failed:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P1001") {
+      return NextResponse.json(
+        { error: "Database unavailable.", vaults: [] },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json({ error: "Could not load vaults.", vaults: [] }, { status: 500 });
+  }
+}
+
 const vaultMetadataSchema = z.object({
   cofreAddress: z.string().refine(
     (value) => {
