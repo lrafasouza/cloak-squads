@@ -165,12 +165,13 @@ export async function createVaultProposal(params: {
   tx.feePayer = params.wallet.publicKey;
   tx.recentBlockhash = latestBlockhash.blockhash;
 
-  // Simulate first to surface real RPC errors before the wallet swallows them.
-  const simResult = await params.connection.simulateTransaction(tx, []);
-  if (simResult.value.err) {
-    const logs = simResult.value.logs?.join("\n") ?? "";
-    const raw = `${JSON.stringify(simResult.value.err)}\n${logs}`.trim();
-    throw new Error(translateOnchainError(raw));
+  if (params.instructions.length === 1) {
+    const simResult = await params.connection.simulateTransaction(tx, []);
+    if (simResult.value.err) {
+      const logs = simResult.value.logs?.join("\n") ?? "";
+      const raw = `${JSON.stringify(simResult.value.err)}\n${logs}`.trim();
+      throw new Error(translateOnchainError(raw));
+    }
   }
 
   let signature: string;
@@ -433,6 +434,89 @@ export async function vaultTransactionExecute(params: {
       logError("[squads-sdk]   .message:", anyErr.message);
     }
     throw new Error(translateOnchainError(sendErr));
+  }
+}
+
+export async function configTransactionExecute(params: {
+  connection: Connection;
+  wallet: BrowserSquadsWallet;
+  multisigPda: PublicKey;
+  transactionIndex: bigint;
+}) {
+  assertBrowserSquadsWallet(params.wallet);
+  log("[squads-sdk] configTransactionExecute start", {
+    multisig: params.multisigPda.toBase58(),
+    transactionIndex: params.transactionIndex.toString(),
+    member: params.wallet.publicKey.toBase58(),
+  });
+
+  const proposalPda = multisig.getProposalPda({
+    multisigPda: params.multisigPda,
+    transactionIndex: params.transactionIndex,
+  })[0];
+  try {
+    const proposal = await multisig.accounts.Proposal.fromAccountAddress(
+      params.connection,
+      proposalPda,
+    );
+    log("[squads-sdk] proposal status:", proposal.status, "approved:", proposal.approved.length);
+  } catch (err) {
+    logError("[squads-sdk] could not load proposal — was it created?", err);
+    throw new Error("Proposal not found on-chain. Did you create + approve it before executing?");
+  }
+
+  const instruction = multisig.instructions.configTransactionExecute({
+    multisigPda: params.multisigPda,
+    transactionIndex: params.transactionIndex,
+    member: params.wallet.publicKey,
+  });
+  const latestBlockhash = await params.connection.getLatestBlockhash();
+  const tx = new Transaction().add(instruction);
+  tx.feePayer = params.wallet.publicKey;
+  tx.recentBlockhash = latestBlockhash.blockhash;
+
+  // Simulate first to surface real RPC errors.
+  const sim = await params.connection.simulateTransaction(tx);
+  if (sim.value.err) {
+    const logs = sim.value.logs?.join("\n") ?? "";
+    const raw = `${JSON.stringify(sim.value.err)}\n${logs}`.trim();
+    throw new Error(translateOnchainError(raw));
+  }
+
+  try {
+    const signature = await params.wallet.sendTransaction(tx, params.connection);
+    const { blockhash: confirmBh, lastValidBlockHeight } =
+      await params.connection.getLatestBlockhash();
+    await params.connection.confirmTransaction(
+      { signature, blockhash: confirmBh, lastValidBlockHeight },
+      "confirmed",
+    );
+    return signature;
+  } catch (sendErr) {
+    logError("[squads-sdk] config execute sendTransaction error:", sendErr);
+    throw new Error(translateOnchainError(sendErr));
+  }
+}
+
+export async function detectTransactionType(
+  connection: Connection,
+  multisigPda: PublicKey,
+  transactionIndex: bigint,
+): Promise<"config" | "vault" | null> {
+  const [transactionPda] = multisig.getTransactionPda({
+    multisigPda,
+    index: transactionIndex,
+  });
+  try {
+    await multisig.accounts.ConfigTransaction.fromAccountAddress(connection, transactionPda);
+    return "config";
+  } catch {
+    try {
+      await multisig.accounts.VaultTransaction.fromAccountAddress(connection, transactionPda);
+      return "vault";
+    } catch {
+      return null;
+    }
   }
 }
 
