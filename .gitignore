@@ -16,4 +16,8 @@ prisma/dev.db*
 **/prisma/dev.db-journal
 apps/web/dev.db
 scripts/.demo-cofre.json
+scripts/.demo-cofre-2ofn.json
 .demo-data.json
+claude-session.jsonl
+.superstack/
+.codex
