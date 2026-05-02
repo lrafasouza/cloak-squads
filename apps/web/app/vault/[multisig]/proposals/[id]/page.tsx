@@ -15,6 +15,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
+import { detectTransactionType } from "@/lib/squads-sdk";
 import { ArrowLeft, CheckCircle2, ChevronRight, Circle, Copy, XCircle } from "lucide-react";
 import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
@@ -138,6 +139,7 @@ export default function ProposalApprovalPage({
   const [approvals, setApprovals] = useState<number>(0);
   const [threshold, setThreshold] = useState<number | null>(null);
   const [memberVote, setMemberVote] = useState<MemberVote>(null);
+  const [transactionType, setTransactionType] = useState<"config" | "vault" | null>(null);
 
   useEffect(() => {
     try {
@@ -193,6 +195,9 @@ export default function ProposalApprovalPage({
           setThreshold(msAccount.threshold);
         } catch { /* threshold unavailable */ }
       }
+      // Detect transaction type (config vs vault) from on-chain account.
+      const detected = await detectTransactionType(connection, multisigPda, BigInt(id));
+      if (detected) setTransactionType(detected);
     } catch (err) {
       console.warn("[proposals] could not load proposal status:", err);
       setStatus("missing");
@@ -452,6 +457,7 @@ export default function ProposalApprovalPage({
                     onSubmitted={onExecuteSubmitted}
                     disabled={executeBlocked}
                     requireCofreInitialized={draft !== null || payrollDraft !== null}
+                    transactionType={transactionType ?? "vault"}
                   />
                   {!executeComplete && executeBlocked && status !== "loading" && (
                     <p className="mt-3 text-xs text-ink-subtle">

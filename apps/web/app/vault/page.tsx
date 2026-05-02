@@ -1,16 +1,16 @@
 "use client";
 
-import { VaultSelectionGrid } from "@/components/vault/VaultSelectionGrid";
+import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/skeleton";
+import { VaultSelectionGrid } from "@/components/vault/VaultSelectionGrid";
+import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { useMyVaults } from "@/lib/use-my-vaults";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { PublicKey } from "@solana/web3.js";
-import { ArrowRight, Search, Wallet, X } from "lucide-react";
 import { motion } from "framer-motion";
-import { Logo } from "@/components/brand/Logo";
+import { ArrowRight, Search, Wallet, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -72,12 +72,7 @@ function ImportAddressForm({ onClose }: { onClose: () => void }) {
           className="h-12 border-border-strong bg-surface-2 pl-10 font-mono text-sm"
         />
       </div>
-      <Button
-        type="submit"
-        disabled={!value.trim()}
-        size="icon"
-        className="h-12 w-12 shrink-0"
-      >
+      <Button type="submit" disabled={!value.trim()} size="icon" className="h-12 w-12 shrink-0">
         <ArrowRight className="h-4 w-4" />
       </Button>
       <button
@@ -88,33 +83,23 @@ function ImportAddressForm({ onClose }: { onClose: () => void }) {
       >
         <X className="h-4 w-4" />
       </button>
-      {error && (
-        <p className="absolute -bottom-6 left-0 text-xs text-signal-danger">{error}</p>
-      )}
+      {error && <p className="absolute -bottom-6 left-0 text-xs text-signal-danger">{error}</p>}
     </motion.form>
   );
 }
 
 export default function VaultPage() {
   useRedirectParam();
-  const wallet = useWallet();
-  const { publicKey, connected } = wallet;
+  const { connected } = useWallet();
 
   const { vaults, loading, error, search } = useMyVaults();
   const [showImport, setShowImport] = useState(false);
-
-  /* Auto-search Aegis vaults from DB when wallet connects */
-  useEffect(() => {
-    if (connected) {
-      search();
-    }
-  }, [connected, search]);
 
   const hasVaults = vaults.length > 0;
   const isReady = connected && !loading;
 
   return (
-    <div className="relative min-h-screen bg-bg text-ink">
+    <div className="relative flex min-h-screen flex-col bg-bg text-ink">
       {/* Background */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-radial-fade" />
@@ -127,14 +112,14 @@ export default function VaultPage() {
         <ClientWalletButton />
       </header>
 
-      <main className="relative z-10 mx-auto max-w-6xl px-4 pt-6 pb-20 md:px-6 md:pt-10 md:pb-28">
+      <main className="relative z-10 flex flex-1 flex-col mx-auto w-full max-w-6xl px-4 pt-6 pb-20 md:px-6 md:pt-10 md:pb-28">
         {/* ── Wallet not connected ── */}
         {!connected && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="flex min-h-[60vh] flex-col items-center justify-center text-center"
+            className="flex flex-1 flex-col items-center justify-center text-center"
           >
             <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-2xl border border-border bg-surface shadow-raise-1">
               <Wallet className="h-9 w-9 text-accent" strokeWidth={1.5} />
@@ -166,13 +151,10 @@ export default function VaultPage() {
 
         {/* ── Loading ── */}
         {connected && loading && (
-          <div className="flex min-h-[50vh] flex-col items-center justify-center gap-5 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center gap-5 text-center">
             <Spinner size="lg" />
             <div>
-              <p className="text-sm font-medium text-ink">Scanning on-chain…</p>
-              <p className="mt-1 text-xs text-ink-subtle">
-                Searching your Squads vaults on mainnet
-              </p>
+              <p className="text-sm font-medium text-ink">Scanning for vaults</p>
             </div>
           </div>
         )}
@@ -182,14 +164,10 @@ export default function VaultPage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center"
+            className="flex flex-1 flex-col items-center justify-center gap-4 text-center"
           >
             <p className="text-sm text-signal-danger">{error}</p>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => search()}
-            >
+            <Button variant="secondary" size="sm" onClick={() => search()}>
               Retry
             </Button>
           </motion.div>
@@ -203,14 +181,6 @@ export default function VaultPage() {
             transition={{ duration: 0.4 }}
           >
             <div className="mb-12 text-center md:mb-16">
-              <motion.p
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.05 }}
-                className="text-eyebrow mb-3"
-              >
-                {publicKey ? `${publicKey.toBase58().slice(0, 6)}…${publicKey.toBase58().slice(-6)}` : ""}
-              </motion.p>
               <motion.h1
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -240,10 +210,7 @@ export default function VaultPage() {
               </motion.p>
             )}
 
-            <VaultSelectionGrid
-              vaults={vaults}
-              onImportClick={() => setShowImport(true)}
-            />
+            <VaultSelectionGrid vaults={vaults} onImportClick={() => setShowImport(true)} />
 
             {showImport && (
               <motion.div

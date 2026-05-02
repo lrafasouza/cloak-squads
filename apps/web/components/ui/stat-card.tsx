@@ -15,19 +15,23 @@ export function StatCard({ label, value, icon: Icon, sub, className }: StatCardP
   return (
     <div
       className={cn(
-        "rounded-lg border border-border bg-surface p-4",
+        "rounded-xl bg-surface p-5 transition-colors hover:bg-surface-2/50",
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-xs font-medium text-ink-subtle">{label}</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-ink">{value}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">
+            {label}
+          </p>
+          <p className="mt-2 text-xl font-semibold tabular-nums tracking-tight text-accent">
+            {value}
+          </p>
           {sub && <p className="mt-0.5 text-xs text-ink-muted">{sub}</p>}
         </div>
         {Icon && (
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2">
-            <Icon className="h-4 w-4 text-ink-subtle" />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10">
+            <Icon className="h-4 w-4 text-accent" />
           </div>
         )}
       </div>

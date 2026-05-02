@@ -15,7 +15,7 @@ export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
           // biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholders have no identity — index is the only stable key
           key={i}
           ref={i === 0 ? ref : undefined}
-          className={cn("animate-pulse rounded-md bg-surface-2", className)}
+          className={cn("shimmer-bg rounded-md", className)}
           {...props}
         />
       ))}

@@ -26,7 +26,11 @@ const items = [
 export function MarqueeTrustBar() {
   const all = [...items, ...items];
   return (
-    <div className="relative overflow-hidden border-y border-border/60">
+    <div className="relative overflow-hidden border-y border-border/40 bg-accent/[0.02]">
+      {/* Edge fades */}
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-bg to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-bg to-transparent" />
+
       <div className="flex py-5">
         <motion.div
           className="flex shrink-0 items-center"
@@ -42,10 +46,12 @@ export function MarqueeTrustBar() {
             return (
               <div
                 key={i}
-                className="flex items-center gap-2 px-8 text-sm text-ink-subtle/30 whitespace-nowrap"
+                className="flex items-center gap-2.5 px-10 text-sm whitespace-nowrap"
               >
-                <Icon className="h-3 w-3 shrink-0" strokeWidth={1.5} />
-                <span className="text-xs font-medium tracking-wide">
+                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-accent/10">
+                  <Icon className="h-3 w-3 shrink-0 text-accent/70" strokeWidth={1.5} />
+                </div>
+                <span className="text-xs font-medium tracking-wide text-ink-subtle/60">
                   {item.label}
                 </span>
               </div>

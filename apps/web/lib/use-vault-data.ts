@@ -34,6 +34,7 @@ export function useVaultData(multisig: string) {
     queryKey: ["vault-data", multisig],
     enabled: !!multisig,
     staleTime: 30_000,
+    refetchInterval: 5_000,
     queryFn: async (): Promise<VaultData> => {
       const multisigPk = new PublicKey(multisig);
       const [vaultPda] = squadsVaultPda(multisigPk, squadsProgram);

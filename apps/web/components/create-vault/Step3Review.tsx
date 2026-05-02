@@ -163,14 +163,14 @@ export function Step3Review({
     const initialSteps: CreationStep[] = [
       { id: "validate", label: "Validate setup", status: "running" },
       { id: "multisig", label: "Create Squads multisig", status: "pending" },
-      { id: "bootstrap", label: "Create bootstrap proposal", status: "pending" },
-      { id: "initialize", label: "Initialize vault", status: "pending" },
+      { id: "bootstrap", label: "Create privacy activation proposal", status: "pending" },
+      { id: "initialize", label: "Activate privacy layer", status: "pending" },
     ];
     setSteps(initialSteps);
 
     startTransaction({
       title: "Creating vault",
-      description: "Setting up your Aegis vault on-chain.",
+      description: "Creating your vault on-chain.",
       steps: [
         { id: "validate", title: "Validate setup", description: "Checking configuration." },
         {
@@ -181,15 +181,15 @@ export function Step3Review({
         },
         {
           id: "bootstrap",
-          title: "Create bootstrap proposal",
-          description: "Preparing Aegis initialization.",
+          title: "Create privacy activation proposal",
+          description: "Preparing the privacy layer setup.",
           status: "pending",
         },
         {
           id: "initialize",
-          title: "Initialize vault",
+          title: "Activate privacy layer",
           description:
-            threshold === 1 ? "Auto-approving and executing." : "Waiting for member approvals.",
+            threshold === 1 ? "Automatically activating for single-signer vaults." : "Waiting for member approvals.",
           status: "pending",
         },
       ],
@@ -251,7 +251,7 @@ export function Step3Review({
           members: parsedMembers.map((key) => ({ key, permissions: memberPerms })),
           timeLock: 0,
           rentCollector: null,
-          memo: "Created via Aegis",
+          memo: "Vault created",
         });
 
         const blockhash = await connection.getLatestBlockhash();
@@ -318,7 +318,7 @@ export function Step3Review({
           wallet,
           multisigPda,
           initCofreIx: initCofre.instruction,
-          memo: "Initialize Aegis vault",
+          memo: "Activate privacy layer",
         });
         transactionIndex = bootstrap.transactionIndex;
         bootstrapSignature = bootstrap.signature;
@@ -334,7 +334,7 @@ export function Step3Review({
         ...(bootstrapSignature ? { signature: bootstrapSignature } : {}),
         description:
           savedBootstrapIndex || !bootstrapSignature
-            ? `Existing bootstrap proposal #${transactionIndex.toString()} found. Skipping creation.`
+            ? `Existing privacy activation proposal #${transactionIndex.toString()} found. Skipping creation.`
             : `Proposal #${transactionIndex.toString()} confirmed.`,
       });
 
@@ -354,7 +354,7 @@ export function Step3Review({
           updateLocalStep("initialize", { status: "success" });
           updateStep("initialize", {
             status: "success",
-            description: "Bootstrap proposal was already executed.",
+            description: "Privacy layer is already active.",
           });
         } else {
           if (proposalStatus === "active") {
@@ -363,7 +363,7 @@ export function Step3Review({
               wallet,
               multisigPda,
               transactionIndex,
-              memo: "Approve vault bootstrap",
+              memo: "Approve privacy activation",
             });
           }
           const execSig = await vaultTransactionExecute({
@@ -384,7 +384,7 @@ export function Step3Review({
         updateLocalStep("initialize", { status: "success" });
         updateStep("initialize", {
           status: "success",
-          description: "Bootstrap proposal awaiting member approvals.",
+          description: "Privacy activation is awaiting member approvals.",
         });
       }
 
@@ -409,8 +409,8 @@ export function Step3Review({
         title: threshold === 1 ? "Vault ready!" : "Vault created",
         description:
           threshold === 1
-            ? "Your vault is initialized and ready."
-            : "Bootstrap proposal needs member approvals.",
+            ? "Your vault is ready. Private transactions are active."
+            : "Privacy activation needs member approvals before private sends are available.",
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create vault";
@@ -454,8 +454,8 @@ export function Step3Review({
           <h2 className="text-lg font-semibold text-ink">Vault created!</h2>
           <p className="mt-1 text-sm text-ink-muted">
             {bootstrapIndex && threshold > 1
-              ? `Bootstrap proposal #${bootstrapIndex} needs member approvals before private execution is active.`
-              : "Your Aegis vault is initialized and ready."}
+              ? `Privacy activation (proposal #${bootstrapIndex}) needs member approvals before you can send privately.`
+              : "Your vault is ready. Private transactions are active."}
           </p>
           <div className="mt-4 rounded-lg border border-border bg-surface-2 px-4 py-2.5">
             <p className="text-[10px] font-medium uppercase tracking-wider text-ink-subtle">
@@ -588,8 +588,8 @@ export function Step3Review({
               {[
                 `Squads multisig — ${allMembers.length} members, ${threshold}-of-${allMembers.length} threshold`,
                 "Squads vault PDA (index 0)",
-                "Aegis Cofre PDA — private execution layer",
-                `Initialization proposal${threshold > 1 ? ` (needs ${threshold} signatures)` : " (auto-executed)"}`,
+                "Privacy layer account",
+                `Activation proposal${threshold > 1 ? ` (needs ${threshold} approvals)` : " (auto-approved)"}`,
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <span className="mt-0.5 text-accent">·</span>

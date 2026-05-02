@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { publicEnv } from "@/lib/env";
-import { vaultTransactionExecute } from "@/lib/squads-sdk";
+import { configTransactionExecute, vaultTransactionExecute } from "@/lib/squads-sdk";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
@@ -15,12 +15,14 @@ export function ExecuteButton({
   onSubmitted,
   disabled,
   requireCofreInitialized = true,
+  transactionType = "vault",
 }: {
   multisig: string;
   transactionIndex: string;
   onSubmitted?: (signature: string) => void;
   disabled?: boolean;
   requireCofreInitialized?: boolean;
+  transactionType?: "config" | "vault";
 }) {
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -33,18 +35,18 @@ export function ExecuteButton({
     setPending(true);
     setError(null);
     startTransaction({
-      title: "Executing vault transaction",
-      description: `Completing Squads proposal #${transactionIndex} so the license can be used by the operator.`,
+      title: `Executing ${transactionType === "config" ? "config" : "vault"} transaction`,
+      description: `Completing Squads proposal #${transactionIndex}.`,
       steps: [
         {
           id: "readiness",
-          title: "Check vault readiness",
-          description: "Verifying the vault and proposal can execute.",
+          title: "Check readiness",
+          description: "Verifying the proposal can execute.",
         },
         {
           id: "execute",
           title: "Sign and submit execution",
-          description: "Approve the wallet prompt to execute the Squads vault transaction.",
+          description: `Approve the wallet prompt to execute the Squads ${transactionType === "config" ? "config" : "vault"} transaction.`,
         },
         {
           id: "confirm",
@@ -65,12 +67,16 @@ export function ExecuteButton({
       }
       updateStep("readiness", { status: "success" });
       updateStep("execute", { status: "running" });
-      const signature = await vaultTransactionExecute({
+      const executeParams = {
         connection,
         wallet,
         multisigPda,
         transactionIndex: BigInt(transactionIndex),
-      });
+      };
+      const signature =
+        transactionType === "config"
+          ? await configTransactionExecute(executeParams)
+          : await vaultTransactionExecute(executeParams);
       updateStep("execute", {
         status: "success",
         signature,
@@ -79,16 +85,19 @@ export function ExecuteButton({
       updateStep("confirm", {
         status: "success",
         signature,
-        description: "Vault transaction confirmed.",
+        description: `${transactionType === "config" ? "Config" : "Vault"} transaction confirmed.`,
       });
       completeTransaction({
-        title: "Vault transaction executed",
-        description: "The license is issued and the operator can continue the private delivery.",
+        title: `${transactionType === "config" ? "Config" : "Vault"} transaction executed`,
+        description:
+          transactionType === "config"
+            ? "The configuration change is complete."
+            : "The license is issued and the operator can continue the private delivery.",
       });
       onSubmitted?.(signature);
     } catch (caught) {
       const message =
-        caught instanceof Error ? caught.message : "Could not execute vault transaction";
+        caught instanceof Error ? caught.message : "Could not execute transaction";
       setError(message);
       failTransaction(message);
     } finally {
@@ -99,7 +108,7 @@ export function ExecuteButton({
   return (
     <div className="space-y-3">
       <Button type="button" variant="secondary" disabled={pending || disabled} onClick={submit}>
-        {pending ? "Executing..." : "Execute vault transaction"}
+        {pending ? "Executing..." : "Execute proposal"}
       </Button>
       {error ? <p className="text-sm text-signal-danger">{error}</p> : null}
     </div>

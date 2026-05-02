@@ -12,7 +12,7 @@ import {
   WorkspaceHeader,
   WorkspacePage,
 } from "@/components/ui/workspace";
-import { DirectSendModal } from "@/components/vault/DirectSendModal";
+
 import {
   Dialog,
   DialogContent,
@@ -1145,10 +1145,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     : 0n;
   const hasDeficit = deficitLamports > 0n;
 
-  const [topUpOpen, setTopUpOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const topUpRecipient = registeredOperator ?? wallet.publicKey?.toBase58() ?? "";
-  const topUpAmount = hasDeficit ? lamportsToSol(deficitLamports) : "";
 
   const executionState = getOperatorExecutionState({
     hasDraft: !!(loadedDraft || payrollDraft),
@@ -1255,20 +1252,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
         {hasDeficit && !operatorBalanceLoading && (
           <InlineAlert tone="warning">
-            <div className="flex items-center justify-between gap-4">
-              <span>
-                Insufficient balance — need{" "}
-                <span className="font-semibold">{lamportsToSol(deficitLamports)} SOL</span> more
-                to execute all pending transfers. Request a top-up from the vault.
-              </span>
-              <button
-                type="button"
-                onClick={() => setTopUpOpen(true)}
-                className="shrink-0 rounded-md border border-signal-warn/40 bg-signal-warn/10 px-3 py-1 text-xs font-semibold text-signal-warn transition-colors hover:bg-signal-warn/20"
-              >
-                Request top-up
-              </button>
-            </div>
+            Insufficient operator balance. Need{" "}
+            <span className="font-semibold">{lamportsToSol(deficitLamports)} SOL</span> more
+            to execute all pending transfers. The vault funds the operator automatically when proposals are created.
           </InlineAlert>
         )}
         {operatorMismatch && wallet.publicKey ? (
@@ -1730,7 +1716,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             <div className="space-y-2">
               <p className="font-semibold text-ink">Why does the operator need SOL?</p>
               <p>
-                Private transfers use <span className="font-medium text-ink">Cloak</span> — a
+                Private transfers use <span className="font-medium text-ink">Cloak</span>, a
                 privacy-shielded pool. The Cloak protocol requires a wallet with a private
                 key to sign deposits. Because the vault PDA has no private key, the{" "}
                 <span className="font-medium text-ink">operator's wallet</span> deposits into
@@ -1741,43 +1727,34 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
             <div className="rounded-lg border border-border bg-surface-2 p-4 font-mono text-xs leading-relaxed">
               <p className="text-ink-subtle">Private payment flow:</p>
-              <p className="mt-2 text-ink">Operator wallet → Cloak pool</p>
+              <p className="mt-2 text-ink">Vault → Operator (auto-funded in proposal)</p>
+              <p className="text-ink">Operator wallet → Cloak pool</p>
               <p className="text-ink-subtle">↓ (privacy shield keeps amount and recipient hidden)</p>
               <p className="text-ink">Cloak pool → Recipient</p>
             </div>
 
             <div className="space-y-2">
-              <p className="font-semibold text-ink">What the operator actually pays</p>
+              <p className="font-semibold text-ink">How operator funding works</p>
               <p>
-                The operator's wallet covers{" "}
-                <span className="font-medium text-ink">everything</span>: the full transfer
-                amount deposited into Cloak, plus transaction fees. The vault PDA is not the
-                direct source of funds for Cloak deposits.
+                Every private proposal (send, invoice, payroll) now includes an automatic{" "}
+                <span className="font-medium text-ink">vault → operator transfer</span> alongside
+                the license instruction. When the team approves and executes the proposal, the
+                operator receives the SOL needed for the Cloak deposit. No manual top-up required.
               </p>
             </div>
 
             <div className="space-y-2">
-              <p className="font-semibold text-ink">How to pre-fund the operator</p>
+              <p className="font-semibold text-ink">What the operator still needs</p>
               <p>
-                Use <span className="font-medium text-ink">Request top-up</span> to propose a
-                direct transfer from the vault to the operator wallet. Members approve it like
-                any other proposal. Once executed, the operator has the SOL needed to run
-                private transfers.
+                The operator only needs a small amount of SOL for{" "}
+                <span className="font-medium text-ink">transaction fees</span> (rent exemption +
+                gas). The transfer amount itself comes from the vault automatically.
               </p>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {topUpRecipient && (
-        <DirectSendModal
-          multisig={multisig}
-          open={topUpOpen}
-          onOpenChange={setTopUpOpen}
-          defaultRecipient={topUpRecipient}
-          defaultAmount={topUpAmount}
-        />
-      )}
     </WorkspacePage>
   );
 }

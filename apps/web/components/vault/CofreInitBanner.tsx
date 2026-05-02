@@ -39,8 +39,8 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
     const multisigPk = new PublicKey(multisig);
     const [vault] = squadsVaultPda(multisigPk, squadsProgram);
     startTransaction({
-      title: "Initializing vault",
-      description: "Preparing the Aegis bootstrap proposal for this Squads multisig.",
+      title: "Activating privacy layer",
+      description: "Preparing the privacy activation proposal for this vault.",
       steps: [
         { id: "readiness", title: "Check readiness", description: "Checking vault status." },
         {
@@ -51,14 +51,14 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
         },
         {
           id: "proposal",
-          title: "Create bootstrap proposal",
-          description: "Open init proposal.",
+          title: "Create activation proposal",
+          description: "Open the privacy setup proposal.",
           status: "pending",
         },
         {
           id: "execute",
-          title: "Execute bootstrap",
-          description: "Auto-execute 1-of-N vaults.",
+          title: "Activate privacy layer",
+          description: "Automatically enabled for single-signer vaults.",
           status: "pending",
         },
       ],
@@ -97,12 +97,12 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
         wallet,
         multisigPda: multisigPk,
         initCofreIx: initCofre.instruction,
-        memo: "Initialize Aegis vault",
+        memo: "Activate privacy layer",
       });
       updateStep("proposal", {
         status: "success",
         signature: bootstrap.signature,
-        description: `Bootstrap proposal #${bootstrap.transactionIndex.toString()} confirmed.`,
+        description: `Privacy activation proposal #${bootstrap.transactionIndex.toString()} confirmed.`,
       });
 
       const multisigAccount = await sqdsMultisig.accounts.Multisig.fromAccountAddress(
@@ -116,7 +116,7 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
           wallet,
           multisigPda: multisigPk,
           transactionIndex: bootstrap.transactionIndex,
-          memo: "Approve vault bootstrap",
+          memo: "Approve privacy activation",
         });
         const execSig = await vaultTransactionExecute({
           connection,
@@ -132,10 +132,10 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
       await queryClient.invalidateQueries({ queryKey: ["vault-data", multisig] });
       await queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
       completeTransaction({
-        title: "Vault bootstrap ready",
-        description: "Privacy layer setup is in progress.",
+        title: "Privacy activation started",
+        description: "The proposal has been created and is awaiting approvals.",
       });
-      addToast("Vault bootstrap ready.", "success");
+      addToast("Privacy activation proposal created.", "success");
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Could not initialize vault.";
       setError(message);
@@ -158,15 +158,15 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
   ]);
 
   return (
-    <div className="rounded-xl border border-accent/30 bg-accent-soft/50 p-5">
+    <div className="rounded-2xl bg-accent-soft/40 p-5">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/20">
           <Shield className="h-5 w-5 text-accent" />
         </div>
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-ink">Initialize Privacy Layer</h3>
+          <h3 className="text-sm font-semibold text-ink">Enable Private Transactions</h3>
           <p className="mt-1 text-xs leading-relaxed text-ink-muted">
-            Create the Aegis bootstrap proposal for this Squads vault.
+            Create a proposal to activate the privacy layer for this vault.
           </p>
           {error && (
             <WarningCallout variant="error" className="mt-3">
@@ -180,7 +180,7 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
             className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-raise-1 transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {pending ? "Initializing..." : "Bootstrap Vault"}
+            {pending ? "Activating..." : "Enable Privacy"}
           </button>
         </div>
       </div>

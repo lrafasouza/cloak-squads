@@ -78,16 +78,41 @@ const config: Config = {
         md: "10px",
         lg: "14px",
         xl: "20px",
+        "2xl": "24px",
+        "3xl": "32px",
       },
       boxShadow: {
         "raise-1": "0 1px 0 0 hsl(var(--border) / 1), 0 8px 24px -12px rgb(0 0 0 / 0.6)",
         "raise-2": "0 1px 0 0 hsl(var(--border) / 1), 0 18px 48px -20px rgb(0 0 0 / 0.7)",
         "accent-glow": "0 0 0 1px hsl(var(--accent) / 0.35), 0 8px 32px -8px hsl(var(--accent) / 0.25)",
+        "accent-glow-md": "0 0 0 1px hsl(var(--accent) / 0.25), 0 16px 48px -12px hsl(var(--accent) / 0.2)",
+        "glass": "0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 0 hsl(var(--ink) / 0.04)",
+      },
+      zIndex: {
+        drawer: "50",
+        modal: "60",
+        toast: "70",
+        cmdk: "80",
+      },
+      transitionTimingFunction: {
+        "aegis": "cubic-bezier(0.16, 1, 0.3, 1)",
       },
       keyframes: {
         "fade-in": {
           "0%": { opacity: "0", transform: "translateY(8px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "fade-in-up": {
+          "0%": { opacity: "0", transform: "translateY(12px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "scale-in": {
+          "0%": { opacity: "0", transform: "scale(0.96)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+        "slide-in-right": {
+          "0%": { opacity: "0", transform: "translateX(12px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
         },
         marquee: {
           "0%": { transform: "translateX(0)" },
@@ -97,11 +122,19 @@ const config: Config = {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        "pulse-glow": {
+          "0%, 100%": { boxShadow: "0 0 20px -4px hsl(var(--accent) / 0.15)" },
+          "50%": { boxShadow: "0 0 28px -2px hsl(var(--accent) / 0.3)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.5s ease-out",
+        "fade-in-up": "fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+        "scale-in": "scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+        "slide-in-right": "slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
         marquee: "marquee 40s linear infinite",
         shimmer: "shimmer 3s ease-in-out infinite",
+        "pulse-glow": "pulse-glow 3s ease-in-out infinite",
       },
       backgroundImage: {
         "grid-faint":

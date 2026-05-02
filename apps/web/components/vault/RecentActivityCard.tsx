@@ -5,7 +5,7 @@ import { publicEnv } from "@/lib/env";
 import { type ProposalSummary, truncateAddress } from "@/lib/proposals";
 import { lamportsToSol } from "@/lib/sol";
 import { cn } from "@/lib/utils";
-import { ArrowDownToLine, ArrowRightLeft, ArrowUpRight, Loader2, Send, Users } from "lucide-react";
+import { ArrowDownToLine, ArrowRightLeft, ArrowUpRight, Send, Users } from "lucide-react";
 import Link from "next/link";
 
 const CLUSTER_SUFFIX =
@@ -64,7 +64,7 @@ function ProposalRow({ multisig, p }: { multisig: string; p: ProposalSummary }) 
       href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
       className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-surface-2"
     >
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 text-ink-subtle transition-colors group-hover:border-border-strong group-hover:text-ink">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-2 text-ink-subtle transition-colors group-hover:bg-accent/10 group-hover:text-accent">
         <TypeIcon className="h-3.5 w-3.5" />
       </div>
 
@@ -123,7 +123,7 @@ function IncomeRow({
       rel="noopener noreferrer"
       className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-surface-2"
     >
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-signal-success/30 bg-signal-success/10 text-signal-success transition-colors group-hover:border-signal-success/50">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-signal-positive/10 text-signal-positive transition-colors">
         <ArrowDownToLine className="h-3.5 w-3.5" />
       </div>
 
@@ -160,11 +160,13 @@ export function RecentActivityCard({
   if (!isLoading && activity.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-border bg-surface shadow-raise-1">
-      <div className="flex items-center justify-between border-b border-border/50 px-5 py-4">
+    <div className="rounded-2xl border border-border/60 bg-surface transition-all duration-300 hover:border-accent/10">
+      <div className="flex items-center justify-between border-b border-border/50 px-6 py-5">
         <div>
-          <h3 className="text-sm font-semibold text-ink">Recent Activity</h3>
-          <p className="mt-0.5 text-xs text-ink-subtle">
+          <h3 className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">
+            Recent Activity
+          </h3>
+          <p className="mt-0.5 text-xs text-ink-muted">
             {isLoading ? "Loading…" : `${activity.length} transactions`}
           </p>
         </div>
@@ -179,9 +181,31 @@ export function RecentActivityCard({
 
       <div className="p-2">
         {isLoading && activity.length === 0 ? (
-          <div className="flex items-center justify-center gap-2 py-6 text-ink-muted">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span className="text-xs">Fetching transactions…</span>
+          <div className="space-y-2 px-4 py-5">
+            <div className="flex items-center gap-3">
+              <div className="h-7 w-7 shrink-0 rounded-md shimmer-bg" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 w-24 shimmer-bg rounded" />
+                <div className="h-3 w-40 shimmer-bg rounded" />
+              </div>
+              <div className="h-3 w-16 shimmer-bg rounded" />
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="h-7 w-7 shrink-0 rounded-md shimmer-bg" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 w-28 shimmer-bg rounded" />
+                <div className="h-3 w-32 shimmer-bg rounded" />
+              </div>
+              <div className="h-3 w-16 shimmer-bg rounded" />
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="h-7 w-7 shrink-0 rounded-md shimmer-bg" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 w-20 shimmer-bg rounded" />
+                <div className="h-3 w-36 shimmer-bg rounded" />
+              </div>
+              <div className="h-3 w-16 shimmer-bg rounded" />
+            </div>
           </div>
         ) : (
           activity.map((item) =>

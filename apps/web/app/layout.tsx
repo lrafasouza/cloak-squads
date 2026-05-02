@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import "./globals.css";
 import { QueryProvider } from "@/components/QueryProvider";
+import { CommandPalette } from "@/components/ui/command-palette";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { TransactionProgressProvider } from "@/components/ui/transaction-progress";
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <WalletProviders>
               <ToastProvider>
                 <TransactionProgressProvider>{children}</TransactionProgressProvider>
+                <CommandPalette />
                 <Toaster
                   position="bottom-right"
                   theme="dark"

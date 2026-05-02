@@ -49,7 +49,7 @@ const STATUS_TEXT: Record<string, string> = {
 const KIND_LABEL: Record<ProposalSummary["type"], string> = {
   payroll: "Payroll",
   single: "Transfer",
-  onchain: "Config",
+  onchain: "Settings",
 };
 
 function KindIcon({ type }: { type: ProposalSummary["type"] }) {

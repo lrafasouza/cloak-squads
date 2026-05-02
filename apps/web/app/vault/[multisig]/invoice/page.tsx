@@ -18,10 +18,13 @@ import {
 import { BookOpen, CheckCircle2, Copy, Link2 } from "lucide-react";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
-import { createIssueLicenseProposal } from "@/lib/squads-sdk";
+import IDL from "@/lib/idl/cloak_gatekeeper.json";
+import { createVaultProposal } from "@/lib/squads-sdk";
+import { lamportsToSol } from "@/lib/sol";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
+import { cofrePda } from "@cloak-squads/core/pda";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import {
@@ -30,8 +33,10 @@ import {
   createUtxo,
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
+import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
+import * as multisigSdk from "@sqds/multisig";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
@@ -136,15 +141,40 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       if (!multisigAddress) throw new Error("Invalid multisig address.");
       if (!wallet.publicKey) throw new Error("Connect a multisig member wallet first.");
 
+      const lamports = solAmountToLamports(amount);
+      const recipientPubkey = new PublicKey(recipientWallet.trim());
+
+      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
+      const vaultBalance = await connection.getBalance(vaultPda, "confirmed");
+      if (BigInt(vaultBalance) < lamports) {
+        const deficit = lamports - BigInt(vaultBalance);
+        throw new Error(
+          `Insufficient vault balance. Need ${lamportsToSol(String(lamports))} SOL, vault has ${lamportsToSol(String(vaultBalance))} SOL. Short ${lamportsToSol(String(deficit))} SOL.`,
+        );
+      }
+
       await assertCofreInitialized({
         connection,
         multisig: multisigAddress,
         gatekeeperProgram: new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID),
       });
-      updateStep("validate", { status: "success" });
 
-      const lamports = solAmountToLamports(amount);
-      const recipientPubkey = new PublicKey(recipientWallet.trim());
+      const gatekeeperProgram = new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID);
+      const [cofreAddr] = cofrePda(multisigAddress, gatekeeperProgram);
+      const cofreAccount = await connection.getAccountInfo(cofreAddr);
+      if (!cofreAccount) throw new Error("Privacy vault not found.");
+      const coder = new BorshAccountsCoder(IDL as Idl);
+      const cofreData = coder.decode<{ operator?: Uint8Array }>("Cofre", cofreAccount.data);
+      if (!cofreData?.operator) throw new Error("No operator registered. Set an operator wallet first.");
+      const operatorPubkey = new PublicKey(cofreData.operator);
+
+      const fundOperatorIx = SystemProgram.transfer({
+        fromPubkey: vaultPda,
+        toPubkey: operatorPubkey,
+        lamports,
+      });
+
+      updateStep("validate", { status: "success" });
 
       setProofStep("generate-witness");
       updateStep("invoice", { status: "running" });
@@ -202,11 +232,11 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         payloadHash: hash,
         nonce: invariants.nonce,
       });
-      const proposalResult = await createIssueLicenseProposal({
+      const proposalResult = await createVaultProposal({
         connection,
         wallet,
         multisigPda: multisigAddress,
-        issueLicenseIx: instruction,
+        instructions: [fundOperatorIx, instruction],
         memo: memo.trim()
           ? `stealth invoice: ${memo.trim()}`
           : `stealth invoice ${stealthData.id.slice(0, 8)}`,

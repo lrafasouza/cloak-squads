@@ -1,49 +1,49 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
-// Squads Multisig V4 binary layout (Anchor 8-byte discriminator):
-//  [8]  discriminator
-//  [32] create_key
-//  [32] config_authority
-//  [2]  threshold (u16)
-//  [4]  time_lock (u32)
-//  [8]  transaction_index (u64)
-//  [8]  stale_transaction_index (u64)
-//  [1|33] rent_collector (Option<Pubkey>)
-//  [1]  bump
-//  [4]  members.len
-//  [36*i] members[i] = key(32) + permissions(4)
-//
-// Member key offsets:
-//   rent_collector = None → base = 100 → member[i].key = 100 + i*36
-//   rent_collector = Some → base = 132 → member[i].key = 132 + i*36
+const MAX_MEMBER_SLOTS = 4;
+const STAGGER_MS = 500;
+const MAX_RETRIES = 1;
+const RETRY_DELAY_MS = 2000;
 
-const MAX_MEMBER_SLOTS = 6; // covers 99%+ of real-world vaults
-const BATCH_SIZE = 3; // max concurrent requests to stay under public RPC rate limits
-const BATCH_DELAY_MS = 300;
+const RPC_URL =
+  process.env.MAINNET_RPC_URL ??
+  process.env.NEXT_PUBLIC_RPC_URL ??
+  "https://api.mainnet-beta.solana.com";
+const SQUADS_PROGRAM_ID =
+  process.env.NEXT_PUBLIC_SQUADS_PROGRAM_ID ?? "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf";
 
-// Always query mainnet where real Squads vaults live,
-// regardless of which cluster the app is pointed at.
-const MAINNET_RPC =
-  process.env.MAINNET_RPC_URL ?? "https://api.mainnet-beta.solana.com";
-const SQUADS_PROGRAM_MAINNET = "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf";
-
-function sleep(ms: number) {
+function stagger(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
 }
 
-async function runBatched<T>(
-  tasks: (() => Promise<T>)[],
-  batchSize: number,
-  delayMs: number,
-): Promise<T[]> {
-  const results: T[] = [];
-  for (let i = 0; i < tasks.length; i += batchSize) {
-    if (i > 0) await sleep(delayMs);
-    const batch = tasks.slice(i, i + batchSize).map((fn) => fn());
-    results.push(...(await Promise.all(batch)));
+async function fetchOffset(
+  connection: Connection,
+  programId: PublicKey,
+  offset: number,
+  ownerBase58: string,
+): Promise<string[]> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const accounts = await connection.getProgramAccounts(programId, {
+        dataSlice: { offset: 0, length: 0 },
+        filters: [{ memcmp: { offset, bytes: ownerBase58 } }],
+        encoding: "base64",
+      });
+      return accounts.map((a) => a.pubkey.toBase58());
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isRetryable =
+        msg.includes("429") || msg.includes("Too Many Requests") || msg.includes("rate");
+      if (attempt < MAX_RETRIES && isRetryable) {
+        console.warn(`[api/vaults/mine] offset ${offset} 429, retrying…`);
+        await stagger(RETRY_DELAY_MS);
+        continue;
+      }
+      console.error(`[api/vaults/mine] offset ${offset} skipped:`, msg.slice(0, 120));
+      return [];
+    }
   }
-  return results;
 }
 
 export async function GET(request: Request) {
@@ -63,43 +63,31 @@ export async function GET(request: Request) {
 
   let programId: PublicKey;
   try {
-    programId = new PublicKey(SQUADS_PROGRAM_MAINNET);
+    programId = new PublicKey(SQUADS_PROGRAM_ID);
   } catch {
     return NextResponse.json({ error: "Invalid Squads program ID" }, { status: 500 });
   }
 
-  const connection = new Connection(MAINNET_RPC, "confirmed");
+  const connection = new Connection(RPC_URL, "confirmed");
   const ownerBase58 = ownerPk.toBase58();
 
-  // Build all offset variants: MAX_MEMBER_SLOTS positions × 2 rent_collector states
   const offsets: number[] = [];
   for (let i = 0; i < MAX_MEMBER_SLOTS; i++) {
-    offsets.push(100 + i * 36); // rent_collector = None
-    offsets.push(132 + i * 36); // rent_collector = Some
-  }
-
-  const tasks = offsets.map(
-    (offset) => () =>
-      connection.getProgramAccounts(programId, {
-        dataSlice: { offset: 0, length: 0 },
-        filters: [{ memcmp: { offset, bytes: ownerBase58 } }],
-        encoding: "base64",
-      }),
-  );
-
-  let results: Awaited<ReturnType<typeof connection.getProgramAccounts>>[];
-  try {
-    results = await runBatched(tasks, BATCH_SIZE, BATCH_DELAY_MS);
-  } catch (err) {
-    console.error("[api/vaults/mine] getProgramAccounts failed:", err);
-    return NextResponse.json({ error: "Failed to query on-chain vaults" }, { status: 500 });
+    offsets.push(100 + i * 36);
+    offsets.push(132 + i * 36);
   }
 
   const seen = new Set<string>();
   const vaults: string[] = [];
-  for (const accounts of results) {
-    for (const { pubkey } of accounts) {
-      const addr = pubkey.toBase58();
+
+  const promises = offsets.map((offset, i) =>
+    stagger(i * STAGGER_MS).then(() => fetchOffset(connection, programId, offset, ownerBase58)),
+  );
+
+  const results = await Promise.all(promises);
+
+  for (const addrs of results) {
+    for (const addr of addrs) {
       if (!seen.has(addr)) {
         seen.add(addr);
         vaults.push(addr);

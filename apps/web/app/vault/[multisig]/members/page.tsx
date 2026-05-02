@@ -80,7 +80,10 @@ export default function MembersPage({
         newMember: newMemberPk,
         memo: `Add member ${newMemberPk.toBase58().slice(0, 8)}…`,
       });
-      await queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) }),
+        queryClient.invalidateQueries({ queryKey: ["vault-data", multisig] }),
+      ]);
       setAddModalOpen(false);
       setAddAddress("");
     } catch (err) {

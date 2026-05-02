@@ -27,7 +27,7 @@ export function QuickActionButton({
     </>
   );
   const classes = cn(
-    "flex items-center justify-center gap-2 rounded-lg border border-border bg-surface-2 py-2.5 text-sm font-medium text-ink-muted transition-colors hover:border-border-strong hover:text-ink",
+    "flex items-center justify-center gap-2 rounded-xl bg-surface py-3 text-sm font-medium text-ink-muted transition-all hover:bg-surface-2 hover:text-accent",
     className,
   );
 

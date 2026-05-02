@@ -90,7 +90,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
     setPending(true);
     startTransaction({
       title: "Creating private send proposal",
-      description: "Preparing the encrypted transfer claim and opening a Squads proposal.",
+      description: "Preparing your private transfer and opening a vault proposal.",
       steps: [
         {
           id: "validate",
@@ -99,18 +99,18 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         },
         {
           id: "commitment",
-          title: "Build private commitment",
-          description: "Creating the Cloak UTXO and payload hash signers will approve.",
+          title: "Build private send",
+          description: "Creating the shielded transfer details signers will approve.",
         },
         {
           id: "squads",
           title: "Create Squads proposal",
-          description: "Funding operator and creating the private send proposal.",
+          description: "Preparing the private transfer and creating the vault proposal.",
         },
         {
           id: "persist",
-          title: "Save execution draft",
-          description: "Saving the private execution data needed by the operator.",
+          title: "Save transfer details",
+          description: "Storing the private payment data securely for the operator.",
         },
       ],
     });

@@ -10,16 +10,16 @@ const cols = [
     links: [
       { label: "How it works", href: "#how" },
       { label: "Use cases", href: "#usecases" },
-      { label: "Pricing", href: "#" },
       { label: "Security", href: "#security" },
+      { label: "FAQ", href: "#faq" },
     ],
   },
   {
     title: "Developers",
     links: [
-      { label: "Documentation", href: "#" },
-      { label: "GitHub", href: "#" },
-      { label: "SDK guide", href: "#" },
+      { label: "Documentation", href: "https://docs.aegis.cloak.dev", external: true },
+      { label: "GitHub", href: "https://github.com/cloak-dev/aegis", external: true },
+      { label: "SDK guide", href: "https://docs.aegis.cloak.dev/sdk", external: true },
     ],
   },
   {
@@ -27,7 +27,6 @@ const cols = [
     links: [
       { label: "About", href: "#" },
       { label: "Brand", href: "#" },
-      { label: "Schedule a meet", href: "#" },
     ],
   },
 ];
@@ -56,12 +55,23 @@ export function SiteFooter({ className }: { className?: string }) {
               <ul className="space-y-3">
                 {col.links.map((link) => (
                   <li key={link.label}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-ink-muted transition-colors hover:text-ink"
-                    >
-                      {link.label}
-                    </Link>
+                    {"external" in link ? (
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-ink-muted transition-colors hover:text-ink"
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link
+                        href={link.href}
+                        className="text-sm text-ink-muted transition-colors hover:text-ink"
+                      >
+                        {link.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>

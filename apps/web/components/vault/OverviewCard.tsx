@@ -1,12 +1,9 @@
 "use client";
 
 import { WarningCallout } from "@/components/ui/warning-callout";
-import { DirectSendModal } from "@/components/vault/DirectSendModal";
-import { QuickActionButton } from "@/components/vault/QuickActionButton";
-import { ReceiveModal } from "@/components/vault/ReceiveModal";
 import { useSolPrice } from "@/lib/hooks/useSolPrice";
-import { ArrowDownToLine, ArrowUpFromLine, BookOpen, RefreshCw, Zap } from "lucide-react";
-import { useState } from "react";
+import NumberFlow from "@number-flow/react";
+import { RefreshCw, TrendingUp } from "lucide-react";
 
 interface OverviewCardProps {
   multisig: string;
@@ -16,19 +13,16 @@ interface OverviewCardProps {
 }
 
 export function OverviewCard({
-  multisig,
   balanceSol,
   cofreInitialized,
   onRefresh,
 }: OverviewCardProps) {
-  const base = `/vault/${multisig}`;
   const { data: solPrice } = useSolPrice();
-  const [receiveOpen, setReceiveOpen] = useState(false);
-  const [sendOpen, setSendOpen] = useState(false);
+  const balanceNum = parseFloat(balanceSol) || 0;
 
   const usdValue =
     solPrice != null
-      ? (parseFloat(balanceSol) * solPrice).toLocaleString("en-US", {
+      ? (balanceNum * solPrice).toLocaleString("en-US", {
           style: "currency",
           currency: "USD",
           maximumFractionDigits: 2,
@@ -36,56 +30,56 @@ export function OverviewCard({
       : null;
 
   return (
-    <>
-      <div className="rounded-xl border border-border bg-surface p-5 shadow-raise-1">
-        <div className="mb-1 flex items-center justify-between">
-          <p className="text-xs font-medium uppercase tracking-wider text-ink-subtle">
-            Total Balance
-          </p>
+    <div className="group relative overflow-hidden rounded-2xl border border-border/60 bg-surface shadow-raise-1 transition-all duration-300 hover:border-accent/20 hover:shadow-accent-glow">
+      {/* Golden accent top bar */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
+
+      {/* Ambient glow */}
+      <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-accent/[0.04] blur-3xl" />
+
+      <div className="relative p-6 md:p-8">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/10">
+              <TrendingUp className="h-3.5 w-3.5 text-accent" strokeWidth={1.5} />
+            </div>
+            <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">
+              Total Balance
+            </p>
+          </div>
           <button
             type="button"
             onClick={onRefresh}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-ink-subtle opacity-0 transition-all hover:bg-surface-2 hover:text-ink group-hover:opacity-100"
             aria-label="Refresh balance"
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        <p className="mt-1 text-3xl font-bold tabular-nums text-ink">
-          {balanceSol}{" "}
-          <span className="text-lg font-medium text-ink-muted">SOL</span>
-        </p>
-
-        {usdValue != null && (
-          <p className="mt-0.5 text-sm font-medium text-ink-subtle tabular-nums">{usdValue}</p>
-        )}
-
-        {!cofreInitialized && (
-          <WarningCallout variant="warning" className="mt-3">
-            Privacy vault not initialized. Bootstrap Aegis to enable private transactions.
-          </WarningCallout>
-        )}
-
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <QuickActionButton
-            icon={ArrowDownToLine}
-            label="Receive"
-            onClick={() => setReceiveOpen(true)}
+        <div className="mt-4 flex items-baseline gap-2">
+          <NumberFlow
+            value={balanceNum}
+            className="font-display text-2xl font-bold tabular-nums tracking-tight text-ink md:text-3xl"
+            suffix=" SOL"
+            locales="en-US"
+            format={{ minimumFractionDigits: 0, maximumFractionDigits: 9 }}
+            transformTiming={{ duration: 400, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
           />
-          <QuickActionButton
-            icon={ArrowUpFromLine}
-            label="Send (Public)"
-            onClick={() => setSendOpen(true)}
-          />
-          <QuickActionButton href={`${base}/invoice`} icon={BookOpen} label="Invoice" />
-          <QuickActionButton href={`${base}/payroll`} icon={Zap} label="Payroll" />
         </div>
 
+        {usdValue != null && (
+          <p className="mt-1 text-sm font-medium tabular-nums text-ink-subtle">{usdValue}</p>
+        )}
       </div>
 
-      <ReceiveModal multisig={multisig} open={receiveOpen} onOpenChange={setReceiveOpen} />
-      <DirectSendModal multisig={multisig} open={sendOpen} onOpenChange={setSendOpen} />
-    </>
+      {!cofreInitialized && (
+        <div className="border-t border-border/50 px-6 py-4 md:px-8">
+          <WarningCallout variant="warning" className="text-xs">
+            Private transactions are not active yet. Set up your vault's privacy layer to enable shielded sends.
+          </WarningCallout>
+        </div>
+      )}
+    </div>
   );
 }

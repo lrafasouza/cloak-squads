@@ -17,14 +17,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, type FormEvent, use, useCallback, useMemo, useState } from "react";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
+import IDL from "@/lib/idl/cloak_gatekeeper.json";
+import { publicEnv } from "@/lib/env";
 import {
   type PayrollRecipientInput,
   formatPayrollCsvTemplate,
   parsePayrollCsv,
 } from "@/lib/payroll-csv";
 import { lamportsToSol } from "@/lib/sol";
-import { createBatchIssueLicenseProposal } from "@/lib/squads-sdk";
+import { createVaultProposal } from "@/lib/squads-sdk";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
+import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
+import { cofrePda } from "@cloak-squads/core/pda";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import {
@@ -33,8 +37,10 @@ import {
   createUtxo,
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
+import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
+import * as multisigSdk from "@sqds/multisig";
 
 function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
@@ -308,15 +314,46 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       if (parsedNotes.length === 0) {
         throw new Error("No recipients prepared. Build notes first.");
       }
+
+      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
+      const vaultBalance = await connection.getBalance(vaultPda, "confirmed");
+      if (BigInt(vaultBalance) < totalAmount) {
+        const deficit = totalAmount - BigInt(vaultBalance);
+        throw new Error(
+          `Insufficient vault balance. Need ${lamportsToSol(totalAmount.toString())} SOL, vault has ${lamportsToSol(String(vaultBalance))} SOL. Short ${lamportsToSol(deficit.toString())} SOL.`,
+        );
+      }
+
+      await assertCofreInitialized({
+        connection,
+        multisig: multisigAddress,
+        gatekeeperProgram: new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID),
+      });
+
+      const gatekeeperProgram = new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID);
+      const [cofreAddr] = cofrePda(multisigAddress, gatekeeperProgram);
+      const cofreAccount = await connection.getAccountInfo(cofreAddr);
+      if (!cofreAccount) throw new Error("Privacy vault not found.");
+      const coder = new BorshAccountsCoder(IDL as Idl);
+      const cofreData = coder.decode<{ operator?: Uint8Array }>("Cofre", cofreAccount.data);
+      if (!cofreData?.operator) throw new Error("No operator registered. Set an operator wallet first.");
+      const operatorPubkey = new PublicKey(cofreData.operator);
+
+      const fundOperatorIx = SystemProgram.transfer({
+        fromPubkey: vaultPda,
+        toPubkey: operatorPubkey,
+        lamports: totalAmount,
+      });
+
       updateStep("validate", { status: "success" });
       updateStep("squads", { status: "running" });
 
       const instructions = parsedNotes.map((n) => n.instruction);
-      const result = await createBatchIssueLicenseProposal({
+      const result = await createVaultProposal({
         connection,
         wallet,
         multisigPda: multisigAddress,
-        issueLicenseIxs: instructions,
+        instructions: [fundOperatorIx, ...instructions],
         memo: `payroll batch (${parsedNotes.length} recipients)`,
       });
       updateStep("squads", {

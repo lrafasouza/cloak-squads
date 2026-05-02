@@ -5,18 +5,53 @@ import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-/* ── GET: list Aegis vaults belonging to the authenticated wallet ── */
-export async function GET() {
+/* ── GET: list vaults ──
+ *
+ * ?addresses=addr1,addr2 → public: returns DB metadata for those addresses
+ *   (no auth required — used to enrich on-chain scan results).
+ * No params → auth required: returns vaults created by the wallet.
+ */
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const addressesParam = searchParams.get("addresses");
+
+  if (addressesParam) {
+    return getVaultsByAddresses(addressesParam);
+  }
+
   const auth = await requireWalletAuth();
   if (auth instanceof NextResponse) return auth;
+  return getVaultsByCreator(auth.publicKey);
+}
 
+async function getVaultsByAddresses(addressesParam: string) {
+  if (!isPrismaAvailable()) {
+    return NextResponse.json({ vaults: [] });
+  }
+
+  const addresses = addressesParam.split(",").filter(Boolean);
+
+  try {
+    const vaults = await prisma.vault.findMany({
+      where: { cofreAddress: { in: addresses } },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    return NextResponse.json({ vaults });
+  } catch (error) {
+    console.error("[api/vaults] address lookup failed:", error);
+    return NextResponse.json({ vaults: [] });
+  }
+}
+
+async function getVaultsByCreator(publicKey: string) {
   if (!isPrismaAvailable()) {
     return NextResponse.json({ vaults: [] });
   }
 
   try {
     const vaults = await prisma.vault.findMany({
-      where: { createdBy: auth.publicKey },
+      where: { createdBy: publicKey },
       orderBy: { createdAt: "desc" },
       take: 100,
     });
@@ -24,10 +59,7 @@ export async function GET() {
   } catch (error) {
     console.error("[api/vaults] list failed:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P1001") {
-      return NextResponse.json(
-        { error: "Database unavailable.", vaults: [] },
-        { status: 503 },
-      );
+      return NextResponse.json({ error: "Database unavailable.", vaults: [] }, { status: 503 });
     }
     return NextResponse.json({ error: "Could not load vaults.", vaults: [] }, { status: 500 });
   }

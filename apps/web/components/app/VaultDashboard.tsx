@@ -3,22 +3,18 @@
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatCard } from "@/components/ui/stat-card";
 import { VaultIdenticon } from "@/components/ui/vault-identicon";
-import { AccountsTab } from "@/components/vault/AccountsTab";
 import { CofreInitBanner } from "@/components/vault/CofreInitBanner";
 import { OverviewCard } from "@/components/vault/OverviewCard";
 import { PendingProposalsCard } from "@/components/vault/PendingProposalsCard";
+import { QuickActionBar } from "@/components/vault/QuickActionBar";
 import { RecentActivityCard } from "@/components/vault/RecentActivityCard";
-import { ShieldedTab } from "@/components/vault/ShieldedTab";
-import { publicEnv } from "@/lib/env";
 import { useRecentActivity } from "@/lib/hooks/useRecentActivity";
 import { truncateAddress } from "@/lib/proposals";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
-import { squadsVaultPda } from "@cloak-squads/core/pda";
-import { PublicKey } from "@solana/web3.js";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, Copy, Shield, Users, Wallet } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 function DashboardVaultIdentity({ multisig }: { multisig: string }) {
   const [vaultName, setVaultName] = useState<string | undefined>();
@@ -57,15 +53,17 @@ function DashboardVaultIdentity({ multisig }: { multisig: string }) {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-ink">Dashboard</h1>
+      <h1 className="text-xl font-semibold tracking-tight text-ink">Dashboard</h1>
       <div className="group/address mt-0.5 flex items-center gap-1.5">
-        <p className="font-mono text-xs text-ink-muted">
-          <span className={vaultName ? "group-hover/address:hidden" : undefined}>
+        <p className="font-mono text-[11px]">
+          {/* default: vault name (or address if no name) */}
+          <span className="inline text-ink-muted group-hover/address:hidden">
             {vaultName || truncateAddress(multisig)}
           </span>
-          {vaultName ? (
-            <span className="hidden group-hover/address:inline">{truncateAddress(multisig)}</span>
-          ) : null}
+          {/* hover: address only */}
+          <span className="hidden text-ink-subtle group-hover/address:inline">
+            {truncateAddress(multisig)}
+          </span>
         </p>
         <button
           type="button"
@@ -75,7 +73,7 @@ function DashboardVaultIdentity({ multisig }: { multisig: string }) {
           title={copiedAddress ? "Copied" : multisig}
         >
           {copiedAddress ? (
-            <Check className="h-3 w-3 text-signal-success" />
+            <Check className="h-3 w-3 text-accent" />
           ) : (
             <Copy className="h-3 w-3" />
           )}
@@ -90,15 +88,6 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
   const { data, isLoading, error } = useVaultData(multisig);
   const { data: proposals = [] } = useProposalSummaries(multisig);
   const { activity, isLoading: activityLoading } = useRecentActivity(multisig, 5);
-  const squadsProgram = useMemo(() => new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID), []);
-  const vaultAddress = useMemo(() => {
-    try {
-      const [vault] = squadsVaultPda(new PublicKey(multisig), squadsProgram);
-      return vault.toBase58();
-    } catch {
-      return multisig;
-    }
-  }, [multisig, squadsProgram]);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["vault-data", multisig] });
@@ -106,10 +95,23 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
 
   if (isLoading) {
     return (
-      <div className="space-y-4 p-6">
-        {[1, 2, 3].map((n) => (
-          <div key={n} className="h-24 animate-pulse rounded-xl border border-border bg-surface" />
-        ))}
+      <div className="space-y-6 p-6">
+        <div className="h-12 w-48 shimmer-bg rounded-lg" />
+        {/* Balance skeleton */}
+        <div className="h-40 shimmer-bg rounded-2xl" />
+        {/* Quick actions skeleton */}
+        <div className="grid grid-cols-4 gap-3">
+          <div className="h-24 shimmer-bg rounded-2xl" />
+          <div className="h-24 shimmer-bg rounded-2xl" />
+          <div className="h-24 shimmer-bg rounded-2xl" />
+          <div className="h-24 shimmer-bg rounded-2xl" />
+        </div>
+        {/* Stats skeleton */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="h-24 shimmer-bg rounded-xl" />
+          <div className="h-24 shimmer-bg rounded-xl" />
+          <div className="h-24 shimmer-bg rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -127,13 +129,20 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
   }
 
   return (
-    <div className="space-y-4 p-6">
-      <div className="flex items-center gap-3">
-        <VaultIdenticon seed={multisig} size={40} className="rounded-xl" />
-        <DashboardVaultIdentity multisig={multisig} />
+    <div className="space-y-6 p-6">
+      {/* Header — identity row */}
+      <div className="relative">
+        {/* Subtle golden radial glow behind header */}
+        <div className="pointer-events-none absolute -left-6 -top-6 h-32 w-64 bg-radial-fade opacity-60" />
+        <div className="relative flex items-center gap-3">
+          <div className="rounded-xl ring-1 ring-accent/20">
+            <VaultIdenticon seed={multisig} size={44} className="rounded-xl" />
+          </div>
+          <DashboardVaultIdentity multisig={multisig} />
+        </div>
       </div>
 
-      <PendingProposalsCard multisig={multisig} proposals={proposals} />
+      {!data.cofreInitialized && <CofreInitBanner multisig={multisig} />}
 
       <OverviewCard
         multisig={multisig}
@@ -142,31 +151,35 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
         onRefresh={refresh}
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/* Quick actions */}
+      <QuickActionBar multisig={multisig} />
+
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-3">
         <StatCard label="Members" value={data.memberCount} icon={Users} />
         <StatCard
           label="Threshold"
           value={`${data.threshold}/${data.memberCount}`}
           icon={Shield}
-          sub={`${Math.round((data.threshold / data.memberCount) * 100)}% required`}
+          sub={`${Math.round((data.threshold / data.memberCount) * 100)}%`}
         />
         <StatCard
-          label="Cloak Protocol"
+          label="Cloak (Gatekeeper)"
           value={data.cofreInitialized ? "Active" : "Inactive"}
           icon={Wallet}
           sub={data.cofreInitialized ? "Protected" : "Pending"}
-          className="col-span-2 sm:col-span-1"
         />
       </div>
 
-      {!data.cofreInitialized && <CofreInitBanner multisig={multisig} />}
+      {/* Pending proposals — below the main grid */}
+      <PendingProposalsCard multisig={multisig} proposals={proposals} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <AccountsTab multisig={multisig} vaultAddress={vaultAddress} balanceSol={data.balanceSol} />
-        <ShieldedTab multisig={multisig} />
-      </div>
-
-      <RecentActivityCard multisig={multisig} activity={activity} isLoading={activityLoading} />
+      {/* Activity — full width */}
+      <RecentActivityCard
+        multisig={multisig}
+        activity={activity}
+        isLoading={activityLoading}
+      />
     </div>
   );
 }

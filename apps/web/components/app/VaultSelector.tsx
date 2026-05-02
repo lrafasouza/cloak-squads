@@ -2,11 +2,22 @@
 
 import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import { truncateAddress } from "@/lib/proposals";
+import { useMyVaults } from "@/lib/use-my-vaults";
 import { cn } from "@/lib/utils";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { Check, ChevronsUpDown, Download, LogOut, Plus, Search, Settings } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  Download,
+  Loader2,
+  LogOut,
+  Plus,
+  Search,
+  Settings,
+} from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface VaultSelectorProps {
   multisig: string;
@@ -14,44 +25,61 @@ interface VaultSelectorProps {
   className?: string;
 }
 
-const RECENT_VAULTS_KEY = "aegis:recent-vaults";
-
-function getRecentVaults(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(RECENT_VAULTS_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
-}
-
-function pushRecentVault(address: string) {
-  if (typeof window === "undefined") return;
-  const recent = getRecentVaults().filter((v) => v !== address);
-  localStorage.setItem(RECENT_VAULTS_KEY, JSON.stringify([address, ...recent].slice(0, 5)));
-}
-
-function removeRecentVault(address: string) {
-  if (typeof window === "undefined") return [];
-  const recent = getRecentVaults().filter((v) => v !== address);
-  localStorage.setItem(RECENT_VAULTS_KEY, JSON.stringify(recent));
-  return recent;
+function VaultRow({
+  addr,
+  label,
+  onNavigate,
+  onRemove,
+}: {
+  addr: string;
+  label?: string;
+  onNavigate: () => void;
+  onRemove?: () => void;
+}) {
+  return (
+    <div className="group flex items-center gap-1 rounded-lg transition-colors hover:bg-surface-2">
+      <button
+        type="button"
+        onClick={onNavigate}
+        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 py-2 text-left"
+      >
+        <VaultIdenticon seed={addr} size={28} className="rounded-md" />
+        <div className="min-w-0 flex-1">
+          {label ? (
+            <>
+              <p className="truncate text-xs font-medium text-ink">{label}</p>
+              <p className="font-mono text-[10px] text-ink-subtle">{truncateAddress(addr)}</p>
+            </>
+          ) : (
+            <p className="font-mono text-xs text-ink">{truncateAddress(addr)}</p>
+          )}
+        </div>
+      </button>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-subtle opacity-0 transition-all hover:bg-surface-3 hover:text-ink group-hover:opacity-100"
+          aria-label={`Remove ${truncateAddress(addr)} from recent vaults`}
+          title="Remove from recent"
+        >
+          <LogOut className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
 }
 
 export function VaultSelector({ multisig, name, className }: VaultSelectorProps) {
+  const { connected } = useWallet();
+  const { vaults: myVaults, loading: myVaultsLoading } = useMyVaults();
+
   const [open, setOpen] = useState(false);
-  const [recentVaults, setRecentVaults] = useState<string[]>([]);
   const [switchInput, setSwitchInput] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const displayName = name || truncateAddress(multisig);
-
-  useEffect(() => {
-    if (!multisig) return;
-    pushRecentVault(multisig);
-    setRecentVaults(getRecentVaults().filter((v) => v !== multisig));
-  }, [multisig]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -69,6 +97,17 @@ export function VaultSelector({ multisig, name, className }: VaultSelectorProps)
     }
   }, [open]);
 
+  const query = switchInput.trim().toLowerCase();
+
+  const filteredMyVaults = useMemo(() => {
+    if (!query) return myVaults;
+    return myVaults.filter(
+      (v) => v.cofreAddress.toLowerCase().includes(query) || v.name?.toLowerCase().includes(query),
+    );
+  }, [myVaults, query]);
+
+  const hasResults = filteredMyVaults.length > 0;
+
   const handleSwitch = () => {
     const addr = switchInput.trim();
     if (!addr) return;
@@ -80,13 +119,12 @@ export function VaultSelector({ multisig, name, className }: VaultSelectorProps)
     }
   };
 
-  const handleRemoveRecent = (address: string) => {
-    const recent = removeRecentVault(address);
-    setRecentVaults(recent.filter((v) => v !== multisig));
+  const handleNavigate = (addr: string) => {
+    setOpen(false);
+    window.location.href = `/vault/${addr}`;
   };
 
   const handleExitCurrentVault = () => {
-    removeRecentVault(multisig);
     window.location.href = "/vault";
   };
 
@@ -166,42 +204,50 @@ export function VaultSelector({ multisig, name, className }: VaultSelectorProps)
             </div>
           </div>
 
-          {/* Recent vaults */}
-          {recentVaults.length > 0 && (
-            <div className="p-1.5">
-              <p className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
-                Recent Vaults
-              </p>
-              <div className="space-y-0.5">
-                {recentVaults.map((addr) => (
-                  <div
-                    key={addr}
-                    className="group flex items-center gap-1 rounded-lg transition-colors hover:bg-surface-2"
-                  >
-                    <Link
-                      href={`/vault/${addr}`}
-                      onClick={() => setOpen(false)}
-                      className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 py-2"
-                    >
-                      <VaultIdenticon seed={addr} size={28} className="rounded-md" />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-mono text-xs text-ink">{truncateAddress(addr)}</p>
-                      </div>
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveRecent(addr)}
-                      className="mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-subtle opacity-0 transition-all hover:bg-surface-3 hover:text-ink group-hover:opacity-100"
-                      aria-label={`Remove ${truncateAddress(addr)} from recent vaults`}
-                      title="Remove from recent"
-                    >
-                      <LogOut className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
+          {/* Vault list */}
+          <div className="max-h-[320px] overflow-y-auto p-1.5">
+            {/* Your Vaults (from DB) */}
+            {connected && myVaultsLoading && (
+              <div className="flex items-center justify-center gap-2 px-2.5 py-4">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-subtle" />
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                  Loading your vaults…
+                </p>
               </div>
-            </div>
-          )}
+            )}
+
+            {connected && filteredMyVaults.length > 0 && (
+              <div className="mb-1">
+                <p className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                  Your Vaults
+                </p>
+                <div className="space-y-0.5">
+                  {filteredMyVaults
+                    .filter((v) => v.cofreAddress !== multisig)
+                    .map((vault) => (
+                      <VaultRow
+                        key={vault.cofreAddress}
+                        addr={vault.cofreAddress}
+                        label={vault.name || truncateAddress(vault.cofreAddress)}
+                        onNavigate={() => handleNavigate(vault.cofreAddress)}
+                      />
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Empty state when searching */}
+            {query && !hasResults && !myVaultsLoading && (
+              <div className="px-2.5 py-4 text-center">
+                <p className="text-xs text-ink-subtle">
+                  No vaults found matching &quot;{switchInput.trim()}&quot;
+                </p>
+                <p className="mt-1 text-[10px] text-ink-subtle">
+                  Press Enter or tap Go to navigate by address
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Create new vault */}
           <div className="border-t border-border bg-surface-2/30 p-1.5">

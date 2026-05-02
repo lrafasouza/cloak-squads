@@ -23,7 +23,7 @@ export function SiteHeader({ className, showWallet = true }: { className?: strin
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 border-b border-border/60 bg-bg/70 backdrop-blur-xl",
+        "sticky top-0 z-40 border-b border-white/[0.04] bg-surface/[0.6] backdrop-blur-xl transition-colors",
         className,
       )}
     >

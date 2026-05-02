@@ -3,12 +3,21 @@
 import { AddressPill } from "@/components/ui/address-pill";
 import { StatCard } from "@/components/ui/stat-card";
 import { WarningCallout } from "@/components/ui/warning-callout";
+import { cn } from "@/lib/utils";
 import { useVaultData } from "@/lib/use-vault-data";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { truncateAddress } from "@/lib/proposals";
 import { Key, Loader2, Shield, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 import { use, useState } from "react";
+
+function ToggleSwitch({ checked, disabled }: { checked: boolean; disabled?: boolean }) {
+  return (
+    <div className={cn("relative h-5 w-9 rounded-full transition-colors duration-200", checked ? "bg-accent" : "bg-surface-3", disabled && "opacity-50 cursor-not-allowed")}>
+      <div className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-surface shadow transition-transform duration-200", checked ? "left-[18px]" : "left-0.5")} />
+    </div>
+  );
+}
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
@@ -82,18 +91,20 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
       </Section>
 
       <Section title="Privacy" description="Shielded transactions and viewing keys">
-        <SettingRow label="Shielded balance" value={<span className="inline-flex items-center gap-1.5"><Key className="h-3.5 w-3.5 text-ink-subtle" />Viewing keys managed per vault</span>} action={<span className="rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs text-ink-muted">Coming soon</span>} />
+        <SettingRow label="Shielded balance" value={<span className="inline-flex items-center gap-1.5"><Key className="h-3.5 w-3.5 text-ink-subtle" />Viewing keys managed per vault</span>} action={
+          <ToggleSwitch checked={data.cofreInitialized} disabled />
+        } />
         <SettingRow label="Audit links" value="Scoped read-only access for auditors" action={<Link href={`/vault/${multisig}/audit`} className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink transition-colors hover:bg-accent-hover">Open</Link>} />
       </Section>
 
       <Section title="Notifications" description="Alerts for proposal events">
-        <SettingRow label="Email notifications" value="Receive alerts when proposals are created or executed" action={<span className="rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs text-ink-muted">Coming soon</span>} />
-        <SettingRow label="Webhook URL" value="POST events to your endpoint" action={<span className="rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs text-ink-muted">Coming soon</span>} />
+        <SettingRow label="Email notifications" value="Receive alerts when proposals are created or executed" action={<ToggleSwitch checked={false} />} />
+        <SettingRow label="Webhook URL" value="POST events to your endpoint" action={<button type="button" className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink">Configure</button>} />
       </Section>
 
       <Section title="Developers" description="API access and integrations">
-        <SettingRow label="API keys" value="Programmatic access to proposals and vault data" action={<span className="rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs text-ink-muted">Coming soon</span>} />
-        <SettingRow label="RPC override" value="Custom Solana RPC endpoint for this vault" action={<span className="rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs text-ink-muted">Coming soon</span>} />
+        <SettingRow label="API keys" value="Programmatic access to proposals and vault data" action={<button type="button" className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink">Generate</button>} />
+        <SettingRow label="RPC override" value="Custom Solana RPC endpoint for this vault" action={<button type="button" className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink">Edit</button>} />
       </Section>
 
       <Section title="Danger Zone" description="Irreversible local actions">

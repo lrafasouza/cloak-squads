@@ -3,6 +3,7 @@
 import { CobeGlobe } from "@/components/landing/CobeGlobe";
 import { ComparisonSection } from "@/components/landing/ComparisonSection";
 import { FAQ } from "@/components/landing/FAQ";
+import { FinalCTASection } from "@/components/landing/FinalCTASection";
 import { MarqueeTrustBar } from "@/components/landing/MarqueeTrustBar";
 import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { LenisProvider } from "@/components/providers/LenisProvider";
@@ -407,20 +408,22 @@ function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="mx-auto mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
+            className="mx-auto mt-10 flex items-center justify-center gap-3"
           >
             <Link
               href="/vault"
-              className="inline-flex items-center justify-center rounded-md bg-accent px-6 py-3 text-base font-semibold text-accent-ink transition-all duration-200 hover:bg-accent-hover hover:shadow-[0_0_30px_rgba(201,168,106,0.15)] active:scale-[0.97] shadow-raise-1"
+              className="inline-flex items-center justify-center rounded-xl bg-accent px-6 py-3 text-base font-semibold text-accent-ink transition-all duration-200 hover:bg-accent-hover hover:shadow-accent-glow-md active:scale-[0.97] shadow-raise-1"
             >
               Open Vault
             </Link>
-            <Link
-              href="/vault"
-              className="inline-flex items-center justify-center rounded-md border border-border-strong px-6 py-3 text-base font-semibold text-ink transition-all duration-200 hover:bg-surface-2 hover:border-accent/20 active:scale-[0.97]"
+            <a
+              href="https://docs.aegis.cloak.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center rounded-xl border border-border-strong bg-transparent px-5 py-3 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
             >
-              Create Vault
-            </Link>
+              View docs
+            </a>
           </motion.div>
 
           <motion.p
@@ -502,6 +505,8 @@ export default function HomePage() {
             <FAQ />
           </div>
         </section>
+
+        <FinalCTASection />
 
         <SiteFooter />
       </div>

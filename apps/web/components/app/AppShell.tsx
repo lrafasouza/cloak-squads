@@ -30,6 +30,7 @@ import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AutoCloseIndicator } from "@/components/ui/auto-close-indicator";
+import { BottomNav } from "@/components/app/BottomNav";
 import { type OperatorInboxItem, OperatorInboxSheet } from "./OperatorInboxSheet";
 
 /* ── Nav structure ── */
@@ -82,12 +83,15 @@ function NavLink({
       href={href}
       {...(onClick ? { onClick } : {})}
       className={cn(
-        "group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+        "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
         isActive
           ? "bg-accent-soft text-accent"
-          : "text-ink-muted hover:bg-surface-2 hover:text-ink",
+          : "text-ink-muted hover:bg-surface-2 hover:text-ink hover:translate-x-0.5",
       )}
     >
+      {isActive && (
+        <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-accent" />
+      )}
       <Icon
         className={cn(
           "h-4 w-4 shrink-0 transition-colors",
@@ -123,12 +127,12 @@ function SidebarContent({
   return (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-3">
+      <div className="flex h-14 shrink-0 items-center gap-3 px-3">
         <Logo href="/" variant="full" size="sm" />
       </div>
 
       {/* Vault selector */}
-      <div className="border-b border-border px-3 py-3">
+      <div className="px-3 pb-3">
         <VaultSelector multisig={multisig} name={vaultName} />
       </div>
 
@@ -150,7 +154,7 @@ function SidebarContent({
 
         {/* Privacy section */}
         <div>
-          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle/70">
             Privacy
           </p>
           <div className="flex flex-col gap-0.5">
@@ -168,7 +172,7 @@ function SidebarContent({
       </nav>
 
       {/* Bottom nav */}
-      <div className="shrink-0 border-t border-border px-3 py-3">
+      <div className="shrink-0 px-3 py-3">
         <div className="flex flex-col gap-0.5">
           {BOTTOM_NAV.map((item) => (
             <NavLink
@@ -183,9 +187,9 @@ function SidebarContent({
             href="https://aegis.so/docs"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+            className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-ink-subtle/70 transition-colors hover:bg-surface-2 hover:text-ink"
           >
-            <HelpCircle className="h-4 w-4 shrink-0 text-ink-subtle" />
+            <HelpCircle className="h-4 w-4 shrink-0 text-ink-subtle/70" />
             Help & Docs
           </Link>
         </div>
@@ -342,7 +346,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-bg">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-border bg-surface md:flex md:flex-col">
+      <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-white/[0.04] bg-surface/[0.5] backdrop-blur-xl md:flex md:flex-col">
         <SidebarContent
           multisig={multisig}
           vaultName={vaultName}
@@ -355,7 +359,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main area */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Topbar — mobile only trigger + inbox */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-border bg-bg/90 px-4 backdrop-blur-xl md:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-white/[0.04] bg-surface/[0.6] px-4 backdrop-blur-xl md:hidden">
           <button
             type="button"
             onClick={() => setMobileNavOpen(true)}
@@ -380,7 +384,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Desktop topbar */}
-        <header className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-3 border-b border-border bg-bg/90 px-6 backdrop-blur-xl md:flex">
+        <header className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-3 border-b border-white/[0.04] bg-surface/[0.6] px-6 backdrop-blur-xl md:flex">
           <OperatorInboxButton
             count={inboxItems.length}
             open={inboxOpen}
@@ -390,7 +394,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto pb-20 md:pb-0">{children}</main>
       </div>
 
       {/* Mobile nav drawer */}
@@ -402,7 +406,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="absolute inset-0 bg-bg/80 backdrop-blur-sm"
             onClick={() => setMobileNavOpen(false)}
           />
-          <aside className="absolute left-0 top-0 h-full w-64 border-r border-border bg-surface shadow-raise-2">
+          <aside className="absolute left-0 top-0 h-full w-72 border-r border-white/[0.04] bg-surface/[0.85] shadow-raise-2 backdrop-blur-xl">
             <div className="absolute right-3 top-3 flex items-center gap-2">
               <AutoCloseIndicator
                 durationMs={10000}
@@ -429,6 +433,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </aside>
         </div>
       )}
+
+      {/* Bottom nav (mobile only) */}
+      <BottomNav />
 
       {/* Inbox sheet (shared) */}
       <OperatorInboxSheet

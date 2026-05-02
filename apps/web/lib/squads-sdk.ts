@@ -469,6 +469,8 @@ export async function configTransactionExecute(params: {
     multisigPda: params.multisigPda,
     transactionIndex: params.transactionIndex,
     member: params.wallet.publicKey,
+    rentPayer: params.wallet.publicKey,
+    spendingLimits: [],
   });
   const latestBlockhash = await params.connection.getLatestBlockhash();
   const tx = new Transaction().add(instruction);

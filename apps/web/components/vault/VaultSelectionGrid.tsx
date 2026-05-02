@@ -29,7 +29,7 @@ function VaultCard({
     >
       <Link
         href={`/vault/${vault.cofreAddress}`}
-        className="group relative flex flex-col items-center gap-5 rounded-2xl border border-border bg-surface/50 p-10 pb-7 backdrop-blur-sm transition-all duration-300 hover:scale-[1.045] hover:border-accent/30 hover:bg-surface hover:shadow-[0_8px_32px_rgba(201,168,106,0.07)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+        className="group relative flex flex-col items-center gap-5 rounded-2xl border border-border bg-surface/50 p-10 pb-7 backdrop-blur-sm transition-all duration-300 hover:scale-[1.045] hover:border-accent/30 hover:bg-surface hover:shadow-accent-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       >
         {/* Avatar */}
         <div className="relative">
@@ -80,7 +80,7 @@ function CreateVaultCard({ index }: { index: number }) {
     >
       <Link
         href="/create"
-        className="group relative flex flex-col items-center gap-5 rounded-2xl border border-dashed border-border bg-surface/30 p-10 pb-7 backdrop-blur-sm transition-all duration-300 hover:scale-[1.045] hover:border-accent/30 hover:bg-surface/50 hover:shadow-[0_8px_32px_rgba(201,168,106,0.05)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+        className="group relative flex flex-col items-center gap-5 rounded-2xl border border-dashed border-border bg-surface/30 p-10 pb-7 backdrop-blur-sm transition-all duration-300 hover:scale-[1.045] hover:border-accent/30 hover:bg-surface/50 hover:shadow-accent-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       >
         <div className="flex h-[100px] w-[100px] items-center justify-center rounded-2xl border border-dashed border-border bg-surface-2/40 transition-all duration-300 group-hover:border-accent/25 group-hover:bg-accent-soft/20">
           <Plus className="h-10 w-10 text-ink-subtle transition-colors duration-300 group-hover:text-accent" strokeWidth={1.5} />
@@ -161,8 +161,9 @@ export function VaultEmptyState({ onImportClick }: { onImportClick: () => void }
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       className="flex flex-col items-center text-center"
     >
-      <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-2xl border border-border bg-surface">
-        <Search className="h-8 w-8 text-ink-subtle" strokeWidth={1.5} />
+      <div className="relative mb-8 flex h-20 w-20 items-center justify-center rounded-2xl border border-border bg-surface shadow-raise-1">
+        <Search className="h-8 w-8 text-accent" strokeWidth={1.5} />
+        <div className="pointer-events-none absolute -inset-3 rounded-full bg-accent/[0.04] blur-xl" />
       </div>
       <h3 className="font-display text-xl font-semibold text-ink">
         No vaults yet
