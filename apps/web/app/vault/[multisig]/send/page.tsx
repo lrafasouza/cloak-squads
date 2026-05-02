@@ -15,10 +15,11 @@ import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ArrowLeft, Send } from "lucide-react";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
-import { createIssueLicenseProposal, createVaultProposal } from "@/lib/squads-sdk";
+import { createVaultProposal } from "@/lib/squads-sdk";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
+import { cofrePda } from "@cloak-squads/core/pda";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import {
@@ -27,6 +28,8 @@ import {
   createUtxo,
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
+import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
+import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
@@ -91,7 +94,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         {
           id: "validate",
           title: "Validate transfer",
-          description: "Checking wallet, recipient, amount, and vault readiness.",
+          description: "Checking wallet, recipient, amount, operator, and vault readiness.",
         },
         {
           id: "commitment",
@@ -101,7 +104,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         {
           id: "squads",
           title: "Create Squads proposal",
-          description: "Your wallet signs the transaction that opens the proposal.",
+          description: "Funding operator and creating the private send proposal.",
         },
         {
           id: "persist",
@@ -124,6 +127,22 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         multisig: multisigAddress,
         gatekeeperProgram,
       });
+
+      const [cofreAddr] = cofrePda(multisigAddress, gatekeeperProgram);
+      const cofreAccount = await connection.getAccountInfo(cofreAddr);
+      if (!cofreAccount) throw new Error("Privacy vault not found.");
+      const coder = new BorshAccountsCoder(IDL as Idl);
+      const cofreData = coder.decode<{ operator?: Uint8Array }>("Cofre", cofreAccount.data);
+      if (!cofreData?.operator) throw new Error("No operator registered. Set an operator wallet first.");
+      const operatorPubkey = new PublicKey(cofreData.operator);
+
+      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
+      const fundOperatorIx = SystemProgram.transfer({
+        fromPubkey: vaultPda,
+        toPubkey: operatorPubkey,
+        lamports,
+      });
+
       updateStep("validate", { status: "success" });
       updateStep("commitment", { status: "running" });
 
@@ -152,12 +171,12 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         nonce: invariants.nonce,
       });
 
-      const result = await createIssueLicenseProposal({
+      const result = await createVaultProposal({
         connection,
         wallet,
         multisigPda: multisigAddress,
-        issueLicenseIx: instruction,
-        memo: "issue license",
+        instructions: [fundOperatorIx, instruction],
+        memo: "private send",
       });
       updateStep("squads", {
         status: "success",
