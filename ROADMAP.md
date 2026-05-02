@@ -40,10 +40,10 @@ This creates a confusing UX:
 - Security audit of gatekeeper program
 - Mainnet smoke tests with real SOL
 
-### 2-of-N Multisig Validation
-- The 2-of-N code path is implemented but never tested with real wallets
-- Need: two browser profiles, 2-of-2 multisig, full flow end-to-end
-- Known gaps: `commitmentClaim` in proposer's sessionStorage only, co-signers can't verify commitments
+### 2-of-N Hardening
+- 2-of-N tested end-to-end on devnet
+- Remaining: `commitmentClaim` in proposer's sessionStorage only, co-signers can't verify commitments
+- Regression tests for multi-member flows
 
 ### UI/UX Polish
 - Mobile-responsive dashboard
