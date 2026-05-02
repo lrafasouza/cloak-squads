@@ -16,6 +16,7 @@ import { ArrowLeft, Send } from "lucide-react";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { createVaultProposal } from "@/lib/squads-sdk";
+import { lamportsToSol } from "@/lib/sol";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
@@ -122,6 +123,15 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       const recipientPubkey = new PublicKey(recipient);
       const lamports = solAmountToLamports(amount);
 
+      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
+      const vaultBalance = await connection.getBalance(vaultPda, "confirmed");
+      if (BigInt(vaultBalance) < lamports) {
+        const deficit = lamports - BigInt(vaultBalance);
+        throw new Error(
+          `Insufficient vault balance. Need ${lamportsToSol(String(lamports))} SOL, vault has ${lamportsToSol(String(vaultBalance))} SOL. Short ${lamportsToSol(String(deficit))} SOL.`,
+        );
+      }
+
       await assertCofreInitialized({
         connection,
         multisig: multisigAddress,
@@ -136,7 +146,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       if (!cofreData?.operator) throw new Error("No operator registered. Set an operator wallet first.");
       const operatorPubkey = new PublicKey(cofreData.operator);
 
-      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
       const fundOperatorIx = SystemProgram.transfer({
         fromPubkey: vaultPda,
         toPubkey: operatorPubkey,
@@ -273,6 +282,14 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       const recipientPubkey = new PublicKey(recipient);
       const lamports = solAmountToLamports(amount);
       const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
+
+      const vaultBalance = await connection.getBalance(vaultPda, "confirmed");
+      if (BigInt(vaultBalance) < lamports) {
+        const deficit = lamports - BigInt(vaultBalance);
+        throw new Error(
+          `Insufficient vault balance. Need ${lamportsToSol(String(lamports))} SOL, vault has ${lamportsToSol(String(vaultBalance))} SOL. Short ${lamportsToSol(String(deficit))} SOL.`,
+        );
+      }
 
       updateStep("validate", { status: "success" });
       updateStep("squads", { status: "running" });
