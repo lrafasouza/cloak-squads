@@ -28,7 +28,7 @@ function filterAuditData(
   if (scope === "amounts_only") {
     filtered = filtered.map((tx) => ({
       ...tx,
-      amount: undefined,
+      nullifier: "REDACTED",
     }));
   }
 
@@ -48,7 +48,7 @@ function exportAuditToCSV(
   const rows = transactions.map((tx) => ({
     timestamp: new Date(tx.timestamp).toISOString(),
     type: tx.type,
-    amount: tx.amount ?? "REDACTED",
+    amount: tx.amount ?? "N/A",
     nullifier: tx.nullifier,
     status: tx.status,
   }));
@@ -73,27 +73,58 @@ function exportAuditToCSV(
 
 test("filterAuditData time_ranged drops out-of-range txs", () => {
   const txs = [
-    { timestamp: 1000, type: "deposit" as const, amount: "100", nullifier: "n1", status: "confirmed" as const },
-    { timestamp: 2000, type: "deposit" as const, amount: "200", nullifier: "n2", status: "confirmed" as const },
-    { timestamp: 3000, type: "deposit" as const, amount: "300", nullifier: "n3", status: "confirmed" as const },
+    {
+      timestamp: 1000,
+      type: "deposit" as const,
+      amount: "100",
+      nullifier: "n1",
+      status: "confirmed" as const,
+    },
+    {
+      timestamp: 2000,
+      type: "deposit" as const,
+      amount: "200",
+      nullifier: "n2",
+      status: "confirmed" as const,
+    },
+    {
+      timestamp: 3000,
+      type: "deposit" as const,
+      amount: "300",
+      nullifier: "n3",
+      status: "confirmed" as const,
+    },
   ];
   const out = filterAuditData(txs, "time_ranged", { startDate: 1500, endDate: 2500 });
   assert.equal(out.length, 1);
   assert.equal(out[0].nullifier, "n2");
 });
 
-test("filterAuditData amounts_only redacts amounts to undefined", () => {
+test("filterAuditData amounts_only redacts nullifiers, keeps amounts", () => {
   const txs = [
-    { timestamp: 1000, type: "deposit" as const, amount: "100", nullifier: "n1", status: "confirmed" as const },
+    {
+      timestamp: 1000,
+      type: "deposit" as const,
+      amount: "100",
+      nullifier: "n1",
+      status: "confirmed" as const,
+    },
   ];
   const out = filterAuditData(txs, "amounts_only");
   assert.equal(out.length, 1);
-  assert.equal(out[0].amount, undefined);
+  assert.equal(out[0].amount, "100");
+  assert.equal(out[0].nullifier, "REDACTED");
 });
 
 test("filterAuditData full leaves data untouched", () => {
   const txs = [
-    { timestamp: 1000, type: "deposit" as const, amount: "100", nullifier: "n1", status: "confirmed" as const },
+    {
+      timestamp: 1000,
+      type: "deposit" as const,
+      amount: "100",
+      nullifier: "n1",
+      status: "confirmed" as const,
+    },
   ];
   const out = filterAuditData(txs, "full");
   assert.equal(out.length, 1);
@@ -102,20 +133,38 @@ test("filterAuditData full leaves data untouched", () => {
 
 test("exportAuditToCSV emits header + escaped rows", () => {
   const txs = [
-    { timestamp: 1700000000000, type: "deposit" as const, amount: "100", nullifier: "n,1", status: "confirmed" as const },
-    { timestamp: 1700000001000, type: "withdraw" as const, amount: undefined, nullifier: "n2", status: "pending" as const },
+    {
+      timestamp: 1700000000000,
+      type: "deposit" as const,
+      amount: "100",
+      nullifier: "n,1",
+      status: "confirmed" as const,
+    },
+    {
+      timestamp: 1700000001000,
+      type: "withdraw" as const,
+      amount: undefined,
+      nullifier: "n2",
+      status: "pending" as const,
+    },
   ];
   const csv = exportAuditToCSV(txs);
   const lines = csv.split("\n").filter(Boolean);
 
   assert.ok(lines[0].startsWith("timestamp,type,amount,nullifier,status"));
   assert.ok(lines[1].includes('"n,1"'), "comma must be quoted");
-  assert.ok(lines[2].includes("REDACTED"), "undefined amount becomes REDACTED");
+  assert.ok(lines[2].includes("N/A"), "undefined amount becomes N/A");
 });
 
 test("filterAuditData time_ranged with no params is a no-op", () => {
   const txs = [
-    { timestamp: 1, type: "deposit" as const, amount: "1", nullifier: "n", status: "confirmed" as const },
+    {
+      timestamp: 1,
+      type: "deposit" as const,
+      amount: "1",
+      nullifier: "n",
+      status: "confirmed" as const,
+    },
   ];
   const out = filterAuditData(txs, "time_ranged");
   assert.equal(out.length, 1);

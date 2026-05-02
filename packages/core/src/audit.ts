@@ -156,11 +156,11 @@ export function filterAuditData(
     );
   }
 
-  // Apply amounts_only filter: redact amounts
+  // Apply amounts_only filter: redact nullifiers (identifiers), keep amounts
   if (scope === "amounts_only") {
     filtered = filtered.map((tx) => ({
       ...tx,
-      amount: undefined,
+      nullifier: "REDACTED",
     }));
   }
 
@@ -170,13 +170,11 @@ export function filterAuditData(
 /**
  * Convert filtered audit data to CSV format for compliance export.
  */
-export function exportAuditToCSV(
-  transactions: FilteredAuditTransaction[],
-): string {
+export function exportAuditToCSV(transactions: FilteredAuditTransaction[]): string {
   const rows: AuditExportRow[] = transactions.map((tx) => ({
     timestamp: new Date(tx.timestamp).toISOString(),
     type: tx.type,
-    amount: tx.amount ?? "REDACTED",
+    amount: tx.amount ?? "N/A",
     nullifier: tx.nullifier,
     status: tx.status,
   }));
@@ -241,7 +239,7 @@ function seededRandom(seed: string) {
  */
 export function generateDeterministicMockData(
   linkId: string,
-  count: number = 5,
+  count = 5,
 ): FilteredAuditTransaction[] {
   const rand = seededRandom(linkId);
   const types: Array<"deposit" | "transfer" | "withdraw"> = ["deposit", "transfer", "withdraw"];

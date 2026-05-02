@@ -166,11 +166,25 @@ export async function createVaultProposal(params: {
   tx.recentBlockhash = latestBlockhash.blockhash;
 
   if (params.instructions.length === 1) {
-    const simResult = await params.connection.simulateTransaction(tx, []);
-    if (simResult.value.err) {
-      const logs = simResult.value.logs?.join("\n") ?? "";
-      const raw = `${JSON.stringify(simResult.value.err)}\n${logs}`.trim();
-      throw new Error(translateOnchainError(raw));
+    try {
+      const simResult = await params.connection.simulateTransaction(tx);
+      if (simResult.value.err) {
+        const logs = simResult.value.logs?.join("\n") ?? "";
+        const raw = `${JSON.stringify(simResult.value.err)}\n${logs}`.trim();
+        throw new Error(translateOnchainError(raw));
+      }
+    } catch (simErr) {
+      const errMsg = simErr instanceof Error ? simErr.message : String(simErr);
+      if (
+        errMsg.includes("No signers") ||
+        errMsg.includes("signature verification failed") ||
+        errMsg.includes("block height exceeded") ||
+        errMsg.includes("Simulation failed")
+      ) {
+        log("[squads-sdk] simulation skipped (unsigned vault tx), proceeding with sendTransaction");
+      } else {
+        throw new Error(translateOnchainError(simErr));
+      }
     }
   }
 
@@ -409,7 +423,9 @@ export async function vaultTransactionExecute(params: {
   const versionedTx = new VersionedTransaction(message);
 
   // Simulate first to surface real RPC errors — wallet adapters often swallow them.
-  const sim = await params.connection.simulateTransaction(versionedTx, { replaceRecentBlockhash: true });
+  const sim = await params.connection.simulateTransaction(versionedTx, {
+    replaceRecentBlockhash: true,
+  });
   if (sim.value.err) {
     const logs = sim.value.logs?.join("\n") ?? "";
     const raw = `${JSON.stringify(sim.value.err)}\n${logs}`.trim();
@@ -560,7 +576,12 @@ export async function createAddMemberProposal(params: {
     transactionIndex,
   });
 
-  return sendConfigTransaction(params.connection, params.wallet, [configIx, proposalIx], transactionIndex);
+  return sendConfigTransaction(
+    params.connection,
+    params.wallet,
+    [configIx, proposalIx],
+    transactionIndex,
+  );
 }
 
 export async function createRemoveMemberProposal(params: {
@@ -588,7 +609,12 @@ export async function createRemoveMemberProposal(params: {
     transactionIndex,
   });
 
-  return sendConfigTransaction(params.connection, params.wallet, [configIx, proposalIx], transactionIndex);
+  return sendConfigTransaction(
+    params.connection,
+    params.wallet,
+    [configIx, proposalIx],
+    transactionIndex,
+  );
 }
 
 export async function createChangeThresholdProposal(params: {
@@ -616,7 +642,12 @@ export async function createChangeThresholdProposal(params: {
     transactionIndex,
   });
 
-  return sendConfigTransaction(params.connection, params.wallet, [configIx, proposalIx], transactionIndex);
+  return sendConfigTransaction(
+    params.connection,
+    params.wallet,
+    [configIx, proposalIx],
+    transactionIndex,
+  );
 }
 
 async function sendConfigTransaction(
@@ -642,7 +673,10 @@ async function sendConfigTransaction(
   }
 
   const { blockhash: confirmBh, lastValidBlockHeight } = await connection.getLatestBlockhash();
-  await connection.confirmTransaction({ signature, blockhash: confirmBh, lastValidBlockHeight }, "confirmed");
+  await connection.confirmTransaction(
+    { signature, blockhash: confirmBh, lastValidBlockHeight },
+    "confirmed",
+  );
   return { signature, transactionIndex };
 }
 

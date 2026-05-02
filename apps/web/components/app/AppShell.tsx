@@ -7,6 +7,7 @@ import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { isProposalPendingStatus } from "@/lib/proposals";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
+import { useVaultMetadata } from "@/lib/use-vault-metadata";
 import { cn } from "@/lib/utils";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
@@ -208,7 +209,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: vault, isLoading: vaultLoading } = useVaultData(multisig);
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [vaultName, setVaultName] = useState<string | undefined>();
+  const { data: vaultMeta } = useVaultMetadata(multisig);
+  const vaultName = vaultMeta?.name || undefined;
   const { data: proposals = [], isLoading: proposalsLoading } = useProposalSummaries(multisig);
 
   const pendingProposals = useMemo(
@@ -245,29 +247,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }, 10000);
     return () => clearTimeout(timer);
   }, [mobileNavOpen]);
-
-  useEffect(() => {
-    if (!multisig) {
-      setVaultName(undefined);
-      return;
-    }
-
-    let cancelled = false;
-    setVaultName(undefined);
-
-    fetch(`/api/vaults/${encodeURIComponent(multisig)}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((metadata: { name?: string } | null) => {
-        if (!cancelled) setVaultName(metadata?.name || undefined);
-      })
-      .catch(() => {
-        if (!cancelled) setVaultName(undefined);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [multisig]);
 
   useEffect(() => {
     if (!multisig || executedCount === 0) return;

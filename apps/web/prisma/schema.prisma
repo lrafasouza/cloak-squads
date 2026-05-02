@@ -22,14 +22,30 @@ model AuditLink {
 }
 
 model Vault {
-  id           String   @id @default(uuid())
-  cofreAddress String   @unique
-  name         String
-  description  String?
-  avatarUrl    String?
-  createdBy    String?
+  id                String   @id @default(uuid())
+  cofreAddress      String   @unique
+  name              String
+  description       String?
+  avatarUrl         String?
+  createdBy         String?
+  emailNotifications Boolean @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  settings VaultSettings?
+
+  @@index([cofreAddress])
+}
+
+model VaultSettings {
+  id           String  @id @default(uuid())
+  cofreAddress String  @unique
+  webhookUrl   String?
+  rpcOverride  String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  vault Vault @relation(fields: [cofreAddress], references: [cofreAddress], onDelete: Cascade)
 
   @@index([cofreAddress])
 }

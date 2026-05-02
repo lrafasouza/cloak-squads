@@ -12,34 +12,15 @@ import { useRecentActivity } from "@/lib/hooks/useRecentActivity";
 import { truncateAddress } from "@/lib/proposals";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
+import { useVaultMetadata } from "@/lib/use-vault-metadata";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, Copy, Shield, Users, Wallet } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 function DashboardVaultIdentity({ multisig }: { multisig: string }) {
-  const [vaultName, setVaultName] = useState<string | undefined>();
+  const { data: vaultMeta } = useVaultMetadata(multisig);
+  const vaultName = vaultMeta?.name || undefined;
   const [copiedAddress, setCopiedAddress] = useState(false);
-
-  useEffect(() => {
-    if (!multisig) {
-      setVaultName(undefined);
-      return;
-    }
-
-    let cancelled = false;
-    fetch(`/api/vaults/${encodeURIComponent(multisig)}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((metadata: { name?: string } | null) => {
-        if (!cancelled) setVaultName(metadata?.name || undefined);
-      })
-      .catch(() => {
-        if (!cancelled) setVaultName(undefined);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [multisig]);
 
   const handleCopyAddress = async () => {
     try {

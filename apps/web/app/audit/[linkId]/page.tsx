@@ -1,6 +1,5 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -13,6 +12,7 @@ import {
   WorkspacePage,
 } from "@/components/ui/workspace";
 import { lamportsToSol } from "@/lib/sol";
+import { cn } from "@/lib/utils";
 import {
   type AuditScope,
   type FilteredAuditTransaction,
@@ -22,7 +22,14 @@ import {
   generateDeterministicMockData,
   validateAuditFragment,
 } from "@cloak-squads/core/audit";
-import { ArrowDownLeft, ArrowRightLeft, ArrowUpRight, Download, FileJson, ShieldCheck } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowRightLeft,
+  ArrowUpRight,
+  Download,
+  FileJson,
+  ShieldCheck,
+} from "lucide-react";
 import Link from "next/link";
 import { use, useEffect, useMemo, useState } from "react";
 
@@ -223,7 +230,7 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
       case "full":
         return "Full access to all transaction data including amounts and addresses.";
       case "amounts_only":
-        return "View-only access to transaction amounts. Addresses are redacted.";
+        return "View-only access to transaction amounts. Identifiers are redacted.";
       case "time_ranged":
         return "View-only access to transactions within the specified date range.";
     }
@@ -288,9 +295,7 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
                   Visible amount
                 </dt>
                 <dd className="mt-1 font-mono text-ink">
-                  {metadata.scope === "amounts_only"
-                    ? "Redacted"
-                    : `${lamportsToSol(totals.visibleAmount)} SOL`}
+                  {lamportsToSol(totals.visibleAmount)} SOL
                 </dd>
               </div>
               <div>
@@ -449,12 +454,12 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
                               {tx.amount ? `${lamportsToSol(tx.amount)} SOL` : "Redacted"}
                             </td>
                             <td className="px-5 py-3.5 font-mono text-xs text-ink-subtle">
-                              {tx.nullifier.slice(0, 12)}...{tx.nullifier.slice(-6)}
+                              {tx.nullifier === "REDACTED"
+                                ? "REDACTED"
+                                : `${tx.nullifier.slice(0, 12)}...${tx.nullifier.slice(-6)}`}
                             </td>
                             <td className="px-5 py-3.5">
-                              <StatusPill
-                                tone={tx.status === "confirmed" ? "success" : "warning"}
-                              >
+                              <StatusPill tone={tx.status === "confirmed" ? "success" : "warning"}>
                                 {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
                               </StatusPill>
                             </td>
