@@ -17,6 +17,7 @@ import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { createVaultProposal } from "@/lib/squads-sdk";
 import { lamportsToSol } from "@/lib/sol";
+import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
@@ -34,6 +35,7 @@ import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, use, useMemo, useState } from "react";
@@ -59,6 +61,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   const { connection } = useConnection();
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
+  const queryClient = useQueryClient();
   const { startTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
 
@@ -251,6 +254,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         title: "Private send proposal ready",
         description: `Proposal #${transactionIndex} is ready for signer approval.`,
       });
+      void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
       router.push(`/vault/${multisig}/proposals/${transactionIndex}`);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Could not create proposal.";
@@ -317,6 +321,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         title: "Public send proposal ready",
         description: `Proposal #${result.transactionIndex.toString()} is ready for signer approval.`,
       });
+      void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
       router.push(`/vault/${multisig}/proposals/${result.transactionIndex.toString()}`);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Could not create proposal.";

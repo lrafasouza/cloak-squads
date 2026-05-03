@@ -1,6 +1,10 @@
 function errorText(error: unknown): string {
   if (typeof error === "string") return error;
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    if (error.message) return error.message;
+    if (error.cause instanceof Error && error.cause.message) return error.cause.message;
+    return error.name || "Unknown error";
+  }
   try {
     return JSON.stringify(error);
   } catch {
@@ -27,7 +31,15 @@ export function translateOnchainError(error: unknown): string {
     return "The paying account does not have enough SOL to complete this transaction. Add devnet SOL, then try again.";
   }
 
-  return message;
+  if (
+    error instanceof Error &&
+    error.name === "WalletSendTransactionError" &&
+    (!error.message || error.message.trim() === "")
+  ) {
+    return "Wallet rejected or failed to send the transaction. Make sure your wallet is unlocked and you approved the signing request.";
+  }
+
+  return message || "Transaction failed. Please try again.";
 }
 
 export function translatedOnchainError(error: unknown): Error {

@@ -21,6 +21,7 @@ import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import { createVaultProposal } from "@/lib/squads-sdk";
 import { lamportsToSol } from "@/lib/sol";
+import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
@@ -37,6 +38,7 @@ import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
@@ -62,6 +64,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   const { connection } = useConnection();
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
+  const queryClient = useQueryClient();
   const { addToast } = useToast();
   const { startTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
@@ -303,6 +306,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         title: "Stealth invoice ready",
         description: `Proposal #${transactionIndex} is ready and the claim link can be shared.`,
       });
+      void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
       addToast("Invoice + proposal created!", "success");
       setResult({ claimUrl: stealthData.claimUrl, transactionIndex });
     } catch (caught) {

@@ -38,7 +38,7 @@ import {
   normalizeLicenseStatus,
 } from "@/lib/operator-license-state";
 import { lamportsToSol } from "@/lib/sol";
-import { useProposalSummaries } from "@/lib/use-proposal-summaries";
+import { proposalSummariesQueryKey, useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
@@ -65,6 +65,7 @@ import {
   type VersionedTransaction,
 } from "@solana/web3.js";
 import * as squadsMultisig from "@sqds/multisig";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -357,6 +358,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const { connection } = useConnection();
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
+  const queryClient = useQueryClient();
   const { startTransaction, updateTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
   const gatekeeperProgram = useMemo(
@@ -989,6 +991,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           ...(withdrawSignature ? { withdrawSignature } : {}),
         });
         markProposalExecuted(multisig, txIndex);
+        void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
       } else if (payrollDraft) {
         // Chained execution
         await executePayroll();
@@ -1081,6 +1084,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     });
     if (payrollStatus === "success") {
       markProposalExecuted(multisig, txIndex);
+      void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
     }
   }
 
@@ -1145,6 +1149,12 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     }
 
     setExecuting(false);
+
+    const allSucceeded = executionSteps.every((s) => s.status === "success");
+    if (allSucceeded) {
+      markProposalExecuted(multisig, txIndex);
+      void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
+    }
   }
 
   const successCount = executionSteps.filter((s) => s.status === "success").length;
