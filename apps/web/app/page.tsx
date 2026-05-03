@@ -458,9 +458,9 @@ export default function HomePage() {
         <div className="pointer-events-none fixed inset-0 overflow-hidden">
           <div className="absolute inset-0 bg-radial-fade" />
           <div className="absolute inset-0 bg-grid-faint bg-grid-md opacity-[0.15]" />
-          {/* Ambient floating orbs */}
+          {/* Ambient floating orbs — desktop only */}
           <motion.div
-            className="absolute top-[10%] left-[15%] h-64 w-64 rounded-full opacity-[0.03] blur-[100px]"
+            className="absolute top-[10%] left-[15%] h-64 w-64 rounded-full opacity-[0.03] blur-[100px] hidden md:block"
             style={{ background: "hsl(var(--accent))" }}
             animate={{
               x: [0, 40, 0],
@@ -469,7 +469,7 @@ export default function HomePage() {
             transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
           />
           <motion.div
-            className="absolute bottom-[20%] right-[10%] h-96 w-96 rounded-full opacity-[0.02] blur-[120px]"
+            className="absolute bottom-[20%] right-[10%] h-96 w-96 rounded-full opacity-[0.02] blur-[120px] hidden md:block"
             style={{ background: "hsl(var(--accent))" }}
             animate={{
               x: [0, -50, 0],

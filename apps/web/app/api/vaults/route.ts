@@ -111,14 +111,14 @@ export async function POST(request: Request) {
       create: {
         cofreAddress: parsed.data.cofreAddress,
         name: parsed.data.name,
-        description: parsed.data.description || null,
-        avatarUrl: parsed.data.avatarUrl || null,
+        description: parsed.data.description ?? null,
+        avatarUrl: parsed.data.avatarUrl ?? null,
         createdBy: auth.publicKey,
       },
       update: {
         name: parsed.data.name,
-        description: parsed.data.description || null,
-        avatarUrl: parsed.data.avatarUrl || null,
+        description: parsed.data.description ?? null,
+        avatarUrl: parsed.data.avatarUrl ?? null,
       },
     });
 
@@ -126,13 +126,22 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("[api/vaults] upsert failed:", error);
 
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P1001") {
-      return NextResponse.json(
-        { error: "Database unavailable.", details: "Could not reach the local Postgres server." },
-        { status: 503 },
-      );
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P1001") {
+        return NextResponse.json(
+          { error: "Database unavailable.", details: "Could not reach the local Postgres server." },
+          { status: 503 },
+        );
+      }
+      if (error.code === "P2002") {
+        return NextResponse.json(
+          { error: "Vault already exists.", cofreAddress: parsed.data.cofreAddress },
+          { status: 409 },
+        );
+      }
     }
 
-    return NextResponse.json({ error: "Could not save vault metadata." }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Could not save vault metadata.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

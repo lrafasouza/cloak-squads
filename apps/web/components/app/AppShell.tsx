@@ -5,7 +5,9 @@ import { Logo } from "@/components/brand/Logo";
 import { Spinner } from "@/components/ui/skeleton";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { isProposalPendingStatus } from "@/lib/proposals";
+import { isProposalExecuted } from "@/lib/operator-execution-history";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
+import { useVaultBalance } from "@/lib/hooks/useVaultBalance";
 import { useVaultData } from "@/lib/use-vault-data";
 import { useVaultMetadata } from "@/lib/use-vault-metadata";
 import { cn } from "@/lib/utils";
@@ -32,6 +34,13 @@ import { useParams, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AutoCloseIndicator } from "@/components/ui/auto-close-indicator";
 import { BottomNav } from "@/components/app/BottomNav";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useSolPrice } from "@/lib/hooks/useSolPrice";
 import { type OperatorInboxItem, OperatorInboxSheet } from "./OperatorInboxSheet";
 
 /* ── Nav structure ── */
@@ -212,16 +221,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: vaultMeta } = useVaultMetadata(multisig);
   const vaultName = vaultMeta?.name || undefined;
   const { data: proposals = [], isLoading: proposalsLoading } = useProposalSummaries(multisig);
-
-  const pendingProposals = useMemo(
-    () => proposals.filter((proposal) => isProposalPendingStatus(proposal.status)),
-    [proposals],
-  );
+  const { balanceSol } = useVaultBalance(multisig);
+  const { data: solPrice } = useSolPrice();
+  const balanceNum = parseFloat(balanceSol) || 0;
+  const usdValue =
+    solPrice != null
+      ? (balanceNum * solPrice).toLocaleString("en-US", {
+          style: "currency",
+          currency: "USD",
+          maximumFractionDigits: 2,
+        })
+      : null;
 
   const inboxItems = useMemo(
     () =>
-      pendingProposals
-        .filter((p) => p.hasDraft)
+      proposals
+        .filter((p) => {
+          if (!p.hasDraft) return false;
+          if (isProposalPendingStatus(p.status)) return true;
+          if (p.status === "executed" && !isProposalExecuted(multisig, p.transactionIndex)) return true;
+          return false;
+        })
         .map(
           (p): OperatorInboxItem => ({
             id: p.id,
@@ -230,10 +250,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             recipient: p.recipient,
             type: p.type === "payroll" ? "payroll" : "single",
             ...(p.recipientCount !== undefined ? { recipientCount: p.recipientCount } : {}),
-            status: "pending",
+            status: p.status === "executed" ? "pending" : "pending",
           }),
         ),
-    [pendingProposals],
+    [proposals, multisig],
   );
 
   const [inboxOpen, setInboxOpen] = useState(false);
@@ -331,7 +351,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           vaultName={vaultName}
           pathname={pathname}
           base={base}
-          inboxCount={pendingProposals.length}
+          inboxCount={inboxItems.length}
         />
       </aside>
 
@@ -364,6 +384,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Desktop topbar */}
         <header className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-3 border-b border-white/[0.04] bg-surface/[0.6] px-6 backdrop-blur-xl md:flex">
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-3 text-xs font-medium text-ink-muted cursor-default">
+                  <Wallet className="h-3.5 w-3.5" />
+                  <span className="num">{balanceSol}</span>
+                  <span className="text-ink-subtle/70">SOL</span>
+                </div>
+              </TooltipTrigger>
+              {usdValue != null && (
+                <TooltipContent side="bottom">
+                  <span className="tabular-nums">{usdValue}</span>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
           <OperatorInboxButton
             count={inboxItems.length}
             open={inboxOpen}
@@ -406,7 +442,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               vaultName={vaultName}
               pathname={pathname}
               base={base}
-              inboxCount={pendingProposals.length}
+              inboxCount={inboxItems.length}
               onClose={() => setMobileNavOpen(false)}
             />
           </aside>

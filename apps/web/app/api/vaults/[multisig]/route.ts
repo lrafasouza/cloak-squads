@@ -76,24 +76,37 @@ export async function PATCH(request: Request, context: { params: Promise<{ multi
   }
 
   try {
+    const data = parsed.data;
+
     const existing = await prisma.vault.findUnique({ where: { cofreAddress: multisig } });
-    if (!existing) {
-      return NextResponse.json({ error: "Vault not found." }, { status: 404 });
+
+    let result: Record<string, unknown>;
+    if (existing) {
+      result = await prisma.vault.update({
+        where: { cofreAddress: multisig },
+        data: {
+          ...(data.name !== undefined ? { name: data.name } : {}),
+          ...(data.description !== undefined ? { description: data.description || null } : {}),
+          ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl || null } : {}),
+          ...(data.emailNotifications !== undefined ? { emailNotifications: data.emailNotifications } : {}),
+        },
+        include: { settings: true },
+      });
+    } else {
+      result = await prisma.vault.create({
+        data: {
+          cofreAddress: multisig,
+          name: data.name ?? "Untitled",
+          description: data.description ?? null,
+          avatarUrl: data.avatarUrl ?? null,
+          createdBy: auth.publicKey,
+          ...(data.emailNotifications !== undefined ? { emailNotifications: data.emailNotifications } : {}),
+        },
+        include: { settings: true },
+      });
     }
 
-    const data = parsed.data;
-    const updated = await prisma.vault.update({
-      where: { cofreAddress: multisig },
-      data: {
-        ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(data.description !== undefined ? { description: data.description || null } : {}),
-        ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl || null } : {}),
-        ...(data.emailNotifications !== undefined ? { emailNotifications: data.emailNotifications } : {}),
-      },
-      include: { settings: true },
-    });
-
-    return NextResponse.json(updated);
+    return NextResponse.json(result);
   } catch (error) {
     console.error("[api/vaults] update failed:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P1001") {

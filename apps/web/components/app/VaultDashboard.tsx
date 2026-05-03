@@ -6,6 +6,7 @@ import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import { CofreInitBanner } from "@/components/vault/CofreInitBanner";
 import { OverviewCard } from "@/components/vault/OverviewCard";
 import { PendingProposalsCard } from "@/components/vault/PendingProposalsCard";
+import { PrivacyFlowModal, PrivacyFlowTrigger } from "@/components/vault/PrivacyFlowModal";
 import { QuickActionBar } from "@/components/vault/QuickActionBar";
 import { RecentActivityCard } from "@/components/vault/RecentActivityCard";
 import { useRecentActivity } from "@/lib/hooks/useRecentActivity";
@@ -69,6 +70,7 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
   const { data, isLoading, error } = useVaultData(multisig);
   const { data: proposals = [] } = useProposalSummaries(multisig);
   const { activity, isLoading: activityLoading } = useRecentActivity(multisig, 5);
+  const [privacyFlowOpen, setPrivacyFlowOpen] = useState(false);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["vault-data", multisig] });
@@ -132,6 +134,9 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
         onRefresh={refresh}
       />
 
+      {/* Privacy flow explainer */}
+      <PrivacyFlowTrigger onClick={() => setPrivacyFlowOpen(true)} />
+
       {/* Quick actions */}
       <QuickActionBar multisig={multisig} />
 
@@ -161,6 +166,8 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
         activity={activity}
         isLoading={activityLoading}
       />
+
+      <PrivacyFlowModal open={privacyFlowOpen} onOpenChange={setPrivacyFlowOpen} />
     </div>
   );
 }

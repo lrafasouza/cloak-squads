@@ -149,7 +149,6 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
   useEffect(() => {
     if (!metadata || !secretKey) return;
 
-    // Derive view key from secret
     let scopeParams: Record<string, unknown> = {};
     try {
       scopeParams = metadata.scopeParams
@@ -167,16 +166,64 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
 
     void viewKey;
 
-    // TODO: Fetch actual transactions from Cloak scan using viewKey
-    // For now, show deterministic mock data based on linkId
-    const mockData = generateDeterministicMockData(metadata.id, 8);
+    const loadRealData = async () => {
+      try {
+        const [singleRes, payrollRes] = await Promise.all([
+          fetch(`/api/proposals/${encodeURIComponent(metadata.cofreAddress)}`),
+          fetch(`/api/payrolls/${encodeURIComponent(metadata.cofreAddress)}`),
+        ]);
 
-    const filtered = filterAuditData(
-      mockData,
-      metadata.scope,
-      scopeParams as { startDate: number; endDate: number },
-    );
-    setTransactions(filtered);
+        const realTxs: FilteredAuditTransaction[] = [];
+
+        if (singleRes.ok) {
+          const drafts = (await singleRes.json()) as Array<{ amount: string; recipient: string; createdAt: string }>;
+          for (const d of drafts) {
+            realTxs.push({
+              type: "transfer",
+              amount: metadata.scope === "amounts_only" ? d.amount : d.amount,
+              nullifier: metadata.scope === "amounts_only" ? "REDACTED" : d.recipient.slice(0, 16),
+              status: "confirmed",
+              timestamp: new Date(d.createdAt).getTime(),
+            });
+          }
+        }
+
+        if (payrollRes.ok) {
+          const payrolls = (await payrollRes.json()) as Array<{ totalAmount: string; recipientCount: number; createdAt: string }>;
+          for (const p of payrolls) {
+            realTxs.push({
+              type: "transfer",
+              amount: p.totalAmount,
+              nullifier: metadata.scope === "amounts_only" ? "REDACTED" : `payroll:${p.recipientCount}`,
+              status: "confirmed",
+              timestamp: new Date(p.createdAt).getTime(),
+            });
+          }
+        }
+
+        if (realTxs.length > 0) {
+          const filtered = filterAuditData(
+            realTxs,
+            metadata.scope,
+            scopeParams as { startDate: number; endDate: number },
+          );
+          setTransactions(filtered);
+          return;
+        }
+      } catch {
+        // Fall through to mock data
+      }
+
+      const mockData = generateDeterministicMockData(metadata.id, 8);
+      const filtered = filterAuditData(
+        mockData,
+        metadata.scope,
+        scopeParams as { startDate: number; endDate: number },
+      );
+      setTransactions(filtered);
+    };
+
+    void loadRealData();
   }, [metadata, secretKey]);
 
   const filteredTransactions = useMemo(

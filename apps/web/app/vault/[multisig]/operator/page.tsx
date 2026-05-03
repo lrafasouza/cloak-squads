@@ -384,6 +384,18 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const { data: proposals = [] } = useProposalSummaries(multisig);
 
   const queueDrafts = useMemo(() => {
+    const executedSet = new Set<string>();
+    try {
+      const key = `aegis:operator-executed-map:${multisig}`;
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const map = JSON.parse(raw) as Record<string, boolean>;
+        for (const [idx, val] of Object.entries(map)) {
+          if (val) executedSet.add(idx);
+        }
+      }
+    } catch {}
+
     return pendingDrafts
       .map((d) => {
         const proposal = proposals.find((p) => p.transactionIndex === d.transactionIndex);
@@ -391,11 +403,11 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       })
       .filter(
         (d) =>
-          d.proposalStatus !== "executed" &&
           d.proposalStatus !== "rejected" &&
-          d.proposalStatus !== "cancelled",
+          d.proposalStatus !== "cancelled" &&
+          !executedSet.has(d.transactionIndex),
       );
-  }, [pendingDrafts, proposals]);
+  }, [pendingDrafts, proposals, multisig]);
   const autoLoadFiredRef = useRef(false);
 
   const multisigAddress = useMemo(() => {
@@ -670,6 +682,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     doCloakDeposit = true,
     depositCacheKey = txIndex,
     invoiceId?: string,
+    _attempt = 0,
   ) {
     if (!wallet.publicKey || !multisigAddress) return;
 
@@ -900,7 +913,13 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           updateStep("deliver", { status: "success", description: "Cloak deposit cached." });
         }
       } catch (caught) {
-        const message = `Cloak deposit failed: ${caught instanceof Error ? caught.message : String(caught)}`;
+        const msg = caught instanceof Error ? caught.message : String(caught);
+        if (msg.includes("stale") && _attempt < 2) {
+          updateTransaction({ detail: "Note index stale, refreshing and retrying..." });
+          await new Promise<void>((resolve) => { setTimeout(resolve, 2000); });
+          return executeSingle(draft, doCloakDeposit, depositCacheKey, invoiceId, _attempt + 1);
+        }
+        const message = `Cloak deposit failed: ${msg}`;
         failTransaction(message);
         throw new Error(message);
       }
@@ -1669,7 +1688,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                     #{item.transactionIndex}
                   </span>
                   <StatusPill tone={item.status === "success" ? "success" : "danger"}>
-                    {item.status}
+                    {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                   </StatusPill>
                   <div className="min-w-0">
                     <p className="truncate text-sm text-ink">

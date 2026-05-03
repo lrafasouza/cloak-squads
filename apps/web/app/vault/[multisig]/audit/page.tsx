@@ -15,6 +15,7 @@ import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cn } from "@/lib/utils";
 import {
   type AuditScope,
+  type FilteredAuditTransaction,
   base64urlEncode,
   exportAuditToCSV,
   generateAuditLinkSecret,
@@ -322,10 +323,10 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
   };
 
   const exportToCSV = (link: AuditLinkSummary) => {
-    const scopeParams = parseScopeParams(link.scopeParams);
     const mockData = generateDeterministicMockData(link.id, 8);
 
-    let filtered = mockData;
+    let filtered: FilteredAuditTransaction[] = mockData;
+    const scopeParams = parseScopeParams(link.scopeParams);
     const { startDate: exportStartDate, endDate: exportEndDate } = scopeParams;
     if (link.scope === "time_ranged" && exportStartDate && exportEndDate) {
       filtered = mockData.filter(
@@ -340,9 +341,9 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
   };
 
   const exportToJSON = (link: AuditLinkSummary) => {
-    const scopeParams = parseScopeParams(link.scopeParams);
     const mockData = generateDeterministicMockData(link.id, 8);
-    let filtered = mockData;
+    let filtered: FilteredAuditTransaction[] = mockData;
+    const scopeParams = parseScopeParams(link.scopeParams);
     const { startDate: exportStartDate, endDate: exportEndDate } = scopeParams;
     if (link.scope === "time_ranged" && exportStartDate && exportEndDate) {
       filtered = mockData.filter(

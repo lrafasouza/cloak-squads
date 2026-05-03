@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { type ChangeEvent, type FormEvent, use, useCallback, useMemo, useState } from "react";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
+import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { publicEnv } from "@/lib/env";
 import {
   type PayrollRecipientInput,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/payroll-csv";
 import { lamportsToSol } from "@/lib/sol";
 import { createVaultProposal } from "@/lib/squads-sdk";
+import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { cofrePda } from "@cloak-squads/core/pda";
@@ -40,6 +42,7 @@ import {
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { useQueryClient } from "@tanstack/react-query";
 import * as multisigSdk from "@sqds/multisig";
 
 function randomBytes(length: number) {
@@ -103,6 +106,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   const { connection } = useConnection();
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
+  const queryClient = useQueryClient();
   const { startTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
 
@@ -198,7 +202,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     setPending(true);
     setDryRunStatus("running");
 
-    // Yield once so the running state paints before the expensive note build starts.
+    ensureCircuitsProxy();
+
     await new Promise<void>((resolve) => {
       window.requestAnimationFrame(() => resolve());
     });
@@ -462,6 +467,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
             ? "The payroll proposal and claim links are ready."
             : `Proposal #${transactionIndex} is ready for signer approval.`,
       });
+
+      void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
 
       // Store claims in sessionStorage
       for (let i = 0; i < parsedNotes.length; i++) {

@@ -15,7 +15,7 @@ const nav = [
   { label: "FAQ", href: "#faq" },
 ];
 
-export function SiteHeader({ className, showWallet = true }: { className?: string; showWallet?: boolean }) {
+export function SiteHeader({ className, showWallet = true, minimal = false }: { className?: string; showWallet?: boolean; minimal?: boolean }) {
   const pathname = usePathname();
   const isVaultPage = pathname?.startsWith("/vault");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -30,45 +30,56 @@ export function SiteHeader({ className, showWallet = true }: { className?: strin
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 md:px-6">
         <Logo href="/" size="md" />
 
-        {/* Desktop nav */}
-        <nav className="hidden items-center gap-1 md:flex">
-          {nav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-md px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:text-ink"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        {!minimal && (
+          <>
+            {/* Desktop nav */}
+            <nav className="hidden items-center gap-1 md:flex">
+              {nav.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="rounded-md px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:text-ink"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
 
-        {/* Desktop actions */}
-        <div className="hidden items-center gap-3 md:flex">
-          {showWallet && <ClientWalletButton />}
-          {!isVaultPage && (
-            <Link
-              href="/vault"
-              className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-hover shadow-raise-1"
-            >
-              Open vault
-            </Link>
-          )}
-        </div>
+            {/* Desktop actions */}
+            <div className="hidden items-center gap-3 md:flex">
+              {showWallet && <ClientWalletButton />}
+              {!isVaultPage && (
+                <Link
+                  href="/vault"
+                  className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-hover shadow-raise-1"
+                >
+                  Open vault
+                </Link>
+              )}
+            </div>
+          </>
+        )}
+        {minimal && (
+          <div className="flex items-center gap-3">
+            {showWallet && <ClientWalletButton />}
+          </div>
+        )}
 
-        {/* Mobile toggle */}
-        <button
-          type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-2 md:hidden"
-          onClick={() => setMobileOpen((v) => !v)}
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-        >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        {!minimal && (
+          /* Mobile toggle */
+          <button
+            type="button"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-2 md:hidden"
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        )}
       </div>
 
       {/* Mobile menu */}
-      {mobileOpen && (
+      {mobileOpen && !minimal && (
         <div className="border-t border-border bg-bg/95 backdrop-blur-xl md:hidden">
           <nav className="flex flex-col px-4 py-3">
             {nav.map((item) => (

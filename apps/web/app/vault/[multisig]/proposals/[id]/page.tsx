@@ -269,7 +269,7 @@ export default function ProposalApprovalPage({
             </div>
             {memberVote && (
               <p className="mt-1 text-xs text-ink-muted">
-                Your vote: <span className="font-semibold text-ink">{memberVote}</span>
+                Your vote: <span className="font-semibold capitalize text-ink">{memberVote}</span>
               </p>
             )}
           </div>
