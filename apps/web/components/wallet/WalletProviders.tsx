@@ -3,7 +3,6 @@
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { PhantomWalletAdapter, SolflareWalletAdapter } from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
 import { type ReactNode, useMemo } from "react";
 
@@ -20,12 +19,11 @@ function adapterNetworkFromEnv() {
 }
 
 export function WalletProviders({ children }: { children: ReactNode }) {
-  const network = adapterNetworkFromEnv();
-  const endpoint = process.env.NEXT_PUBLIC_RPC_URL ?? clusterApiUrl(network);
-  const wallets = useMemo(
-    () => [new PhantomWalletAdapter(), new SolflareWalletAdapter({ network })],
-    [network],
-  );
+  const endpoint = process.env.NEXT_PUBLIC_RPC_URL ?? clusterApiUrl(adapterNetworkFromEnv());
+
+  // Empty array: @solana/wallet-adapter-react v0.15 auto-detects all installed wallets
+  // that implement the Wallet Standard (Phantom, Backpack, Solflare, Coinbase, Glow, etc.)
+  const wallets = useMemo(() => [], []);
 
   return (
     <ConnectionProvider endpoint={endpoint}>

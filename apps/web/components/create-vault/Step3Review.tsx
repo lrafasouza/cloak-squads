@@ -121,6 +121,7 @@ export function Step3Review({
   const [steps, setSteps] = useState<CreationStep[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [deployFee, setDeployFee] = useState<DeployFeeBreakdownValue | null>(null);
+  const [prefetchedTreasury, setPrefetchedTreasury] = useState<PublicKey | null>(null);
   const submittingRef = useRef(false);
 
   const myPubkey = wallet.publicKey?.toBase58() ?? "";
@@ -139,15 +140,19 @@ export function Step3Review({
   useEffect(() => {
     let cancelled = false;
     estimateDeployFee(connection)
-      .then((fee) => {
-        if (!cancelled) setDeployFee(fee);
-      })
-      .catch(() => {
-        if (!cancelled) setDeployFee(null);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then((fee) => { if (!cancelled) setDeployFee(fee); })
+      .catch(() => { if (!cancelled) setDeployFee(null); });
+    return () => { cancelled = true; };
+  }, [connection]);
+
+  // Pre-fetch treasury so sendTransaction fires immediately on click (avoids wallet timeout)
+  useEffect(() => {
+    let cancelled = false;
+    const [programConfigPda] = multisigSdk.getProgramConfigPda({});
+    multisigSdk.accounts.ProgramConfig.fromAccountAddress(connection, programConfigPda)
+      .then((cfg) => { if (!cancelled) setPrefetchedTreasury(cfg.treasury); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [connection]);
 
   const updateLocalStep = useCallback((id: string, update: Partial<CreationStep>) => {
@@ -200,12 +205,16 @@ export function Step3Review({
       const [multisigPda] = multisigSdk.getMultisigPda({ createKey: createKey.publicKey });
       const [vaultPda] = multisigSdk.getVaultPda({ multisigPda, index: 0 });
 
-      const [programConfigPda] = multisigSdk.getProgramConfigPda({});
-      const programConfig = await multisigSdk.accounts.ProgramConfig.fromAccountAddress(
-        connection,
-        programConfigPda,
-      );
-      const treasury = programConfig.treasury;
+      // Use pre-fetched treasury to avoid RPC call on click path (prevents wallet disconnect timeout)
+      let treasury = prefetchedTreasury;
+      if (!treasury) {
+        const [programConfigPda] = multisigSdk.getProgramConfigPda({});
+        const programConfig = await multisigSdk.accounts.ProgramConfig.fromAccountAddress(
+          connection,
+          programConfigPda,
+        );
+        treasury = programConfig.treasury;
+      }
 
       const parsedMembers = allMembers.map((addr) => {
         try {
@@ -434,6 +443,7 @@ export function Step3Review({
     description,
     avatarDataUrl,
     deployFee,
+    prefetchedTreasury,
     onCreatedMultisig,
     onBootstrapIndex,
     fetchWithAuth,
