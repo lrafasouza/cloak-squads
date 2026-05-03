@@ -313,7 +313,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         caught instanceof Error ? caught.message : "Could not create stealth invoice.";
       setError(message);
       failTransaction(message);
-      addToast(message, "error");
+      addToast(message, "success");
     } finally {
       setPending(false);
       setProofStep(null);

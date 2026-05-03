@@ -180,18 +180,6 @@ export function Step2Members({
           </button>
         </div>
 
-        {threshold === 1 && totalCount === 1 && (
-          <p className="mt-3 text-xs text-ink-muted">
-            Add another member as a backup. Losing access to your wallet means losing access to
-            your vault assets.
-          </p>
-        )}
-        {threshold === totalCount && totalCount > 1 && (
-          <p className="mt-3 text-xs text-ink-muted">
-            Requiring all members means a single offline signer blocks every transaction. Consider
-            an M-of-N setup where M is less than N.
-          </p>
-        )}
       </div>
 
       {/* Operator card */}

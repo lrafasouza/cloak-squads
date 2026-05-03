@@ -285,7 +285,7 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
               await patchVault({ name: val.trim() || "Untitled" });
               addToast("Vault name updated", "success");
             } catch (e) {
-              addToast(e instanceof Error ? e.message : "Failed to update name", "error");
+              addToast(e instanceof Error ? e.message : "Failed to update name", "success");
               throw e;
             }
           }}
@@ -301,7 +301,7 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
               await patchVault({ description: val.trim() || null });
               addToast("Description updated", "success");
             } catch (e) {
-              addToast(e instanceof Error ? e.message : "Failed to update description", "error");
+              addToast(e instanceof Error ? e.message : "Failed to update description", "success");
               throw e;
             }
           }}

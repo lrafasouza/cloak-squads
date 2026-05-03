@@ -17,8 +17,18 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import * as sqdsMultisig from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Shield } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { Clock, Loader2, Shield } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+type BannerState = "idle" | "checking" | "pending-proposal" | "awaiting-approvals";
+
+function readProposalStatus(status: unknown): string {
+  if (status && typeof status === "object") {
+    const kind = (status as { __kind?: unknown }).__kind;
+    if (typeof kind === "string") return kind.toLowerCase();
+  }
+  return "unknown";
+}
 
 export function CofreInitBanner({ multisig }: { multisig: string }) {
   const { connection } = useConnection();
@@ -28,8 +38,40 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
   const { startTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
   const squadsProgram = useMemo(() => new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID), []);
+  const [bannerState, setBannerState] = useState<BannerState>("checking");
+  const [existingIndex, setExistingIndex] = useState<bigint | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // On mount, check if a cofre init proposal already exists (index 1 — always the bootstrap one)
+  useEffect(() => {
+    let cancelled = false;
+    async function check() {
+      const multisigPk = new PublicKey(multisig);
+      try {
+        const [proposalPda] = sqdsMultisig.getProposalPda({
+          multisigPda: multisigPk,
+          transactionIndex: 1n,
+        });
+        const proposal = await sqdsMultisig.accounts.Proposal.fromAccountAddress(
+          connection,
+          proposalPda,
+        );
+        if (cancelled) return;
+        const status = readProposalStatus(proposal.status);
+        if (status === "active" || status === "approved") {
+          setExistingIndex(1n);
+          setBannerState("awaiting-approvals");
+          return;
+        }
+      } catch {
+        // No proposal at index 1 — user needs to create one
+      }
+      if (!cancelled) setBannerState("idle");
+    }
+    check();
+    return () => { cancelled = true; };
+  }, [multisig, connection]);
 
   const handleBootstrap = useCallback(async () => {
     if (!wallet.publicKey || !wallet.sendTransaction) return;
@@ -88,21 +130,53 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
       }
 
       updateStep("proposal", { status: "running" });
-      const initCofre = await buildInitCofreIxBrowser({
-        multisig: multisigPk,
-        operator: wallet.publicKey,
-      });
-      const bootstrap = await createInitCofreProposal({
-        connection,
-        wallet,
-        multisigPda: multisigPk,
-        initCofreIx: initCofre.instruction,
-        memo: "Activate privacy layer",
-      });
+
+      // Dedup: reuse existing active/approved proposal instead of creating a duplicate
+      let transactionIndex = existingIndex;
+      let bootstrapSignature: string | undefined;
+
+      if (!transactionIndex) {
+        // Double-check on-chain in case mount check raced with wallet connection
+        try {
+          const [existingPda] = sqdsMultisig.getProposalPda({
+            multisigPda: multisigPk,
+            transactionIndex: 1n,
+          });
+          const existingProposal = await sqdsMultisig.accounts.Proposal.fromAccountAddress(
+            connection,
+            existingPda,
+          );
+          const status = readProposalStatus(existingProposal.status);
+          if (status === "active" || status === "approved") {
+            transactionIndex = 1n;
+          }
+        } catch {
+          // No existing proposal — will create below
+        }
+      }
+
+      if (!transactionIndex) {
+        const initCofre = await buildInitCofreIxBrowser({
+          multisig: multisigPk,
+          operator: wallet.publicKey,
+        });
+        const bootstrap = await createInitCofreProposal({
+          connection,
+          wallet,
+          multisigPda: multisigPk,
+          initCofreIx: initCofre.instruction,
+          memo: "Activate privacy layer",
+        });
+        transactionIndex = bootstrap.transactionIndex;
+        bootstrapSignature = bootstrap.signature;
+      }
+
       updateStep("proposal", {
         status: "success",
-        signature: bootstrap.signature,
-        description: `Privacy activation proposal #${bootstrap.transactionIndex.toString()} confirmed.`,
+        ...(bootstrapSignature ? { signature: bootstrapSignature } : {}),
+        description: bootstrapSignature
+          ? `Privacy activation proposal #${transactionIndex.toString()} confirmed.`
+          : `Existing proposal #${transactionIndex.toString()} found. Skipping creation.`,
       });
 
       const multisigAccount = await sqdsMultisig.accounts.Multisig.fromAccountAddress(
@@ -115,18 +189,20 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
           connection,
           wallet,
           multisigPda: multisigPk,
-          transactionIndex: bootstrap.transactionIndex,
+          transactionIndex,
           memo: "Approve privacy activation",
         });
         const execSig = await vaultTransactionExecute({
           connection,
           wallet,
           multisigPda: multisigPk,
-          transactionIndex: bootstrap.transactionIndex,
+          transactionIndex,
         });
         updateStep("execute", { status: "success", signature: execSig });
       } else {
         updateStep("execute", { status: "success", description: "Waiting for member approvals." });
+        setBannerState("awaiting-approvals");
+        setExistingIndex(transactionIndex);
       }
 
       await queryClient.invalidateQueries({ queryKey: ["vault-data", multisig] });
@@ -139,7 +215,7 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
       const message = caught instanceof Error ? caught.message : "Could not initialize vault.";
       setError(message);
       failTransaction(message);
-      addToast(message, "error");
+      addToast(message, "success");
     } finally {
       setPending(false);
     }
@@ -147,6 +223,7 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
     addToast,
     completeTransaction,
     connection,
+    existingIndex,
     failTransaction,
     multisig,
     queryClient,
@@ -155,6 +232,38 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
     updateStep,
     wallet,
   ]);
+
+  if (bannerState === "checking") {
+    return (
+      <div className="rounded-2xl bg-accent-soft/40 p-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/20">
+            <Loader2 className="h-5 w-5 text-accent animate-spin" />
+          </div>
+          <p className="text-sm text-ink-muted">Checking privacy layer status…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (bannerState === "awaiting-approvals") {
+    return (
+      <div className="rounded-2xl bg-accent-soft/40 p-5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/20">
+            <Clock className="h-5 w-5 text-accent" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-ink">Privacy activation pending</h3>
+            <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+              Proposal #{existingIndex?.toString() ?? "1"} is waiting for member approvals. Once
+              approved and executed, private transactions will be available.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl bg-accent-soft/40 p-5">

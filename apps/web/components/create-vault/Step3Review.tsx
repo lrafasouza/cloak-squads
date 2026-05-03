@@ -424,6 +424,7 @@ export function Step3Review({
         throw new Error(body?.error ?? "Vault created, but metadata could not be saved.");
       }
 
+      try { localStorage.removeItem("aegis:my-vaults"); } catch {}
       setCreatedPda(multisigPda.toBase58());
       setStatus("success");
       completeTransaction({
