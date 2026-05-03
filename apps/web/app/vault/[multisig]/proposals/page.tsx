@@ -239,6 +239,7 @@ export default function TransactionsPage({
 
   const [cancelTarget, setCancelTarget] = useState<ProposalSummary | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const [archivedIds, setArchivedIds] = useState<Set<string>>(() => {
     try {
@@ -256,6 +257,7 @@ export default function TransactionsPage({
   async function confirmCancel() {
     if (!cancelTarget || !wallet.publicKey || !multisigAddress || !wallet.sendTransaction) return;
     setCancelling(true);
+    setCancelError(null);
     try {
       await proposalCancel({
         connection,
@@ -264,11 +266,11 @@ export default function TransactionsPage({
         transactionIndex: BigInt(cancelTarget.transactionIndex),
       });
       await queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
-    } catch {
-      // swallow
+      setCancelTarget(null);
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "Could not cancel proposal.");
     } finally {
       setCancelling(false);
-      setCancelTarget(null);
     }
   }
 
@@ -451,8 +453,13 @@ export default function TransactionsPage({
         confirmVariant="destructive"
         isLoading={cancelling}
         onConfirm={() => void confirmCancel()}
-        onCancel={() => { if (!cancelling) setCancelTarget(null); }}
+        onCancel={() => { if (!cancelling) { setCancelTarget(null); setCancelError(null); } }}
       />
+      {cancelError && (
+        <p className="mt-2 rounded-md border border-signal-danger/30 bg-signal-danger/15 px-3 py-2 text-sm text-signal-danger">
+          {cancelError}
+        </p>
+      )}
     </div>
   );
 }

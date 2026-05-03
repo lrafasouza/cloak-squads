@@ -202,13 +202,13 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     setPending(true);
     setDryRunStatus("running");
 
-    ensureCircuitsProxy();
-
-    await new Promise<void>((resolve) => {
-      window.requestAnimationFrame(() => resolve());
-    });
-
     try {
+      ensureCircuitsProxy();
+
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
+      });
+
       const notes: RecipientNote[] = [];
       for (const recipient of recipients) {
         const recipientPubkey = new PublicKey(recipient.wallet);

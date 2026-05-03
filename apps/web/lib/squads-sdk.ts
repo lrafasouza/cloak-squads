@@ -710,6 +710,6 @@ async function sendSingleInstruction(
       logError("[squads-sdk]   .cause:", anyErr.cause);
       logError("[squads-sdk]   .message:", anyErr.message);
     }
-    throw sendErr;
+    throw new Error(translateOnchainError(sendErr));
   }
 }
