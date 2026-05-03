@@ -381,6 +381,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const [executionHistory, setExecutionHistory] = useState<ExecutionHistoryItem[]>([]);
   const [executing, setExecuting] = useState(false);
+  const [payrollComplete, setPayrollComplete] = useState(false);
   const [pendingDrafts, setPendingDrafts] = useState<DraftSummary[]>([]);
   const [draftOnChainStatus, setDraftOnChainStatus] = useState<ProposalStatus>("loading");
   const [licenseStatus, setLicenseStatus] = useState<OperatorLicenseStatus>("idle");
@@ -579,6 +580,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     setSignature(null);
     setWithdrawSignature(null);
     setExecutionSteps([]);
+    setPayrollComplete(false);
     setLicenseStatus("idle");
 
     try {
@@ -686,6 +688,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     depositCacheKey = txIndex,
     invoiceId?: string,
     _attempt = 0,
+    suppressProgress = false,
   ) {
     if (!wallet.publicKey || !multisigAddress) return;
 
@@ -694,7 +697,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       : invoiceId
         ? " for invoice claim"
         : "";
-    startTransaction({
+    if (!suppressProgress) startTransaction({
       title: isPayroll ? "Executing payroll transfer" : "Executing private transfer",
       description: `${lamportsToSol(draft.invariants.amount)} SOL${transferLabel}. This may take longer while the privacy shield is prepared.`,
       steps: [
@@ -959,10 +962,12 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       signature: sig,
       description: "License consumed and private execution finalized.",
     });
-    completeTransaction({
-      title: isPayroll ? "Payroll transfer complete" : "Private transfer complete",
-      description: "All required on-chain transactions for this transfer are confirmed.",
-    });
+    if (!suppressProgress) {
+      completeTransaction({
+        title: "Private transfer complete",
+        description: "All required on-chain transactions for this transfer are confirmed.",
+      });
+    }
 
     return sig;
   }
@@ -1026,9 +1031,15 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     setExecutionSteps(steps);
     let completed = 0;
     let lastError: string | undefined;
+    let lastSig: string | undefined;
+
+    startTransaction({
+      title: "Executing payroll batch",
+      description: `Processing ${payrollDraft.recipients.length} private transfer${payrollDraft.recipients.length !== 1 ? "s" : ""}.`,
+      steps: [{ id: "batch", title: "Batch execution in progress", description: "Each recipient is processed sequentially.", status: "running" }],
+    });
 
     for (let i = 0; i < payrollDraft.recipients.length; i++) {
-      // Update current step to running
       setExecutionSteps((prev) =>
         prev.map((s) => (s.index === i ? { ...s, status: "running" } : s)),
       );
@@ -1053,12 +1064,15 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           true,
           `${txIndex}:${i}`,
           isInvoiceMode ? recipient.invoiceId : undefined,
+          0,
+          true, // suppressProgress — payroll manages its own overlay
         );
 
         setExecutionSteps((prev) =>
           prev.map((s) => (s.index === i ? { ...s, status: "success", signature: sig } : s)),
         );
         completed += 1;
+        if (sig) lastSig = sig;
       } catch (caught) {
         const errorMsg = caught instanceof Error ? caught.message : "Execution failed";
         lastError = errorMsg;
@@ -1083,9 +1097,18 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             error: lastError ?? `Executed ${completed}/${payrollDraft.recipientCount} recipients.`,
           }),
     });
+
     if (payrollStatus === "success") {
+      completeTransaction({
+        title: `Payroll complete — ${completed} transfer${completed !== 1 ? "s" : ""} confirmed`,
+        description: "All private payroll transfers have been executed on-chain.",
+      });
+      setPayrollComplete(true);
+      if (lastSig) setSignature(lastSig);
       markProposalExecuted(multisig, txIndex);
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
+    } else {
+      failTransaction(lastError ?? `Executed ${completed}/${payrollDraft.recipientCount} recipients.`);
     }
   }
 
@@ -1109,6 +1132,12 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
   async function runFromStep(startIndex: number) {
     if (!payrollDraft || !wallet.publicKey || !multisigAddress) return;
+
+    const totalRecipients = payrollDraft.recipients.length;
+    // Count already-succeeded steps (before startIndex) using local snapshot to avoid stale reads
+    const alreadyDone = executionSteps.filter((s) => s.index < startIndex && s.status === "success").length;
+    let completed = alreadyDone;
+    let lastSig: string | undefined;
 
     for (let i = startIndex; i < payrollDraft.recipients.length; i++) {
       setExecutionSteps((prev) =>
@@ -1135,11 +1164,15 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           true,
           `${txIndex}:${i}`,
           isInvoiceMode ? recipient.invoiceId : undefined,
+          0,
+          true, // suppressProgress
         );
 
         setExecutionSteps((prev) =>
           prev.map((s) => (s.index === i ? { ...s, status: "success", signature: sig } : s)),
         );
+        completed += 1;
+        if (sig) lastSig = sig;
       } catch (caught) {
         const errorMsg = caught instanceof Error ? caught.message : "Execution failed";
         setExecutionSteps((prev) =>
@@ -1151,8 +1184,13 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
     setExecuting(false);
 
-    const allSucceeded = executionSteps.every((s) => s.status === "success");
-    if (allSucceeded) {
+    if (completed === totalRecipients) {
+      completeTransaction({
+        title: `Payroll complete — ${completed} transfer${completed !== 1 ? "s" : ""} confirmed`,
+        description: "All private payroll transfers have been executed on-chain.",
+      });
+      setPayrollComplete(true);
+      if (lastSig) setSignature(lastSig);
       markProposalExecuted(multisig, txIndex);
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
     }
@@ -1186,7 +1224,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     proposalStatus: draftOnChainStatus,
     licenseStatus,
   });
-  const canExecute = !pending && !signature && executionState.canExecute;
+  const canExecute = !pending && !signature && !payrollComplete && executionState.canExecute;
   const proposalStatusMessage = operatorStatusMessage(executionState.reason);
 
   if (!multisigAddress) {
@@ -1586,8 +1624,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   </div>
                 )}
 
-                {/* Execute form — hidden after successful execution */}
-                {!signature && (
+                {/* Execute form — hidden after successful single or payroll execution */}
+                {!signature && !payrollComplete && (
                   <form onSubmit={execute} className="space-y-2">
                     <Button type="submit" disabled={!canExecute}>
                       {pending
@@ -1619,8 +1657,45 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
                 {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
 
-                {/* Latest confirmed transactions */}
-                {(cloakSignature || signature || withdrawSignature) && (
+                {/* Payroll complete — per-recipient explorer links */}
+                {isPayroll && payrollComplete && executionSteps.some((s) => s.signature) && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-signal-positive">
+                      Payroll complete — {executionSteps.filter((s) => s.status === "success").length}/{executionSteps.length} transfers confirmed
+                    </p>
+                    {executionSteps
+                      .filter((s) => s.signature)
+                      .map((s) => {
+                        const recipient = payrollDraft?.recipients[s.index];
+                        return (
+                          <div
+                            key={s.index}
+                            className="flex flex-col gap-2 rounded-md border border-border bg-bg px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <dt className="text-sm text-ink-muted">
+                              {recipient?.name ?? `Recipient ${s.index + 1}`}
+                            </dt>
+                            <dd className="flex items-center gap-2">
+                              <code className="font-mono text-xs text-ink">
+                                {truncateSignature(s.signature!)}
+                              </code>
+                              <a
+                                href={transactionExplorerUrl(s.signature!)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft"
+                              >
+                                Explorer
+                              </a>
+                            </dd>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* Latest confirmed transactions (single transfer) */}
+                {!isPayroll && (cloakSignature || signature || withdrawSignature) && (
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-ink">Latest confirmed transactions</p>
                     {[
@@ -1628,9 +1703,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                       withdrawSignature
                         ? { label: "Recipient delivery", value: withdrawSignature }
                         : null,
-                      signature && !isPayroll
-                        ? { label: "License consumption", value: signature }
-                        : null,
+                      signature ? { label: "License consumption", value: signature } : null,
                     ]
                       .filter((item): item is { label: string; value: string } => Boolean(item))
                       .map((item) => (
