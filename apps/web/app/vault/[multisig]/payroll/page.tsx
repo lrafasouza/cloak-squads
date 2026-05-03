@@ -15,7 +15,7 @@ import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ArrowLeft, CheckCircle2, FileText, PlayCircle, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type ChangeEvent, type FormEvent, use, useCallback, useMemo, useState } from "react";
+import { type ChangeEvent, type FormEvent, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
@@ -116,6 +116,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   const [pending, setPending] = useState(false);
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [dryRunStatus, setDryRunStatus] = useState<"idle" | "running" | "ready" | "error">("idle");
+  const [zkWarmup, setZkWarmup] = useState<"idle" | "warming" | "ready">("idle");
+  const zkWarmupRef = useRef(false);
   const [uploadTab, setUploadTab] = useState<UploadTab>("input");
   const [mode, setMode] = useState<PayrollMode>("direct");
   const [createdPayroll, setCreatedPayroll] = useState<{
@@ -155,6 +157,19 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       })),
     [duplicateWallets, recipients],
   );
+
+  // Pre-initialize Poseidon BN128 WASM when the page loads.
+  // First call to buildPoseidon() takes 5-15s (compiles WASM at runtime).
+  // Warming up here means it's cached before the user clicks "Build notes".
+  useEffect(() => {
+    if (zkWarmupRef.current) return;
+    zkWarmupRef.current = true;
+    setZkWarmup("warming");
+    ensureCircuitsProxy();
+    generateUtxoKeypair()
+      .then(() => setZkWarmup("ready"))
+      .catch(() => setZkWarmup("idle"));
+  }, []);
 
   function handleCsvChange(event: ChangeEvent<HTMLTextAreaElement>) {
     const text = event.target.value;
@@ -844,13 +859,16 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                       <button
                         type="button"
                         onClick={() => void buildNotes()}
-                        disabled={pending || duplicateWallets.size > 0}
+                        disabled={pending || duplicateWallets.size > 0 || zkWarmup === "warming"}
                         className="inline-flex min-h-9 items-center gap-2 rounded-md bg-surface-2 px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50"
+                        title={zkWarmup === "warming" ? "Initializing ZK engine, please wait…" : undefined}
                       >
                         <PlayCircle className="h-4 w-4" />
-                        {pending
-                          ? "Preparing notes..."
-                          : `Build ${recipients.length} private note${recipients.length !== 1 ? "s" : ""}`}
+                        {zkWarmup === "warming"
+                          ? "Initializing ZK engine…"
+                          : pending
+                            ? "Preparing notes..."
+                            : `Build ${recipients.length} private note${recipients.length !== 1 ? "s" : ""}`}
                       </button>
                     </div>
 
