@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { decryptField, isEncrypted } from "@/lib/field-crypto";
+import { requireVaultMember } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
@@ -6,10 +8,15 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
 
   try {
+    // Validate as a valid Solana address (multisig/vault address)
     new PublicKey(id);
   } catch {
     return NextResponse.json({ error: "Invalid cofre address." }, { status: 400 });
   }
+
+  // Membership required to list all invoices of a vault
+  const auth = await requireVaultMember(id);
+  if (auth instanceof NextResponse) return auth;
 
   try {
     const invoices = await prisma.stealthInvoice.findMany({
@@ -33,10 +40,12 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         expiresAt: invoice.expiresAt.toISOString(),
         createdAt: invoice.createdAt.toISOString(),
         claimedAt: invoice.claimedAt?.toISOString() ?? null,
-        // UTXO data for claim (never expose utxoPrivateKey via GET)
+        // UTXO data for vault management — decrypt blinding, never expose private key
         utxoAmount: invoice.utxoAmount,
         utxoPublicKey: invoice.utxoPublicKey,
-        utxoBlinding: invoice.utxoBlinding,
+        utxoBlinding: invoice.utxoBlinding
+          ? (isEncrypted(invoice.utxoBlinding) ? decryptField(invoice.utxoBlinding) : invoice.utxoBlinding)
+          : null,
         utxoMint: invoice.utxoMint,
         utxoLeafIndex: invoice.utxoLeafIndex,
         utxoCommitment: invoice.utxoCommitment,

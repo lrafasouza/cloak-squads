@@ -11,6 +11,7 @@ type StoredAuth = {
   publicKey: string;
   signature: string; // base58
   timestamp: number; // unix seconds
+  nonce: string;
 };
 
 /**
@@ -43,6 +44,7 @@ export function useWalletAuth() {
           "x-solana-pubkey": cachedRef.current.publicKey,
           "x-solana-signature": cachedRef.current.signature,
           "x-solana-timestamp": String(cachedRef.current.timestamp),
+          "x-solana-nonce": cachedRef.current.nonce,
         };
       }
     }
@@ -57,6 +59,7 @@ export function useWalletAuth() {
             "x-solana-pubkey": parsed.publicKey,
             "x-solana-signature": parsed.signature,
             "x-solana-timestamp": String(parsed.timestamp),
+            "x-solana-nonce": parsed.nonce,
           };
         }
       }
@@ -75,7 +78,8 @@ export function useWalletAuth() {
     }
 
     const timestamp = now;
-    const message = `aegis:${pubKeyB58}:${timestamp}`;
+    const nonce = crypto.randomUUID();
+    const message = `aegis:${pubKeyB58}:${timestamp}:${nonce}`;
     const messageBytes = new TextEncoder().encode(message);
 
     const signPromise = (async (): Promise<Record<string, string> | null> => {
@@ -95,6 +99,7 @@ export function useWalletAuth() {
         publicKey: pubKeyB58,
         signature: signatureB58,
         timestamp,
+        nonce,
       };
 
       cachedRef.current = auth;
@@ -108,6 +113,7 @@ export function useWalletAuth() {
         "x-solana-pubkey": auth.publicKey,
         "x-solana-signature": auth.signature,
         "x-solana-timestamp": String(auth.timestamp),
+        "x-solana-nonce": auth.nonce,
       };
     })();
 

@@ -1,13 +1,21 @@
 import { prisma } from "@/lib/prisma";
-import { requireWalletAuth } from "@/lib/wallet-auth";
+import { encryptField } from "@/lib/field-crypto";
+import { requireVaultOperator } from "@/lib/vault-membership";
 import { NextResponse } from "next/server";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireWalletAuth();
+  const { id } = await params;
+
+  // Read the invoice to get cofreAddress for operator check
+  const existing = await prisma.stealthInvoice.findUnique({ where: { id } });
+  if (!existing) {
+    return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
+  }
+
+  const auth = await requireVaultOperator(existing.cofreAddress);
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const { id } = await params;
     const body = await request.json();
     const {
       utxoAmount,
@@ -21,13 +29,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       utxoLeftSiblingCommitment,
     } = body;
 
+    // Encrypt sensitive fields at rest
     const invoice = await prisma.stealthInvoice.update({
       where: { id },
       data: {
         utxoAmount,
-        utxoPrivateKey,
+        utxoPrivateKey: utxoPrivateKey ? encryptField(utxoPrivateKey) : null,
         utxoPublicKey,
-        utxoBlinding,
+        utxoBlinding: utxoBlinding ? encryptField(utxoBlinding) : null,
         utxoMint,
         utxoLeafIndex,
         utxoCommitment,

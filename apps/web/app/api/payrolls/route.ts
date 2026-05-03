@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { checkRateLimit } from "@/lib/rate-limit";
-import { requireWalletAuth } from "@/lib/wallet-auth";
+import { checkRateLimitAsync } from "@/lib/rate-limit";
+import { requireVaultMember } from "@/lib/vault-membership";
 import { Prisma } from "@prisma/client";
 import { PublicKey } from "@solana/web3.js";
 import { headers } from "next/headers";
@@ -138,16 +138,6 @@ const payrollDraftSchema = z
   });
 
 export async function POST(request: Request) {
-  const auth = await requireWalletAuth();
-  if (auth instanceof NextResponse) return auth;
-
-  const hdrs = await headers();
-  const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
-  const ip = (raw.split(",")[0] ?? raw).trim();
-  if (!checkRateLimit(ip)) {
-    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -161,6 +151,17 @@ export async function POST(request: Request) {
       { error: "Invalid payroll draft.", details: parsed.error.flatten() },
       { status: 400 },
     );
+  }
+
+  // Membership check requires the cofreAddress from the validated body
+  const auth = await requireVaultMember(parsed.data.cofreAddress);
+  if (auth instanceof NextResponse) return auth;
+
+  const hdrs = await headers();
+  const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
+  const ip = (raw.split(",")[0] ?? raw).trim();
+  if (!(await checkRateLimitAsync(ip))) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   try {

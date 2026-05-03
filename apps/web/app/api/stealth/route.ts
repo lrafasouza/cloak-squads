@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { checkRateLimit } from "@/lib/rate-limit";
-import { requireWalletAuth } from "@/lib/wallet-auth";
+import { checkRateLimitAsync } from "@/lib/rate-limit";
+import { requireVaultMember } from "@/lib/vault-membership";
 import { Prisma } from "@prisma/client";
 import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -47,16 +47,6 @@ function base64urlEncode(bytes: Uint8Array): string {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireWalletAuth();
-  if (auth instanceof NextResponse) return auth;
-
-  const hdrs = await headers();
-  const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
-  const ip = (raw.split(",")[0] ?? raw).trim();
-  if (!checkRateLimit(ip)) {
-    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -72,11 +62,25 @@ export async function POST(request: Request) {
     );
   }
 
+  // Membership check requires the cofreAddress from the validated body
+  const auth = await requireVaultMember(parsed.data.cofreAddress);
+  if (auth instanceof NextResponse) return auth;
+
+  const hdrs = await headers();
+  const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
+  const ip = (raw.split(",")[0] ?? raw).trim();
+  if (!(await checkRateLimitAsync(ip))) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const { cofreAddress, invoiceRef, memo, amount, recipientWallet } = parsed.data;
 
     const stealthKp = nacl.box.keyPair();
     const stealthPubkey = bs58.encode(stealthKp.publicKey);
+    // Derive Ed25519 signing key from the same seed for challenge-response
+    const signKp = nacl.sign.keyPair.fromSeed(stealthKp.secretKey.slice(0, 32));
+    const signPubkey = bs58.encode(signKp.publicKey);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
     const invoice = await prisma.stealthInvoice.create({
@@ -86,6 +90,7 @@ export async function POST(request: Request) {
         invoiceRef: invoiceRef ?? null,
         memo: memo ?? null,
         stealthPubkey,
+        signPubkey,
         amountHintEncrypted: Buffer.from(amount),
         status: "pending",
         expiresAt,

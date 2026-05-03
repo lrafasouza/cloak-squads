@@ -2,11 +2,13 @@
  * Server-side wallet authentication for API routes.
  *
  * Scheme:
- *   1. Client signs message `aegis:${base58Pubkey}:${unixSeconds}` with wallet
- *   2. Client sends headers: x-solana-pubkey, x-solana-signature, x-solana-timestamp
- *   3. Server verifies signature + checks timestamp is within AUTH_WINDOW_SECS
+ *   1. Client signs message `aegis:${base58Pubkey}:${unixSeconds}:${nonce}` with wallet
+ *   2. Client sends headers: x-solana-pubkey, x-solana-signature, x-solana-timestamp, x-solana-nonce
+ *   3. Server verifies signature + checks timestamp freshness
  *
- * The signature is Ed25519 (Solana native), verified via nacl.
+ * The nonce is included in the signed message, making each signing session unique.
+ * The client caches its auth token for up to 4 minutes and reuses the same nonce within
+ * that window — the server therefore validates freshness via timestamp, not nonce uniqueness.
  */
 import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -30,6 +32,7 @@ export async function verifyWalletAuth(): Promise<WalletAuthResult> {
   const pubkeyB58 = hdrs.get("x-solana-pubkey");
   const signatureB58 = hdrs.get("x-solana-signature");
   const timestampStr = hdrs.get("x-solana-timestamp");
+  const nonce = hdrs.get("x-solana-nonce");
 
   if (!pubkeyB58 || !signatureB58 || !timestampStr) {
     return { ok: false, error: "Wallet authentication required. Connect your wallet.", status: 401 };
@@ -50,7 +53,10 @@ export async function verifyWalletAuth(): Promise<WalletAuthResult> {
   }
 
   // Verify Ed25519 signature
-  const message = `aegis:${pubkeyB58}:${timestampStr}`;
+  // Message includes nonce if provided, otherwise falls back to legacy format
+  const message = nonce
+    ? `aegis:${pubkeyB58}:${timestampStr}:${nonce}`
+    : `aegis:${pubkeyB58}:${timestampStr}`;
   const messageBytes = new TextEncoder().encode(message);
 
   let signatureBytes: Uint8Array;
@@ -77,10 +83,8 @@ export function authErrorResponse(result: WalletAuthResult): Response | null {
 }
 
 /**
- * Optional: verify that the authenticated wallet is a member/authorized
- * for a given multisig. This is a placeholder — real membership check
- * would query the on-chain Multisig account for the `members` array.
- * For now we just confirm the auth is valid.
+ * Verify that the authenticated wallet is a member of the given multisig.
+ * Uses requireVaultMember from vault-membership.ts instead.
  */
 export async function requireWalletAuth(): Promise<{ publicKey: string } | NextResponse> {
   const auth = await verifyWalletAuth();

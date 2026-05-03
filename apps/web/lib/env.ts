@@ -14,6 +14,8 @@ const serverEnvSchema = z.object({
   JWT_SIGNING_SECRET: z.string().min(16),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
   FALLBACK_RPC_URL: z.string().url().optional(),
+  REDIS_URL: z.string().url().optional(),
+  REDIS_TOKEN: z.string().optional(),
 });
 
 export const publicEnv = publicEnvSchema.parse({
@@ -31,6 +33,8 @@ export function getServerEnv() {
     JWT_SIGNING_SECRET: process.env.JWT_SIGNING_SECRET,
     LOG_LEVEL: process.env.LOG_LEVEL,
     FALLBACK_RPC_URL: process.env.FALLBACK_RPC_URL,
+    REDIS_URL: process.env.REDIS_URL,
+    REDIS_TOKEN: process.env.REDIS_TOKEN,
   });
 }
 

@@ -1,5 +1,5 @@
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
-import { requireWalletAuth } from "@/lib/wallet-auth";
+import { requireVaultOperator } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
@@ -23,7 +23,7 @@ export async function GET(
   const url = new URL(request.url);
   const includeSensitive = url.searchParams.get("includeSensitive") === "true";
   if (includeSensitive) {
-    const auth = await requireWalletAuth();
+    const auth = await requireVaultOperator(multisig);
     if (auth instanceof NextResponse) return auth;
   }
 

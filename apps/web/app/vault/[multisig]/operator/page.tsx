@@ -38,7 +38,6 @@ import {
   normalizeLicenseStatus,
 } from "@/lib/operator-license-state";
 import { lamportsToSol } from "@/lib/sol";
-import { useToast } from "@/components/ui/toast-provider";
 import { proposalSummariesQueryKey, useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
@@ -257,11 +256,11 @@ async function cloakDepositBrowser(
       signMessage: wallet.signMessage,
       depositorPublicKey: wallet.publicKey,
       onProgress: (s: string) => {
-        console.error(`[cloak] ${s}`);
+        console.debug(`[cloak] ${s}`);
         callbacks?.onProgress?.(s);
       },
       onProofProgress: (p: number) => {
-        console.error(`[cloak] proof ${p}%`);
+        console.debug(`[cloak] proof ${p}%`);
         callbacks?.onProofProgress?.(p);
       },
     } as Parameters<typeof transact>[1],
@@ -361,7 +360,6 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
   const queryClient = useQueryClient();
-  const { addToast } = useToast();
   const { startTransaction, updateTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
   const gatekeeperProgram = useMemo(
@@ -892,11 +890,11 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               depositorPublicKey: wallet.publicKey,
               ...(cloakResult.merkleTree ? { cachedMerkleTree: cloakResult.merkleTree } : {}),
               onProgress: (s: string) => {
-                console.error(`[cloak] withdraw ${s}`);
+                console.debug(`[cloak] withdraw ${s}`);
                 updateTransaction({ detail: translateCloakProgress(s) });
               },
               onProofProgress: (p: number) => {
-                console.error(`[cloak] withdraw proof ${p}%`);
+                console.debug(`[cloak] withdraw proof ${p}%`);
                 updateTransaction({ proofProgress: p });
               },
             } as Parameters<typeof fullWithdraw>[2];
@@ -995,11 +993,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         });
         markProposalExecuted(multisig, txIndex);
         void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
-        addToast("Private transfer completed successfully!", "success", 3000);
       } else if (payrollDraft) {
         // Chained execution
         await executePayroll();
-        addToast("Payroll batch completed successfully!", "success", 3000);
       } else {
         throw new Error("Load a proposal draft first.");
       }
@@ -1590,34 +1586,36 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   </div>
                 )}
 
-                {/* Execute form */}
-                <form onSubmit={execute} className="space-y-2">
-                  <Button type="submit" disabled={!canExecute}>
-                    {pending
-                      ? isPayroll
-                        ? "Executing batch…"
-                        : "Executing…"
-                      : isPayroll
-                        ? "Execute batch"
-                        : "Execute transfer"}
-                  </Button>
-                  {!wallet.publicKey ? (
-                    <p className="text-xs text-signal-warn">
-                      Connect the registered operator wallet.
-                    </p>
-                  ) : null}
-                  {operatorMismatch && wallet.publicKey ? (
-                    <p className="text-xs text-signal-warn">
-                      Switch to the registered operator wallet.
-                    </p>
-                  ) : null}
-                  {lowOperatorSol ? (
-                    <p className="text-xs text-signal-warn">Add SOL to cover network fees.</p>
-                  ) : null}
-                  {cofreMissing ? (
-                    <p className="text-xs text-signal-warn">Finish private vault setup first.</p>
-                  ) : null}
-                </form>
+                {/* Execute form — hidden after successful execution */}
+                {!signature && (
+                  <form onSubmit={execute} className="space-y-2">
+                    <Button type="submit" disabled={!canExecute}>
+                      {pending
+                        ? isPayroll
+                          ? "Executing batch…"
+                          : "Executing…"
+                        : isPayroll
+                          ? "Execute batch"
+                          : "Execute transfer"}
+                    </Button>
+                    {!wallet.publicKey ? (
+                      <p className="text-xs text-signal-warn">
+                        Connect the registered operator wallet.
+                      </p>
+                    ) : null}
+                    {operatorMismatch && wallet.publicKey ? (
+                      <p className="text-xs text-signal-warn">
+                        Switch to the registered operator wallet.
+                      </p>
+                    ) : null}
+                    {lowOperatorSol ? (
+                      <p className="text-xs text-signal-warn">Add SOL to cover network fees.</p>
+                    ) : null}
+                    {cofreMissing ? (
+                      <p className="text-xs text-signal-warn">Finish private vault setup first.</p>
+                    ) : null}
+                  </form>
+                )}
 
                 {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
 

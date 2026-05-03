@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkChallenge, consumeChallenge } from "@/lib/claim-challenge";
+import { decryptField, isEncrypted } from "@/lib/field-crypto";
+import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { requireWalletAuth } from "@/lib/wallet-auth";
 import bs58 from "bs58";
 import { headers } from "next/headers";
@@ -8,7 +10,12 @@ import nacl from "tweetnacl";
 import { z } from "zod";
 
 const claimDataSchema = z.object({
-  accessKey: z.string().min(1),
+  // Challenge-response: client proves ownership of the stealth keypair
+  // by sending the challenge nonce + their derived public key + a signature
+  // over the challenge using the Ed25519 key derived from the box seed.
+  challengeId: z.string().min(1),
+  derivedPubkey: z.string().min(1),
+  challengeSignature: z.string().min(1),
 });
 
 function base64urlDecode(str: string): Uint8Array {
@@ -24,7 +31,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const hdrs = await headers();
   const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
   const ip = (raw.split(",")[0] ?? raw).trim();
-  if (!checkRateLimit(ip)) {
+  if (!(await checkRateLimitAsync(ip))) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
@@ -54,21 +61,49 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    let accessSecret: Uint8Array;
-    try {
-      accessSecret = base64urlDecode(parsed.data.accessKey);
-    } catch {
-      return NextResponse.json({ error: "Invalid invoice access key." }, { status: 400 });
+    // Step 1: Verify the derived public key matches the stored stealthPubkey
+    if (parsed.data.derivedPubkey !== invoice.stealthPubkey) {
+      return NextResponse.json(
+        { error: "Derived public key does not match the invoice." },
+        { status: 403 },
+      );
     }
 
-    if (accessSecret.length !== nacl.box.secretKeyLength) {
-      return NextResponse.json({ error: "Invalid invoice access key." }, { status: 400 });
+    // Step 2: Verify the challenge exists and is valid
+    const challenge = checkChallenge(id, parsed.data.challengeId);
+    if (!challenge) {
+      return NextResponse.json(
+        { error: "Invalid or expired challenge. Request a new challenge." },
+        { status: 403 },
+      );
     }
 
-    const accessKeypair = nacl.box.keyPair.fromSecretKey(accessSecret);
-    if (bs58.encode(accessKeypair.publicKey) !== invoice.stealthPubkey) {
-      return NextResponse.json({ error: "Invalid invoice access key." }, { status: 403 });
+    // Step 3: Verify the Ed25519 signature over the challenge
+    // The signPubkey was derived at invoice creation from the same seed as the box keypair.
+    if (!invoice.signPubkey) {
+      // Legacy invoices without signPubkey — skip challenge verification but consume challenge
+      consumeChallenge(id);
+    } else {
+      const signatureBytes = base64urlDecode(parsed.data.challengeSignature);
+      const signPubkeyBytes = bs58.decode(invoice.signPubkey);
+
+      const validSig = nacl.sign.detached.verify(
+        challenge,
+        signatureBytes,
+        signPubkeyBytes,
+      );
+
+      if (!validSig) {
+        consumeChallenge(id);
+        return NextResponse.json(
+          { error: "Invalid challenge signature." },
+          { status: 403 },
+        );
+      }
     }
+
+    // Consume the challenge (one-time use)
+    consumeChallenge(id);
 
     if (invoice.status === "claimed") {
       return NextResponse.json(
@@ -101,10 +136,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
+    // Decrypt sensitive fields that were encrypted at rest
+    const utxoPrivateKey = invoice.utxoPrivateKey
+      ? (isEncrypted(invoice.utxoPrivateKey) ? decryptField(invoice.utxoPrivateKey) : invoice.utxoPrivateKey)
+      : null;
+    const utxoBlinding = invoice.utxoBlinding
+      ? (isEncrypted(invoice.utxoBlinding) ? decryptField(invoice.utxoBlinding) : invoice.utxoBlinding)
+      : null;
+
     return NextResponse.json({
       utxoAmount: invoice.utxoAmount,
-      utxoPrivateKey: invoice.utxoPrivateKey,
-      utxoBlinding: invoice.utxoBlinding,
+      utxoPrivateKey,
+      utxoBlinding,
       utxoMint: invoice.utxoMint,
       utxoLeafIndex: invoice.utxoLeafIndex,
       utxoCommitment: invoice.utxoCommitment,

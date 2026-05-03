@@ -1,7 +1,7 @@
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { serializeDraft } from "@/lib/serialize-proposal-draft";
-import { requireWalletAuth } from "@/lib/wallet-auth";
+import { requireVaultMember, requireVaultOperator } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
@@ -27,7 +27,7 @@ export async function GET(
   const url = new URL(request.url);
   const includeSensitive = url.searchParams.get("includeSensitive") === "true";
   if (includeSensitive) {
-    const auth = await requireWalletAuth();
+    const auth = await requireVaultOperator(multisig);
     if (auth instanceof NextResponse) return auth;
   }
 
@@ -55,17 +55,17 @@ export async function PATCH(
   req: Request,
   context: { params: Promise<{ multisig: string; index: string }> },
 ) {
-  const auth = await requireWalletAuth();
+  const params = await context.params;
+
+  const auth = await requireVaultMember(params.multisig);
   if (auth instanceof NextResponse) return auth;
 
   const hdrs = await headers();
   const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
   const ip = (raw.split(",")[0] ?? raw).trim();
-  if (!checkRateLimit(ip, 30, 60_000)) {
+  if (!(await checkRateLimitAsync(ip, 30, 60_000))) {
     return NextResponse.json({ error: "Rate limited" }, { status: 429 });
   }
-
-  const params = await context.params;
 
   try {
     new PublicKey(params.multisig);
