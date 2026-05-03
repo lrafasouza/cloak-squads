@@ -128,7 +128,7 @@ export type FilteredAuditTransaction = {
   type: "deposit" | "transfer" | "withdraw";
   amount?: string | undefined;
   nullifier: string;
-  status: "confirmed" | "pending";
+  status: "confirmed" | "pending" | "failed";
 };
 
 export type AuditExportRow = {

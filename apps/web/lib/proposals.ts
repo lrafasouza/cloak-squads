@@ -21,6 +21,7 @@ export type ProposalSummary = {
   amount: string;
   recipient: string;
   memo: string;
+  title: string;
   createdAt: string;
   type: ProposalSummaryType;
   recipientCount?: number;
@@ -83,6 +84,7 @@ export async function loadPersistedProposalSummaries(
     ? ((await singleRes.json()) as ApiDraftSummary[]).map((draft) => ({
         ...draft,
         type: "single" as const,
+        title: draft.memo || `${draft.amount} SOL → ${truncateAddress(draft.recipient)}`,
         hasDraft: true,
       }))
     : [];
@@ -95,11 +97,37 @@ export async function loadPersistedProposalSummaries(
         totalAmount: draft.totalAmount ?? "0",
         amount: draft.totalAmount ?? "0",
         recipient: `${draft.recipientCount ?? 0} recipients`,
+        title: draft.memo || `Payroll — ${draft.recipientCount ?? 0} recipients`,
         hasDraft: true,
       }))
     : [];
 
   return [...singleDrafts, ...payrollDrafts];
+}
+
+function parseConfigActionTitle(actions: unknown[]): string {
+  if (!actions || actions.length === 0) return "Config change";
+  const parts = actions.map((action: unknown) => {
+    if (action && typeof action === "object") {
+      const kind = (action as { __kind?: unknown }).__kind;
+      if (kind === "AddMember") {
+        const newMember = (action as { newMember?: { key?: { toBase58?: () => string } } }).newMember;
+        const addr = newMember?.key?.toBase58?.() ?? "unknown";
+        return `Add member ${truncateAddress(addr)}`;
+      }
+      if (kind === "RemoveMember") {
+        const oldMember = (action as { oldMember?: { toBase58?: () => string } }).oldMember;
+        const addr = oldMember?.toBase58?.() ?? "unknown";
+        return `Remove member ${truncateAddress(addr)}`;
+      }
+      if (kind === "ChangeThreshold") {
+        const newThreshold = (action as { newThreshold?: number }).newThreshold;
+        return `Change threshold to ${newThreshold ?? "?"}`;
+      }
+    }
+    return "Config change";
+  });
+  return parts.join(", ");
 }
 
 export async function loadOnchainProposalSummaries(params: {
@@ -129,14 +157,47 @@ export async function loadOnchainProposalSummaries(params: {
           connection,
           proposalPda,
         );
+
+        // Try to read the underlying transaction account for memo/action details
+        const [transactionPda] = squadsMultisig.getTransactionPda({
+          multisigPda: multisigAddress,
+          index,
+        });
+
+        let title = "";
+        let txType: ProposalSummaryType = "onchain";
+
+        try {
+          const configTx = await squadsMultisig.accounts.ConfigTransaction.fromAccountAddress(
+            connection,
+            transactionPda,
+          );
+          title = parseConfigActionTitle(configTx.actions as unknown[]);
+          txType = "onchain";
+        } catch {
+          try {
+            const vaultTx = await squadsMultisig.accounts.VaultTransaction.fromAccountAddress(
+              connection,
+              transactionPda,
+            );
+            // Try to extract a readable title from the vault tx instructions
+            const ixCount = vaultTx.message.instructions.length;
+            title = ixCount > 0 ? `Vault transaction (${ixCount} instruction${ixCount > 1 ? "s" : ""})` : "Vault transaction";
+            txType = "onchain";
+          } catch {
+            title = "On-chain proposal";
+          }
+        }
+
         return {
           id: `onchain-${index.toString()}`,
           transactionIndex: index.toString(),
           amount: "0",
           recipient: "Squads vault transaction",
-          memo: "On-chain proposal",
+          memo: "",
+          title,
           createdAt: new Date(0).toISOString(),
-          type: "onchain" as const,
+          type: txType,
           status: readProposalStatus(proposal.status),
           approvals: proposal.approved.length,
           threshold,
@@ -178,6 +239,10 @@ export function mergeProposalSummaries(
     if (chain?.status !== undefined) merged.status = chain.status;
     if (chain?.approvals !== undefined) merged.approvals = chain.approvals;
     if (chain?.threshold !== undefined) merged.threshold = chain.threshold;
+    // Use on-chain title if persisted draft has no memo-based title (e.g. config actions)
+    if (chain?.title && (!draft.title || draft.title === draft.memo)) {
+      merged.title = chain.title;
+    }
     byIndex.set(draft.transactionIndex, merged);
   }
 

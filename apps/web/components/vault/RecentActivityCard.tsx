@@ -50,7 +50,7 @@ function ProposalRow({ multisig, p }: { multisig: string; p: ProposalSummary }) 
       ? `${p.recipientCount ?? "?"} recipients`
       : p.recipient && p.recipient !== "Squads vault transaction"
         ? truncateAddress(p.recipient)
-        : p.memo || "—";
+        : p.title || p.memo || "—";
 
   const time =
     p.createdAt && new Date(p.createdAt).getFullYear() > 1970

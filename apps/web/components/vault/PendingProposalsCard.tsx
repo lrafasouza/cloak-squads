@@ -1,7 +1,6 @@
 "use client";
 
-import { type ProposalSummary, truncateAddress } from "@/lib/proposals";
-import { lamportsToSol } from "@/lib/sol";
+import type { ProposalSummary } from "@/lib/proposals";
 import Link from "next/link";
 
 export function PendingProposalsCard({
@@ -29,12 +28,6 @@ export function PendingProposalsCard({
       </div>
       <div className="flex flex-col gap-2 px-5 pb-5">
         {pending.slice(0, 5).map((p) => {
-          const summary =
-            p.type === "payroll"
-              ? `Payroll - ${p.recipientCount ?? "?"} recipients`
-              : p.amount && p.amount !== "0"
-                ? `${lamportsToSol(p.amount)} SOL to ${truncateAddress(p.recipient)}`
-                : p.memo || "Config change";
           const sigProgress =
             p.approvals != null && p.threshold != null ? `${p.approvals}/${p.threshold}` : "--";
 
@@ -46,7 +39,7 @@ export function PendingProposalsCard({
             >
               <div className="min-w-0">
                 <p className="truncate font-medium text-ink">
-                  <span className="text-ink-subtle">#{p.transactionIndex}</span>{" "}{summary}
+                  <span className="text-ink-subtle">#{p.transactionIndex}</span>{" "}{p.title}
                 </p>
                 {p.memo && <p className="truncate text-xs text-ink-subtle">{p.memo}</p>}
               </div>

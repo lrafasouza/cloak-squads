@@ -1,6 +1,5 @@
 "use client";
 
-import { WarningCallout } from "@/components/ui/warning-callout";
 import { cn } from "@/lib/utils";
 import { Key, Minus, Plus, Trash2, UserRound } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -143,10 +142,9 @@ export function Step2Members({
           </button>
         )}
 
-        <WarningCallout variant="warning" className="mt-4">
-          Only add wallets you fully control. Do not add CEX addresses — they cannot sign
-          transactions.
-        </WarningCallout>
+        <p className="mt-3 text-xs text-ink-muted">
+          Only add wallets you fully control. CEX addresses cannot sign transactions.
+        </p>
       </div>
 
       {/* Threshold card */}
@@ -183,16 +181,16 @@ export function Step2Members({
         </div>
 
         {threshold === 1 && totalCount === 1 && (
-          <WarningCallout variant="warning" className="mt-3">
+          <p className="mt-3 text-xs text-ink-muted">
             Add another member as a backup. Losing access to your wallet means losing access to
             your vault assets.
-          </WarningCallout>
+          </p>
         )}
         {threshold === totalCount && totalCount > 1 && (
-          <WarningCallout variant="warning" className="mt-3">
+          <p className="mt-3 text-xs text-ink-muted">
             Requiring all members means a single offline signer blocks every transaction. Consider
-            M-of-N where M &lt; N.
-          </WarningCallout>
+            an M-of-N setup where M is less than N.
+          </p>
         )}
       </div>
 

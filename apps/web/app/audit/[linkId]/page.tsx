@@ -176,13 +176,15 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
         const realTxs: FilteredAuditTransaction[] = [];
 
         if (singleRes.ok) {
-          const drafts = (await singleRes.json()) as Array<{ amount: string; recipient: string; createdAt: string }>;
+          const drafts = (await singleRes.json()) as Array<{ amount: string; recipient: string; createdAt: string; archivedAt?: string | null }>;
           for (const d of drafts) {
+            // If the draft was archived (proposal failed/was cancelled), mark as failed
+            const status: FilteredAuditTransaction["status"] = d.archivedAt ? "failed" : "confirmed";
             realTxs.push({
               type: "transfer",
               amount: metadata.scope === "amounts_only" ? d.amount : d.amount,
               nullifier: metadata.scope === "amounts_only" ? "REDACTED" : d.recipient.slice(0, 16),
-              status: "confirmed",
+              status,
               timestamp: new Date(d.createdAt).getTime(),
             });
           }
@@ -199,6 +201,34 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
               timestamp: new Date(p.createdAt).getTime(),
             });
           }
+        }
+
+        // Also fetch archived drafts to detect failed/cancelled proposals
+        try {
+          const archivedRes = await fetch(`/api/proposals/${encodeURIComponent(metadata.cofreAddress)}?includeArchived=true`);
+          if (archivedRes.ok) {
+            const archivedDrafts = (await archivedRes.json()) as Array<{ amount: string; recipient: string; createdAt: string; archivedAt?: string | null }>;
+            for (const d of archivedDrafts) {
+              if (!d.archivedAt) continue;
+              // Check if this failed draft is already in the list
+              const nullifier = metadata.scope === "amounts_only" ? "REDACTED" : d.recipient.slice(0, 16);
+              const existingIdx = realTxs.findIndex((tx) => tx.nullifier === nullifier);
+              if (existingIdx >= 0) {
+                realTxs[existingIdx]!.status = "failed";
+              } else {
+                // Add failed transaction that wasn't in the non-archived list
+                realTxs.push({
+                  type: "transfer",
+                  amount: d.amount,
+                  nullifier,
+                  status: "failed",
+                  timestamp: new Date(d.createdAt).getTime(),
+                });
+              }
+            }
+          }
+        } catch {
+          // Archived status check is best-effort; don't block audit view
         }
 
         if (realTxs.length > 0) {
@@ -247,6 +277,7 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
       transfers: filteredTransactions.filter((tx) => tx.type === "transfer").length,
       withdraws: filteredTransactions.filter((tx) => tx.type === "withdraw").length,
       pending: filteredTransactions.filter((tx) => tx.status === "pending").length,
+      failed: filteredTransactions.filter((tx) => tx.status === "failed").length,
     };
   }, [filteredTransactions]);
 
@@ -416,12 +447,13 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
                       <option value="all">All statuses</option>
                       <option value="confirmed">Confirmed</option>
                       <option value="pending">Pending</option>
+                      <option value="failed">Failed</option>
                     </select>
                   </div>
                 }
               />
               <PanelBody>
-                <div className="mb-6 grid gap-4 sm:grid-cols-4">
+                <div className="mb-6 grid gap-4 sm:grid-cols-5">
                   <div>
                     <p className="text-xs font-medium text-ink-subtle">Deposits</p>
                     <p className="mt-1 font-mono text-xl font-semibold text-ink">
@@ -444,6 +476,12 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
                     <p className="text-xs font-medium text-ink-subtle">Pending</p>
                     <p className="mt-1 font-mono text-xl font-semibold text-ink">
                       {totals.pending}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-ink-subtle">Failed</p>
+                    <p className="mt-1 font-mono text-xl font-semibold text-signal-danger">
+                      {totals.failed}
                     </p>
                   </div>
                 </div>
@@ -506,7 +544,7 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
                                 : `${tx.nullifier.slice(0, 12)}...${tx.nullifier.slice(-6)}`}
                             </td>
                             <td className="px-5 py-3.5">
-                              <StatusPill tone={tx.status === "confirmed" ? "success" : "warning"}>
+                              <StatusPill tone={tx.status === "confirmed" ? "success" : tx.status === "failed" ? "danger" : "warning"}>
                                 {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
                               </StatusPill>
                             </td>
