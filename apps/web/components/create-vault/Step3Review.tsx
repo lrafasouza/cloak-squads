@@ -121,6 +121,7 @@ export function Step3Review({
   const [steps, setSteps] = useState<CreationStep[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [deployFee, setDeployFee] = useState<DeployFeeBreakdownValue | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [prefetchedTreasury, setPrefetchedTreasury] = useState<PublicKey | null>(null);
   const submittingRef = useRef(false);
 
@@ -136,6 +137,8 @@ export function Step3Review({
     [createKeySecret],
   );
   const totalFeeSOL = deployFee ? lamportsToSol(String(deployFee.totalLamports)) : "0.020";
+  const requiredLamports = deployFee?.totalLamports ?? 23_000_000;
+  const hasInsufficientBalance = walletBalance !== null && walletBalance < requiredLamports;
 
   useEffect(() => {
     let cancelled = false;
@@ -144,6 +147,15 @@ export function Step3Review({
       .catch(() => { if (!cancelled) setDeployFee(null); });
     return () => { cancelled = true; };
   }, [connection]);
+
+  useEffect(() => {
+    if (!wallet.publicKey) return;
+    let cancelled = false;
+    connection.getBalance(wallet.publicKey)
+      .then((bal) => { if (!cancelled) setWalletBalance(bal); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [connection, wallet.publicKey]);
 
   // Pre-fetch treasury so sendTransaction fires immediately on click (avoids wallet timeout)
   useEffect(() => {
@@ -640,6 +652,17 @@ export function Step3Review({
         </p>
       </div>
 
+      {hasInsufficientBalance && (
+        <WarningCallout variant="warning">
+          Insufficient SOL balance. You need at least{" "}
+          <span className="font-semibold">{totalFeeSOL} SOL</span> to deploy this vault.
+          Your wallet currently has{" "}
+          <span className="font-semibold">
+            {lamportsToSol(String(walletBalance))} SOL
+          </span>.
+        </WarningCallout>
+      )}
+
       {error && <WarningCallout variant="error">{error}</WarningCallout>}
 
       {/* Footer */}
@@ -655,11 +678,11 @@ export function Step3Review({
         <button
           type="button"
           onClick={handleCreate}
-          disabled={isPending || !wallet.connected}
+          disabled={isPending || !wallet.connected || hasInsufficientBalance}
           className={cn(
             "inline-flex min-h-10 items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold transition-all",
             "shadow-raise-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
-            !isPending && wallet.connected
+            !isPending && wallet.connected && !hasInsufficientBalance
               ? "bg-accent text-accent-ink hover:bg-accent-hover"
               : "bg-surface-2 text-ink-subtle cursor-not-allowed",
           )}
