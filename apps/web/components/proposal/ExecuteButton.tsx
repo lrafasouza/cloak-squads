@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/toast-provider";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { publicEnv } from "@/lib/env";
 import { configTransactionExecute, vaultTransactionExecute } from "@/lib/squads-sdk";
@@ -29,7 +28,6 @@ export function ExecuteButton({
   const wallet = useWallet();
   const { startTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
-  const { addToast } = useToast();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,7 +94,6 @@ export function ExecuteButton({
             ? "The configuration change is complete."
             : "The license is issued and the operator can continue the private delivery.",
       });
-      addToast("Proposal executed successfully!", "success", 3000);
       onSubmitted?.(signature);
     } catch (caught) {
       const message =

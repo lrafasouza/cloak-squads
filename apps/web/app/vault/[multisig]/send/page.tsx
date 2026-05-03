@@ -12,7 +12,6 @@ import {
   WorkspacePage,
 } from "@/components/ui/workspace";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
-import { useToast } from "@/components/ui/toast-provider";
 import { ArrowLeft, Send } from "lucide-react";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
@@ -65,7 +64,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   const queryClient = useQueryClient();
   const { startTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
-  const { addToast } = useToast();
 
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
@@ -256,7 +254,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         title: "Private send proposal ready",
         description: `Proposal #${transactionIndex} is ready for signer approval.`,
       });
-      addToast("Private send proposal created!", "success", 3000);
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
       router.push(`/vault/${multisig}/proposals/${transactionIndex}`);
     } catch (caught) {
@@ -324,7 +321,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         title: "Public send proposal ready",
         description: `Proposal #${result.transactionIndex.toString()} is ready for signer approval.`,
       });
-      addToast("Public send proposal created!", "success", 3000);
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
       router.push(`/vault/${multisig}/proposals/${result.transactionIndex.toString()}`);
     } catch (caught) {

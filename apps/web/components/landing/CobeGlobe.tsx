@@ -142,16 +142,16 @@ export function CobeGlobe() {
     };
   }, [isMobile]);
 
-  // Static fallback for mobile — no WebGL, just a decorative glow
+  // Static fallback for mobile — minimal decorative accent, no wasted space
   if (isMobile) {
     return (
-      <div className="relative w-full max-w-[320px] aspect-square mx-auto">
+      <div className="relative w-full mx-auto flex items-center justify-center py-2">
         <div
-          className="absolute inset-0 rounded-full opacity-20 blur-[80px] pointer-events-none"
+          className="h-24 w-24 rounded-full opacity-[0.12] blur-[40px] pointer-events-none"
           style={{ background: "radial-gradient(circle, hsl(var(--accent)), transparent 70%)" }}
         />
-        <div className="absolute inset-[15%] rounded-full border border-accent/10" />
-        <div className="absolute inset-[30%] rounded-full border border-accent/5" />
+        <div className="absolute h-16 w-16 rounded-full border border-accent/10" />
+        <div className="absolute h-8 w-8 rounded-full border border-accent/5" />
       </div>
     );
   }

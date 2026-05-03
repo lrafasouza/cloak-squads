@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
+import { translateCloakProgress } from "@/lib/cloak-progress";
 import { lamportsToSol } from "@/lib/sol";
 import { statusBadge } from "@/lib/status-labels";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
@@ -16,6 +17,7 @@ import {
 } from "@cloak.dev/sdk-devnet";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
+import bs58 from "bs58";
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 
@@ -30,13 +32,7 @@ type StealthInvoice = {
   status: string;
   expiresAt: string;
   createdAt: string;
-  // UTXO data for claim
-  utxoAmount: string | null;
-  utxoPublicKey: string | null;
-  utxoBlinding: string | null;
-  utxoMint: string | null;
-  utxoLeafIndex: number | null;
-  utxoCommitment: string | null;
+  claimedAt: string | null;
 };
 
 type ClaimUtxoData = {
@@ -141,21 +137,14 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
           return;
         }
 
-        const res = await fetchWithAuth(`/api/stealth/${encodeURIComponent(vault)}`);
+        const res = await fetch(`/api/stealth/invoice/${encodeURIComponent(stealthId)}`);
         if (!res.ok) {
           setError("Failed to load invoice data.");
           setClaimState("invalid");
           return;
         }
 
-        const invoices = (await res.json()) as StealthInvoice[];
-        const found = invoices.find((inv) => inv.id === stealthId);
-
-        if (!found) {
-          setError("Invoice not found.");
-          setClaimState("invalid");
-          return;
-        }
+        const found = (await res.json()) as StealthInvoice;
 
         if (found.status === "claimed") {
           setInvoice(found);
@@ -219,10 +208,35 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
 
     try {
       updateStep("prepare", { status: "running" });
+
+      // Step 1: Request challenge from server
+      const challengeRes = await fetch(`/api/stealth/${invoice.id}/challenge`, { method: "POST" });
+      if (!challengeRes.ok) {
+        const body = (await challengeRes.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Could not request claim challenge.");
+      }
+      const { challengeId, challenge } = (await challengeRes.json()) as { challengeId: string; challenge: string };
+
+      // Step 2: Derive Ed25519 signing key from the same seed as the box keypair
+      // The box secret key's first 32 bytes are the seed for both key types.
+      const nacl = await import("tweetnacl");
+      const challengeBytes = base64urlDecode(challenge);
+      const signKeypair = nacl.sign.keyPair.fromSeed(secretKey);
+      const challengeSignature = nacl.sign.detached(challengeBytes, signKeypair.secretKey);
+
+      // Step 3: Derive the box public key to prove ownership matches stored stealthPubkey
+      const boxKeypair = nacl.box.keyPair.fromSecretKey(secretKey);
+      const derivedPubkey = bs58.encode(boxKeypair.publicKey);
+
+      // Step 4: Send challengeId + derivedPubkey + signature to claim-data endpoint
       const utxoResponse = await fetchWithAuth(`/api/stealth/${invoice.id}/claim-data`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessKey: base64urlEncode(secretKey) }),
+        body: JSON.stringify({
+          challengeId,
+          derivedPubkey,
+          challengeSignature: base64urlEncode(challengeSignature),
+        }),
       });
       if (!utxoResponse.ok) {
         const body = (await utxoResponse.json().catch(() => null)) as { error?: string } | null;
@@ -277,16 +291,15 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         ...(wallet.signMessage ? { signMessage: wallet.signMessage } : {}),
         depositorPublicKey: wallet.publicKey,
         onProgress: (s: string) => {
-          console.info(`[cloak-claim] ${s}`);
-          updateTransaction({ detail: s });
+          console.debug(`[cloak-claim] ${s}`);
+          updateTransaction({ detail: translateCloakProgress(s) });
         },
         onProofProgress: (p: number) => {
-          console.info(`[cloak-claim] proof ${p}%`);
+          console.debug(`[cloak-claim] proof ${p}%`);
           updateTransaction({ proofProgress: p });
         },
       } as Parameters<typeof fullWithdraw>[2]);
 
-      console.log("Claim tx:", result.signature);
       updateStep("withdraw", {
         status: "success",
         signature: result.signature,

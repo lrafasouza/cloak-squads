@@ -135,7 +135,6 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
         title: "Privacy activation started",
         description: "The proposal has been created and is awaiting approvals.",
       });
-      addToast("Privacy activation proposal created.", "success");
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Could not initialize vault.";
       setError(message);

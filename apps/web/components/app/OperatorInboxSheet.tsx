@@ -41,7 +41,7 @@ export function OperatorInboxSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex flex-col" autoClose={false}>
-        <SheetHeader className="pb-3">
+        <SheetHeader className="px-0 pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface-2">
@@ -86,7 +86,7 @@ export function OperatorInboxSheet({
                   className="group relative overflow-hidden rounded-xl border border-border bg-surface p-4 shadow-raise-1 transition-all duration-200 hover:border-border-strong hover:shadow-raise-2"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex min-w-0 items-center gap-2.5">
                       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2">
                         {item.type === "payroll" ? (
                           <Users className="h-3.5 w-3.5 text-ink-subtle" />
@@ -94,13 +94,13 @@ export function OperatorInboxSheet({
                           <User className="h-3.5 w-3.5 text-ink-subtle" />
                         )}
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-ink">
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-sm font-medium text-ink">
                           {item.type === "payroll"
                             ? `Payroll · ${item.recipientCount ?? 0} recipients`
                             : "SINGLE TRANSFER"}
                         </span>
-                        <span className="mt-0.5 font-mono text-xs text-ink-subtle num">
+                        <span className="mt-0.5 truncate font-mono text-xs text-ink-subtle num">
                           {item.recipient}
                         </span>
                       </div>

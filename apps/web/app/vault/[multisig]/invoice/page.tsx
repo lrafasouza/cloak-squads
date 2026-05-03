@@ -307,7 +307,6 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         description: `Proposal #${transactionIndex} is ready and the claim link can be shared.`,
       });
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
-      addToast("Invoice + proposal created!", "success", 3000);
       setResult({ claimUrl: stealthData.claimUrl, transactionIndex });
     } catch (caught) {
       const message =

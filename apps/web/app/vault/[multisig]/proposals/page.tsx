@@ -76,7 +76,7 @@ function ApprovalDots({ approvals, threshold }: { approvals: number; threshold: 
   );
 }
 
-function ProposalCard({
+function ProposalQueueRow({
   multisig,
   p,
   onCancel,
@@ -103,68 +103,55 @@ function ProposalCard({
   const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "—";
 
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-raise-1 transition-all hover:border-border-strong hover:shadow-raise-2">
+    <div className="group relative grid items-center gap-4 px-5 py-3.5 transition-colors hover:bg-surface-2" style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}>
       <Link
         href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
         className="absolute inset-0"
         aria-label={`View proposal #${p.transactionIndex}`}
       />
-      <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
-        <div className="relative flex items-center gap-2 z-10 pointer-events-none">
-          <span className="font-mono text-sm font-medium text-ink-subtle">
-            #{p.transactionIndex}
-          </span>
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
-            <KindIcon type={p.type} />
-            {KIND_LABEL[p.type]}
-          </span>
-        </div>
-        <div className="relative flex items-center gap-1.5 z-10 pointer-events-none">
-          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
-          <span className="text-xs font-medium text-ink-muted">{label}</span>
-        </div>
+      <span className="relative font-mono text-sm font-medium text-ink-subtle z-10 pointer-events-none">
+        #{p.transactionIndex}
+      </span>
+      <div className="relative flex items-center gap-1.5 text-xs font-medium text-ink-muted z-10 pointer-events-none">
+        <KindIcon type={p.type} />
+        {KIND_LABEL[p.type]}
       </div>
-
-      <div className="flex flex-1 flex-col justify-between p-4">
-        <div className="relative z-10 pointer-events-none">
-          <p className="text-base font-semibold text-ink">{description}</p>
-          {recipient && (
-            <p className="mt-1 truncate font-mono text-xs text-ink-subtle">{recipient}</p>
-          )}
-          {p.memo && p.type !== "single" && (
-            <p className="mt-1 truncate text-xs text-ink-subtle">{p.memo}</p>
-          )}
-        </div>
-
-        <div className="mt-4 flex items-center justify-between">
-          <div className="relative z-10 pointer-events-none">
-            {p.approvals != null && p.threshold != null ? (
-              <ApprovalDots approvals={p.approvals} threshold={p.threshold} />
-            ) : (
-              <span className="text-xs text-ink-subtle">—</span>
-            )}
-          </div>
-          <div className="relative flex items-center gap-1 z-20">
-            {p.status === "active" && onCancel && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onCancel(p); }}
-                disabled={cancelling}
-                title="Cancel proposal"
-                className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-signal-danger/15 hover:text-signal-danger disabled:opacity-40"
-              >
-                {cancelling ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
-              </button>
-            )}
-            <Link
-              href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
-              onClick={(e) => e.stopPropagation()}
-              className="relative z-20 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink shadow-raise-1 transition-opacity hover:opacity-90"
-            >
-              {p.status === "active" ? "Sign" : p.status === "approved" ? "Execute" : "View"}
-            </Link>
-          </div>
-        </div>
+      <div className="relative min-w-0 z-10 pointer-events-none">
+        <p className="truncate text-sm font-medium text-ink">{description}</p>
+        {recipient && (
+          <p className="truncate font-mono text-xs text-ink-subtle">{recipient}</p>
+        )}
+      </div>
+      <div className="relative flex justify-end z-10 pointer-events-none">
+        {p.approvals != null && p.threshold != null ? (
+          <ApprovalDots approvals={p.approvals} threshold={p.threshold} />
+        ) : (
+          <span className="text-xs text-ink-subtle">—</span>
+        )}
+      </div>
+      <div className="relative flex items-center justify-end gap-1.5 z-10 pointer-events-none">
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+        <span className="text-xs font-medium text-ink-muted">{label}</span>
+      </div>
+      <div className="relative flex items-center justify-end gap-1 z-20">
+        {p.status === "active" && onCancel && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onCancel(p); }}
+            disabled={cancelling}
+            title="Cancel proposal"
+            className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-signal-danger/15 hover:text-signal-danger disabled:opacity-40"
+          >
+            {cancelling ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+          </button>
+        )}
+        <Link
+          href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
+          onClick={(e) => e.stopPropagation()}
+          className="relative z-20 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink shadow-raise-1 transition-opacity hover:opacity-90"
+        >
+          {p.status === "active" ? "Sign" : p.status === "approved" ? "Execute" : "View"}
+        </Link>
       </div>
     </div>
   );
@@ -513,17 +500,30 @@ export default function TransactionsPage({
                 </p>
               </div>
             ) : (
-              <div className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
-                {items.map((p) => (
-                  <ProposalCard
-                    key={p.id}
-                    multisig={multisig}
-                    p={p}
-                    onCancel={(target: ProposalSummary) => setCancelTarget(target)}
-                    cancelling={cancelling && cancelTarget?.id === p.id}
-                  />
-                ))}
-              </div>
+              <>
+                <div
+                  className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
+                  style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
+                >
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">#</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Type</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Details</span>
+                  <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Approvals</span>
+                  <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Status</span>
+                  <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Action</span>
+                </div>
+                <div className="divide-y divide-border/40">
+                  {items.map((p) => (
+                    <ProposalQueueRow
+                      key={p.id}
+                      multisig={multisig}
+                      p={p}
+                      onCancel={(target: ProposalSummary) => setCancelTarget(target)}
+                      cancelling={cancelling && cancelTarget?.id === p.id}
+                    />
+                  ))}
+                </div>
+              </>
             );
           })()
         ) : (

@@ -8,8 +8,8 @@ import {
   Copy,
   ExternalLink,
   Loader2,
-  ShieldCheck,
   WalletCards,
+  X,
   XCircle,
 } from "lucide-react";
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -125,6 +125,56 @@ function SignatureLink({ signature }: { signature: string }) {
   );
 }
 
+const SUCCESS_AUTO_CLOSE_MS = 3000;
+const ERROR_AUTO_CLOSE_MS = 10000;
+
+function SuccessToast({
+  transaction,
+  onClose,
+}: {
+  transaction: TransactionState;
+  onClose: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(onClose, SUCCESS_AUTO_CLOSE_MS);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const node = (
+    <div className="fixed bottom-4 right-4 z-[70] w-full max-w-sm">
+      <div className="relative flex items-start gap-4 rounded-2xl border border-signal-positive/25 bg-surface p-5 shadow-raise-2">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-signal-positive/30 bg-signal-positive/10">
+          <Check className="h-5 w-5 text-signal-positive" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-eyebrow text-signal-positive">Success</p>
+          <h2 className="mt-0.5 font-display text-base font-semibold text-ink">{transaction.title}</h2>
+          {transaction.description && (
+            <p className="mt-1 text-sm leading-5 text-ink-muted">{transaction.description}</p>
+          )}
+          <div className="mt-3 flex items-center gap-3">
+            <AutoCloseIndicator durationMs={SUCCESS_AUTO_CLOSE_MS} onComplete={onClose} />
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  );
+
+  if (!mounted) return null;
+  return createPortal(node, document.body);
+}
+
 function TransactionModal({
   transaction,
   onClose,
@@ -138,15 +188,16 @@ function TransactionModal({
   }, []);
 
   const canClose = transaction.status !== "running";
+  const autoCloseMs = transaction.status === "success" ? SUCCESS_AUTO_CLOSE_MS : ERROR_AUTO_CLOSE_MS;
 
-  /* Auto-close after 10 seconds once finished */
   useEffect(() => {
     if (!canClose) return;
     const timer = setTimeout(() => {
       onClose();
-    }, 10000);
+    }, autoCloseMs);
     return () => clearTimeout(timer);
-  }, [canClose, onClose]);
+  }, [canClose, onClose, autoCloseMs]);
+
   const completedSteps = transaction.steps.filter((step) => step.status === "success").length;
   const progress = transaction.steps.length
     ? Math.round((completedSteps / transaction.steps.length) * 100)
@@ -169,19 +220,28 @@ function TransactionModal({
                   "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
                   transaction.status === "error"
                     ? "border-signal-danger/35 bg-signal-danger/10 text-signal-danger"
-                    : "border-accent/30 bg-accent-soft text-accent",
+                    : transaction.status === "success"
+                      ? "border-signal-positive/35 bg-signal-positive/10 text-signal-positive"
+                      : "border-accent/30 bg-accent-soft text-accent",
                 )}
               >
                 {transaction.status === "error" ? (
                   <XCircle className="h-5 w-5" aria-hidden="true" />
                 ) : transaction.status === "success" ? (
-                  <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                  <Check className="h-5 w-5" aria-hidden="true" />
                 ) : (
                   <WalletCards className="h-5 w-5" aria-hidden="true" />
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-eyebrow">
+                <p className={cn(
+                  "text-eyebrow",
+                  transaction.status === "error"
+                    ? "text-signal-danger"
+                    : transaction.status === "success"
+                      ? "text-signal-positive"
+                      : "text-ink-muted",
+                )}>
                   {transaction.status === "running"
                     ? "Processing"
                     : transaction.status === "success"
@@ -206,7 +266,7 @@ function TransactionModal({
             </div>
             {canClose ? (
               <div className="flex items-center gap-2">
-                <AutoCloseIndicator durationMs={10000} onComplete={onClose} paused={!canClose} />
+                <AutoCloseIndicator durationMs={autoCloseMs} onComplete={onClose} paused={!canClose} />
                 <Button type="button" variant="ghost" onClick={onClose}>
                   Close
                 </Button>
@@ -221,7 +281,14 @@ function TransactionModal({
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2">
               <div
-                className="h-full rounded-full bg-accent transition-[width] duration-300"
+                className={cn(
+                  "h-full rounded-full transition-[width] duration-300",
+                  transaction.status === "success"
+                    ? "bg-signal-positive"
+                    : transaction.status === "error"
+                      ? "bg-signal-danger"
+                      : "bg-accent",
+                )}
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -235,7 +302,9 @@ function TransactionModal({
                 "mb-4 rounded-lg border px-3 py-2.5 text-sm",
                 transaction.status === "error"
                   ? "border-signal-danger/35 bg-signal-danger/10 text-signal-danger"
-                  : "border-border bg-bg text-ink-muted",
+                  : transaction.status === "success"
+                    ? "border-signal-positive/25 bg-signal-positive/10 text-signal-positive"
+                    : "border-border bg-bg text-ink-muted",
               )}
             >
               {transaction.detail}
@@ -289,7 +358,11 @@ function TransactionModal({
 
         <div className="border-t border-border bg-bg/35 px-5 py-4 md:px-6">
           <p className="text-xs leading-5 text-ink-subtle">
-            Keep this tab open. Your wallet may prompt you to sign between steps.
+            {transaction.status === "success"
+              ? "All steps completed successfully."
+              : transaction.status === "error"
+                ? "One or more steps failed. Check the details above."
+                : "Keep this tab open. Your wallet may prompt you to sign between steps."}
           </p>
         </div>
       </div>
@@ -398,7 +471,11 @@ export function TransactionProgressProvider({ children }: { children: ReactNode 
     <TransactionProgressContext.Provider value={value}>
       {children}
       {transaction?.open ? (
-        <TransactionModal transaction={transaction} onClose={closeTransaction} />
+        transaction.status === "success" ? (
+          <SuccessToast transaction={transaction} onClose={closeTransaction} />
+        ) : (
+          <TransactionModal transaction={transaction} onClose={closeTransaction} />
+        )
       ) : null}
     </TransactionProgressContext.Provider>
   );

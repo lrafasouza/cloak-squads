@@ -12,7 +12,6 @@ import {
   WorkspacePage,
 } from "@/components/ui/workspace";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
-import { useToast } from "@/components/ui/toast-provider";
 import { ArrowLeft, CheckCircle2, FileText, PlayCircle, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -110,7 +109,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   const queryClient = useQueryClient();
   const { startTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
-  const { addToast } = useToast();
   const [csvText, setCsvText] = useState("");
   const [recipients, setRecipients] = useState<PayrollRecipientInput[]>([]);
   const [parsedNotes, setParsedNotes] = useState<RecipientNote[]>([]);
@@ -468,7 +466,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
             ? "The payroll proposal and claim links are ready."
             : `Proposal #${transactionIndex} is ready for signer approval.`,
       });
-      addToast("Payroll proposal created!", "success", 3000);
 
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
 

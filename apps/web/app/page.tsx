@@ -81,8 +81,8 @@ function HowItWorksSection() {
                 <ScrollReveal key={step.num} delay={i * 0.12} distance={20}>
                   <div className="relative flex flex-col items-center text-center">
                     {/* Large icon circle */}
-                    <div className="relative z-10 flex h-24 w-24 items-center justify-center rounded-full border-2 border-border bg-bg shadow-sm mb-6">
-                      <Icon className="h-10 w-10 text-accent" strokeWidth={1.5} />
+                    <div className="relative z-10 flex h-16 w-16 md:h-24 md:w-24 items-center justify-center rounded-full border-2 border-border bg-bg shadow-sm mb-6">
+                      <Icon className="h-7 w-7 md:h-10 md:w-10 text-accent" strokeWidth={1.5} />
                     </div>
 
                     {/* Step number */}
@@ -359,13 +359,13 @@ function HeroSection() {
   return (
     <section id="hero" ref={ref} className="relative z-10 overflow-hidden">
       <motion.div style={{ y, opacity }}>
-        <div className="mx-auto max-w-7xl px-4 pt-20 pb-10 md:px-6 md:pt-28 md:pb-16">
+        <div className="mx-auto max-w-7xl px-4 pt-16 pb-6 md:px-6 md:pt-28 md:pb-16">
           {/* Badge */}
           <motion.div
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            className="mx-auto mb-6 flex items-center justify-center"
+            className="mx-auto mb-4 md:mb-6 flex items-center justify-center"
           >
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-1.5">
               <span className="relative flex h-2 w-2">
@@ -440,7 +440,7 @@ function HeroSection() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-12"
+            className="mt-4 md:mt-12"
           >
             <CobeGlobe />
           </motion.div>
