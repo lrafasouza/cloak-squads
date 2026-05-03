@@ -76,6 +76,13 @@ function statusTone(status: TransactionStepStatus) {
   return "border-border bg-surface-2 text-ink-subtle";
 }
 
+const STEP_STATUS_LABEL: Record<TransactionStepStatus, string> = {
+  pending: "Waiting",
+  running: "In progress",
+  success: "Done",
+  error: "Failed",
+};
+
 function StepIcon({ status }: { status: TransactionStepStatus }) {
   if (status === "success") return <Check className="h-4 w-4" aria-hidden="true" />;
   if (status === "error") return <XCircle className="h-4 w-4" aria-hidden="true" />;
@@ -176,10 +183,10 @@ function TransactionModal({
               <div className="min-w-0">
                 <p className="text-eyebrow">
                   {transaction.status === "running"
-                    ? "Transaction in progress"
+                    ? "Processing"
                     : transaction.status === "success"
-                      ? "Transaction complete"
-                      : "Transaction failed"}
+                      ? "Complete"
+                      : "Failed"}
                 </p>
                 <h2
                   id="transaction-progress-title"
@@ -238,7 +245,7 @@ function TransactionModal({
           {typeof transaction.proofProgress === "number" && transaction.status === "running" ? (
             <div className="mb-4 rounded-lg border border-border bg-bg px-3 py-3">
               <div className="flex items-center justify-between text-xs text-ink-muted">
-                <span>Privacy shield</span>
+                <span>Zero-knowledge proof</span>
                 <span className="font-mono tabular-nums">{transaction.proofProgress}%</span>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
@@ -266,7 +273,7 @@ function TransactionModal({
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-semibold text-ink">{step.title}</p>
                       <span className="rounded border border-border bg-surface-2 px-1.5 py-0.5 text-[11px] uppercase text-ink-subtle">
-                        {step.status}
+                        {STEP_STATUS_LABEL[step.status]}
                       </span>
                     </div>
                     {step.description ? (
@@ -282,7 +289,7 @@ function TransactionModal({
 
         <div className="border-t border-border bg-bg/35 px-5 py-4 md:px-6">
           <p className="text-xs leading-5 text-ink-subtle">
-            Keep this tab open until the flow finishes. Wallet prompts may appear between steps.
+            Keep this tab open. Your wallet may prompt you to sign between steps.
           </p>
         </div>
       </div>

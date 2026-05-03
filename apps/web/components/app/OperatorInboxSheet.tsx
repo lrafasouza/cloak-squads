@@ -98,7 +98,7 @@ export function OperatorInboxSheet({
                         <span className="text-sm font-medium text-ink">
                           {item.type === "payroll"
                             ? `Payroll · ${item.recipientCount ?? 0} recipients`
-                            : "Single Transfer"}
+                            : "SINGLE TRANSFER"}
                         </span>
                         <span className="mt-0.5 font-mono text-xs text-ink-subtle num">
                           {item.recipient}

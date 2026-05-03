@@ -16,7 +16,7 @@ import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
 import { detectTransactionType } from "@/lib/squads-sdk";
-import { ArrowLeft, CheckCircle2, ChevronRight, Circle, Copy, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronRight, Circle, Copy, ExternalLink, ShieldCheck, XCircle } from "lucide-react";
 import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 
@@ -217,7 +217,7 @@ export default function ProposalApprovalPage({
     (sig: string, kind: "approve" | "reject") => {
       setSignature(sig);
       setMemberVote(kind === "approve" ? "approved" : "rejected");
-      addToast(kind === "approve" ? "Vote approved!" : "Vote rejected", kind === "approve" ? "success" : "info");
+      addToast(kind === "approve" ? "Vote approved!" : "Vote rejected", kind === "approve" ? "success" : "info", 3000);
       setTimeout(() => void refreshStatus(), 1500);
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisigParam) });
     },
@@ -227,7 +227,7 @@ export default function ProposalApprovalPage({
   const onExecuteSubmitted = useCallback(
     (sig: string) => {
       setExecuteSignature(sig);
-      addToast("Transaction executed successfully!", "success");
+      addToast("Transaction executed successfully!", "success", 3000);
       setTimeout(() => void refreshStatus(), 1500);
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisigParam) });
     },
@@ -435,19 +435,39 @@ export default function ProposalApprovalPage({
             <div className="rounded-xl border border-border bg-surface p-5 shadow-raise-1">
               <h2 className="mb-4 text-sm font-semibold text-ink">Execute</h2>
               {executeComplete ? (
-                <div className="flex items-start gap-2.5 rounded-lg bg-accent-soft px-3.5 py-3">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
-                  <div>
-                    <p className="text-sm font-semibold text-accent">Transaction executed</p>
-                    <p className="mt-0.5 text-xs text-ink-muted">
-                      The Squads proposal is complete.
-                    </p>
-                    {executeSignature && (
-                      <p className="mt-2 break-all rounded-md border border-accent/20 bg-bg/40 px-2.5 py-1.5 font-mono text-[10px] text-ink-muted">
-                        {executeSignature}
+                <div className="space-y-3">
+                  <div className="flex items-start gap-2.5 rounded-lg bg-accent-soft px-3.5 py-3">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                    <div>
+                      <p className="text-sm font-semibold text-accent">Transaction executed</p>
+                      <p className="mt-0.5 text-xs text-ink-muted">
+                        The Squads proposal is complete.
                       </p>
-                    )}
+                      {executeSignature && (
+                        <p className="mt-2 break-all rounded-md border border-accent/20 bg-bg/40 px-2.5 py-1.5 font-mono text-[10px] text-ink-muted">
+                          {executeSignature}
+                        </p>
+                      )}
+                    </div>
                   </div>
+                  {transactionType !== "config" && (
+                    <div className="flex items-start gap-2.5 rounded-lg border border-signal-warn/25 bg-signal-warn/10 px-3.5 py-3">
+                      <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-signal-warn" />
+                      <div>
+                        <p className="text-sm font-semibold text-ink">Waiting for Operator</p>
+                        <p className="mt-0.5 text-xs text-ink-muted">
+                          The Operator must now execute the private delivery so the SOL is sent to the recipient.
+                        </p>
+                        <Link
+                          href={`/vault/${multisigParam}/operator?proposal=${encodeURIComponent(id)}`}
+                          className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink shadow-raise-1 transition-opacity hover:opacity-90"
+                        >
+                          Go to Operator
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>

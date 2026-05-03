@@ -38,6 +38,7 @@ import {
   normalizeLicenseStatus,
 } from "@/lib/operator-license-state";
 import { lamportsToSol } from "@/lib/sol";
+import { useToast } from "@/components/ui/toast-provider";
 import { proposalSummariesQueryKey, useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
@@ -68,6 +69,7 @@ import * as squadsMultisig from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { translateCloakProgress } from "@/lib/cloak-progress";
 import {
   type FormEvent,
   Suspense,
@@ -359,6 +361,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const wallet = useWallet();
   const { fetchWithAuth } = useWalletAuth();
   const queryClient = useQueryClient();
+  const { addToast } = useToast();
   const { startTransaction, updateTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
   const gatekeeperProgram = useMemo(
@@ -793,7 +796,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               keypair: { privateKey: bigint; publicKey: bigint };
             },
             {
-              onProgress: (message) => updateTransaction({ detail: message }),
+              onProgress: (message) => updateTransaction({ detail: translateCloakProgress(message) }),
               onProofProgress: (progress) => updateTransaction({ proofProgress: progress }),
             },
           );
@@ -890,7 +893,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               ...(cloakResult.merkleTree ? { cachedMerkleTree: cloakResult.merkleTree } : {}),
               onProgress: (s: string) => {
                 console.error(`[cloak] withdraw ${s}`);
-                updateTransaction({ detail: s });
+                updateTransaction({ detail: translateCloakProgress(s) });
               },
               onProofProgress: (p: number) => {
                 console.error(`[cloak] withdraw proof ${p}%`);
@@ -992,9 +995,11 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         });
         markProposalExecuted(multisig, txIndex);
         void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
+        addToast("Private transfer completed successfully!", "success", 3000);
       } else if (payrollDraft) {
         // Chained execution
         await executePayroll();
+        addToast("Payroll batch completed successfully!", "success", 3000);
       } else {
         throw new Error("Load a proposal draft first.");
       }
@@ -1185,7 +1190,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     proposalStatus: draftOnChainStatus,
     licenseStatus,
   });
-  const canExecute = !pending && executionState.canExecute;
+  const canExecute = !pending && !signature && executionState.canExecute;
   const proposalStatusMessage = operatorStatusMessage(executionState.reason);
 
   if (!multisigAddress) {
@@ -1390,7 +1395,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                               : "bg-surface-2 text-ink-muted"
                           }`}
                         >
-                          {d.type}
+                          {d.type.toUpperCase()}
                         </span>
                         <p className="truncate text-sm text-ink">
                           {d.type === "payroll"

@@ -76,6 +76,100 @@ function ApprovalDots({ approvals, threshold }: { approvals: number; threshold: 
   );
 }
 
+function ProposalCard({
+  multisig,
+  p,
+  onCancel,
+  cancelling,
+}: {
+  multisig: string;
+  p: ProposalSummary;
+  onCancel?: (p: ProposalSummary) => void;
+  cancelling?: boolean;
+}) {
+  const description =
+    p.type === "payroll"
+      ? `${p.recipientCount ?? "?"} recipients`
+      : p.amount && p.amount !== "0"
+        ? `${lamportsToSol(p.amount)} SOL`
+        : p.title || p.memo || "Configuration change";
+
+  const recipient =
+    p.type === "single" && p.recipient
+      ? truncateAddress(p.recipient)
+      : null;
+
+  const dot = STATUS_DOT[p.status ?? "draft"] ?? "bg-ink-subtle";
+  const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "—";
+
+  return (
+    <div className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-raise-1 transition-all hover:border-border-strong hover:shadow-raise-2">
+      <Link
+        href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
+        className="absolute inset-0"
+        aria-label={`View proposal #${p.transactionIndex}`}
+      />
+      <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
+        <div className="relative flex items-center gap-2 z-10 pointer-events-none">
+          <span className="font-mono text-sm font-medium text-ink-subtle">
+            #{p.transactionIndex}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
+            <KindIcon type={p.type} />
+            {KIND_LABEL[p.type]}
+          </span>
+        </div>
+        <div className="relative flex items-center gap-1.5 z-10 pointer-events-none">
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+          <span className="text-xs font-medium text-ink-muted">{label}</span>
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col justify-between p-4">
+        <div className="relative z-10 pointer-events-none">
+          <p className="text-base font-semibold text-ink">{description}</p>
+          {recipient && (
+            <p className="mt-1 truncate font-mono text-xs text-ink-subtle">{recipient}</p>
+          )}
+          {p.memo && p.type !== "single" && (
+            <p className="mt-1 truncate text-xs text-ink-subtle">{p.memo}</p>
+          )}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between">
+          <div className="relative z-10 pointer-events-none">
+            {p.approvals != null && p.threshold != null ? (
+              <ApprovalDots approvals={p.approvals} threshold={p.threshold} />
+            ) : (
+              <span className="text-xs text-ink-subtle">—</span>
+            )}
+          </div>
+          <div className="relative flex items-center gap-1 z-20">
+            {p.status === "active" && onCancel && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onCancel(p); }}
+                disabled={cancelling}
+                title="Cancel proposal"
+                className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-signal-danger/15 hover:text-signal-danger disabled:opacity-40"
+              >
+                {cancelling ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+              </button>
+            )}
+            <Link
+              href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
+              onClick={(e) => e.stopPropagation()}
+              className="relative z-20 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink shadow-raise-1 transition-opacity hover:opacity-90"
+            >
+              {p.status === "active" ? "Sign" : p.status === "approved" ? "Execute" : "View"}
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProposalRow({
   multisig,
   p,
@@ -96,7 +190,7 @@ function ProposalRow({
       ? `${p.recipientCount ?? "?"} recipients · ${lamportsToSol(p.totalAmount ?? "0")} SOL`
       : p.amount && p.amount !== "0"
         ? `${lamportsToSol(p.amount)} SOL → ${truncateAddress(p.recipient)}`
-        : p.memo || "Configuration change";
+        : p.title || p.memo || "Configuration change";
 
   const dot = STATUS_DOT[p.status ?? "draft"] ?? "bg-ink-subtle";
   const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "—";
@@ -371,8 +465,8 @@ export default function TransactionsPage({
               <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Tx</span>
             </div>
           )
-        ) : (
-          !isLoading && grouped[activeTab as Exclude<TabId, "income">]?.length > 0 && (
+        ) : activeTab !== "queue" ? (
+          !isLoading && grouped[activeTab as Exclude<TabId, "income" | "queue">]?.length > 0 && (
             <div
               className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
               style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
@@ -385,7 +479,7 @@ export default function TransactionsPage({
               <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Action</span>
             </div>
           )
-        )}
+        ) : null}
 
         {/* Rows */}
         {isLoading ? (
@@ -408,23 +502,40 @@ export default function TransactionsPage({
               ))}
             </div>
           )
+        ) : activeTab === "queue" ? (
+          (() => {
+            const items = grouped.queue;
+            return items.length === 0 ? (
+              <div className="py-16 text-center">
+                <p className="text-sm font-medium text-ink-muted">No pending transactions</p>
+                <p className="mt-1 text-xs text-ink-subtle">
+                  New proposals will appear here once submitted.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                {items.map((p) => (
+                  <ProposalCard
+                    key={p.id}
+                    multisig={multisig}
+                    p={p}
+                    onCancel={(target: ProposalSummary) => setCancelTarget(target)}
+                    cancelling={cancelling && cancelTarget?.id === p.id}
+                  />
+                ))}
+              </div>
+            );
+          })()
         ) : (
           (() => {
-            const items = grouped[activeTab as Exclude<TabId, "income">] ?? [];
+            const items = grouped[activeTab as Exclude<TabId, "income" | "queue">] ?? [];
             return items.length === 0 ? (
               <div className="py-16 text-center">
                 <p className="text-sm font-medium text-ink-muted">
-                  {activeTab === "queue"
-                    ? "No pending transactions"
-                    : activeTab === "history"
-                      ? "No history yet"
-                      : "No drafts saved"}
+                  {activeTab === "history"
+                    ? "No history yet"
+                    : "No drafts saved"}
                 </p>
-                {activeTab === "queue" && (
-                  <p className="mt-1 text-xs text-ink-subtle">
-                    New proposals will appear here once submitted.
-                  </p>
-                )}
               </div>
             ) : (
               <div className="divide-y divide-border/40">
@@ -434,9 +545,7 @@ export default function TransactionsPage({
                     multisig={multisig}
                     p={p}
                     isHistory={activeTab === "history"}
-                    {...(activeTab === "queue" ? { onCancel: (target: ProposalSummary) => setCancelTarget(target) } : {})}
                     {...(activeTab === "history" ? { onHide: hideProposal } : {})}
-                    cancelling={cancelling && cancelTarget?.id === p.id}
                   />
                 ))}
               </div>
