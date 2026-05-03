@@ -1,0 +1,1 @@
+ALTER TABLE "Vault" ADD COLUMN IF NOT EXISTS "emailNotifications" BOOLEAN NOT NULL DEFAULT false;
