@@ -32,6 +32,8 @@ services:
           property: connectionString
       - key: JWT_SIGNING_SECRET
         generateValue: true
+      - key: COINGECKO_API_KEY
+        sync: false
 
 databases:
   - name: aegis-db

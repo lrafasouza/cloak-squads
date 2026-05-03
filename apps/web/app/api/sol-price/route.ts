@@ -4,10 +4,14 @@ export const revalidate = 60;
 
 export async function GET() {
   try {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (process.env.COINGECKO_API_KEY) {
+      headers["x-cg-demo-api-key"] = process.env.COINGECKO_API_KEY;
+    }
     const res = await fetch(
       "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd",
       {
-        headers: { Accept: "application/json" },
+        headers,
         signal: AbortSignal.timeout(5000),
         next: { revalidate: 60 },
       },
