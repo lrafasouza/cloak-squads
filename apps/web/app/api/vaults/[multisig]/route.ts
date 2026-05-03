@@ -115,6 +115,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ multi
         { status: 503 },
       );
     }
-    return NextResponse.json({ error: "Could not update vault." }, { status: 500 });
+    const message =
+      error instanceof Prisma.PrismaClientKnownRequestError
+        ? `[${error.code}] ${error.message}`
+        : error instanceof Error
+          ? error.message
+          : "Could not update vault.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
