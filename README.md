@@ -1,10 +1,10 @@
 # Aegis
 
-**Private execution infrastructure for Squads multisig vaults on Solana.**
+**Private Treasury Operations on Solana. Built on Squads Protocol v4.**
 
 Every Squads vault transfer is public by default — block explorers show the exact recipient, amount, and memo. For DAOs and teams managing payroll, vendor payments, or strategic investments, this is a real problem: counterparties can front-run trades, salary structures are exposed, and operational security is zero.
 
-Aegis wraps your existing Squads v4 multisig with a privacy-aware execution layer. Members approve through the normal Squads flow. A custom on-chain gatekeeper program issues single-use, time-limited licenses. A registered operator uses those licenses to route payments through the **Cloak protocol** — a zero-knowledge shield pool that breaks the on-chain link between sender and recipient.
+Aegis is an extension layer for Squads Protocol v4. It adds privacy primitives, payroll automation, invoicing, and scoped audit access on top of the multisig standard already securing $10B+ in Solana treasuries. Members approve through the normal Squads flow. A custom on-chain gatekeeper program issues single-use, time-limited licenses. A registered operator uses those licenses to route payments through the **Cloak protocol** — a zero-knowledge shield pool that breaks the on-chain link between sender and recipient.
 
 **Live demo:** [https://aegis-web-iiv0.onrender.com](https://aegis-web-iiv0.onrender.com) (devnet)
 
@@ -93,6 +93,31 @@ Any wallet with a block explorer can watch your vault in real time. Aegis breaks
 6. The operator consumes the license and routes the withdrawal to the recipient (fullWithdraw).
    The on-chain record shows: operator → Cloak pool. Nothing links vault to recipient.
 ```
+
+---
+
+## Built on Squads Protocol
+
+Aegis is built on top of **Squads Protocol v4** using the `@sqds/multisig` SDK (v2.1.4). We do not replace or reimplement Squads — we extend it.
+
+### What Squads gives you (the foundation)
+
+- Multisig vault creation and management
+- N-of-M threshold proposals and voting
+- Transaction execution via the Squads vault PDA
+- Member management and role configuration
+
+### What Aegis adds on top (the extension layer)
+
+- **Privacy via Cloak** — zero-knowledge shield pool routing that breaks the on-chain link between your vault and recipients
+- **Payroll automation** — CSV import, batch proposals, and per-recipient execution
+- **Stealth invoicing** — secret claim links where recipients withdraw without exposing their wallet
+- **Scoped audit links** — time-limited, revocable read access for accountants and regulators
+
+Your existing Squads vault, members, thresholds, and approval flow remain completely unchanged. Aegis proposals are standard Squads vault transactions that call the Aegis gatekeeper program.
+
+- **Squads:** [https://squads.so](https://squads.so)
+- **Squads docs:** [https://docs.squads.so](https://docs.squads.so)
 
 ---
 

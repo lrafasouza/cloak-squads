@@ -397,7 +397,7 @@ function HeroSection() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal-warn opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-signal-warn" />
               </span>
-              <span className="text-eyebrow text-accent">Devnet Live</span>
+              <span className="text-eyebrow text-accent">Built on Squads · Devnet</span>
             </div>
           </motion.div>
 
@@ -409,9 +409,12 @@ function HeroSection() {
             className="text-center"
           >
             <h1 className="font-display text-[2rem] leading-[1.08] tracking-tight sm:text-display font-bold text-ink">
-              Private Execution for{" "}
-              <span className="text-accent">Shared Treasuries</span>
+              The Privacy Layer{" "}
+              <span className="text-accent">for Squads</span>
             </h1>
+            <p className="mt-2 text-sm font-medium text-ink-subtle">
+              Built on Squads Protocol v4
+            </p>
           </motion.div>
 
           {/* Subtitle */}
@@ -422,8 +425,8 @@ function HeroSection() {
             className="text-center"
           >
             <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-ink-muted sm:text-lg md:text-xl">
-              Private multisig payments on Solana. Send and receive without exposing amounts
-              or recipient addresses on public block explorers.
+              Aegis extends your Squads vault with privacy primitives, payroll
+              automation, and scoped audit access — without changing your approval flow.
             </p>
           </motion.div>
 

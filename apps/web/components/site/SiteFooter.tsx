@@ -2,6 +2,7 @@
 
 import { Logo } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
+import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 const cols = [
@@ -40,12 +41,24 @@ export function SiteFooter({ className }: { className?: string }) {
           <div className="lg:col-span-2">
             <Logo href="/" size="md" />
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-ink-muted">
-              Private execution for shared treasuries on Solana. Shielded multisig operations,
-              auditable when required.
+              Aegis extends Squads Protocol v4 with privacy, payroll, invoicing,
+              and scoped audit. Built on top of the multisig standard $10B+ in
+              Solana treasuries already trust.
             </p>
-            <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-signal-warn animate-pulse" />
-              <span className="text-eyebrow text-accent">Devnet Live</span>
+            <div className="mt-6 flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-signal-warn animate-pulse" />
+                <span className="text-eyebrow text-accent">Devnet Live</span>
+              </div>
+              <a
+                href="https://squads.so"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Built on Squads
+              </a>
             </div>
           </div>
 

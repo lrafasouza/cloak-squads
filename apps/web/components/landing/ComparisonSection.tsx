@@ -116,10 +116,10 @@ function ColumnHeader({ side }: { side: "squads" | "aegis" }) {
             isAegis ? "text-accent" : "text-ink-subtle"
           )}
         >
-          {isAegis ? "Squads + Aegis" : "Squads alone"}
+          {isAegis ? "What Aegis adds on top" : "What Squads gives you"}
         </p>
         <p className="text-[11px] text-ink-subtle leading-tight">
-          {isAegis ? "Privacy + workflows" : "Approval & treasury"}
+          {isAegis ? "The extension layer" : "The foundation"}
         </p>
       </div>
     </div>
@@ -282,7 +282,7 @@ function BottomLine() {
       <div className="mt-14 md:mt-20 max-w-xl mx-auto text-center">
         <div className="h-px w-16 bg-border mx-auto mb-8" />
         <p className="text-sm text-ink-muted leading-relaxed">
-          We do not replace your treasury. We wrap it with private execution,
+          Aegis is built on top of Squads Protocol v4. We wrap your treasury with private execution,
           payroll workflows, invoicing, and scoped audit, all while keeping
           your existing Squads approval layer intact.
         </p>
@@ -301,7 +301,7 @@ export function ComparisonSection() {
               Comparison
             </Eyebrow>
             <h2 className="font-display text-display-sm font-bold text-ink">
-              Why not just use Squads?
+              Built on Squads. Extended for privacy.
             </h2>
             <p className="mt-4 text-ink-muted leading-relaxed">
               Squads is the approval layer you already trust. Aegis adds

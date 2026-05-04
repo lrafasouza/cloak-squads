@@ -8,7 +8,11 @@ import { useState } from "react";
 const faqs = [
   {
     q: "What is Aegis?",
-    a: "Aegis adds privacy to your existing Squads treasury on Solana. Your team approves payments the same way they always have. Aegis then executes those payments so amounts and recipient addresses stay hidden from public block explorers.",
+    a: "Aegis is an extension layer for Squads Protocol v4 on Solana. We add privacy primitives, payroll automation, invoicing, and scoped audit access on top of your existing Squads vault — your approval flow, members, and thresholds work exactly as before.",
+  },
+  {
+    q: "Is Aegis a Squads alternative?",
+    a: "No. Aegis is built on top of Squads Protocol v4 — we don't compete with Squads, we extend it. Your existing Squads vault, members, and approval thresholds work exactly as before. We add privacy and operational workflows that Squads doesn't natively provide.",
   },
   {
     q: "How does the Operator work?",
