@@ -31,10 +31,10 @@ export function FinalCTASection() {
               Aegis privacy built in.
             </p>
 
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-center">
               <Link
                 href="/vault"
-                className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-accent-ink shadow-raise-1 transition-all hover:bg-accent-hover hover:shadow-accent-glow-md active:scale-[0.98]"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-sm font-semibold text-accent-ink shadow-raise-1 transition-all hover:bg-accent-hover hover:shadow-accent-glow-md active:scale-[0.98]"
               >
                 Open your vault
                 <ArrowRight className="h-4 w-4" />
@@ -43,7 +43,7 @@ export function FinalCTASection() {
                 href="https://docs.aegis.cloak.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-xl border border-border-strong bg-transparent px-6 py-3 text-sm font-medium text-ink transition-colors hover:bg-surface-2"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-border-strong bg-transparent px-6 py-3.5 text-sm font-medium text-ink transition-colors hover:bg-surface-2"
               >
                 Read the docs
               </a>

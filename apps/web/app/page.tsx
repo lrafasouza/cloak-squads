@@ -69,31 +69,56 @@ function HowItWorksSection() {
           </div>
         </ScrollReveal>
 
-        {/* Wizard steps — horizontal on desktop */}
+        {/* Wizard steps — horizontal on desktop, card-list on mobile */}
         <div className="relative">
           {/* Connecting line — desktop only */}
           <div className="absolute top-12 left-[16%] right-[16%] h-px bg-border hidden md:block" />
 
-          <div className="grid grid-cols-1 gap-12 md:grid-cols-3 md:gap-8">
+          {/* Desktop: centered circles */}
+          <div className="hidden md:grid grid-cols-3 gap-8">
             {steps.map((step, i) => {
               const Icon = step.icon;
               return (
                 <ScrollReveal key={step.num} delay={i * 0.12} distance={20}>
                   <div className="relative flex flex-col items-center text-center">
-                    {/* Large icon circle */}
-                    <div className="relative z-10 flex h-16 w-16 md:h-24 md:w-24 items-center justify-center rounded-full border-2 border-border bg-bg shadow-sm mb-6">
-                      <Icon className="h-7 w-7 md:h-10 md:w-10 text-accent" strokeWidth={1.5} />
+                    <div className="relative z-10 flex h-24 w-24 items-center justify-center rounded-full border-2 border-border bg-bg shadow-sm mb-6">
+                      <Icon className="h-10 w-10 text-accent" strokeWidth={1.5} />
                     </div>
-
-                    {/* Step number */}
                     <span className="text-xs font-mono uppercase tracking-wider text-accent mb-2">
                       Step {step.num}
                     </span>
-
                     <h3 className="text-lg font-semibold text-ink mb-2">{step.title}</h3>
-                    <p className="text-sm leading-relaxed text-ink-muted max-w-xs">
-                      {step.desc}
-                    </p>
+                    <p className="text-sm leading-relaxed text-ink-muted max-w-xs">{step.desc}</p>
+                  </div>
+                </ScrollReveal>
+              );
+            })}
+          </div>
+
+          {/* Mobile: horizontal step cards */}
+          <div className="md:hidden space-y-0">
+            {steps.map((step, i) => {
+              const Icon = step.icon;
+              return (
+                <ScrollReveal key={step.num} delay={i * 0.1} distance={16}>
+                  <div className="relative flex items-start gap-4 py-5">
+                    {/* Left column: icon + vertical connector */}
+                    <div className="flex flex-col items-center shrink-0">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-accent/30 bg-accent/5 z-10">
+                        <Icon className="h-5 w-5 text-accent" strokeWidth={1.5} />
+                      </div>
+                      {i < steps.length - 1 && (
+                        <div className="w-px flex-1 bg-border/60 mt-2 min-h-[2rem]" />
+                      )}
+                    </div>
+                    {/* Right: content */}
+                    <div className="pb-4">
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-accent">
+                        Step {step.num}
+                      </span>
+                      <h3 className="mt-0.5 text-base font-semibold text-ink">{step.title}</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-ink-muted">{step.desc}</p>
+                    </div>
                   </div>
                 </ScrollReveal>
               );
@@ -383,9 +408,8 @@ function HeroSection() {
             transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
             className="text-center"
           >
-            <h1 className="font-display text-display font-bold text-ink">
-              Private Execution for
-              <br />
+            <h1 className="font-display text-[2rem] leading-[1.08] tracking-tight sm:text-display font-bold text-ink">
+              Private Execution for{" "}
               <span className="text-accent">Shared Treasuries</span>
             </h1>
           </motion.div>
@@ -397,7 +421,7 @@ function HeroSection() {
             transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className="text-center"
           >
-            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-ink-muted md:text-xl">
+            <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-ink-muted sm:text-lg md:text-xl">
               Private multisig payments on Solana. Send and receive without exposing amounts
               or recipient addresses on public block explorers.
             </p>
@@ -408,11 +432,11 @@ function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="mx-auto mt-10 flex items-center justify-center gap-3"
+            className="mx-auto mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-center"
           >
             <Link
               href="/vault"
-              className="inline-flex items-center justify-center rounded-xl bg-accent px-6 py-3 text-base font-semibold text-accent-ink transition-all duration-200 hover:bg-accent-hover hover:shadow-accent-glow-md active:scale-[0.97] shadow-raise-1"
+              className="inline-flex items-center justify-center rounded-xl bg-accent px-6 py-3.5 text-base font-semibold text-accent-ink transition-all duration-200 hover:bg-accent-hover hover:shadow-accent-glow-md active:scale-[0.97] shadow-raise-1"
             >
               Open Vault
             </Link>
@@ -420,7 +444,7 @@ function HeroSection() {
               href="https://docs.aegis.cloak.dev"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center rounded-xl border border-border-strong bg-transparent px-5 py-3 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+              className="inline-flex items-center justify-center rounded-xl border border-border-strong bg-transparent px-5 py-3.5 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
             >
               View docs
             </a>

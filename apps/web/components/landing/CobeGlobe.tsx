@@ -1,6 +1,7 @@
 "use client";
 
 import createGlobe from "cobe";
+import { Lock, Shield, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 /**
@@ -142,16 +143,39 @@ export function CobeGlobe() {
     };
   }, [isMobile]);
 
-  // Static fallback for mobile — minimal decorative accent, no wasted space
+  // Static fallback for mobile — feature pills with ambient glow
   if (isMobile) {
     return (
-      <div className="relative w-full mx-auto flex items-center justify-center py-2">
+      <div className="relative w-full mx-auto py-6 flex flex-col items-center gap-5">
+        {/* Ambient glow */}
         <div
-          className="h-24 w-24 rounded-full opacity-[0.12] blur-[40px] pointer-events-none"
-          style={{ background: "radial-gradient(circle, hsl(var(--accent)), transparent 70%)" }}
+          className="absolute inset-0 pointer-events-none opacity-[0.08] blur-[60px]"
+          style={{ background: "radial-gradient(ellipse at 50% 50%, hsl(var(--accent)), transparent 70%)" }}
         />
-        <div className="absolute h-16 w-16 rounded-full border border-accent/10" />
-        <div className="absolute h-8 w-8 rounded-full border border-accent/5" />
+
+        {/* Central shield */}
+        <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-2 border-accent/20 bg-accent/5">
+          <Shield className="h-9 w-9 text-accent" strokeWidth={1.5} />
+          <div className="absolute inset-0 rounded-full border border-accent/10 scale-[1.3]" />
+          <div className="absolute inset-0 rounded-full border border-accent/5 scale-[1.65]" />
+        </div>
+
+        {/* Feature pills row */}
+        <div className="flex flex-wrap justify-center gap-2">
+          {[
+            { icon: Lock, label: "Shielded" },
+            { icon: Shield, label: "On-chain" },
+            { icon: Zap, label: "Solana Native" },
+          ].map(({ icon: Icon, label }) => (
+            <div
+              key={label}
+              className="flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/5 px-3 py-1.5"
+            >
+              <Icon className="h-3 w-3 text-accent" strokeWidth={1.5} />
+              <span className="text-xs font-medium text-accent/80">{label}</span>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
