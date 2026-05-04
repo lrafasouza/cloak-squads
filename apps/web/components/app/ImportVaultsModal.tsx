@@ -35,7 +35,7 @@ export function ImportVaultsModal({ open, onOpenChange }: ImportVaultsModalProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="md" autoClose={false}>
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Your Squads vaults</DialogTitle>
           <DialogDescription>

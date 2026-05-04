@@ -66,7 +66,7 @@ export function SheetContent({
   className,
   children,
   side = "right",
-  autoClose = true,
+  autoClose = false,
 }: {
   className?: string;
   children: ReactNode;

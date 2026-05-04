@@ -55,7 +55,7 @@ export function ReceiveModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="sm" autoClose={false}>
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Receive SOL</DialogTitle>
           <DialogDescription>

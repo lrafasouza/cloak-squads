@@ -126,7 +126,7 @@ function SignatureLink({ signature }: { signature: string }) {
 }
 
 const SUCCESS_AUTO_CLOSE_MS = 3000;
-const ERROR_AUTO_CLOSE_MS = 10000;
+const ERROR_AUTO_CLOSE_MS = 20000;
 
 function SuccessToast({
   transaction,

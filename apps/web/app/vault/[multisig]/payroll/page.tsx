@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import {
   InlineAlert,
   Panel,
@@ -11,27 +12,23 @@ import {
   WorkspaceHeader,
   WorkspacePage,
 } from "@/components/ui/workspace";
-import { useTransactionProgress } from "@/components/ui/transaction-progress";
-import { ArrowLeft, CheckCircle2, FileText, PlayCircle, Upload } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { type ChangeEvent, type FormEvent, use, useCallback, useEffect, useMemo, useState } from "react";
-import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
-import IDL from "@/lib/idl/cloak_gatekeeper.json";
+import { RecipientInput } from "@/components/vault/RecipientInput";
 import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { publicEnv } from "@/lib/env";
+import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
+import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import {
   type PayrollRecipientInput,
   formatPayrollCsvTemplate,
   parsePayrollCsv,
 } from "@/lib/payroll-csv";
-import { lamportsToSol } from "@/lib/sol";
+import { lamportsToSol, solToLamports } from "@/lib/sol";
 import { createVaultProposal } from "@/lib/squads-sdk";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
-import { cofrePda } from "@cloak-squads/core/pda";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
+import { cofrePda } from "@cloak-squads/core/pda";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import {
   NATIVE_SOL_MINT,
@@ -42,8 +39,31 @@ import {
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { useQueryClient } from "@tanstack/react-query";
 import * as multisigSdk from "@sqds/multisig";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Download,
+  FileText,
+  List,
+  PlayCircle,
+  Trash2,
+  Upload,
+  UserPlus,
+  Users,
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  type ChangeEvent,
+  type FormEvent,
+  use,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 let zkWarmupSingleton: Promise<void> | null = null;
 function warmupZk(): Promise<void> {
@@ -77,6 +97,11 @@ function hexToBytes(hex: string) {
   return out;
 }
 
+function abbrev(addr: string) {
+  if (addr.length <= 16) return addr;
+  return `${addr.slice(0, 6)}…${addr.slice(-6)}`;
+}
+
 type PayrollMode = "direct" | "invoice";
 
 type PayrollClaimLink = {
@@ -85,7 +110,7 @@ type PayrollClaimLink = {
   claimUrl: string;
 };
 
-type UploadTab = "input" | "preview";
+type ActiveTab = "recipients" | "review";
 
 type RecipientNote = {
   name: string;
@@ -123,6 +148,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   const queryClient = useQueryClient();
   const { startTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
+
+  /* ── Core data ── */
   const [csvText, setCsvText] = useState("");
   const [recipients, setRecipients] = useState<PayrollRecipientInput[]>([]);
   const [parsedNotes, setParsedNotes] = useState<RecipientNote[]>([]);
@@ -131,12 +158,21 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [dryRunStatus, setDryRunStatus] = useState<"idle" | "running" | "ready" | "error">("idle");
   const [zkWarmup, setZkWarmup] = useState<"idle" | "warming" | "ready">("idle");
-  const [uploadTab, setUploadTab] = useState<UploadTab>("input");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("recipients");
   const [mode, setMode] = useState<PayrollMode>("direct");
   const [createdPayroll, setCreatedPayroll] = useState<{
     transactionIndex: string;
     claimLinks: PayrollClaimLink[];
   } | null>(null);
+
+  /* ── Manual form ── */
+  const [manualName, setManualName] = useState("");
+  const [manualWallet, setManualWallet] = useState("");
+  const [manualAmount, setManualAmount] = useState("");
+  const [manualMemo, setManualMemo] = useState("");
+
+  /* ── CSV paste toggle ── */
+  const [showCsvTextarea, setShowCsvTextarea] = useState(false);
 
   const multisigAddress = useMemo(() => {
     try {
@@ -160,6 +196,14 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     return duplicates;
   }, [recipients]);
 
+  const canAddManual = useMemo(() => {
+    if (!manualName.trim() || !manualWallet.trim() || !manualAmount) return false;
+    const num = Number.parseFloat(manualAmount);
+    if (Number.isNaN(num) || num <= 0) return false;
+    if (recipients.length >= 10) return false;
+    return true;
+  }, [manualName, manualWallet, manualAmount, recipients.length]);
+
   const dryRunRows = useMemo(
     () =>
       recipients.map((recipient, index) => ({
@@ -171,6 +215,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     [duplicateWallets, recipients],
   );
 
+  /* ── ZK warmup ── */
   useEffect(() => {
     if (zkWarmupSingleton) {
       void zkWarmupSingleton.then(() => setZkWarmup("ready"));
@@ -182,21 +227,74 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       .catch(() => setZkWarmup("idle"));
   }, []);
 
+  /* ── Manual add / remove ── */
+  function addManualRecipient() {
+    if (!canAddManual) return;
+
+    const trimmedWallet = manualWallet.trim();
+    try {
+      new PublicKey(trimmedWallet);
+    } catch {
+      setError("Invalid Solana wallet address.");
+      return;
+    }
+
+    if (recipients.some((r) => r.wallet === trimmedWallet)) {
+      setError("This wallet is already in the recipient list.");
+      return;
+    }
+
+    try {
+      const lamports = solToLamports(manualAmount.trim());
+      const newRecipient: PayrollRecipientInput = {
+        name: manualName.trim(),
+        wallet: trimmedWallet,
+        amount: lamports,
+        memo: manualMemo.trim() || undefined,
+      };
+      setRecipients((prev) => [...prev, newRecipient]);
+      setManualName("");
+      setManualWallet("");
+      setManualAmount("");
+      setManualMemo("");
+      setError(null);
+    } catch {
+      setError("Invalid amount. Must be a positive number in SOL.");
+    }
+  }
+
+  function removeRecipient(index: number) {
+    setRecipients((prev) => prev.filter((_, i) => i !== index));
+    setParsedNotes([]);
+    setDryRunStatus("idle");
+  }
+
+  function clearAllRecipients() {
+    setRecipients([]);
+    setParsedNotes([]);
+    setCsvText("");
+    setDryRunStatus("idle");
+    setError(null);
+  }
+
+  /* ── CSV handlers ── */
   function handleCsvChange(event: ChangeEvent<HTMLTextAreaElement>) {
     const text = event.target.value;
     setCsvText(text);
     setError(null);
-    setRecipients([]);
     setParsedNotes([]);
     setCreatedPayroll(null);
-    setUploadTab("input");
     setDryRunStatus("idle");
 
-    if (!text.trim()) return;
+    if (!text.trim()) {
+      setRecipients([]);
+      return;
+    }
 
     const { data, errors } = parsePayrollCsv(text);
     if (errors.length > 0 && !data) {
       setError(errors.join("\n"));
+      setRecipients([]);
       return;
     }
     if (data) {
@@ -211,7 +309,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   function handleFileUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
@@ -221,6 +318,19 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     reader.readAsText(file);
   }
 
+  function downloadTemplate() {
+    const blob = new Blob([formatPayrollCsvTemplate()], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "payroll-template.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  /* ── Build notes ── */
   const buildNotes = useCallback(async () => {
     if (!multisigAddress) return;
     setError(null);
@@ -229,7 +339,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
     try {
       ensureCircuitsProxy();
-
       await new Promise<void>((resolve) => {
         window.requestAnimationFrame(() => resolve());
       });
@@ -237,8 +346,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       const notes: RecipientNote[] = [];
       for (const recipient of recipients) {
         const recipientPubkey = new PublicKey(recipient.wallet);
-
-        // Generate real Cloak UTXO commitment
         const keypair = await generateUtxoKeypair();
         const mint = NATIVE_SOL_MINT;
         const utxo = await createUtxo(BigInt(recipient.amount), keypair, mint);
@@ -298,6 +405,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     }
   }, [multisigAddress, recipients]);
 
+  /* ── Submit payroll ── */
   async function submitPayroll(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -340,7 +448,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       if (!wallet.publicKey || !multisigAddress) {
         throw new Error("Connect a wallet and open a valid multisig.");
       }
-
       if (parsedNotes.length === 0) {
         throw new Error("No recipients prepared. Build notes first.");
       }
@@ -366,7 +473,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       if (!cofreAccount) throw new Error("Privacy vault not found.");
       const coder = new BorshAccountsCoder(IDL as Idl);
       const cofreData = coder.decode<{ operator?: Uint8Array }>("Cofre", cofreAccount.data);
-      if (!cofreData?.operator) throw new Error("No operator registered. Set an operator wallet first.");
+      if (!cofreData?.operator)
+        throw new Error("No operator registered. Set an operator wallet first.");
       const operatorPubkey = new PublicKey(cofreData.operator);
 
       const fundOperatorIx = SystemProgram.transfer({
@@ -433,10 +541,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         notesWithInvoices = parsedNotes.map((n, i) => {
           const invoice = invoiceResults[i];
           if (!invoice) throw new Error(`Missing invoice for ${n.name}.`);
-          return {
-            ...n,
-            invoiceId: invoice.id,
-          };
+          return { ...n, invoiceId: invoice.id };
         });
         updateStep("invoices", {
           status: "success",
@@ -447,7 +552,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       }
 
       updateStep("persist", { status: "running" });
-      // Persist payroll draft
       const draftPayload = {
         cofreAddress: multisigAddress.toBase58(),
         transactionIndex,
@@ -495,9 +599,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
 
-      // Store claims in sessionStorage
       for (let i = 0; i < parsedNotes.length; i++) {
-        const n = parsedNotes[i]; // safe: loop bound is parsedNotes.length
+        const n = parsedNotes[i];
         if (!n) continue;
         try {
           sessionStorage.setItem(
@@ -532,6 +635,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     }
   }
 
+  /* ── Early exits ── */
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
@@ -543,7 +647,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     );
   }
 
-  // Success state — show claim links card
   if (createdPayroll) {
     return (
       <WorkspacePage>
@@ -557,7 +660,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
             </span>
           }
         />
-
         <Panel>
           <PanelHeader
             icon={CheckCircle2}
@@ -582,7 +684,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                 Copy all links
               </button>
             </div>
-
             <div className="mt-4 grid gap-3">
               {createdPayroll.claimLinks.map((link) => {
                 const fullUrl =
@@ -611,7 +712,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                 );
               })}
             </div>
-
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <Link
                 href={`/vault/${multisig}/proposals/${createdPayroll.transactionIndex}`}
@@ -626,7 +726,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                   setParsedNotes([]);
                   setRecipients([]);
                   setCsvText("");
-                  setUploadTab("input");
+                  setActiveTab("recipients");
                   setDryRunStatus("idle");
                 }}
                 className="inline-flex min-h-11 items-center justify-center rounded-md border border-border-strong px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-2"
@@ -645,7 +745,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       <WorkspaceHeader
         eyebrow="PAYROLL"
         title="Batch private settle"
-        description="Upload CSV, build private notes, then submit for vault approval."
+        description="Add recipients manually or import from CSV, build private notes, then submit for vault approval."
         action={
           <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
             Max 10
@@ -658,76 +758,260 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         <div className="flex items-center gap-0.5 border-b border-border pb-1">
           <button
             type="button"
-            onClick={() => setUploadTab("input")}
+            onClick={() => setActiveTab("recipients")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              uploadTab === "input"
+              activeTab === "recipients"
                 ? "bg-accent-soft text-accent"
                 : "text-ink-muted hover:bg-surface-2 hover:text-ink"
             }`}
           >
-            <Upload className="h-3.5 w-3.5" />
-            CSV Input
+            <Users className="h-3.5 w-3.5" />
+            Recipients
+            {recipients.length > 0 && (
+              <span className="ml-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-accent-ink">
+                {recipients.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (recipients.length > 0) {
+                setActiveTab("review");
+                setConfirmChecked(false);
+              }
+            }}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              activeTab === "review"
+                ? "bg-accent-soft text-accent"
+                : "text-ink-muted hover:bg-surface-2 hover:text-ink"
+            } ${recipients.length === 0 ? "cursor-not-allowed opacity-40" : ""}`}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Review
           </button>
         </div>
 
-        {/* CSV INPUT TAB */}
-        {uploadTab === "input" && (
-          <Panel>
-            <PanelHeader icon={Upload} title="Upload recipients" />
-            <PanelBody className="space-y-5">
-              <div>
-                <Label htmlFor="csv-file">Upload CSV file</Label>
-                <Input
-                  id="csv-file"
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={handleFileUpload}
-                  className="mt-1"
+        {/* ── RECIPIENTS TAB ── */}
+        {activeTab === "recipients" && (
+          <div className="space-y-6">
+            {/* Manual add form */}
+            <Panel>
+              <PanelHeader icon={UserPlus} title="Add recipient" />
+              <PanelBody className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="payroll-name">Name</Label>
+                    <Input
+                      id="payroll-name"
+                      type="text"
+                      value={manualName}
+                      onChange={(e) => setManualName(e.target.value)}
+                      placeholder="e.g. Alice, Treasury"
+                      className="mt-1.5"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="payroll-wallet">Wallet</Label>
+                    <div className="mt-1.5">
+                      <RecipientInput
+                        id="payroll-wallet"
+                        value={manualWallet}
+                        onChange={setManualWallet}
+                        placeholder="Solana address or saved contact"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="payroll-amount">Amount (SOL)</Label>
+                    <Input
+                      id="payroll-amount"
+                      type="number"
+                      step="0.000000001"
+                      min="0.000000001"
+                      value={manualAmount}
+                      onChange={(e) => setManualAmount(e.target.value)}
+                      placeholder="0.5"
+                      className="mt-1.5 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="payroll-memo">Memo (optional)</Label>
+                    <Input
+                      id="payroll-memo"
+                      type="text"
+                      value={manualMemo}
+                      onChange={(e) => setManualMemo(e.target.value)}
+                      placeholder="Monthly salary"
+                      className="mt-1.5"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button type="button" onClick={addManualRecipient} disabled={!canAddManual}>
+                    <UserPlus className="mr-1.5 h-4 w-4" />
+                    Add recipient
+                  </Button>
+                  <span className="text-xs text-ink-muted">{recipients.length}/10 recipients</span>
+                </div>
+              </PanelBody>
+            </Panel>
+
+            {/* Recipients list */}
+            {recipients.length > 0 && (
+              <Panel>
+                <PanelHeader
+                  icon={List}
+                  title={`Recipients · ${recipients.length}/10`}
+                  action={
+                    <button
+                      type="button"
+                      onClick={clearAllRecipients}
+                      className="text-xs text-signal-danger hover:underline"
+                    >
+                      Clear all
+                    </button>
+                  }
                 />
-              </div>
+                <PanelBody>
+                  <div className="divide-y divide-border">
+                    {recipients.map((r, i) => (
+                      <div
+                        key={`${r.wallet}-${i}`}
+                        className="flex items-center justify-between gap-4 py-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-ink">{r.name}</span>
+                            {duplicateWallets.has(r.wallet) && (
+                              <span className="rounded-full bg-signal-warn/10 px-1.5 py-0.5 text-[10px] font-bold text-signal-warn">
+                                Duplicate
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-xs text-ink-muted">
+                            <span className="font-mono">{abbrev(r.wallet)}</span>
+                            {" · "}
+                            <span className="font-mono font-medium text-ink">
+                              {lamportsToSol(r.amount)} SOL
+                            </span>
+                            {r.memo ? ` · ${r.memo}` : ""}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeRecipient(i)}
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-signal-danger/15 hover:text-signal-danger transition-colors"
+                          aria-label={`Remove ${r.name}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </PanelBody>
+              </Panel>
+            )}
 
-              <div>
-                <Label htmlFor="csv-text">Or paste CSV content</Label>
-                <textarea
-                  id="csv-text"
-                  value={csvText}
-                  onChange={handleCsvChange}
-                  placeholder={formatPayrollCsvTemplate()}
-                  rows={6}
-                  className="mt-1 w-full rounded-md border border-border-strong bg-bg px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                />
-              </div>
+            {/* CSV import */}
+            <Panel>
+              <PanelHeader
+                icon={Upload}
+                title="Or import from CSV"
+                action={
+                  <button
+                    type="button"
+                    onClick={downloadTemplate}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download template
+                  </button>
+                }
+              />
+              <PanelBody className="space-y-5">
+                <div>
+                  <Label htmlFor="csv-file">Upload CSV file</Label>
+                  <Input
+                    id="csv-file"
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={handleFileUpload}
+                    className="mt-1"
+                  />
+                </div>
 
-              {error && <InlineAlert tone="danger">{error}</InlineAlert>}
+                <div>
+                  {!showCsvTextarea ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowCsvTextarea(true)}
+                      className="text-sm text-accent transition-colors hover:text-accent-hover"
+                    >
+                      Or paste CSV content
+                    </button>
+                  ) : (
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <Label htmlFor="csv-text">Paste CSV content</Label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCsvTextarea(false);
+                            setCsvText("");
+                            setRecipients((prev) =>
+                              prev.filter((r) => r.name !== "__csv_import__"),
+                            );
+                          }}
+                          className="text-xs text-ink-muted hover:text-ink"
+                        >
+                          Hide
+                        </button>
+                      </div>
+                      <textarea
+                        id="csv-text"
+                        value={csvText}
+                        onChange={handleCsvChange}
+                        placeholder={formatPayrollCsvTemplate()}
+                        rows={6}
+                        className="w-full rounded-md border border-border-strong bg-bg px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      />
+                    </div>
+                  )}
+                </div>
 
-              <div>
+                {error && <InlineAlert tone="danger">{error}</InlineAlert>}
+              </PanelBody>
+            </Panel>
+
+            {/* Next button */}
+            {recipients.length > 0 && (
+              <div className="flex justify-end">
                 <Button
                   type="button"
-                  disabled={recipients.length === 0}
                   onClick={() => {
-                    setUploadTab("preview");
+                    setActiveTab("review");
                     setConfirmChecked(false);
-                    if (!pending && recipients.length > 0 && parsedNotes.length === 0) {
-                      void buildNotes();
-                    }
                   }}
                 >
                   Next: Review →
                 </Button>
               </div>
-            </PanelBody>
-          </Panel>
+            )}
+          </div>
         )}
 
-        {/* REVIEW TAB */}
-        {uploadTab === "preview" && (
+        {/* ── REVIEW TAB ── */}
+        {activeTab === "review" && (
           <Panel>
             <PanelHeader icon={FileText} title="Review & build" />
             <PanelBody>
               <form onSubmit={submitPayroll} className="space-y-5">
                 {recipients.length === 0 && (
                   <div className="py-12 text-center">
-                    <p className="text-sm text-ink-muted">No items yet</p>
+                    <p className="text-sm text-ink-muted">
+                      No recipients yet. Go back to add some.
+                    </p>
                   </div>
                 )}
 
@@ -745,7 +1029,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
                 {recipients.length > 0 && (
                   <>
-                    {/* 3-stat row */}
+                    {/* Stats */}
                     <div className="grid gap-3 sm:grid-cols-3">
                       <div className="rounded-md border border-border bg-bg px-3 py-2">
                         <p className="text-xs text-ink-subtle">Recipients</p>
@@ -856,11 +1140,11 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                       </table>
                     </div>
 
-                    {/* Build notes button */}
-                    <div className="flex gap-3">
+                    {/* Actions */}
+                    <div className="flex flex-wrap gap-3">
                       <button
                         type="button"
-                        onClick={() => setUploadTab("input")}
+                        onClick={() => setActiveTab("recipients")}
                         disabled={pending}
                         className="inline-flex min-h-9 items-center rounded-md border border-border-strong px-3 py-1.5 text-sm font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-50"
                       >
@@ -872,7 +1156,11 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                         onClick={() => void buildNotes()}
                         disabled={pending || duplicateWallets.size > 0 || zkWarmup === "warming"}
                         className="inline-flex min-h-9 items-center gap-2 rounded-md bg-surface-2 px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50"
-                        title={zkWarmup === "warming" ? "Initializing ZK engine, please wait…" : undefined}
+                        title={
+                          zkWarmup === "warming"
+                            ? "Initializing ZK engine, please wait…"
+                            : undefined
+                        }
                       >
                         <PlayCircle className="h-4 w-4" />
                         {zkWarmup === "warming"
@@ -890,10 +1178,10 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                         onChange={(e) => setConfirmChecked(e.target.checked)}
                         className="mt-0.5 h-4 w-4 rounded border-border accent-accent"
                       />
-                      I confirm the recipient list and amounts are correct before creating this payroll.
+                      I confirm the recipient list and amounts are correct before creating this
+                      payroll.
                     </label>
 
-                    {/* Submit button */}
                     {!pending && (
                       <div className="flex gap-3">
                         <Button
@@ -907,7 +1195,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                   </>
                 )}
 
-                {/* Error display */}
                 {error && (
                   <pre className="whitespace-pre-wrap rounded-md border border-signal-danger/30 bg-signal-danger/15 p-3 text-xs text-signal-danger">
                     {error}

@@ -67,7 +67,7 @@ export function DialogContent({
   className,
   children,
   size = "md",
-  autoClose = true,
+  autoClose = false,
 }: {
   className?: string;
   children: ReactNode;

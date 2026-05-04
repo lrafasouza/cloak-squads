@@ -72,9 +72,9 @@ export function PanelHeader({
         className,
       )}
     >
-      <div className="flex min-w-0 items-start gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         {Icon ? (
-          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-ink-subtle">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-ink-subtle">
             <Icon className="h-4 w-4" aria-hidden="true" />
           </div>
         ) : null}
@@ -202,11 +202,7 @@ export function StatusPill({
 
   return (
     <span
-      className={cn(
-        "inline-flex items-center gap-1.5 text-xs font-medium",
-        textColor,
-        className,
-      )}
+      className={cn("inline-flex items-center gap-1.5 text-xs font-medium", textColor, className)}
     >
       <span className={cn("h-1.5 w-1.5 rounded-full", dotColor)} />
       {children}

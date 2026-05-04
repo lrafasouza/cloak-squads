@@ -5,7 +5,6 @@ import { AlertTriangle, HelpCircle, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AutoCloseIndicator } from "./auto-close-indicator";
 import { Button } from "./button";
 
 interface ConfirmModalProps {
@@ -33,7 +32,6 @@ export function ConfirmModal({
 }: ConfirmModalProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
   const [mounted, setMounted] = useState(false);
-  const [autoCloseKey, setAutoCloseKey] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -44,18 +42,6 @@ export function ConfirmModal({
       confirmRef.current?.focus();
     }
   }, [open]);
-
-  /* Auto-close after 10 seconds */
-  useEffect(() => {
-    if (!open) {
-      setAutoCloseKey((k) => k + 1);
-      return;
-    }
-    const timer = setTimeout(() => {
-      onCancel();
-    }, 10000);
-    return () => clearTimeout(timer);
-  }, [open, onCancel]);
 
   const node = (
     <AnimatePresence>
@@ -116,13 +102,7 @@ export function ConfirmModal({
                 </div>
               </div>
 
-              <div className="absolute right-0 top-0 flex items-center gap-2">
-                <AutoCloseIndicator
-                  key={autoCloseKey}
-                  durationMs={10000}
-                  onComplete={onCancel}
-                  paused={!open}
-                />
+              <div className="absolute right-0 top-0">
                 <button
                   type="button"
                   onClick={onCancel}

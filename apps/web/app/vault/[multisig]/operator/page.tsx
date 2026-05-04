@@ -1930,7 +1930,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
       {/* Help modal */}
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
-        <DialogContent size="md" autoClose={false}>
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>How operator budget works</DialogTitle>
           </DialogHeader>

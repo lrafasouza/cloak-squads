@@ -1,13 +1,16 @@
 "use client";
 
+import { BottomNav } from "@/components/app/BottomNav";
 import { VaultSelector } from "@/components/app/VaultSelector";
 import { Logo } from "@/components/brand/Logo";
 import { Spinner } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
-import { isProposalPendingStatus } from "@/lib/proposals";
-import { isProposalExecuted } from "@/lib/operator-execution-history";
-import { useProposalSummaries } from "@/lib/use-proposal-summaries";
+import { useSolPrice } from "@/lib/hooks/useSolPrice";
 import { useVaultBalance } from "@/lib/hooks/useVaultBalance";
+import { isProposalExecuted } from "@/lib/operator-execution-history";
+import { isProposalPendingStatus } from "@/lib/proposals";
+import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
 import { useVaultMetadata } from "@/lib/use-vault-metadata";
 import { cn } from "@/lib/utils";
@@ -15,6 +18,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import {
   BookOpen,
+  BookUser,
   FileText,
   HelpCircle,
   Key,
@@ -32,15 +36,7 @@ import {
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { AutoCloseIndicator } from "@/components/ui/auto-close-indicator";
-import { BottomNav } from "@/components/app/BottomNav";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { useSolPrice } from "@/lib/hooks/useSolPrice";
+import { CloakBanner } from "./CloakBanner";
 import { type OperatorInboxItem, OperatorInboxSheet } from "./OperatorInboxSheet";
 
 /* ── Nav structure ── */
@@ -64,7 +60,10 @@ const PRIVACY_NAV: NavItem[] = [
   { label: "Audit", href: "/audit", icon: Shield },
 ];
 
-const BOTTOM_NAV: NavItem[] = [{ label: "Settings", href: "/settings", icon: Settings }];
+const BOTTOM_NAV: NavItem[] = [
+  { label: "Address Book", href: "/address-book", icon: BookUser },
+  { label: "Settings", href: "/settings", icon: Settings },
+];
 
 /* ── Shared NavLink ── */
 function NavLink({
@@ -181,6 +180,11 @@ function SidebarContent({
         </div>
       </nav>
 
+      {/* Cloak banner */}
+      <div className="shrink-0 px-3 pb-2">
+        <CloakBanner />
+      </div>
+
       {/* Bottom nav */}
       <div className="shrink-0 px-3 py-3">
         <div className="flex flex-col gap-0.5">
@@ -223,7 +227,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: proposals = [], isLoading: proposalsLoading } = useProposalSummaries(multisig);
   const { balanceSol } = useVaultBalance(multisig);
   const { data: solPrice } = useSolPrice();
-  const balanceNum = parseFloat(balanceSol) || 0;
+  const balanceNum = Number.parseFloat(balanceSol) || 0;
   const usdValue =
     solPrice != null
       ? (balanceNum * solPrice).toLocaleString("en-US", {
@@ -239,7 +243,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         .filter((p) => {
           if (!p.hasDraft) return false;
           if (isProposalPendingStatus(p.status)) return true;
-          if (p.status === "executed" && !isProposalExecuted(multisig, p.transactionIndex)) return true;
+          if (p.status === "executed" && !isProposalExecuted(multisig, p.transactionIndex))
+            return true;
           return false;
         })
         .map(
@@ -261,15 +266,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     () => proposals.filter((p) => p.status === "executed").length,
     [proposals],
   );
-
-  /* Auto-close mobile nav after 10 seconds */
-  useEffect(() => {
-    if (!mobileNavOpen) return;
-    const timer = setTimeout(() => {
-      setMobileNavOpen(false);
-    }, 10000);
-    return () => clearTimeout(timer);
-  }, [mobileNavOpen]);
 
   useEffect(() => {
     if (!multisig || executedCount === 0) return;
@@ -425,12 +421,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileNavOpen(false)}
           />
           <aside className="absolute left-0 top-0 h-full w-72 border-r border-white/[0.04] bg-surface/[0.85] shadow-raise-2 backdrop-blur-xl">
-            <div className="absolute right-3 top-3 flex items-center gap-2">
-              <AutoCloseIndicator
-                durationMs={10000}
-                onComplete={() => setMobileNavOpen(false)}
-                paused={!mobileNavOpen}
-              />
+            <div className="absolute right-3 top-3">
               <button
                 type="button"
                 className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-surface-2"

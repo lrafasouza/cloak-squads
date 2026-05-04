@@ -40,7 +40,7 @@ export function OperatorInboxSheet({
 }: OperatorInboxSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex flex-col" autoClose={false}>
+      <SheetContent side="right" className="flex flex-col">
         <SheetHeader className="px-0 pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">

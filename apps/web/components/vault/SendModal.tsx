@@ -338,7 +338,7 @@ export function SendModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent size="lg" autoClose={false}>
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Send SOL</DialogTitle>
           <DialogDescription>
