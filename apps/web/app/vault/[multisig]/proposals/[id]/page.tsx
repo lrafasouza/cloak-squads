@@ -279,21 +279,19 @@ export default function ProposalApprovalPage({
     (sig: string, kind: "approve" | "reject") => {
       setSignature(sig);
       setMemberVote(kind === "approve" ? "approved" : "rejected");
-      addToast(kind === "approve" ? "Vote approved!" : "Vote rejected", kind === "approve" ? "success" : "info", 3000);
       setTimeout(() => void refreshStatus(), 1500);
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisigParam) });
     },
-    [refreshStatus, addToast, queryClient, multisigParam],
+    [refreshStatus, queryClient, multisigParam],
   );
 
   const onExecuteSubmitted = useCallback(
     (sig: string) => {
       setExecuteSignature(sig);
-      addToast("Transaction executed successfully!", "success", 3000);
       setTimeout(() => void refreshStatus(), 1500);
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisigParam) });
     },
-    [refreshStatus, addToast, queryClient, multisigParam],
+    [refreshStatus, queryClient, multisigParam],
   );
 
   const handleCancel = useCallback(async () => {

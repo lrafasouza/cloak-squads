@@ -1,6 +1,5 @@
 "use client";
 
-import { useToast } from "@/components/ui/toast-provider";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { WarningCallout } from "@/components/ui/warning-callout";
 import { publicEnv } from "@/lib/env";
@@ -34,7 +33,6 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
   const { connection } = useConnection();
   const wallet = useWallet();
   const queryClient = useQueryClient();
-  const { addToast } = useToast();
   const { startTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
   const squadsProgram = useMemo(() => new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID), []);
@@ -215,12 +213,10 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
       const message = caught instanceof Error ? caught.message : "Could not initialize vault.";
       setError(message);
       failTransaction(message);
-      addToast(message, "success");
     } finally {
       setPending(false);
     }
   }, [
-    addToast,
     completeTransaction,
     connection,
     existingIndex,
