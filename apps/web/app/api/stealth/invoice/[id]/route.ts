@@ -24,8 +24,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       invoiceRef: invoice.invoiceRef,
       memo: invoice.memo,
       stealthPubkey: invoice.stealthPubkey,
-      amountHint: invoice.amountHintEncrypted
-        ? Buffer.from(invoice.amountHintEncrypted).toString("utf-8")
+      amountHint: invoice.amountHint
+        ? Buffer.from(invoice.amountHint).toString("utf-8")
         : null,
       status: invoice.status,
       expiresAt: invoice.expiresAt.toISOString(),

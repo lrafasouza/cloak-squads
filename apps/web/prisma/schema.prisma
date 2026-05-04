@@ -58,7 +58,7 @@ model StealthInvoice {
   memo                String?
   stealthPubkey       String
   signPubkey          String?
-  amountHintEncrypted Bytes?
+  amountHint          Bytes?
   status              String
   expiresAt           DateTime
   createdAt           DateTime @default(now())

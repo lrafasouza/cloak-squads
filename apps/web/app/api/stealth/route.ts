@@ -91,7 +91,7 @@ export async function POST(request: Request) {
         memo: memo ?? null,
         stealthPubkey,
         signPubkey,
-        amountHintEncrypted: Buffer.from(amount),
+        amountHint: Buffer.from(amount),
         status: "pending",
         expiresAt,
       },

@@ -230,7 +230,7 @@ function ProposalRow({
             type="button"
             onClick={(e) => { e.stopPropagation(); onHide(p.id); }}
             title="Hide from history"
-            className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-3 hover:text-ink"
+            className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle transition-opacity md:opacity-0 md:group-hover:opacity-100 hover:bg-surface-3 hover:text-ink"
           >
             <EyeOff className="h-3 w-3" />
           </button>
@@ -238,7 +238,7 @@ function ProposalRow({
         <Link
           href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
           onClick={(e) => e.stopPropagation()}
-          className="relative z-20 rounded px-2 py-0.5 text-xs font-medium text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent-soft hover:text-accent"
+          className="relative z-20 rounded px-2 py-0.5 text-xs font-medium text-ink-muted transition-opacity md:opacity-0 md:group-hover:opacity-100 hover:bg-accent-soft hover:text-accent"
         >
           {p.status === "active" ? "Sign" : p.status === "approved" ? "Execute" : "View"}
         </Link>
@@ -295,7 +295,7 @@ function IncomeRow({ entry }: { entry: IncomeEntry }) {
           href={explorerUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-3 hover:text-ink"
+          className="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-ink-subtle transition-opacity md:opacity-0 md:group-hover:opacity-100 hover:bg-surface-3 hover:text-ink"
         >
           Solscan
           <ExternalLink className="h-3 w-3" />
@@ -445,68 +445,24 @@ export default function TransactionsPage({
           ))}
         </div>
 
-        {/* Column headers */}
-        {activeTab === "income" ? (
-          !isLoading && incomeEntries.length > 0 && (
-            <div
-              className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
-              style={{ gridTemplateColumns: "1fr 1fr 8rem 5rem" }}
-            >
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Amount</span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">From</span>
-              <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Date</span>
-              <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Tx</span>
-            </div>
-          )
-        ) : activeTab !== "queue" ? (
-          !isLoading && grouped[activeTab as Exclude<TabId, "income" | "queue">]?.length > 0 && (
-            <div
-              className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
-              style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
-            >
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">#</span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Type</span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Details</span>
-              <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Approvals</span>
-              <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Status</span>
-              <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Action</span>
-            </div>
-          )
-        ) : null}
-
-        {/* Rows */}
-        {isLoading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-ink-muted">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Loading…</span>
-          </div>
-        ) : activeTab === "income" ? (
-          incomeEntries.length === 0 ? (
-            <div className="py-16 text-center">
-              <p className="text-sm font-medium text-ink-muted">No incoming transfers yet</p>
-              <p className="mt-1 text-xs text-ink-subtle">
-                SOL sent directly to this vault will appear here.
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border/40">
-              {incomeEntries.map((entry) => (
-                <IncomeRow key={entry.signature} entry={entry} />
-              ))}
-            </div>
-          )
-        ) : activeTab === "queue" ? (
-          (() => {
-            const items = grouped.queue;
-            return items.length === 0 ? (
-              <div className="py-16 text-center">
-                <p className="text-sm font-medium text-ink-muted">No pending transactions</p>
-                <p className="mt-1 text-xs text-ink-subtle">
-                  New proposals will appear here once submitted.
-                </p>
-              </div>
-            ) : (
-              <>
+        {/* Scrollable area — prevents horizontal overflow on mobile */}
+        <div className="overflow-x-auto">
+          <div className="min-w-[640px]">
+            {/* Column headers */}
+            {activeTab === "income" ? (
+              !isLoading && incomeEntries.length > 0 && (
+                <div
+                  className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
+                  style={{ gridTemplateColumns: "1fr 1fr 8rem 5rem" }}
+                >
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Amount</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">From</span>
+                  <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Date</span>
+                  <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Tx</span>
+                </div>
+              )
+            ) : activeTab !== "queue" ? (
+              !isLoading && grouped[activeTab as Exclude<TabId, "income" | "queue">]?.length > 0 && (
                 <div
                   className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
                   style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
@@ -518,47 +474,96 @@ export default function TransactionsPage({
                   <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Status</span>
                   <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Action</span>
                 </div>
+              )
+            ) : null}
+
+            {/* Rows */}
+            {isLoading ? (
+              <div className="flex items-center justify-center gap-2 py-16 text-ink-muted">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Loading…</span>
+              </div>
+            ) : activeTab === "income" ? (
+              incomeEntries.length === 0 ? (
+                <div className="py-16 text-center">
+                  <p className="text-sm font-medium text-ink-muted">No incoming transfers yet</p>
+                  <p className="mt-1 text-xs text-ink-subtle">
+                    SOL sent directly to this vault will appear here.
+                  </p>
+                </div>
+              ) : (
                 <div className="divide-y divide-border/40">
-                  {items.map((p) => (
-                    <ProposalQueueRow
-                      key={p.id}
-                      multisig={multisig}
-                      p={p}
-                      onCancel={(target: ProposalSummary) => setCancelTarget(target)}
-                      cancelling={cancelling && cancelTarget?.id === p.id}
-                    />
+                  {incomeEntries.map((entry) => (
+                    <IncomeRow key={entry.signature} entry={entry} />
                   ))}
                 </div>
-              </>
-            );
-          })()
-        ) : (
-          (() => {
-            const items = grouped[activeTab as Exclude<TabId, "income" | "queue">] ?? [];
-            return items.length === 0 ? (
-              <div className="py-16 text-center">
-                <p className="text-sm font-medium text-ink-muted">
-                  {activeTab === "history"
-                    ? "No history yet"
-                    : "No drafts saved"}
-                </p>
-              </div>
+              )
+            ) : activeTab === "queue" ? (
+              (() => {
+                const items = grouped.queue;
+                return items.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <p className="text-sm font-medium text-ink-muted">No pending transactions</p>
+                    <p className="mt-1 text-xs text-ink-subtle">
+                      New proposals will appear here once submitted.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
+                      style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
+                    >
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">#</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Type</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Details</span>
+                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Approvals</span>
+                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Status</span>
+                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Action</span>
+                    </div>
+                    <div className="divide-y divide-border/40">
+                      {items.map((p) => (
+                        <ProposalQueueRow
+                          key={p.id}
+                          multisig={multisig}
+                          p={p}
+                          onCancel={(target: ProposalSummary) => setCancelTarget(target)}
+                          cancelling={cancelling && cancelTarget?.id === p.id}
+                        />
+                      ))}
+                    </div>
+                  </>
+                );
+              })()
             ) : (
-              <div className="divide-y divide-border/40">
-                {items.map((p) => (
-                  <ProposalRow
-                    key={p.id}
-                    multisig={multisig}
-                    p={p}
-                    isHistory={activeTab === "history"}
-                    {...(activeTab === "history" ? { onHide: hideProposal } : { onCancel: (target: ProposalSummary) => setCancelTarget(target) })}
-                    cancelling={cancelling && cancelTarget?.id === p.id}
-                  />
-                ))}
-              </div>
-            );
-          })()
-        )}
+              (() => {
+                const items = grouped[activeTab as Exclude<TabId, "income" | "queue">] ?? [];
+                return items.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <p className="text-sm font-medium text-ink-muted">
+                      {activeTab === "history"
+                        ? "No history yet"
+                        : "No drafts saved"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/40">
+                    {items.map((p) => (
+                      <ProposalRow
+                        key={p.id}
+                        multisig={multisig}
+                        p={p}
+                        isHistory={activeTab === "history"}
+                        {...(activeTab === "history" ? { onHide: hideProposal } : { onCancel: (target: ProposalSummary) => setCancelTarget(target) })}
+                        cancelling={cancelling && cancelTarget?.id === p.id}
+                      />
+                    ))}
+                  </div>
+                );
+              })()
+            )}
+          </div>
+        </div>
       </div>
 
       <ConfirmModal

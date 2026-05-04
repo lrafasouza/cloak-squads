@@ -15,6 +15,7 @@ import {
   Plus,
   Search,
   Settings,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -70,14 +71,158 @@ function VaultRow({
   );
 }
 
+interface ContentProps {
+  multisig: string;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  switchInput: string;
+  setSwitchInput: (v: string) => void;
+  handleSwitch: () => void;
+  connected: boolean;
+  myVaultsLoading: boolean;
+  filteredMyVaults: { cofreAddress: string; name?: string | null }[];
+  handleNavigate: (addr: string) => void;
+  query: string;
+  hasResults: boolean;
+  onClose: () => void;
+}
+
+function VaultSelectorContent({
+  multisig,
+  inputRef,
+  switchInput,
+  setSwitchInput,
+  handleSwitch,
+  connected,
+  myVaultsLoading,
+  filteredMyVaults,
+  handleNavigate,
+  query,
+  hasResults,
+  onClose,
+}: ContentProps) {
+  return (
+    <>
+      {/* Search / Switch */}
+      <div className="border-b border-border bg-surface-2/50 p-3">
+        <div className="relative flex items-center gap-2">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-subtle" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={switchInput}
+            onChange={(e) => setSwitchInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSwitch()}
+            placeholder="Search vaults or paste address…"
+            className="h-9 flex-1 rounded-lg border border-border bg-surface pl-8 pr-2 text-xs text-ink placeholder:text-ink-subtle focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/20"
+          />
+          {switchInput.trim() && (
+            <button
+              type="button"
+              onClick={handleSwitch}
+              className="h-9 rounded-lg bg-accent px-3 text-xs font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
+            >
+              Go
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Vault list */}
+      <div className="max-h-[320px] overflow-y-auto p-1.5">
+        {connected && myVaultsLoading && (
+          <div className="flex items-center justify-center gap-2 px-2.5 py-4">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-subtle" />
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+              Loading your vaults…
+            </p>
+          </div>
+        )}
+
+        {connected && filteredMyVaults.length > 0 && (
+          <div className="mb-1">
+            <p className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+              Your Vaults
+            </p>
+            <div className="space-y-0.5">
+              {filteredMyVaults
+                .filter((v) => v.cofreAddress !== multisig)
+                .map((vault) => (
+                  <VaultRow
+                    key={vault.cofreAddress}
+                    addr={vault.cofreAddress}
+                    label={vault.name || truncateAddress(vault.cofreAddress)}
+                    onNavigate={() => handleNavigate(vault.cofreAddress)}
+                  />
+                ))}
+            </div>
+          </div>
+        )}
+
+        {query && !hasResults && !myVaultsLoading && (
+          <div className="px-2.5 py-4 text-center">
+            <p className="text-xs text-ink-subtle">
+              No vaults found matching &quot;{switchInput.trim()}&quot;
+            </p>
+            <p className="mt-1 text-[10px] text-ink-subtle">
+              Press Enter or tap Go to navigate by address
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Footer actions */}
+      <div className="border-t border-border bg-surface-2/30 p-1.5">
+        <Link
+          href="/create"
+          onClick={onClose}
+          className="flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-xs font-medium text-accent transition-colors hover:bg-accent-soft"
+        >
+          <div className="flex h-7 w-7 items-center justify-center rounded-md border border-dashed border-accent/40 bg-accent-soft/50">
+            <Plus className="h-3.5 w-3.5 text-accent" />
+          </div>
+          <span>Create new vault</span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => inputRef.current?.focus()}
+          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+        >
+          <div className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface">
+            <Download className="h-3.5 w-3.5" />
+          </div>
+          <span>Import existing vault</span>
+        </button>
+        <Link
+          href={`/vault/${multisig}/settings`}
+          onClick={onClose}
+          className="flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+        >
+          <div className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface">
+            <Settings className="h-3.5 w-3.5" />
+          </div>
+          <span>Manage vaults</span>
+        </Link>
+      </div>
+    </>
+  );
+}
+
 export function VaultSelector({ multisig, name, className }: VaultSelectorProps) {
   const { connected } = useWallet();
   const { vaults: myVaults, loading: myVaultsLoading } = useMyVaults();
 
   const [open, setOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [switchInput, setSwitchInput] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const displayName = name || truncateAddress(multisig);
 
@@ -176,111 +321,63 @@ export function VaultSelector({ multisig, name, className }: VaultSelectorProps)
         </div>
       </div>
 
-      {/* Dropdown */}
-      {open && (
+      {/* Desktop dropdown */}
+      {open && !isMobile && (
         <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-border bg-surface shadow-raise-2">
-          {/* Search / Switch */}
-          <div className="border-b border-border bg-surface-2/50 p-3">
-            <div className="relative flex items-center gap-2">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-subtle" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={switchInput}
-                onChange={(e) => setSwitchInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSwitch()}
-                placeholder="Search vaults or paste address…"
-                className="h-9 flex-1 rounded-lg border border-border bg-surface pl-8 pr-2 text-xs text-ink placeholder:text-ink-subtle focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/20"
-              />
-              {switchInput.trim() && (
-                <button
-                  type="button"
-                  onClick={handleSwitch}
-                  className="h-9 rounded-lg bg-accent px-3 text-xs font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
-                >
-                  Go
-                </button>
-              )}
+          <VaultSelectorContent
+            multisig={multisig}
+            inputRef={inputRef}
+            switchInput={switchInput}
+            setSwitchInput={setSwitchInput}
+            handleSwitch={handleSwitch}
+            connected={connected}
+            myVaultsLoading={myVaultsLoading}
+            filteredMyVaults={filteredMyVaults}
+            handleNavigate={handleNavigate}
+            query={query}
+            hasResults={hasResults}
+            onClose={() => setOpen(false)}
+          />
+        </div>
+      )}
+
+      {/* Mobile full-screen bottom sheet */}
+      {open && isMobile && (
+        <div className="fixed inset-0 z-[60]">
+          <button
+            type="button"
+            aria-label="Close vault switcher"
+            className="absolute inset-0 bg-bg/80 backdrop-blur-sm"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute bottom-0 left-0 right-0 flex max-h-[85vh] flex-col rounded-t-2xl border-t border-border bg-surface shadow-raise-2">
+            <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3.5">
+              <h3 className="text-sm font-semibold text-ink">Switch Vault</h3>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-surface-2 hover:text-ink"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-          </div>
-
-          {/* Vault list */}
-          <div className="max-h-[320px] overflow-y-auto p-1.5">
-            {/* Your Vaults (from DB) */}
-            {connected && myVaultsLoading && (
-              <div className="flex items-center justify-center gap-2 px-2.5 py-4">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-subtle" />
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
-                  Loading your vaults…
-                </p>
-              </div>
-            )}
-
-            {connected && filteredMyVaults.length > 0 && (
-              <div className="mb-1">
-                <p className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
-                  Your Vaults
-                </p>
-                <div className="space-y-0.5">
-                  {filteredMyVaults
-                    .filter((v) => v.cofreAddress !== multisig)
-                    .map((vault) => (
-                      <VaultRow
-                        key={vault.cofreAddress}
-                        addr={vault.cofreAddress}
-                        label={vault.name || truncateAddress(vault.cofreAddress)}
-                        onNavigate={() => handleNavigate(vault.cofreAddress)}
-                      />
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {/* Empty state when searching */}
-            {query && !hasResults && !myVaultsLoading && (
-              <div className="px-2.5 py-4 text-center">
-                <p className="text-xs text-ink-subtle">
-                  No vaults found matching &quot;{switchInput.trim()}&quot;
-                </p>
-                <p className="mt-1 text-[10px] text-ink-subtle">
-                  Press Enter or tap Go to navigate by address
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Create new vault */}
-          <div className="border-t border-border bg-surface-2/30 p-1.5">
-            <Link
-              href="/create"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-xs font-medium text-accent transition-colors hover:bg-accent-soft"
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-md border border-dashed border-accent/40 bg-accent-soft/50">
-                <Plus className="h-3.5 w-3.5 text-accent" />
-              </div>
-              <span>Create new vault</span>
-            </Link>
-            <button
-              type="button"
-              onClick={() => inputRef.current?.focus()}
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface">
-                <Download className="h-3.5 w-3.5" />
-              </div>
-              <span>Import existing vault</span>
-            </button>
-            <Link
-              href={`/vault/${multisig}/settings`}
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface">
-                <Settings className="h-3.5 w-3.5" />
-              </div>
-              <span>Manage vaults</span>
-            </Link>
+            <div className="flex-1 overflow-y-auto">
+              <VaultSelectorContent
+                multisig={multisig}
+                inputRef={inputRef}
+                switchInput={switchInput}
+                setSwitchInput={setSwitchInput}
+                handleSwitch={handleSwitch}
+                connected={connected}
+                myVaultsLoading={myVaultsLoading}
+                filteredMyVaults={filteredMyVaults}
+                handleNavigate={handleNavigate}
+                query={query}
+                hasResults={hasResults}
+                onClose={() => setOpen(false)}
+              />
+            </div>
           </div>
         </div>
       )}

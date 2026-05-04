@@ -194,7 +194,7 @@ function SidebarContent({
             />
           ))}
           <Link
-            href="https://aegis.so/docs"
+            href="https://docs.aegis.cloak.dev"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-ink-subtle/70 transition-colors hover:bg-surface-2 hover:text-ink"
@@ -250,7 +250,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             recipient: p.recipient,
             type: p.type === "payroll" ? "payroll" : "single",
             ...(p.recipientCount !== undefined ? { recipientCount: p.recipientCount } : {}),
-            status: p.status === "executed" ? "pending" : "pending",
+            status: p.status === "executed" ? "executed" : "pending",
           }),
         ),
     [proposals, multisig],

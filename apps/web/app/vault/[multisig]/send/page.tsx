@@ -12,6 +12,8 @@ import {
   WorkspacePage,
 } from "@/components/ui/workspace";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
+import { useVaultBalance } from "@/lib/hooks/useVaultBalance";
+import { useSolPrice } from "@/lib/hooks/useSolPrice";
 import { ArrowLeft, Send } from "lucide-react";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
@@ -38,7 +40,7 @@ import * as multisigSdk from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, use, useMemo, useState } from "react";
+import { type FormEvent, use, useMemo, useState, useCallback } from "react";
 
 function randomBytes(length: number): Uint8Array {
   const bytes = new Uint8Array(length);
@@ -73,6 +75,19 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   const [error, setError] = useState<string | null>(null);
   const [confirmChecked, setConfirmChecked] = useState(false);
 
+  const { balanceSol } = useVaultBalance(multisig);
+  const { data: solPrice } = useSolPrice();
+
+  const usdPreview = useMemo(() => {
+    const num = parseFloat(amount);
+    if (!num || !solPrice) return null;
+    return (num * solPrice).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+  }, [amount, solPrice]);
+
+  const handleMaxAmount = useCallback(() => {
+    setAmount(balanceSol);
+  }, [balanceSol]);
+
   const multisigAddress = useMemo(() => {
     try {
       return new PublicKey(multisig);
@@ -89,7 +104,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setConfirmChecked(false);
     setPending(true);
     startTransaction({
       title: "Creating private send proposal",
@@ -267,7 +281,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   async function handlePublicSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setConfirmChecked(false);
     setPending(true);
     startTransaction({
       title: "Creating public send proposal",
@@ -397,7 +410,20 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                 </div>
 
                 <div>
-                  <Label htmlFor="amount">Amount (SOL)</Label>
+                  <div className="flex items-baseline justify-between">
+                    <Label htmlFor="amount">Amount (SOL)</Label>
+                    <span className="text-xs text-ink-muted">
+                      Available:{" "}
+                      <button
+                        type="button"
+                        className="font-mono text-accent hover:underline disabled:opacity-50"
+                        onClick={handleMaxAmount}
+                        disabled={pending}
+                      >
+                        {balanceSol} SOL
+                      </button>
+                    </span>
+                  </div>
                   <Input
                     id="amount"
                     type="number"
@@ -410,6 +436,11 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                     required
                     disabled={pending}
                   />
+                  {usdPreview && (
+                    <p className="mt-1 text-xs text-ink-muted">
+                      ≈ {usdPreview}
+                    </p>
+                  )}
                 </div>
 
                 <div>

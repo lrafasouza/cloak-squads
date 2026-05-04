@@ -15,7 +15,7 @@ import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
 import { useVaultMetadata } from "@/lib/use-vault-metadata";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, Copy, Shield, Users, Wallet } from "lucide-react";
+import { AlertTriangle, Check, Copy, Lock, Shield, Users } from "lucide-react";
 import { useState } from "react";
 
 function DashboardVaultIdentity({ multisig }: { multisig: string }) {
@@ -152,7 +152,7 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
         <StatCard
           label="Cloak (Gatekeeper)"
           value={data.cofreInitialized ? "Active" : "Inactive"}
-          icon={Wallet}
+          icon={Lock}
           sub={data.cofreInitialized ? "Protected" : "Pending"}
         />
       </div>

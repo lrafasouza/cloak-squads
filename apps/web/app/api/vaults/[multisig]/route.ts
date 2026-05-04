@@ -42,6 +42,8 @@ const updateSchema = z.object({
   description: z.string().trim().max(64).optional(),
   avatarUrl: z.string().trim().max(350_000).optional(),
   emailNotifications: z.boolean().optional(),
+  webhookUrl: z.string().trim().url().max(500).nullable().optional(),
+  rpcOverride: z.string().trim().url().max(500).nullable().optional(),
 });
 
 export async function PATCH(request: Request, context: { params: Promise<{ multisig: string }> }) {
@@ -78,6 +80,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ multi
   try {
     const data = parsed.data;
 
+    const hasSettings = data.webhookUrl !== undefined || data.rpcOverride !== undefined;
+
     const existing = await prisma.vault.findUnique({ where: { cofreAddress: multisig } });
 
     let result: Record<string, unknown>;
@@ -89,6 +93,22 @@ export async function PATCH(request: Request, context: { params: Promise<{ multi
           ...(data.description !== undefined ? { description: data.description || null } : {}),
           ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl || null } : {}),
           ...(data.emailNotifications !== undefined ? { emailNotifications: data.emailNotifications } : {}),
+          ...(hasSettings
+            ? {
+                settings: {
+                  upsert: {
+                    create: {
+                      webhookUrl: data.webhookUrl ?? null,
+                      rpcOverride: data.rpcOverride ?? null,
+                    },
+                    update: {
+                      ...(data.webhookUrl !== undefined ? { webhookUrl: data.webhookUrl } : {}),
+                      ...(data.rpcOverride !== undefined ? { rpcOverride: data.rpcOverride } : {}),
+                    },
+                  },
+                },
+              }
+            : {}),
         },
         include: { settings: true },
       });
@@ -101,6 +121,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ multi
           avatarUrl: data.avatarUrl ?? null,
           createdBy: auth.publicKey,
           ...(data.emailNotifications !== undefined ? { emailNotifications: data.emailNotifications } : {}),
+          ...(hasSettings
+            ? {
+                settings: {
+                  create: {
+                    webhookUrl: data.webhookUrl ?? null,
+                    rpcOverride: data.rpcOverride ?? null,
+                  },
+                },
+              }
+            : {}),
         },
         include: { settings: true },
       });

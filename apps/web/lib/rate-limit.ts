@@ -102,17 +102,11 @@ async function checkRateLimitRedis(ip: string, limit: number, windowSecs: number
 
 // ── Public API ──────────────────────────────────────────────────
 /**
- * Check rate limit for a given IP address.
- * Uses Redis if REDIS_URL is set, otherwise falls back to in-memory.
+ * Check rate limit for a given IP address (in-memory only).
+ * Always uses the in-memory store regardless of REDIS_URL.
+ * Use checkRateLimitAsync in API route handlers for Redis-backed limiting.
  */
 export function checkRateLimit(ip: string, limit = 10, windowMs = 60_000): boolean {
-  // Synchronous path: use in-memory when no Redis URL configured
-  if (!process.env.REDIS_URL) {
-    return checkRateLimitMemory(ip, limit, windowMs);
-  }
-
-  // Redis path: we can't make this synchronous, so we fall back to memory
-  // for the sync API. Use checkRateLimitAsync for Redis-backed rate limiting.
   return checkRateLimitMemory(ip, limit, windowMs);
 }
 

@@ -249,6 +249,8 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
 
   const vaultName = metadata?.name || "";
   const vaultDescription = metadata?.description || "";
+  const webhookUrl = metadata?.settings?.webhookUrl || "";
+  const rpcOverride = metadata?.settings?.rpcOverride || "";
 
   return (
     <div className="space-y-4 p-6">
@@ -285,7 +287,7 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
               await patchVault({ name: val.trim() || "Untitled" });
               addToast("Vault name updated", "success");
             } catch (e) {
-              addToast(e instanceof Error ? e.message : "Failed to update name", "success");
+              addToast(e instanceof Error ? e.message : "Failed to update name", "error");
               throw e;
             }
           }}
@@ -301,7 +303,7 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
               await patchVault({ description: val.trim() || null });
               addToast("Description updated", "success");
             } catch (e) {
-              addToast(e instanceof Error ? e.message : "Failed to update description", "success");
+              addToast(e instanceof Error ? e.message : "Failed to update description", "error");
               throw e;
             }
           }}
@@ -363,10 +365,19 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
           value="Receive alerts when proposals are created or executed"
           action={<ComingSoonBadge />}
         />
-        <SettingRow
+        <InlineEditField
           label="Webhook URL"
-          value="POST events to your endpoint"
-          action={<ComingSoonBadge />}
+          value={webhookUrl}
+          placeholder="https://your-server.com/webhook"
+          onSave={async (val) => {
+            try {
+              await patchVault({ webhookUrl: val.trim() || null });
+              addToast("Webhook URL updated", "success");
+            } catch (e) {
+              addToast(e instanceof Error ? e.message : "Failed to update webhook URL", "error");
+              throw e;
+            }
+          }}
         />
       </Section>
 
@@ -376,10 +387,19 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
           value="Programmatic access to proposals and vault data"
           action={<ComingSoonBadge />}
         />
-        <SettingRow
+        <InlineEditField
           label="RPC override"
-          value="Custom Solana RPC endpoint for this vault"
-          action={<ComingSoonBadge />}
+          value={rpcOverride}
+          placeholder="https://your-rpc.com"
+          onSave={async (val) => {
+            try {
+              await patchVault({ rpcOverride: val.trim() || null });
+              addToast("RPC override updated", "success");
+            } catch (e) {
+              addToast(e instanceof Error ? e.message : "Failed to update RPC override", "error");
+              throw e;
+            }
+          }}
         />
       </Section>
     </div>

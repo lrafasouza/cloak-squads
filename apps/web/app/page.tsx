@@ -468,6 +468,7 @@ function HeroSection() {
           >
             <CobeGlobe />
           </motion.div>
+
         </div>
       </motion.div>
     </section>

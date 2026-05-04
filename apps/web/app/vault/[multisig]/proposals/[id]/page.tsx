@@ -116,6 +116,59 @@ function CopyAddress({ address }: { address: string }) {
   );
 }
 
+function MemberVoteGrid({
+  members,
+  approvedVoters,
+  rejectedVoters,
+}: {
+  members: string[];
+  approvedVoters: string[];
+  rejectedVoters: string[];
+}) {
+  if (members.length === 0) return null;
+  const approvedSet = new Set(approvedVoters);
+  const rejectedSet = new Set(rejectedVoters);
+
+  return (
+    <div className="mt-4 border-t border-border/50 pt-4">
+      <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+        Members
+      </p>
+      <div className="flex flex-col gap-2">
+        {members.map((addr) => {
+          const vote = approvedSet.has(addr)
+            ? "approved"
+            : rejectedSet.has(addr)
+              ? "rejected"
+              : "pending";
+          return (
+            <div key={addr} className="flex items-center justify-between gap-3">
+              <span className="font-mono text-xs text-ink-muted">
+                {addr.slice(0, 6)}…{addr.slice(-4)}
+              </span>
+              {vote === "approved" && (
+                <span className="flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold text-accent">
+                  <CheckCircle2 className="h-3 w-3" /> Approved
+                </span>
+              )}
+              {vote === "rejected" && (
+                <span className="flex items-center gap-1 rounded-full bg-signal-danger/10 px-2 py-0.5 text-[10px] font-semibold text-signal-danger">
+                  <XCircle className="h-3 w-3" /> Rejected
+                </span>
+              )}
+              {vote === "pending" && (
+                <span className="flex items-center gap-1 rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-ink-subtle">
+                  <Circle className="h-3 w-3" /> Pending
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function ProposalApprovalPage({
   params,
 }: {
@@ -138,6 +191,9 @@ export default function ProposalApprovalPage({
   const [, setCommitmentClaims] = useState<Map<string, CommitmentClaim>>(new Map());
   const [status, setStatus] = useState<ProposalStatusKind | "loading" | "missing">("loading");
   const [approvals, setApprovals] = useState<number>(0);
+  const [approvedVoters, setApprovedVoters] = useState<string[]>([]);
+  const [rejectedVoters, setRejectedVoters] = useState<string[]>([]);
+  const [members, setMembers] = useState<string[]>([]);
   const [threshold, setThreshold] = useState<number | null>(null);
   const [memberVote, setMemberVote] = useState<MemberVote>(null);
   const [transactionType, setTransactionType] = useState<"config" | "vault" | null>(null);
@@ -191,11 +247,14 @@ export default function ProposalApprovalPage({
       const proposal = await multisig.accounts.Proposal.fromAccountAddress(connection, proposalPda);
       setStatus(readProposalStatus(proposal.status));
       setApprovals(proposal.approved.length);
+      setApprovedVoters(proposal.approved.map((k: PublicKey) => k.toBase58()));
+      setRejectedVoters((proposal.rejected ?? []).map((k: PublicKey) => k.toBase58()));
       setMemberVote(getMemberVote(proposal, wallet.publicKey?.toBase58()));
       if (threshold === null) {
         try {
           const msAccount = await multisig.accounts.Multisig.fromAccountAddress(connection, multisigPda);
           setThreshold(msAccount.threshold);
+          setMembers(msAccount.members.map((m: { key: PublicKey }) => m.key.toBase58()));
         } catch { /* threshold unavailable */ }
       }
       // Detect transaction type (config vs vault) from on-chain account.
@@ -426,6 +485,11 @@ export default function ProposalApprovalPage({
             <div className="rounded-xl border border-border bg-surface p-5 shadow-raise-1">
               <h2 className="mb-4 text-sm font-semibold text-ink">Approvals</h2>
               <ApprovalBar approvals={approvals} threshold={threshold} />
+              <MemberVoteGrid
+                members={members}
+                approvedVoters={approvedVoters}
+                rejectedVoters={rejectedVoters}
+              />
             </div>
 
             {/* Vote */}

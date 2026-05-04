@@ -25,8 +25,8 @@ const cols = [
   {
     title: "Company",
     links: [
-      { label: "About", href: "#" },
-      { label: "Brand", href: "#" },
+      { label: "About", href: "https://github.com/cloak-dev/aegis", external: true },
+      { label: "Brand", href: "https://github.com/cloak-dev/aegis", external: true },
     ],
   },
 ];
@@ -85,12 +85,22 @@ export function SiteFooter({ className }: { className?: string }) {
             &copy; {new Date().getFullYear()} Aegis. Private execution for shared treasuries.
           </p>
           <div className="flex gap-6 text-xs text-ink-subtle">
-            <Link href="#" className="hover:text-ink transition-colors">
+            <a
+              href="https://github.com/cloak-dev/aegis"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-ink transition-colors"
+            >
               Terms
-            </Link>
-            <Link href="#" className="hover:text-ink transition-colors">
+            </a>
+            <a
+              href="https://github.com/cloak-dev/aegis"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-ink transition-colors"
+            >
               Privacy
-            </Link>
+            </a>
           </div>
         </div>
       </div>
