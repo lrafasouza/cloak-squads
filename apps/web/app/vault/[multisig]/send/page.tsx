@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RecipientInput } from "@/components/vault/RecipientInput";
 import {
   InlineAlert,
   Panel,
@@ -397,16 +398,15 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
               <form onSubmit={sendMode === "private" ? handleSubmit : handlePublicSend} className="space-y-4">
                 <div>
                   <Label htmlFor="recipient">Recipient</Label>
-                  <Input
-                    id="recipient"
-                    type="text"
-                    placeholder="Solana wallet address"
-                    value={recipient}
-                    onChange={(e) => setRecipient(e.target.value)}
-                    className="mt-1.5 font-mono"
-                    required
-                    disabled={pending}
-                  />
+                  <div className="mt-1.5">
+                    <RecipientInput
+                      id="recipient"
+                      value={recipient}
+                      onChange={setRecipient}
+                      disabled={pending}
+                      required
+                    />
+                  </div>
                 </div>
 
                 <div>

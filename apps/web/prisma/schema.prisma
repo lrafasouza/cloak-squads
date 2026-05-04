@@ -115,6 +115,19 @@ model PayrollDraft {
   @@index([cofreAddress])
 }
 
+model AddressBookEntry {
+  id          String   @id @default(uuid())
+  ownerPubkey String
+  label       String
+  address     String
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([ownerPubkey, address])
+  @@index([ownerPubkey])
+}
+
 model PayrollRecipient {
   id              String  @id @default(uuid())
   payrollDraftId  String
