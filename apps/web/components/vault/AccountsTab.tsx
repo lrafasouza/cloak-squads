@@ -7,10 +7,12 @@ export function AccountsTab({
   multisig,
   vaultAddress,
   balanceSol,
+  usdcUi,
 }: {
   multisig: string;
   vaultAddress: string;
   balanceSol: string;
+  usdcUi: string;
 }) {
   return (
     <div className="rounded-2xl bg-surface p-5">
@@ -18,12 +20,17 @@ export function AccountsTab({
         <h3 className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">Accounts</h3>
         <Link href={`/vault/${multisig}/settings`} className="text-xs text-ink-subtle transition-colors hover:text-accent">Manage</Link>
       </div>
-      <div className="flex items-center justify-between rounded-xl bg-surface-2 px-4 py-3">
-        <div>
-          <p className="text-sm font-medium text-ink">Vault</p>
-          <div className="mt-1"><AddressPill value={vaultAddress} chars={6} /></div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between rounded-xl bg-surface-2 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-ink">Vault</p>
+            <div className="mt-1"><AddressPill value={vaultAddress} chars={6} /></div>
+          </div>
+          <div className="text-right">
+            <p className="font-mono text-sm font-medium tabular-nums text-accent">{balanceSol} SOL</p>
+            <p className="font-mono text-xs tabular-nums text-ink-muted">{usdcUi} USDC</p>
+          </div>
         </div>
-        <p className="font-mono text-sm font-medium tabular-nums text-accent">{balanceSol} SOL</p>
       </div>
     </div>
   );

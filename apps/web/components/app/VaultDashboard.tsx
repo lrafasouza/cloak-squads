@@ -130,6 +130,7 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
       <OverviewCard
         multisig={multisig}
         balanceSol={data.balanceSol}
+        usdcUi={data.usdcUi}
         cofreInitialized={data.cofreInitialized}
         onRefresh={refresh}
       />

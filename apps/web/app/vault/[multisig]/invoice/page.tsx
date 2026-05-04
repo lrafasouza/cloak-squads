@@ -6,6 +6,7 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
+import { TokenLogo } from "@/components/ui/token-logo";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import {
   InlineAlert,
@@ -15,18 +16,19 @@ import {
   WorkspaceHeader,
   WorkspacePage,
 } from "@/components/ui/workspace";
-import { BookOpen, CheckCircle2, Copy, Link2 } from "lucide-react";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
+import { SOL_TOKEN, useVaultTokens } from "@/lib/hooks/useVaultTokens";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
-import { createVaultProposal } from "@/lib/squads-sdk";
 import { lamportsToSol } from "@/lib/sol";
+import { createVaultProposal } from "@/lib/squads-sdk";
+import { SOL_MINT, tokenAmountToUnits } from "@/lib/tokens";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
-import { cofrePda } from "@cloak-squads/core/pda";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
+import { cofrePda } from "@cloak-squads/core/pda";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import {
   NATIVE_SOL_MINT,
@@ -35,14 +37,20 @@ import {
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
+import {
+  createAssociatedTokenAccountInstruction,
+  createTransferCheckedInstruction,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
+import { BookOpen, Check, CheckCircle2, ChevronDown, Copy, Link2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
-import { type FormEvent, use, useEffect, useMemo, useState } from "react";
+import { type FormEvent, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
@@ -56,6 +64,89 @@ function hexToBytes(hex: string) {
     bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   }
   return bytes;
+}
+
+// ── Token Dropdown ─────────────────────────────────────────────────────────
+
+interface TokenDropdownProps {
+  tokens: ReturnType<typeof useVaultTokens>["data"];
+  selectedMint: string;
+  onSelect: (mint: string) => void;
+  disabled?: boolean;
+  loading?: boolean;
+}
+
+function TokenDropdown({
+  tokens = [],
+  selectedMint,
+  onSelect,
+  disabled,
+  loading,
+}: TokenDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = tokens.find((t) => t.mint === selectedMint) ?? tokens[0];
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => !disabled && !loading && setOpen((v) => !v)}
+        disabled={disabled || loading}
+        className="flex h-11 min-w-[110px] items-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-ink transition-colors hover:border-border-strong hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        {loading ? (
+          <span className="h-5 w-5 animate-pulse rounded-full bg-surface-2" />
+        ) : selected ? (
+          <TokenLogo symbol={selected.symbol as "SOL" | "USDC"} size={20} />
+        ) : null}
+        <span>{loading ? "—" : (selected?.symbol ?? "SOL")}</span>
+        <ChevronDown
+          className={`ml-auto h-3.5 w-3.5 text-ink-muted transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1.5 min-w-[200px] overflow-hidden rounded-xl border border-border bg-surface shadow-lg ring-1 ring-black/5">
+          {loading ? (
+            <div className="px-4 py-3 text-xs text-ink-muted">Loading tokens…</div>
+          ) : tokens.length === 0 ? (
+            <div className="px-4 py-3 text-xs text-ink-muted">No tokens found</div>
+          ) : (
+            tokens.map((t) => {
+              const active = t.mint === selectedMint;
+              return (
+                <button
+                  key={t.mint}
+                  type="button"
+                  onClick={() => {
+                    onSelect(t.mint);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-surface-2 ${active ? "text-accent" : "text-ink"}`}
+                >
+                  <TokenLogo symbol={t.symbol as "SOL" | "USDC"} size={18} />
+                  <span className="flex-1 text-left font-medium">{t.symbol}</span>
+                  <span className="font-mono text-xs text-ink-muted">{t.uiBalance}</span>
+                  {active && <Check className="h-3.5 w-3.5 shrink-0 text-accent" />}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function InvoicePage({ params }: { params: Promise<{ multisig: string }> }) {
@@ -79,10 +170,34 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [claimQrDataUrl, setClaimQrDataUrl] = useState<string | null>(null);
+  const [selectedMint, setSelectedMint] = useState<string>(SOL_TOKEN.mint);
   const [result, setResult] = useState<{
     claimUrl: string;
     transactionIndex: string;
   } | null>(null);
+
+  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig);
+
+  const selectedToken = useMemo(
+    () => tokens.find((t) => t.mint === selectedMint) ?? tokens[0],
+    [tokens, selectedMint],
+  );
+
+  const isSol = selectedMint === SOL_MINT;
+  const tokenLabel = selectedToken?.symbol ?? "SOL";
+
+  const amountStep = isSol ? "0.000000001" : "0.000001";
+  const amountMin = isSol ? "0.000000001" : "0.000001";
+  const amountPlaceholder = isSol ? "0.0" : "0.00";
+
+  const handleMaxAmount = useCallback(() => {
+    if (selectedToken) setAmount(selectedToken.uiBalance);
+  }, [selectedToken]);
+
+  const handleTokenSelect = useCallback((mint: string) => {
+    setSelectedMint(mint);
+    setAmount("");
+  }, []);
 
   const multisigAddress = useMemo(() => {
     try {
@@ -143,17 +258,29 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
     try {
       if (!multisigAddress) throw new Error("Invalid multisig address.");
       if (!wallet.publicKey) throw new Error("Connect a multisig member wallet first.");
+      if (!selectedToken) throw new Error("Select a token.");
 
-      const lamports = solAmountToLamports(amount);
+      const decimals = selectedToken.decimals;
+      const tokenUnits = isSol ? solAmountToLamports(amount) : tokenAmountToUnits(amount, decimals);
       const recipientPubkey = new PublicKey(recipientWallet.trim());
 
       const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
-      const vaultBalance = await connection.getBalance(vaultPda, "confirmed");
-      if (BigInt(vaultBalance) < lamports) {
-        const deficit = lamports - BigInt(vaultBalance);
-        throw new Error(
-          `Insufficient vault balance. Need ${lamportsToSol(String(lamports))} SOL, vault has ${lamportsToSol(String(vaultBalance))} SOL. Short ${lamportsToSol(String(deficit))} SOL.`,
-        );
+
+      // Balance check
+      if (isSol) {
+        const vaultBalance = await connection.getBalance(vaultPda, "confirmed");
+        if (BigInt(vaultBalance) < tokenUnits) {
+          const deficit = tokenUnits - BigInt(vaultBalance);
+          throw new Error(
+            `Insufficient vault balance. Need ${lamportsToSol(String(tokenUnits))} SOL, vault has ${lamportsToSol(String(vaultBalance))} SOL. Short ${lamportsToSol(String(deficit))} SOL.`,
+          );
+        }
+      } else {
+        if (tokenUnits > selectedToken.balance) {
+          throw new Error(
+            `Insufficient ${tokenLabel}. Need ${amount}, vault has ${selectedToken.uiBalance}.`,
+          );
+        }
       }
 
       await assertCofreInitialized({
@@ -168,21 +295,48 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       if (!cofreAccount) throw new Error("Privacy vault not found.");
       const coder = new BorshAccountsCoder(IDL as Idl);
       const cofreData = coder.decode<{ operator?: Uint8Array }>("Cofre", cofreAccount.data);
-      if (!cofreData?.operator) throw new Error("No operator registered. Set an operator wallet first.");
+      if (!cofreData?.operator)
+        throw new Error("No operator registered. Set an operator wallet first.");
       const operatorPubkey = new PublicKey(cofreData.operator);
 
-      const fundOperatorIx = SystemProgram.transfer({
-        fromPubkey: vaultPda,
-        toPubkey: operatorPubkey,
-        lamports,
-      });
+      // Build "fund operator" instruction — SOL or SPL token
+      const proposalInstructions = [];
+      if (isSol) {
+        proposalInstructions.push(
+          SystemProgram.transfer({
+            fromPubkey: vaultPda,
+            toPubkey: operatorPubkey,
+            lamports: tokenUnits,
+          }),
+        );
+      } else {
+        const mintPk = new PublicKey(selectedToken.mint);
+        const vaultAta = await getAssociatedTokenAddress(mintPk, vaultPda, true);
+        const operatorAta = await getAssociatedTokenAddress(mintPk, operatorPubkey);
+        const operatorAtaInfo = await connection.getAccountInfo(operatorAta);
+        if (!operatorAtaInfo) {
+          proposalInstructions.push(
+            createAssociatedTokenAccountInstruction(vaultPda, operatorAta, operatorPubkey, mintPk),
+          );
+        }
+        proposalInstructions.push(
+          createTransferCheckedInstruction(
+            vaultAta,
+            mintPk,
+            operatorAta,
+            vaultPda,
+            tokenUnits,
+            decimals,
+          ),
+        );
+      }
 
       updateStep("validate", { status: "success" });
 
       setProofStep("generate-witness");
       updateStep("invoice", { status: "running" });
 
-      // Step 1: Create StealthInvoice in DB (server generates nacl keypair + claim URL)
+      // Step 1: Create StealthInvoice in DB
       const stealthRes = await fetchWithAuth("/api/stealth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -190,7 +344,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
           cofreAddress: multisigAddress.toBase58(),
           invoiceRef: invoiceRef.trim() || undefined,
           memo: memo.trim() || undefined,
-          amount: lamports.toString(),
+          amount: tokenUnits.toString(),
           recipientWallet: recipientPubkey.toBase58(),
         }),
       });
@@ -208,18 +362,16 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
 
       // Step 2: Generate Cloak UTXO commitment
       const keypair = await generateUtxoKeypair();
-      const mint = NATIVE_SOL_MINT;
-      const utxo = await createUtxo(lamports, keypair, mint);
+      const cloakMint = isSol ? NATIVE_SOL_MINT : new PublicKey(selectedToken.mint);
+      const utxo = await createUtxo(tokenUnits, keypair, cloakMint);
       const commitmentBigInt = await computeUtxoCommitment(utxo);
       const commitment = commitmentBigInt.toString(16).padStart(64, "0");
 
-      // Use recipientWallet as recipientVkPub so operator can match invoice via
-      // recipientWallet === loadedDraft.recipient (operator/page.tsx line ~423)
       const invariants: PayloadInvariants = {
         nullifier: randomBytes(32),
         commitment: hexToBytes(commitment),
-        amount: lamports,
-        tokenMint: mint,
+        amount: tokenUnits,
+        tokenMint: cloakMint,
         recipientVkPub: recipientPubkey.toBytes(),
         nonce: randomBytes(16),
       };
@@ -230,16 +382,18 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
 
       // Step 3: Build gatekeeper instruction + Squads proposal
       const hash = computePayloadHash(invariants);
-      const { instruction } = await buildIssueLicenseIxBrowser({
+      const { instruction: licenseIx } = await buildIssueLicenseIxBrowser({
         multisig: multisigAddress,
         payloadHash: hash,
         nonce: invariants.nonce,
       });
+      proposalInstructions.push(licenseIx);
+
       const proposalResult = await createVaultProposal({
         connection,
         wallet,
         multisigPda: multisigAddress,
-        instructions: [fundOperatorIx, instruction],
+        instructions: proposalInstructions,
         memo: memo.trim()
           ? `stealth invoice: ${memo.trim()}`
           : `stealth invoice ${stealthData.id.slice(0, 8)}`,
@@ -259,18 +413,18 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         blinding: utxo.blinding.toString(16).padStart(64, "0"),
         commitment,
         recipient_vk: recipientPubkey.toBase58(),
-        token_mint: mint.toBase58(),
+        token_mint: cloakMint.toBase58(),
       };
 
       updateStep("persist", { status: "running" });
-      // Step 4: Persist ProposalDraft (recipient = recipientWallet for operator lookup)
+      // Step 4: Persist ProposalDraft
       const draftRes = await fetchWithAuth("/api/proposals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cofreAddress: multisigAddress.toBase58(),
           transactionIndex,
-          amount: lamports.toString(),
+          amount: tokenUnits.toString(),
           recipient: recipientPubkey.toBase58(),
           memo: memo.trim() || undefined,
           payloadHash: Array.from(hash),
@@ -291,7 +445,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         throw new Error(body?.error ?? "Could not persist proposal draft.");
       }
 
-      // Step 5: Cache claim secrets in sessionStorage (never sent to server)
+      // Step 5: Cache claim secrets in sessionStorage
       try {
         sessionStorage.setItem(
           `claim:${multisigAddress.toBase58()}:${transactionIndex}`,
@@ -360,7 +514,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
     );
   }
 
-  // After success: show claim URL + link to proposal (don't auto-redirect, user must copy first)
+  // After success: show claim URL + link to proposal
   if (result) {
     const fullClaimUrl = `${typeof window !== "undefined" ? window.location.origin : ""}${result.claimUrl}`;
     return (
@@ -419,7 +573,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       <div className="space-y-8">
         <WorkspaceHeader
           eyebrow="STEALTH INVOICE"
-          title="Create claim link"
+          title={`Create ${tokenLabel} claim link`}
           description="Generate a private invoice and open a Squads proposal for signer approval."
         />
 
@@ -460,17 +614,41 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
 
                 <div className="grid gap-4 md:grid-cols-[160px_1fr]">
                   <div>
-                    <Label htmlFor="amount">Amount (SOL)</Label>
-                    <Input
-                      id="amount"
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="0.5"
-                      className="mt-1.5 font-mono"
-                    />
+                    <div className="flex items-baseline justify-between">
+                      <Label htmlFor="amount">Amount ({tokenLabel})</Label>
+                      <span className="text-xs text-ink-muted">
+                        Available:{" "}
+                        <button
+                          type="button"
+                          className="font-mono text-accent hover:underline disabled:opacity-50"
+                          onClick={handleMaxAmount}
+                          disabled={pending || !selectedToken}
+                        >
+                          {selectedToken
+                            ? `${selectedToken.uiBalance} ${selectedToken.symbol}`
+                            : "—"}
+                        </button>
+                      </span>
+                    </div>
+                    <div className="mt-1.5 flex gap-2">
+                      <TokenDropdown
+                        tokens={tokens}
+                        selectedMint={selectedMint}
+                        onSelect={handleTokenSelect}
+                        disabled={pending}
+                        loading={tokensLoading}
+                      />
+                      <Input
+                        id="amount"
+                        type="number"
+                        step={amountStep}
+                        min={amountMin}
+                        placeholder={amountPlaceholder}
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        className="font-mono"
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -525,7 +703,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         <ConfirmModal
           open={showConfirm}
           title="Create invoice"
-          description={`This creates a claim link and opens a proposal for ${amount} SOL.`}
+          description={`This creates a claim link and opens a proposal for ${amount || "0"} ${tokenLabel}.`}
           confirmText="Create"
           cancelText="Cancel"
           onConfirm={executeCreate}

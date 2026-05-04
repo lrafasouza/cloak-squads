@@ -8,5 +8,7 @@ export function useVaultBalance(multisig: string) {
     ...query,
     balanceLamports: query.data?.balanceLamports ?? 0,
     balanceSol: query.data?.balanceSol ?? "0",
+    usdcRaw: query.data?.usdcRaw ?? 0n,
+    usdcUi: query.data?.usdcUi ?? "0",
   };
 }

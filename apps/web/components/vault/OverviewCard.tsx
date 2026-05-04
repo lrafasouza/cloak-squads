@@ -8,21 +8,28 @@ import { RefreshCw, TrendingUp } from "lucide-react";
 interface OverviewCardProps {
   multisig: string;
   balanceSol: string;
+  usdcUi: string;
   cofreInitialized: boolean;
   onRefresh: () => void;
 }
 
 export function OverviewCard({
   balanceSol,
+  usdcUi,
   cofreInitialized,
   onRefresh,
 }: OverviewCardProps) {
   const { data: solPrice } = useSolPrice();
-  const balanceNum = parseFloat(balanceSol) || 0;
 
-  const usdValue =
-    solPrice != null
-      ? (balanceNum * solPrice).toLocaleString("en-US", {
+  const solNum = parseFloat(balanceSol) || 0;
+  const usdcNum = parseFloat(usdcUi) || 0;
+
+  const solUsd = solPrice != null ? solNum * solPrice : null;
+  const totalUsd = solUsd != null ? solUsd + usdcNum : null;
+
+  const totalUsdFormatted =
+    totalUsd != null
+      ? totalUsd.toLocaleString("en-US", {
           style: "currency",
           currency: "USD",
           maximumFractionDigits: 2,
@@ -57,20 +64,38 @@ export function OverviewCard({
           </button>
         </div>
 
+        {/* Primary: total USD */}
         <div className="mt-4 flex items-baseline gap-2">
-          <NumberFlow
-            value={balanceNum}
-            className="font-display text-2xl font-bold tabular-nums tracking-tight text-ink md:text-3xl"
-            suffix=" SOL"
-            locales="en-US"
-            format={{ minimumFractionDigits: 0, maximumFractionDigits: 9 }}
-            transformTiming={{ duration: 400, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-          />
+          {totalUsdFormatted != null ? (
+            <NumberFlow
+              value={totalUsd!}
+              className="font-display text-2xl font-bold tabular-nums tracking-tight text-ink md:text-3xl"
+              prefix="$"
+              locales="en-US"
+              format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
+              transformTiming={{ duration: 400, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
+            />
+          ) : (
+            <span className="font-display text-2xl font-bold tabular-nums tracking-tight text-ink md:text-3xl">
+              —
+            </span>
+          )}
         </div>
 
-        {usdValue != null && (
-          <p className="mt-1 text-sm font-medium tabular-nums text-ink-subtle">{usdValue}</p>
-        )}
+        {/* Secondary: SOL + USDC breakdown */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="font-mono text-sm tabular-nums text-ink-muted">
+            <span className="text-ink-subtle">{balanceSol}</span>
+            {" "}
+            <span className="text-ink-subtle/60">SOL</span>
+          </span>
+          <span className="text-ink-subtle/30">·</span>
+          <span className="font-mono text-sm tabular-nums text-ink-muted">
+            <span className="text-ink-subtle">{usdcNum > 0 ? usdcUi : "0"}</span>
+            {" "}
+            <span className="text-ink-subtle/60">USDC</span>
+          </span>
+        </div>
       </div>
 
       {!cofreInitialized && (

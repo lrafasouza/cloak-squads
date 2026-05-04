@@ -315,7 +315,7 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
             data.cofreInitialized ? "Initialized — gatekeeper active" : "Not initialized"
           }
         />
-        <SettingRow label="Balance" value={`${data.balanceSol} SOL`} />
+        <SettingRow label="Balance" value={`${data.balanceSol} SOL · ${data.usdcUi} USDC`} />
       </Section>
 
       <Section title="Members & Threshold" description="Manage vault membership and security">

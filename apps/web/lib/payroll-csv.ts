@@ -1,4 +1,4 @@
-import { solToLamports } from "@/lib/sol";
+import { tokenAmountToUnits } from "@/lib/tokens";
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 
@@ -13,40 +13,45 @@ function isValidSolanaAddress(address: string): boolean {
   }
 }
 
-export const payrollRecipientSchema = z.object({
-  name: z.string().min(1, "Name is required").max(100),
-  wallet: z.string().refine(isValidSolanaAddress, {
-    message: "Invalid Solana wallet address",
-  }),
-  amount: z
-    .string()
-    .regex(/^\d+(\.\d+)?$/, "Amount must be a number in SOL (e.g. 2 or 0.5)")
-    .refine(
-      (val) => {
-        try {
-          const lamports = BigInt(solToLamports(val));
-          return lamports > 0n && lamports <= BigInt(MAX_U64);
-        } catch {
-          return false;
-        }
-      },
-      { message: "Amount must be greater than 0 and fit in u64" },
-    ),
-  memo: z.string().max(200).optional(),
-});
+function buildSchema(decimals: number) {
+  return z.object({
+    name: z.string().min(1, "Name is required").max(100),
+    wallet: z.string().refine(isValidSolanaAddress, {
+      message: "Invalid Solana wallet address",
+    }),
+    amount: z
+      .string()
+      .regex(/^\d+(\.\d+)?$/, "Amount must be a positive number")
+      .refine(
+        (val) => {
+          try {
+            const units = tokenAmountToUnits(val, decimals);
+            return units > 0n && units <= BigInt(MAX_U64);
+          } catch {
+            return false;
+          }
+        },
+        { message: "Amount must be greater than 0 and fit in u64" },
+      ),
+    memo: z.string().max(200).optional(),
+  });
+}
 
-export const payrollCsvSchema = z
-  .array(payrollRecipientSchema)
-  .min(1, "At least one recipient is required")
-  .max(10, "Maximum 10 recipients allowed in V1");
+export type PayrollRecipientInput = {
+  name: string;
+  wallet: string;
+  amount: string;
+  memo: string | undefined;
+};
 
-export type PayrollRecipientInput = z.infer<typeof payrollRecipientSchema>;
-export type PayrollCsvInput = z.infer<typeof payrollCsvSchema>;
-
-export function parsePayrollCsv(csvText: string): {
+export function parsePayrollCsv(
+  csvText: string,
+  decimals = 9,
+): {
   data: PayrollRecipientInput[] | null;
   errors: string[];
 } {
+  const schema = buildSchema(decimals);
   const lines = csvText
     .split("\n")
     .map((line) => line.trim())
@@ -89,7 +94,7 @@ export function parsePayrollCsv(csvText: string): {
     }
 
     const [name, wallet, amount, memo] = parts;
-    const parsed = payrollRecipientSchema.safeParse({ name, wallet, amount, memo });
+    const parsed = schema.safeParse({ name, wallet, amount, memo });
 
     if (!parsed.success) {
       const errorMessages = Object.values(parsed.error.flatten().fieldErrors).flat().join("; ");
@@ -97,8 +102,13 @@ export function parsePayrollCsv(csvText: string): {
       continue;
     }
 
-    // Convert SOL → lamports so the rest of the app always works in lamports
-    recipients.push({ ...parsed.data, amount: solToLamports(parsed.data.amount) });
+    // Convert to token-native units
+    recipients.push({
+      name: parsed.data.name,
+      wallet: parsed.data.wallet,
+      amount: tokenAmountToUnits(parsed.data.amount, decimals).toString(),
+      memo: parsed.data.memo ?? undefined,
+    });
   }
 
   if (recipients.length === 0) {

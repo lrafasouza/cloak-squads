@@ -11,16 +11,20 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TokenLogo } from "@/components/ui/token-logo";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
+import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
+import { SOL_TOKEN, useVaultTokens } from "@/lib/hooks/useVaultTokens";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
-import { createVaultProposal } from "@/lib/squads-sdk";
 import { lamportsToSol } from "@/lib/sol";
+import { createVaultProposal } from "@/lib/squads-sdk";
+import { SOL_MINT, tokenAmountToUnits } from "@/lib/tokens";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
-import { cofrePda } from "@cloak-squads/core/pda";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
+import { cofrePda } from "@cloak-squads/core/pda";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import {
   NATIVE_SOL_MINT,
@@ -29,12 +33,16 @@ import {
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
+import {
+  createAssociatedTokenAccountInstruction,
+  createTransferCheckedInstruction,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { Send } from "lucide-react";
-import { publicEnv } from "@/lib/env";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
 import * as multisigSdk from "@sqds/multisig";
+import { Check, ChevronDown, Send } from "lucide-react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
@@ -52,6 +60,89 @@ function hexToBytes(hex: string) {
 }
 
 type SendMode = "private" | "public";
+
+// ── Token Dropdown ─────────────────────────────────────────────────────────
+
+interface TokenDropdownProps {
+  tokens: ReturnType<typeof useVaultTokens>["data"];
+  selectedMint: string;
+  onSelect: (mint: string) => void;
+  disabled?: boolean;
+  loading?: boolean;
+}
+
+function TokenDropdown({
+  tokens = [],
+  selectedMint,
+  onSelect,
+  disabled,
+  loading,
+}: TokenDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = tokens.find((t) => t.mint === selectedMint) ?? tokens[0];
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => !disabled && !loading && setOpen((v) => !v)}
+        disabled={disabled || loading}
+        className="flex h-11 min-w-[110px] items-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-ink transition-colors hover:border-border-strong hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        {loading ? (
+          <span className="h-5 w-5 animate-pulse rounded-full bg-surface-2" />
+        ) : selected ? (
+          <TokenLogo symbol={selected.symbol as "SOL" | "USDC"} size={20} />
+        ) : null}
+        <span>{loading ? "—" : (selected?.symbol ?? "SOL")}</span>
+        <ChevronDown
+          className={`ml-auto h-3.5 w-3.5 text-ink-muted transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1.5 min-w-[200px] overflow-hidden rounded-xl border border-border bg-surface shadow-lg ring-1 ring-black/5">
+          {loading ? (
+            <div className="px-4 py-3 text-xs text-ink-muted">Loading tokens…</div>
+          ) : tokens.length === 0 ? (
+            <div className="px-4 py-3 text-xs text-ink-muted">No tokens found</div>
+          ) : (
+            tokens.map((t) => {
+              const active = t.mint === selectedMint;
+              return (
+                <button
+                  key={t.mint}
+                  type="button"
+                  onClick={() => {
+                    onSelect(t.mint);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-surface-2 ${active ? "text-accent" : "text-ink"}`}
+                >
+                  <TokenLogo symbol={t.symbol as "SOL" | "USDC"} size={18} />
+                  <span className="flex-1 text-left font-medium">{t.symbol}</span>
+                  <span className="font-mono text-xs text-ink-muted">{t.uiBalance}</span>
+                  {active && <Check className="h-3.5 w-3.5 shrink-0 text-accent" />}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function SendModal({
   multisig,
@@ -80,6 +171,21 @@ export function SendModal({
   const [mode, setMode] = useState<SendMode>(defaultMode ?? "private");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedMint, setSelectedMint] = useState<string>(SOL_TOKEN.mint);
+
+  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig);
+
+  const selectedToken = useMemo(
+    () => tokens.find((t) => t.mint === selectedMint) ?? tokens[0],
+    [tokens, selectedMint],
+  );
+
+  const isSol = selectedMint === SOL_MINT;
+  const tokenLabel = selectedToken?.symbol ?? "SOL";
+
+  const amountStep = isSol ? "0.000000001" : "0.000001";
+  const amountMin = isSol ? "0.000000001" : "0.000001";
+  const amountPlaceholder = isSol ? "0.0" : "0.00";
 
   useEffect(() => {
     if (open) {
@@ -108,6 +214,7 @@ export function SendModal({
     setMemo("");
     setError(null);
     setMode("private");
+    setSelectedMint(SOL_TOKEN.mint);
   };
 
   const handleClose = (v: boolean) => {
@@ -116,6 +223,15 @@ export function SendModal({
       if (!v) reset();
     }
   };
+
+  const handleMaxAmount = useCallback(() => {
+    if (selectedToken) setAmount(selectedToken.uiBalance);
+  }, [selectedToken]);
+
+  const handleTokenSelect = useCallback((mint: string) => {
+    setSelectedMint(mint);
+    setAmount("");
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -129,71 +245,142 @@ export function SendModal({
       return;
     }
 
-    let lamports: bigint;
-    try {
-      lamports = solAmountToLamports(amount);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid amount.");
-      return;
-    }
-
     if (!wallet.publicKey || !multisigAddress || !wallet.sendTransaction) {
       setError("Connect a wallet and open a valid multisig.");
       return;
     }
 
+    const decimals = selectedToken?.decimals ?? 9;
+    let tokenUnits: bigint;
+    try {
+      tokenUnits = isSol ? solAmountToLamports(amount) : tokenAmountToUnits(amount, decimals);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Invalid amount.");
+      return;
+    }
+
+    if (tokenUnits === 0n) {
+      setError("Amount must be greater than 0.");
+      return;
+    }
+
     setPending(true);
 
-    if (mode === "public") {
-      startTransaction({
-        title: "Creating public send proposal",
-        description: "Opening a standard Squads vault transfer proposal.",
-        steps: [
-          { id: "validate", title: "Validate transfer", description: "Checking wallet, recipient, and vault balance." },
-          { id: "squads", title: "Create Squads proposal", description: "Your wallet signs the vault transaction." },
-        ],
-      });
-    } else {
-      startTransaction({
-        title: "Creating private send proposal",
-        description: "Preparing your private transfer and opening a vault proposal.",
-        steps: [
-          { id: "validate", title: "Validate transfer", description: "Checking wallet, recipient, amount, operator, and vault readiness." },
-          { id: "commitment", title: "Build private send", description: "Creating the shielded transfer details signers will approve." },
-          { id: "squads", title: "Create Squads proposal", description: "Funding operator and creating the private send proposal." },
-          { id: "persist", title: "Save transfer details", description: "Storing the private payment data securely for the operator." },
-        ],
-      });
-    }
+    const titlePrefix = mode === "public" ? "public" : "private";
+    startTransaction({
+      title: `Creating ${titlePrefix} ${tokenLabel} send proposal`,
+      description:
+        mode === "public"
+          ? "Opening a standard Squads vault transfer proposal."
+          : "Preparing your private transfer and opening a vault proposal.",
+      steps:
+        mode === "public"
+          ? [
+              {
+                id: "validate",
+                title: "Validate transfer",
+                description: `Checking wallet, recipient, and ${tokenLabel} balance.`,
+              },
+              {
+                id: "squads",
+                title: "Create Squads proposal",
+                description: "Your wallet signs the vault transaction.",
+              },
+            ]
+          : [
+              {
+                id: "validate",
+                title: "Validate transfer",
+                description: `Checking wallet, recipient, ${tokenLabel} balance, operator, and vault readiness.`,
+              },
+              {
+                id: "commitment",
+                title: "Build private send",
+                description: "Creating the shielded transfer details signers will approve.",
+              },
+              {
+                id: "squads",
+                title: "Create Squads proposal",
+                description: "Funding operator and creating the private send proposal.",
+              },
+              {
+                id: "persist",
+                title: "Save transfer details",
+                description: "Storing the private payment data securely for the operator.",
+              },
+            ],
+    });
 
     try {
       const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
-      const vaultBalance = await connection.getBalance(vaultPda, "confirmed");
-      if (BigInt(vaultBalance) < lamports) {
-        const deficit = lamports - BigInt(vaultBalance);
-        const msg = `Insufficient vault balance. Need ${lamportsToSol(String(lamports))} SOL, vault has ${lamportsToSol(String(vaultBalance))} SOL. Short ${lamportsToSol(String(deficit))} SOL.`;
-        setError(msg);
-        failTransaction(msg);
-        setPending(false);
-        return;
+
+      // Balance check
+      if (isSol) {
+        const vaultBalance = await connection.getBalance(vaultPda, "confirmed");
+        if (BigInt(vaultBalance) < tokenUnits) {
+          const deficit = tokenUnits - BigInt(vaultBalance);
+          const msg = `Insufficient vault balance. Need ${lamportsToSol(String(tokenUnits))} SOL, vault has ${lamportsToSol(String(vaultBalance))} SOL. Short ${lamportsToSol(String(deficit))} SOL.`;
+          setError(msg);
+          failTransaction(msg);
+          setPending(false);
+          return;
+        }
+      } else {
+        if (!selectedToken) throw new Error("Select a token.");
+        if (tokenUnits > selectedToken.balance) {
+          throw new Error(
+            `Insufficient ${tokenLabel}. Need ${amount}, vault has ${selectedToken.uiBalance}.`,
+          );
+        }
       }
 
       if (mode === "public") {
         updateStep("validate", { status: "success" });
         updateStep("squads", { status: "running" });
 
-        const transferIx = SystemProgram.transfer({
-          fromPubkey: vaultPda,
-          toPubkey: recipientPubkey,
-          lamports,
-        });
+        const instructions = [];
+        if (isSol) {
+          instructions.push(
+            SystemProgram.transfer({
+              fromPubkey: vaultPda,
+              toPubkey: recipientPubkey,
+              lamports: tokenUnits,
+            }),
+          );
+        } else {
+          if (!selectedToken) throw new Error("Select a token.");
+          const mintPk = new PublicKey(selectedToken.mint);
+          const vaultAta = await getAssociatedTokenAddress(mintPk, vaultPda, true);
+          const recipientAta = await getAssociatedTokenAddress(mintPk, recipientPubkey);
+          const recipientAtaInfo = await connection.getAccountInfo(recipientAta);
+          if (!recipientAtaInfo) {
+            instructions.push(
+              createAssociatedTokenAccountInstruction(
+                vaultPda,
+                recipientAta,
+                recipientPubkey,
+                mintPk,
+              ),
+            );
+          }
+          instructions.push(
+            createTransferCheckedInstruction(
+              vaultAta,
+              mintPk,
+              recipientAta,
+              vaultPda,
+              tokenUnits,
+              decimals,
+            ),
+          );
+        }
 
         const result = await createVaultProposal({
           connection,
           wallet,
           multisigPda: multisigAddress,
-          instructions: [transferIx],
-          memo: memo.trim() || "Public send",
+          instructions,
+          memo: memo.trim() || `Send ${amount} ${tokenLabel}`,
         });
 
         updateStep("squads", {
@@ -202,13 +389,14 @@ export function SendModal({
           description: `Proposal #${result.transactionIndex.toString()} created on-chain.`,
         });
         completeTransaction({
-          title: "Public send proposal ready",
+          title: `${tokenLabel} proposal ready`,
           description: `Proposal #${result.transactionIndex.toString()} is ready for signer approval.`,
         });
         handleClose(false);
         return;
       }
 
+      // Private mode
       await assertCofreInitialized({
         connection,
         multisig: multisigAddress,
@@ -220,29 +408,58 @@ export function SendModal({
       if (!cofreAccount) throw new Error("Privacy vault not found.");
       const coder = new BorshAccountsCoder(IDL as Idl);
       const cofreData = coder.decode<{ operator?: Uint8Array }>("Cofre", cofreAccount.data);
-      if (!cofreData?.operator) throw new Error("No operator registered. Set an operator wallet first.");
+      if (!cofreData?.operator)
+        throw new Error("No operator registered. Set an operator wallet first.");
       const operatorPubkey = new PublicKey(cofreData.operator);
 
-      const fundOperatorIx = SystemProgram.transfer({
-        fromPubkey: vaultPda,
-        toPubkey: operatorPubkey,
-        lamports,
-      });
+      // Build "fund operator" instruction — SOL or SPL token
+      const proposalInstructions = [];
+      if (isSol) {
+        proposalInstructions.push(
+          SystemProgram.transfer({
+            fromPubkey: vaultPda,
+            toPubkey: operatorPubkey,
+            lamports: tokenUnits,
+          }),
+        );
+      } else {
+        if (!selectedToken) throw new Error("Select a token.");
+        const mintPk = new PublicKey(selectedToken.mint);
+        const vaultAta = await getAssociatedTokenAddress(mintPk, vaultPda, true);
+        const operatorAta = await getAssociatedTokenAddress(mintPk, operatorPubkey);
+        const operatorAtaInfo = await connection.getAccountInfo(operatorAta);
+        if (!operatorAtaInfo) {
+          proposalInstructions.push(
+            createAssociatedTokenAccountInstruction(vaultPda, operatorAta, operatorPubkey, mintPk),
+          );
+        }
+        proposalInstructions.push(
+          createTransferCheckedInstruction(
+            vaultAta,
+            mintPk,
+            operatorAta,
+            vaultPda,
+            tokenUnits,
+            decimals,
+          ),
+        );
+      }
 
       updateStep("validate", { status: "success" });
       updateStep("commitment", { status: "running" });
 
+      if (!selectedToken) throw new Error("Select a token.");
+      const cloakMint = isSol ? NATIVE_SOL_MINT : new PublicKey(selectedToken.mint);
       const keypair = await generateUtxoKeypair();
-      const mint = NATIVE_SOL_MINT;
-      const utxo = await createUtxo(lamports, keypair, mint);
+      const utxo = await createUtxo(tokenUnits, keypair, cloakMint);
       const commitmentBigInt = await computeUtxoCommitment(utxo);
       const commitmentHex = commitmentBigInt.toString(16).padStart(64, "0");
 
       const invariants: PayloadInvariants = {
         nullifier: randomBytes(32),
         commitment: hexToBytes(commitmentHex),
-        amount: lamports,
-        tokenMint: mint,
+        amount: tokenUnits,
+        tokenMint: cloakMint,
         recipientVkPub: recipientPubkey.toBytes(),
         nonce: randomBytes(16),
       };
@@ -252,18 +469,19 @@ export function SendModal({
       updateStep("commitment", { status: "success" });
       updateStep("squads", { status: "running" });
 
-      const { instruction } = await buildIssueLicenseIxBrowser({
+      const { instruction: licenseIx } = await buildIssueLicenseIxBrowser({
         multisig: multisigAddress,
         payloadHash,
         nonce: invariants.nonce,
       });
+      proposalInstructions.push(licenseIx);
 
       const result = await createVaultProposal({
         connection,
         wallet,
         multisigPda: multisigAddress,
-        instructions: [fundOperatorIx, instruction],
-        memo: memo.trim() || "private send",
+        instructions: proposalInstructions,
+        memo: memo.trim() || `private send ${tokenLabel}`,
       });
 
       const transactionIndex = result.transactionIndex.toString();
@@ -276,13 +494,13 @@ export function SendModal({
       updateStep("persist", { status: "running" });
 
       const commitmentClaim = {
-        amount: lamports.toString(),
+        amount: tokenUnits.toString(),
         keypairPrivateKey: keypair.privateKey.toString(16).padStart(64, "0"),
         keypairPublicKey: keypair.publicKey.toString(16).padStart(64, "0"),
         blinding: utxo.blinding.toString(16).padStart(64, "0"),
         commitment: commitmentHex,
         recipient_vk: recipientPubkey.toBase58(),
-        token_mint: mint.toBase58(),
+        token_mint: cloakMint.toBase58(),
       };
 
       try {
@@ -300,15 +518,15 @@ export function SendModal({
         body: JSON.stringify({
           cofreAddress: multisigAddress.toBase58(),
           transactionIndex,
-          amount: lamports.toString(),
+          amount: tokenUnits.toString(),
           recipient: recipientPubkey.toBase58(),
           memo: memo.trim() || undefined,
           payloadHash: Array.from(payloadHash),
           invariants: {
             nullifier: Array.from(invariants.nullifier),
             commitment: Array.from(invariants.commitment),
-            amount: lamports.toString(),
-            tokenMint: mint.toBase58(),
+            amount: tokenUnits.toString(),
+            tokenMint: cloakMint.toBase58(),
             recipientVkPub: Array.from(invariants.recipientVkPub),
             nonce: Array.from(invariants.nonce),
           },
@@ -323,7 +541,7 @@ export function SendModal({
 
       updateStep("persist", { status: "success" });
       completeTransaction({
-        title: "Private send proposal ready",
+        title: `Private ${tokenLabel} proposal ready`,
         description: `Proposal #${transactionIndex} is ready for signer approval.`,
       });
       handleClose(false);
@@ -340,7 +558,7 @@ export function SendModal({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>Send SOL</DialogTitle>
+          <DialogTitle>Send {tokenLabel}</DialogTitle>
           <DialogDescription>
             {mode === "private"
               ? "Funds are routed through the shielded pool. The recipient address stays unlinkable on-chain."
@@ -356,9 +574,7 @@ export function SendModal({
                 type="button"
                 onClick={() => !pending && setMode(m)}
                 className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-                  mode === m
-                    ? "bg-accent-soft text-accent"
-                    : "text-ink-muted hover:text-ink"
+                  mode === m ? "bg-accent-soft text-accent" : "text-ink-muted hover:text-ink"
                 }`}
               >
                 {m === "private" ? "Private" : "Public"}
@@ -381,17 +597,39 @@ export function SendModal({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="sm-amount">Amount (SOL)</Label>
-            <Input
-              id="sm-amount"
-              type="number"
-              step="0.000000001"
-              min="0.000000001"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              disabled={pending}
-            />
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="sm-amount">Amount ({tokenLabel})</Label>
+              <span className="text-xs text-ink-muted">
+                Available:{" "}
+                <button
+                  type="button"
+                  className="font-mono text-accent hover:underline disabled:opacity-50"
+                  onClick={handleMaxAmount}
+                  disabled={pending || !selectedToken}
+                >
+                  {selectedToken ? `${selectedToken.uiBalance} ${selectedToken.symbol}` : "—"}
+                </button>
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <TokenDropdown
+                tokens={tokens}
+                selectedMint={selectedMint}
+                onSelect={handleTokenSelect}
+                disabled={pending}
+                loading={tokensLoading}
+              />
+              <Input
+                id="sm-amount"
+                type="number"
+                step={amountStep}
+                min={amountMin}
+                placeholder={amountPlaceholder}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                disabled={pending}
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -415,13 +653,15 @@ export function SendModal({
             <p className="text-xs leading-relaxed text-ink-muted">
               {mode === "private" ? (
                 <>
-                  This creates a <span className="font-medium text-ink">private send proposal</span>.
+                  This creates a{" "}
+                  <span className="font-medium text-ink">private {tokenLabel} send proposal</span>.
                   The vault funds the operator, who executes the shielded transfer after approval.
                 </>
               ) : (
                 <>
                   This creates a <span className="font-medium text-ink">multisig proposal</span>.
-                  Once enough members approve, any member can execute and the SOL leaves the vault.
+                  Once enough members approve, any member can execute and the {tokenLabel} leaves
+                  the vault.
                 </>
               )}
             </p>
@@ -437,8 +677,8 @@ export function SendModal({
               {pending
                 ? "Creating proposal…"
                 : mode === "private"
-                  ? "Create private send"
-                  : "Create public send"}
+                  ? `Send ${tokenLabel} privately`
+                  : `Send ${tokenLabel}`}
             </Button>
           </DialogFooter>
         </form>

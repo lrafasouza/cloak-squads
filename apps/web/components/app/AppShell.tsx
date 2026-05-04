@@ -225,12 +225,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: vaultMeta } = useVaultMetadata(multisig);
   const vaultName = vaultMeta?.name || undefined;
   const { data: proposals = [], isLoading: proposalsLoading } = useProposalSummaries(multisig);
-  const { balanceSol } = useVaultBalance(multisig);
+  const { balanceSol, usdcUi } = useVaultBalance(multisig);
   const { data: solPrice } = useSolPrice();
-  const balanceNum = Number.parseFloat(balanceSol) || 0;
+  const solNum = Number.parseFloat(balanceSol) || 0;
+  const usdcNum = Number.parseFloat(usdcUi) || 0;
+  const totalUsd = solPrice != null ? solNum * solPrice + usdcNum : null;
   const usdValue =
-    solPrice != null
-      ? (balanceNum * solPrice).toLocaleString("en-US", {
+    totalUsd != null
+      ? totalUsd.toLocaleString("en-US", {
           style: "currency",
           currency: "USD",
           maximumFractionDigits: 2,
@@ -388,13 +390,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <TooltipTrigger asChild>
                 <div className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-3 text-xs font-medium text-ink-muted cursor-default">
                   <Wallet className="h-3.5 w-3.5" />
-                  <span className="num">{balanceSol}</span>
-                  <span className="text-ink-subtle/70">SOL</span>
+                  <span className="tabular-nums">
+                    {usdValue ?? `${balanceSol} SOL`}
+                  </span>
                 </div>
               </TooltipTrigger>
               {usdValue != null && (
                 <TooltipContent side="bottom">
-                  <span className="tabular-nums">{usdValue}</span>
+                  <span className="tabular-nums">{balanceSol} SOL · {usdcUi} USDC</span>
                 </TooltipContent>
               )}
             </Tooltip>

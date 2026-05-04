@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TokenLogo } from "@/components/ui/token-logo";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import {
   InlineAlert,
@@ -16,14 +17,16 @@ import { RecipientInput } from "@/components/vault/RecipientInput";
 import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
+import { SOL_TOKEN, useVaultTokens } from "@/lib/hooks/useVaultTokens";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import {
   type PayrollRecipientInput,
   formatPayrollCsvTemplate,
   parsePayrollCsv,
 } from "@/lib/payroll-csv";
-import { lamportsToSol, solToLamports } from "@/lib/sol";
+import { lamportsToSol } from "@/lib/sol";
 import { createVaultProposal } from "@/lib/squads-sdk";
+import { SOL_MINT, formatTokenAmount, tokenAmountToUnits } from "@/lib/tokens";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
@@ -37,13 +40,20 @@ import {
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
+import {
+  createAssociatedTokenAccountInstruction,
+  createTransferCheckedInstruction,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  Check,
   CheckCircle2,
+  ChevronDown,
   Download,
   FileText,
   List,
@@ -62,6 +72,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -102,15 +113,20 @@ function abbrev(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-6)}`;
 }
 
+function displayAmount(amountStr: string, decimals: number, isSol: boolean): string {
+  if (isSol) return lamportsToSol(amountStr);
+  return formatTokenAmount(BigInt(amountStr), decimals);
+}
+
 type PayrollMode = "direct" | "invoice";
+
+type ActiveTab = "recipients" | "review";
 
 type PayrollClaimLink = {
   name: string;
   wallet: string;
   claimUrl: string;
 };
-
-type ActiveTab = "recipients" | "review";
 
 type RecipientNote = {
   name: string;
@@ -139,6 +155,89 @@ type RecipientNote = {
   invoiceId?: string;
 };
 
+// ── Token Dropdown ─────────────────────────────────────────────────────────
+
+interface TokenDropdownProps {
+  tokens: ReturnType<typeof useVaultTokens>["data"];
+  selectedMint: string;
+  onSelect: (mint: string) => void;
+  disabled?: boolean;
+  loading?: boolean;
+}
+
+function TokenDropdown({
+  tokens = [],
+  selectedMint,
+  onSelect,
+  disabled,
+  loading,
+}: TokenDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = tokens.find((t) => t.mint === selectedMint) ?? tokens[0];
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => !disabled && !loading && setOpen((v) => !v)}
+        disabled={disabled || loading}
+        className="flex h-11 min-w-[110px] items-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-ink transition-colors hover:border-border-strong hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        {loading ? (
+          <span className="h-5 w-5 animate-pulse rounded-full bg-surface-2" />
+        ) : selected ? (
+          <TokenLogo symbol={selected.symbol as "SOL" | "USDC"} size={20} />
+        ) : null}
+        <span>{loading ? "—" : (selected?.symbol ?? "SOL")}</span>
+        <ChevronDown
+          className={`ml-auto h-3.5 w-3.5 text-ink-muted transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1.5 min-w-[200px] overflow-hidden rounded-xl border border-border bg-surface shadow-lg ring-1 ring-black/5">
+          {loading ? (
+            <div className="px-4 py-3 text-xs text-ink-muted">Loading tokens…</div>
+          ) : tokens.length === 0 ? (
+            <div className="px-4 py-3 text-xs text-ink-muted">No tokens found</div>
+          ) : (
+            tokens.map((t) => {
+              const active = t.mint === selectedMint;
+              return (
+                <button
+                  key={t.mint}
+                  type="button"
+                  onClick={() => {
+                    onSelect(t.mint);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-surface-2 ${active ? "text-accent" : "text-ink"}`}
+                >
+                  <TokenLogo symbol={t.symbol as "SOL" | "USDC"} size={18} />
+                  <span className="flex-1 text-left font-medium">{t.symbol}</span>
+                  <span className="font-mono text-xs text-ink-muted">{t.uiBalance}</span>
+                  {active && <Check className="h-3.5 w-3.5 shrink-0 text-accent" />}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PayrollPage({ params }: { params: Promise<{ multisig: string }> }) {
   const { multisig } = use(params);
   const router = useRouter();
@@ -164,6 +263,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     transactionIndex: string;
     claimLinks: PayrollClaimLink[];
   } | null>(null);
+  const [selectedMint, setSelectedMint] = useState<string>(SOL_TOKEN.mint);
 
   /* ── Manual form ── */
   const [manualName, setManualName] = useState("");
@@ -173,6 +273,17 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
   /* ── CSV paste toggle ── */
   const [showCsvTextarea, setShowCsvTextarea] = useState(false);
+
+  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig);
+
+  const selectedToken = useMemo(
+    () => tokens.find((t) => t.mint === selectedMint) ?? tokens[0],
+    [tokens, selectedMint],
+  );
+
+  const isSol = selectedMint === SOL_MINT;
+  const tokenLabel = selectedToken?.symbol ?? "SOL";
+  const decimals = selectedToken?.decimals ?? 9;
 
   const multisigAddress = useMemo(() => {
     try {
@@ -245,11 +356,11 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     }
 
     try {
-      const lamports = solToLamports(manualAmount.trim());
+      const units = tokenAmountToUnits(manualAmount.trim(), decimals);
       const newRecipient: PayrollRecipientInput = {
         name: manualName.trim(),
         wallet: trimmedWallet,
-        amount: lamports,
+        amount: units.toString(),
         memo: manualMemo.trim() || undefined,
       };
       setRecipients((prev) => [...prev, newRecipient]);
@@ -259,7 +370,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       setManualMemo("");
       setError(null);
     } catch {
-      setError("Invalid amount. Must be a positive number in SOL.");
+      setError(`Invalid amount. Must be a positive number in ${tokenLabel}.`);
     }
   }
 
@@ -291,7 +402,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       return;
     }
 
-    const { data, errors } = parsePayrollCsv(text);
+    const { data, errors } = parsePayrollCsv(text, decimals);
     if (errors.length > 0 && !data) {
       setError(errors.join("\n"));
       setRecipients([]);
@@ -347,8 +458,10 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       for (const recipient of recipients) {
         const recipientPubkey = new PublicKey(recipient.wallet);
         const keypair = await generateUtxoKeypair();
-        const mint = NATIVE_SOL_MINT;
-        const utxo = await createUtxo(BigInt(recipient.amount), keypair, mint);
+        if (!selectedToken) throw new Error("Select a token.");
+        const mint = isSol ? NATIVE_SOL_MINT : new PublicKey(selectedToken.mint);
+        const amountUnits = BigInt(recipient.amount);
+        const utxo = await createUtxo(amountUnits, keypair, mint);
         const commitmentBigInt = await computeUtxoCommitment(utxo);
         const commitment = commitmentBigInt.toString(16).padStart(64, "0");
 
@@ -362,7 +475,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         const invariants: PayloadInvariants = {
           nullifier: randomBytes(32),
           commitment: hexToBytes(note.commitment),
-          amount: BigInt(recipient.amount),
+          amount: amountUnits,
           tokenMint: mint,
           recipientVkPub: recipientPubkey.toBytes(),
           nonce: randomBytes(16),
@@ -403,7 +516,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     } finally {
       setPending(false);
     }
-  }, [multisigAddress, recipients]);
+  }, [multisigAddress, recipients, isSol, selectedToken]);
 
   /* ── Submit payroll ── */
   async function submitPayroll(event: FormEvent<HTMLFormElement>) {
@@ -451,14 +564,25 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       if (parsedNotes.length === 0) {
         throw new Error("No recipients prepared. Build notes first.");
       }
+      if (!selectedToken) throw new Error("Select a token.");
 
       const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
-      const vaultBalance = await connection.getBalance(vaultPda, "confirmed");
-      if (BigInt(vaultBalance) < totalAmount) {
-        const deficit = totalAmount - BigInt(vaultBalance);
-        throw new Error(
-          `Insufficient vault balance. Need ${lamportsToSol(totalAmount.toString())} SOL, vault has ${lamportsToSol(String(vaultBalance))} SOL. Short ${lamportsToSol(deficit.toString())} SOL.`,
-        );
+
+      // Balance check
+      if (isSol) {
+        const vaultBalance = await connection.getBalance(vaultPda, "confirmed");
+        if (BigInt(vaultBalance) < totalAmount) {
+          const deficit = totalAmount - BigInt(vaultBalance);
+          throw new Error(
+            `Insufficient vault balance. Need ${lamportsToSol(totalAmount.toString())} SOL, vault has ${lamportsToSol(String(vaultBalance))} SOL. Short ${lamportsToSol(deficit.toString())} SOL.`,
+          );
+        }
+      } else {
+        if (totalAmount > selectedToken.balance) {
+          throw new Error(
+            `Insufficient ${tokenLabel}. Need ${formatTokenAmount(totalAmount, decimals)}, vault has ${selectedToken.uiBalance}.`,
+          );
+        }
       }
 
       await assertCofreInitialized({
@@ -477,11 +601,37 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         throw new Error("No operator registered. Set an operator wallet first.");
       const operatorPubkey = new PublicKey(cofreData.operator);
 
-      const fundOperatorIx = SystemProgram.transfer({
-        fromPubkey: vaultPda,
-        toPubkey: operatorPubkey,
-        lamports: totalAmount,
-      });
+      // Build "fund operator" instruction — SOL or SPL token
+      const proposalInstructions = [];
+      if (isSol) {
+        proposalInstructions.push(
+          SystemProgram.transfer({
+            fromPubkey: vaultPda,
+            toPubkey: operatorPubkey,
+            lamports: totalAmount,
+          }),
+        );
+      } else {
+        const mintPk = new PublicKey(selectedToken.mint);
+        const vaultAta = await getAssociatedTokenAddress(mintPk, vaultPda, true);
+        const operatorAta = await getAssociatedTokenAddress(mintPk, operatorPubkey);
+        const operatorAtaInfo = await connection.getAccountInfo(operatorAta);
+        if (!operatorAtaInfo) {
+          proposalInstructions.push(
+            createAssociatedTokenAccountInstruction(vaultPda, operatorAta, operatorPubkey, mintPk),
+          );
+        }
+        proposalInstructions.push(
+          createTransferCheckedInstruction(
+            vaultAta,
+            mintPk,
+            operatorAta,
+            vaultPda,
+            totalAmount,
+            decimals,
+          ),
+        );
+      }
 
       updateStep("validate", { status: "success" });
       updateStep("squads", { status: "running" });
@@ -491,7 +641,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         connection,
         wallet,
         multisigPda: multisigAddress,
-        instructions: [fundOperatorIx, ...instructions],
+        instructions: [...proposalInstructions, ...instructions],
         memo: `payroll batch (${parsedNotes.length} recipients)`,
       });
       updateStep("squads", {
@@ -744,7 +894,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     <WorkspacePage>
       <WorkspaceHeader
         eyebrow="PAYROLL"
-        title="Batch private settle"
+        title={`Batch private ${tokenLabel} settle`}
         description="Add recipients manually or import from CSV, build private notes, then submit for vault approval."
         action={
           <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
@@ -823,17 +973,34 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="payroll-amount">Amount (SOL)</Label>
-                    <Input
-                      id="payroll-amount"
-                      type="number"
-                      step="0.000000001"
-                      min="0.000000001"
-                      value={manualAmount}
-                      onChange={(e) => setManualAmount(e.target.value)}
-                      placeholder="0.5"
-                      className="mt-1.5 font-mono"
-                    />
+                    <div className="flex items-baseline justify-between">
+                      <Label htmlFor="payroll-amount">Amount ({tokenLabel})</Label>
+                    </div>
+                    <div className="mt-1.5 flex gap-2">
+                      <TokenDropdown
+                        tokens={tokens}
+                        selectedMint={selectedMint}
+                        onSelect={(mint) => {
+                          setSelectedMint(mint);
+                          setRecipients([]);
+                          setParsedNotes([]);
+                          setCsvText("");
+                          setDryRunStatus("idle");
+                        }}
+                        disabled={pending || recipients.length > 0}
+                        loading={tokensLoading}
+                      />
+                      <Input
+                        id="payroll-amount"
+                        type="number"
+                        step={isSol ? "0.000000001" : "0.000001"}
+                        min={isSol ? "0.000000001" : "0.000001"}
+                        value={manualAmount}
+                        onChange={(e) => setManualAmount(e.target.value)}
+                        placeholder={isSol ? "0.5" : "0.00"}
+                        className="flex-1 font-mono"
+                      />
+                    </div>
                   </div>
                   <div>
                     <Label htmlFor="payroll-memo">Memo (optional)</Label>
@@ -893,7 +1060,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                             <span className="font-mono">{abbrev(r.wallet)}</span>
                             {" · "}
                             <span className="font-mono font-medium text-ink">
-                              {lamportsToSol(r.amount)} SOL
+                              {displayAmount(r.amount, decimals, isSol)} {tokenLabel}
                             </span>
                             {r.memo ? ` · ${r.memo}` : ""}
                           </p>
@@ -1040,7 +1207,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                       <div className="rounded-md border border-border bg-bg px-3 py-2">
                         <p className="text-xs text-ink-subtle">Total</p>
                         <p className="mt-1 font-mono text-lg font-semibold text-ink">
-                          {lamportsToSol(totalAmount)} SOL
+                          {displayAmount(totalAmount.toString(), decimals, isSol)} {tokenLabel}
                         </p>
                       </div>
                       <div className="rounded-md border border-border bg-bg px-3 py-2">
@@ -1121,7 +1288,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                                 {row.wallet.slice(0, 8)}...{row.wallet.slice(-8)}
                               </td>
                               <td className="px-3 py-2 text-right font-mono text-ink">
-                                {lamportsToSol(row.amount)} SOL
+                                {displayAmount(row.amount, decimals, isSol)} {tokenLabel}
                               </td>
                               <td className="px-3 py-2">
                                 <span
