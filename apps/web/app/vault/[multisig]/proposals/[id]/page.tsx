@@ -3,6 +3,7 @@
 import { ApprovalButtons } from "@/components/proposal/ApprovalButtons";
 import type { CommitmentCheckState } from "@/components/proposal/CommitmentCheck";
 import { ExecuteButton } from "@/components/proposal/ExecuteButton";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/workspace";
 import { type ProposalStatusKind, readProposalStatus } from "@/lib/proposals";
@@ -18,6 +19,7 @@ import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
   ChevronRight,
@@ -25,6 +27,8 @@ import {
   Copy,
   ExternalLink,
   Loader2,
+  RefreshCw,
+  Settings,
   ShieldCheck,
   X,
   XCircle,
@@ -225,6 +229,7 @@ export default function ProposalApprovalPage({
   const [signature, setSignature] = useState<string | null>(null);
   const [executeSignature, setExecuteSignature] = useState<string | null>(null);
   const [draftLoading, setDraftLoading] = useState(true);
+  const [draftError, setDraftError] = useState<number | null>(null);
   const [draft, setDraft] = useState<ProposalDraft | null>(null);
   const [payrollDraft, setPayrollDraft] = useState<PayrollDraft | null>(null);
   const [commitmentClaim, setCommitmentClaim] = useState<CommitmentClaim | null>(null);
@@ -255,16 +260,18 @@ export default function ProposalApprovalPage({
     }
   }, [multisigParam, id]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadDraft = useCallback(async () => {
+    const cancelled = false;
     setDraftLoading(true);
-    async function loadDraft() {
+    setDraftError(null);
+    try {
       const singleResponse = await fetchWithAuth(
         `/api/proposals/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}?includeSensitive=true`,
       );
       if (singleResponse.ok) {
         if (!cancelled) {
           setDraft((await singleResponse.json()) as ProposalDraft);
+          setPayrollDraft(null);
           setDraftLoading(false);
         }
         return;
@@ -275,6 +282,7 @@ export default function ProposalApprovalPage({
       if (payrollResponse.ok) {
         if (!cancelled) {
           setPayrollDraft((await payrollResponse.json()) as PayrollDraft);
+          setDraft(null);
           setDraftLoading(false);
         }
         return;
@@ -282,21 +290,27 @@ export default function ProposalApprovalPage({
       if (!cancelled) {
         setDraft(null);
         setPayrollDraft(null);
+        setDraftError(
+          singleResponse.status === 503 || payrollResponse.status === 503
+            ? 503
+            : singleResponse.status,
+        );
         setDraftLoading(false);
       }
-    }
-    loadDraft().catch((error: unknown) => {
+    } catch (error: unknown) {
       console.warn("[proposals] could not load draft:", error);
       if (!cancelled) {
         setDraft(null);
         setPayrollDraft(null);
+        setDraftError(0);
         setDraftLoading(false);
       }
-    });
-    return () => {
-      cancelled = true;
-    };
+    }
   }, [fetchWithAuth, multisigParam, id]);
+
+  useEffect(() => {
+    void loadDraft();
+  }, [loadDraft]);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -418,7 +432,8 @@ export default function ProposalApprovalPage({
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-semibold tracking-tight text-ink">
-                {isPayroll ? "Payroll batch" : "Transfer"} #{id}
+                {isPayroll ? "Payroll batch" : transactionType === "config" ? "Config" : "Transfer"}{" "}
+                #{id}
               </h1>
               <StatusBadge status={displayStatus} />
             </div>
@@ -437,7 +452,11 @@ export default function ProposalApprovalPage({
             <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-raise-1">
               <div className="border-b border-border px-5 py-4">
                 <h2 className="text-sm font-semibold text-ink">
-                  {isPayroll ? "Payroll recipients" : "Transfer details"}
+                  {isPayroll
+                    ? "Payroll recipients"
+                    : transactionType === "config"
+                      ? "Configuration"
+                      : "Transfer details"}
                 </h2>
               </div>
 
@@ -496,6 +515,32 @@ export default function ProposalApprovalPage({
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-border-strong border-t-accent" />
                       <span className="text-sm">Loading payroll data…</span>
                     </div>
+                  ) : draftError ? (
+                    <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-signal-warn/10">
+                        <AlertTriangle className="h-6 w-6 text-signal-warn" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-ink">
+                          {draftError === 503
+                            ? "Database temporarily unavailable"
+                            : "Could not load transfer details"}
+                        </p>
+                        <p className="max-w-xs text-xs text-ink-muted">
+                          {draftError === 503
+                            ? "The database is currently unreachable. The proposal details are stored on-chain and can still be executed by signers."
+                            : "Something went wrong while fetching the proposal details. You can still vote and execute the proposal."}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void loadDraft()}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-surface-3"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Retry
+                      </button>
+                    </div>
                   ) : (
                     <InlineAlert>No persisted payroll draft found for this proposal.</InlineAlert>
                   )
@@ -530,12 +575,128 @@ export default function ProposalApprovalPage({
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-border-strong border-t-accent" />
                     <span className="text-sm">Loading proposal data…</span>
                   </div>
+                ) : transactionType === "config" ? (
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3 rounded-lg bg-surface-2 p-4">
+                      <Settings className="mt-0.5 h-4 w-4 shrink-0 text-ink-muted" />
+                      <div>
+                        <p className="text-sm font-semibold text-ink">Configuration proposal</p>
+                        <p className="mt-0.5 text-xs text-ink-muted">
+                          This proposal updates the vault settings or member list. Details are
+                          stored on-chain.
+                        </p>
+                      </div>
+                    </div>
+                    <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                      <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+                          Type
+                        </dt>
+                        <dd className="mt-0.5 text-ink">Vault configuration</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+                          Index
+                        </dt>
+                        <dd className="mt-0.5 font-mono text-ink">#{id}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                ) : draftError ? (
+                  <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-signal-warn/10">
+                      <AlertTriangle className="h-6 w-6 text-signal-warn" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-ink">
+                        {draftError === 503
+                          ? "Database temporarily unavailable"
+                          : "Could not load transfer details"}
+                      </p>
+                      <p className="max-w-xs text-xs text-ink-muted">
+                        {draftError === 503
+                          ? "The database is currently unreachable. The proposal details are stored on-chain and can still be executed by signers."
+                          : "Something went wrong while fetching the proposal details. You can still vote and execute the proposal."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void loadDraft()}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-surface-3"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Retry
+                    </button>
+                  </div>
                 ) : (
                   <InlineAlert>
                     No persisted proposal draft found for this proposal index.
                   </InlineAlert>
                 )}
               </div>
+            </div>
+
+            {/* Timeline — compact */}
+            <div className="rounded-xl border border-border bg-surface shadow-raise-1">
+              <div className="border-b border-border px-5 py-3.5">
+                <h2 className="text-sm font-semibold text-ink">Timeline</h2>
+              </div>
+              <ol className="divide-y divide-border/50">
+                {[
+                  {
+                    label: "Draft loaded",
+                    done: draft !== null || payrollDraft !== null,
+                    current: false,
+                  },
+                  {
+                    label: "Proposal opened",
+                    done: status !== "loading" && status !== "missing",
+                    current: false,
+                  },
+                  {
+                    label: "Votes collected",
+                    done: approvals > 0,
+                    current: status === "active" && !(threshold !== null && approvals >= threshold),
+                    detail: threshold !== null ? `${approvals}/${threshold}` : `${approvals}`,
+                  },
+                  {
+                    label: "Threshold reached",
+                    done:
+                      status === "approved" ||
+                      (status === "active" && threshold !== null && approvals >= threshold) ||
+                      executeComplete,
+                    current:
+                      (status === "approved" ||
+                        (status === "active" && threshold !== null && approvals >= threshold)) &&
+                      !executeComplete,
+                  },
+                  {
+                    label: "Executed",
+                    done: executeComplete,
+                    current: false,
+                  },
+                ].map((step) => (
+                  <li key={step.label} className="flex items-center gap-3 px-5 py-3">
+                    {step.done ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-accent" />
+                    ) : (
+                      <Circle
+                        className={`h-3.5 w-3.5 shrink-0 ${step.current ? "text-signal-warn" : "text-border-strong"}`}
+                      />
+                    )}
+                    <span
+                      className={`text-sm ${step.done ? "text-ink" : step.current ? "text-signal-warn" : "text-ink-subtle"}`}
+                    >
+                      {step.label}
+                    </span>
+                    {step.detail && (
+                      <span className="ml-auto text-xs font-mono text-ink-muted">
+                        {step.detail}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ol>
             </div>
 
             {/* Technical details */}
@@ -671,37 +832,37 @@ export default function ProposalApprovalPage({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <ExecuteButton
-                      multisig={multisigParam}
-                      transactionIndex={id}
-                      onSubmitted={onExecuteSubmitted}
-                      disabled={executeBlocked}
-                      requireCofreInitialized={draft !== null || payrollDraft !== null}
-                      transactionType={transactionType ?? "vault"}
-                    />
-                    {(status === "active" || status === "approved") && (
-                      <button
-                        type="button"
-                        onClick={() => void handleCancel()}
-                        disabled={cancelling}
-                        className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
-                      >
-                        {cancelling ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <X className="mr-2 h-4 w-4" />
-                        )}
-                        {cancelling
-                          ? status === "approved"
-                            ? "Cancelling…"
-                            : "Rejecting…"
-                          : status === "approved"
-                            ? "Cancel proposal"
-                            : "Reject proposal"}
-                      </button>
-                    )}
-                  </div>
+                  <ExecuteButton
+                    className="w-full"
+                    multisig={multisigParam}
+                    transactionIndex={id}
+                    onSubmitted={onExecuteSubmitted}
+                    disabled={executeBlocked}
+                    requireCofreInitialized={draft !== null || payrollDraft !== null}
+                    transactionType={transactionType ?? "vault"}
+                  />
+                  {(status === "active" || status === "approved") && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      disabled={cancelling}
+                      onClick={() => void handleCancel()}
+                    >
+                      {cancelling ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <X className="mr-2 h-4 w-4" />
+                      )}
+                      {cancelling
+                        ? status === "approved"
+                          ? "Cancelling…"
+                          : "Rejecting…"
+                        : status === "approved"
+                          ? "Cancel proposal"
+                          : "Reject proposal"}
+                    </Button>
+                  )}
                   {!executeComplete && executeBlocked && status !== "loading" && (
                     <p className="text-xs text-ink-subtle">
                       {status === "active" && threshold !== null
@@ -716,69 +877,6 @@ export default function ProposalApprovalPage({
                   )}
                 </div>
               )}
-            </div>
-
-            {/* Timeline — compact */}
-            <div className="rounded-xl border border-border bg-surface shadow-raise-1">
-              <div className="border-b border-border px-5 py-3.5">
-                <h2 className="text-sm font-semibold text-ink">Timeline</h2>
-              </div>
-              <ol className="divide-y divide-border/50">
-                {[
-                  {
-                    label: "Draft loaded",
-                    done: draft !== null || payrollDraft !== null,
-                    current: false,
-                  },
-                  {
-                    label: "Proposal opened",
-                    done: status !== "loading" && status !== "missing",
-                    current: false,
-                  },
-                  {
-                    label: "Votes collected",
-                    done: approvals > 0,
-                    current: status === "active" && !(threshold !== null && approvals >= threshold),
-                    detail: threshold !== null ? `${approvals}/${threshold}` : `${approvals}`,
-                  },
-                  {
-                    label: "Threshold reached",
-                    done:
-                      status === "approved" ||
-                      (status === "active" && threshold !== null && approvals >= threshold) ||
-                      executeComplete,
-                    current:
-                      (status === "approved" ||
-                        (status === "active" && threshold !== null && approvals >= threshold)) &&
-                      !executeComplete,
-                  },
-                  {
-                    label: "Executed",
-                    done: executeComplete,
-                    current: false,
-                  },
-                ].map((step) => (
-                  <li key={step.label} className="flex items-center gap-3 px-5 py-3">
-                    {step.done ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-accent" />
-                    ) : (
-                      <Circle
-                        className={`h-3.5 w-3.5 shrink-0 ${step.current ? "text-signal-warn" : "text-border-strong"}`}
-                      />
-                    )}
-                    <span
-                      className={`text-sm ${step.done ? "text-ink" : step.current ? "text-signal-warn" : "text-ink-subtle"}`}
-                    >
-                      {step.label}
-                    </span>
-                    {step.detail && (
-                      <span className="ml-auto text-xs font-mono text-ink-muted">
-                        {step.detail}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ol>
             </div>
           </div>
         </div>

@@ -16,6 +16,7 @@ export function ExecuteButton({
   disabled,
   requireCofreInitialized = true,
   transactionType = "vault",
+  className,
 }: {
   multisig: string;
   transactionIndex: string;
@@ -23,6 +24,7 @@ export function ExecuteButton({
   disabled?: boolean;
   requireCofreInitialized?: boolean;
   transactionType?: "config" | "vault";
+  className?: string;
 }) {
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -96,8 +98,7 @@ export function ExecuteButton({
       });
       onSubmitted?.(signature);
     } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : "Could not execute transaction";
+      const message = caught instanceof Error ? caught.message : "Could not execute transaction";
       setError(message);
       failTransaction(message);
     } finally {
@@ -107,7 +108,13 @@ export function ExecuteButton({
 
   return (
     <div className="space-y-3">
-      <Button type="button" variant="secondary" disabled={pending || disabled} onClick={submit}>
+      <Button
+        type="button"
+        variant="secondary"
+        disabled={pending || disabled}
+        onClick={submit}
+        className={className}
+      >
         {pending ? "Executing..." : "Execute proposal"}
       </Button>
       {error ? <p className="text-sm text-signal-danger">{error}</p> : null}
