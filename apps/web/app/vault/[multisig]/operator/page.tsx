@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { ShieldX } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
@@ -38,6 +39,7 @@ import {
   normalizeLicenseStatus,
 } from "@/lib/operator-license-state";
 import { lamportsToSol } from "@/lib/sol";
+import { simulateAndOptimize } from "@/lib/tx-optimization";
 import { proposalSummariesQueryKey, useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
@@ -58,12 +60,7 @@ import {
 } from "@cloak.dev/sdk-devnet";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import {
-  ComputeBudgetProgram,
-  PublicKey,
-  Transaction,
-  type VersionedTransaction,
-} from "@solana/web3.js";
+import { PublicKey, Transaction, type VersionedTransaction } from "@solana/web3.js";
 import * as squadsMultisig from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -572,6 +569,15 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     return registeredOperator !== wallet.publicKey.toBase58();
   }, [registeredOperator, wallet.publicKey]);
 
+  // Fetch a draft with includeSensitive=true, falling back to non-sensitive view on 403
+  // (so non-operator wallets can still load the draft for review without exposing claims).
+  async function fetchDraftWithFallback(baseUrl: string): Promise<Response> {
+    const sensitiveUrl = `${baseUrl}?includeSensitive=true`;
+    const sensitiveResponse = await fetchWithAuth(sensitiveUrl);
+    if (sensitiveResponse.status !== 403) return sensitiveResponse;
+    return fetchWithAuth(baseUrl);
+  }
+
   async function loadDraft() {
     if (!txIndex || !multisig) return;
     setLoadedDraft(null);
@@ -584,9 +590,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     setLicenseStatus("idle");
 
     try {
-      // Try single draft first
-      const singleResponse = await fetchWithAuth(
-        `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(txIndex)}?includeSensitive=true`,
+      // Try single draft first (fall back to non-sensitive view if wallet is not the operator)
+      const singleResponse = await fetchDraftWithFallback(
+        `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(txIndex)}`,
       );
       if (singleResponse.ok) {
         const draft = (await singleResponse.json()) as SingleDraft;
@@ -596,8 +602,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       }
 
       // Try payroll draft
-      const payrollResponse = await fetchWithAuth(
-        `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(txIndex)}?includeSensitive=true`,
+      const payrollResponse = await fetchDraftWithFallback(
+        `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(txIndex)}`,
       );
       if (payrollResponse.ok) {
         const draft = (await payrollResponse.json()) as PayrollDraft;
@@ -942,11 +948,17 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       invariants: { nullifier, commitment, amount, tokenMint, recipientVkPub, nonce },
     });
 
-    const tx = new Transaction().add(
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1000 }),
-      ix,
-    );
+    const { budgetIxs, simulationErr, logs: simLogs } = await simulateAndOptimize({
+      connection,
+      instructions: [ix],
+      payer: wallet.publicKey,
+      writableAccounts: [multisigAddress],
+    });
+    if (simulationErr) {
+      const raw = `${JSON.stringify(simulationErr)}\n${simLogs.join("\n")}`.trim();
+      throw new Error(raw);
+    }
+    const tx = new Transaction().add(...budgetIxs, ix);
     tx.feePayer = wallet.publicKey;
     tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
@@ -1238,6 +1250,92 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     );
   }
 
+  if (operatorMismatch && wallet.publicKey) {
+    const connected = wallet.publicKey.toBase58();
+
+    return (
+      <WorkspacePage>
+        <div className="flex min-h-[calc(100vh-10rem)] flex-col items-center justify-center px-4">
+          {/* Icon */}
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-signal-danger/20 bg-signal-danger/5">
+            <ShieldX className="h-8 w-8 text-signal-danger" strokeWidth={1.5} />
+          </div>
+
+          {/* Heading */}
+          <div className="mt-6 text-center">
+            <p className="text-xs font-semibold uppercase tracking-widest text-signal-danger">
+              Access restricted
+            </p>
+            <h1 className="mt-2 font-display text-3xl font-semibold leading-tight text-ink md:text-4xl">
+              Wrong wallet connected
+            </h1>
+            <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-ink-muted">
+              The execution queue requires the registered operator wallet.
+              Connect the correct wallet to continue.
+            </p>
+          </div>
+
+          {/* Wallet comparison */}
+          <div className="mt-10 w-full max-w-md space-y-2">
+            {/* Connected (wrong) */}
+            <div className="flex items-start gap-3 rounded-xl border border-signal-danger/30 bg-signal-danger/5 px-4 py-3.5">
+              <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-signal-danger/40 bg-signal-danger/10">
+                <span className="text-[10px] font-bold leading-none text-signal-danger">✕</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-signal-danger/70">
+                  Connected
+                </p>
+                <p className="mt-0.5 break-all font-mono text-xs text-ink" title={connected}>
+                  {connected}
+                </p>
+              </div>
+            </div>
+
+            {/* Operator (required) */}
+            {registeredOperator ? (
+              <div className="flex items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3.5">
+                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10">
+                  <span className="text-[10px] font-bold leading-none text-accent">✓</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                    Required operator
+                  </p>
+                  <p
+                    className="mt-0.5 break-all font-mono text-xs text-ink"
+                    title={registeredOperator}
+                  >
+                    {registeredOperator}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Actions */}
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href={`/vault/${multisig}`}
+              className="text-sm font-medium text-ink-muted transition-colors hover:text-ink"
+            >
+              Back to vault
+            </Link>
+            <Button
+              type="button"
+              onClick={() => {
+                void wallet.disconnect();
+              }}
+            >
+              Change wallet
+            </Button>
+          </div>
+
+        </div>
+      </WorkspacePage>
+    );
+  }
+
   const statusDot = (status: string) => {
     if (status === "active" || status === "approved") return "bg-accent";
     if (status === "executed") return "bg-signal-positive";
@@ -1327,7 +1425,21 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         )}
         {operatorMismatch && wallet.publicKey ? (
           <InlineAlert tone="warning">
-            Switch to the registered operator wallet before executing.
+            <div className="space-y-1">
+              <div>The connected wallet is not the registered operator. Switch wallets before executing.</div>
+              <div className="font-mono text-[11px] leading-5">
+                <div>
+                  <span className="text-ink-subtle">Connected:</span>{" "}
+                  <span className="break-all">{wallet.publicKey.toBase58()}</span>
+                </div>
+                {registeredOperator ? (
+                  <div>
+                    <span className="text-ink-subtle">Operator:</span>{" "}
+                    <span className="break-all">{registeredOperator}</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
           </InlineAlert>
         ) : null}
         {lowOperatorSol && !hasDeficit ? (
@@ -1466,8 +1578,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                                 setSignature(null);
                                 setExecutionSteps([]);
                                 try {
-                                  const singleResponse = await fetchWithAuth(
-                                    `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}?includeSensitive=true`,
+                                  const singleResponse = await fetchDraftWithFallback(
+                                    `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
                                   );
                                   if (singleResponse.ok) {
                                     const draft = (await singleResponse.json()) as SingleDraft;
@@ -1475,8 +1587,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                                     void checkOnChainStatus(d.transactionIndex, draft);
                                     return;
                                   }
-                                  const payrollResponse = await fetchWithAuth(
-                                    `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}?includeSensitive=true`,
+                                  const payrollResponse = await fetchDraftWithFallback(
+                                    `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
                                   );
                                   if (payrollResponse.ok) {
                                     const draft = (await payrollResponse.json()) as PayrollDraft;
@@ -1642,9 +1754,14 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                       </p>
                     ) : null}
                     {operatorMismatch && wallet.publicKey ? (
-                      <p className="text-xs text-signal-warn">
-                        Switch to the registered operator wallet.
-                      </p>
+                      <div className="text-xs text-signal-warn space-y-1">
+                        <p>Connected wallet is not the registered operator.</p>
+                        {registeredOperator ? (
+                          <p className="font-mono text-[11px] break-all text-ink-subtle">
+                            Operator: {registeredOperator}
+                          </p>
+                        ) : null}
+                      </div>
                     ) : null}
                     {lowOperatorSol ? (
                       <p className="text-xs text-signal-warn">Add SOL to cover network fees.</p>

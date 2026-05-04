@@ -11,6 +11,7 @@ import type {
 } from "@solana/web3.js";
 import { Transaction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
+import { simulateAndOptimize } from "@/lib/tx-optimization";
 
 const IS_DEV = process.env.NODE_ENV === "development";
 
@@ -93,7 +94,15 @@ export async function createInitCofreProposal(params: {
     transactionIndex,
   });
 
-  const tx = new Transaction().add(createVaultIx, createProposalIx);
+  const coreIxs = [createVaultIx, createProposalIx];
+  const { budgetIxs } = await simulateAndOptimize({
+    connection: params.connection,
+    instructions: coreIxs,
+    payer: params.wallet.publicKey,
+    writableAccounts: [params.multisigPda],
+  });
+
+  const tx = new Transaction().add(...budgetIxs, ...coreIxs);
   tx.feePayer = params.wallet.publicKey;
   tx.recentBlockhash = latestBlockhash.blockhash;
 
@@ -161,32 +170,32 @@ export async function createVaultProposal(params: {
     transactionIndex,
   });
 
-  const tx = new Transaction().add(createVaultIx, createProposalIx);
+  const coreIxs = [createVaultIx, createProposalIx];
+  const { budgetIxs, simulationErr, logs: simLogs } = await simulateAndOptimize({
+    connection: params.connection,
+    instructions: coreIxs,
+    payer: params.wallet.publicKey,
+    writableAccounts: [params.multisigPda],
+  });
+
+  // Surface real on-chain errors, but tolerate sim-only artifacts (no signers,
+  // expired blockhash) so we don't block legitimate vault TXs.
+  if (simulationErr && params.instructions.length === 1) {
+    const errStr = JSON.stringify(simulationErr);
+    const tolerated =
+      errStr.includes("BlockhashNotFound") ||
+      errStr.includes("signature verification") ||
+      errStr.includes("AccountNotFound");
+    if (!tolerated) {
+      const raw = `${errStr}\n${simLogs.join("\n")}`.trim();
+      throw new Error(translateOnchainError(raw));
+    }
+    log("[squads-sdk] simulation produced tolerated error, proceeding:", errStr);
+  }
+
+  const tx = new Transaction().add(...budgetIxs, ...coreIxs);
   tx.feePayer = params.wallet.publicKey;
   tx.recentBlockhash = latestBlockhash.blockhash;
-
-  if (params.instructions.length === 1) {
-    try {
-      const simResult = await params.connection.simulateTransaction(tx);
-      if (simResult.value.err) {
-        const logs = simResult.value.logs?.join("\n") ?? "";
-        const raw = `${JSON.stringify(simResult.value.err)}\n${logs}`.trim();
-        throw new Error(translateOnchainError(raw));
-      }
-    } catch (simErr) {
-      const errMsg = simErr instanceof Error ? simErr.message : String(simErr);
-      if (
-        errMsg.includes("No signers") ||
-        errMsg.includes("signature verification failed") ||
-        errMsg.includes("block height exceeded") ||
-        errMsg.includes("Simulation failed")
-      ) {
-        log("[squads-sdk] simulation skipped (unsigned vault tx), proceeding with sendTransaction");
-      } else {
-        throw new Error(translateOnchainError(simErr));
-      }
-    }
-  }
 
   let signature: string;
   try {
@@ -253,7 +262,15 @@ export async function createBatchIssueLicenseProposal(params: {
     transactionIndex,
   });
 
-  const tx = new Transaction().add(createVaultIx, createProposalIx);
+  const coreIxs = [createVaultIx, createProposalIx];
+  const { budgetIxs } = await simulateAndOptimize({
+    connection: params.connection,
+    instructions: coreIxs,
+    payer: params.wallet.publicKey,
+    writableAccounts: [params.multisigPda],
+  });
+
+  const tx = new Transaction().add(...budgetIxs, ...coreIxs);
   tx.feePayer = params.wallet.publicKey;
   tx.recentBlockhash = latestBlockhash.blockhash;
 
@@ -415,22 +432,27 @@ export async function vaultTransactionExecute(params: {
     member: params.wallet.publicKey,
   });
   const latestBlockhash = await params.connection.getLatestBlockhash();
+
+  // Single simulation: builds budget ixs AND surfaces on-chain errors. Wallet adapters
+  // often swallow these errors, so we must throw on real failures here.
+  const { budgetIxs, simulationErr, logs: simLogs } = await simulateAndOptimize({
+    connection: params.connection,
+    instructions: [instruction],
+    payer: params.wallet.publicKey,
+    writableAccounts: [params.multisigPda],
+    lookupTableAccounts,
+  });
+  if (simulationErr) {
+    const raw = `${JSON.stringify(simulationErr)}\n${simLogs.join("\n")}`.trim();
+    throw new Error(translateOnchainError(raw));
+  }
+
   const message = new TransactionMessage({
     payerKey: params.wallet.publicKey,
     recentBlockhash: latestBlockhash.blockhash,
-    instructions: [instruction],
+    instructions: [...budgetIxs, instruction],
   }).compileToV0Message(lookupTableAccounts);
   const versionedTx = new VersionedTransaction(message);
-
-  // Simulate first to surface real RPC errors — wallet adapters often swallow them.
-  const sim = await params.connection.simulateTransaction(versionedTx, {
-    replaceRecentBlockhash: true,
-  });
-  if (sim.value.err) {
-    const logs = sim.value.logs?.join("\n") ?? "";
-    const raw = `${JSON.stringify(sim.value.err)}\n${logs}`.trim();
-    throw new Error(translateOnchainError(raw));
-  }
 
   try {
     const signature = await params.wallet.sendTransaction(versionedTx, params.connection);
@@ -489,17 +511,22 @@ export async function configTransactionExecute(params: {
     spendingLimits: [],
   });
   const latestBlockhash = await params.connection.getLatestBlockhash();
-  const tx = new Transaction().add(instruction);
-  tx.feePayer = params.wallet.publicKey;
-  tx.recentBlockhash = latestBlockhash.blockhash;
 
-  // Simulate first to surface real RPC errors.
-  const sim = await params.connection.simulateTransaction(tx);
-  if (sim.value.err) {
-    const logs = sim.value.logs?.join("\n") ?? "";
-    const raw = `${JSON.stringify(sim.value.err)}\n${logs}`.trim();
+  // Single simulation: builds budget ixs AND surfaces on-chain errors.
+  const { budgetIxs, simulationErr, logs: simLogs } = await simulateAndOptimize({
+    connection: params.connection,
+    instructions: [instruction],
+    payer: params.wallet.publicKey,
+    writableAccounts: [params.multisigPda],
+  });
+  if (simulationErr) {
+    const raw = `${JSON.stringify(simulationErr)}\n${simLogs.join("\n")}`.trim();
     throw new Error(translateOnchainError(raw));
   }
+
+  const tx = new Transaction().add(...budgetIxs, instruction);
+  tx.feePayer = params.wallet.publicKey;
+  tx.recentBlockhash = latestBlockhash.blockhash;
 
   try {
     const signature = await params.wallet.sendTransaction(tx, params.connection);
@@ -660,7 +687,12 @@ async function sendConfigTransaction(
   transactionIndex: bigint,
 ): Promise<{ signature: string; transactionIndex: bigint }> {
   const latestBlockhash = await connection.getLatestBlockhash();
-  const tx = new Transaction().add(...instructions);
+  const { budgetIxs } = await simulateAndOptimize({
+    connection,
+    instructions,
+    payer: wallet.publicKey,
+  });
+  const tx = new Transaction().add(...budgetIxs, ...instructions);
   tx.feePayer = wallet.publicKey;
   tx.recentBlockhash = latestBlockhash.blockhash;
 
@@ -690,7 +722,12 @@ async function sendSingleInstruction(
   label = "sendSingleInstruction",
 ) {
   const latestBlockhash = await connection.getLatestBlockhash();
-  const tx = new Transaction().add(instruction);
+  const { budgetIxs } = await simulateAndOptimize({
+    connection,
+    instructions: [instruction],
+    payer: wallet.publicKey,
+  });
+  const tx = new Transaction().add(...budgetIxs, instruction);
   tx.feePayer = wallet.publicKey;
   tx.recentBlockhash = latestBlockhash.blockhash;
 

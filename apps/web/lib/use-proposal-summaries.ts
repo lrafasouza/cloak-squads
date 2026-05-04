@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  getProposalPdaForIndex,
-  isProposalPendingStatus,
   loadOnchainProposalSummaries,
   loadPersistedProposalSummaries,
   mergeProposalSummaries,
@@ -33,7 +31,7 @@ export function useProposalSummaries(multisig: string) {
     enabled: multisigAddress !== null,
     staleTime: 20_000,
     gcTime: 5 * 60_000,
-    refetchInterval: 60_000,
+    // No refetchInterval: real-time updates come via the multisig account subscription below.
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     queryFn: async () => {
@@ -60,28 +58,17 @@ export function useProposalSummaries(multisig: string) {
       }, 300);
     };
 
-    const subIds: number[] = [];
-
-    subIds.push(connection.onAccountChange(multisigAddress, invalidate, "confirmed"));
-
-    for (const proposal of query.data ?? []) {
-      if (!isProposalPendingStatus(proposal.status)) continue;
-      try {
-        const index = BigInt(proposal.transactionIndex);
-        const proposalPda = getProposalPdaForIndex(multisigAddress, index);
-        subIds.push(connection.onAccountChange(proposalPda, invalidate, "confirmed"));
-      } catch {
-        // Ignore malformed transaction indices.
-      }
-    }
+    // Subscribe ONLY to the multisig account. Any proposal create / approve / reject /
+    // execute mutates the multisig account (transactionIndex, staleTransactionIndex, or
+    // member-related fields), so a single subscription is sufficient and avoids N+1
+    // WebSocket connections (one per pending proposal).
+    const subId = connection.onAccountChange(multisigAddress, invalidate, "confirmed");
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
-      for (const subId of subIds) {
-        void connection.removeAccountChangeListener(subId).catch(() => undefined);
-      }
+      void connection.removeAccountChangeListener(subId).catch(() => undefined);
     };
-  }, [connection, multisig, multisigAddress, query.data, queryClient]);
+  }, [connection, multisig, multisigAddress, queryClient]);
 
   return { ...query, multisigAddress };
 }

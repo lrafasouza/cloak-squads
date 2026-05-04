@@ -34,7 +34,10 @@ export function useVaultData(multisig: string) {
     queryKey: ["vault-data", multisig],
     enabled: !!multisig,
     staleTime: 30_000,
-    refetchInterval: 5_000,
+    // Pause polling when tab is hidden to avoid burning RPC quota in background tabs.
+    refetchInterval: () =>
+      typeof document !== "undefined" && document.visibilityState === "hidden" ? false : 20_000,
+    refetchIntervalInBackground: false,
     queryFn: async (): Promise<VaultData> => {
       const multisigPk = new PublicKey(multisig);
       const [vaultPda] = squadsVaultPda(multisigPk, squadsProgram);
