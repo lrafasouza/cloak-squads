@@ -15,7 +15,7 @@ import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ArrowLeft, CheckCircle2, FileText, PlayCircle, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type ChangeEvent, type FormEvent, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, use, useCallback, useEffect, useMemo, useState } from "react";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
@@ -44,6 +44,20 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { useQueryClient } from "@tanstack/react-query";
 import * as multisigSdk from "@sqds/multisig";
+
+let zkWarmupSingleton: Promise<void> | null = null;
+function warmupZk(): Promise<void> {
+  if (!zkWarmupSingleton) {
+    zkWarmupSingleton = (async () => {
+      ensureCircuitsProxy();
+      await generateUtxoKeypair();
+    })().catch((err) => {
+      zkWarmupSingleton = null;
+      throw err;
+    });
+  }
+  return zkWarmupSingleton;
+}
 
 function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
@@ -117,7 +131,6 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [dryRunStatus, setDryRunStatus] = useState<"idle" | "running" | "ready" | "error">("idle");
   const [zkWarmup, setZkWarmup] = useState<"idle" | "warming" | "ready">("idle");
-  const zkWarmupRef = useRef(false);
   const [uploadTab, setUploadTab] = useState<UploadTab>("input");
   const [mode, setMode] = useState<PayrollMode>("direct");
   const [createdPayroll, setCreatedPayroll] = useState<{
@@ -158,15 +171,13 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     [duplicateWallets, recipients],
   );
 
-  // Pre-initialize Poseidon BN128 WASM when the page loads.
-  // First call to buildPoseidon() takes 5-15s (compiles WASM at runtime).
-  // Warming up here means it's cached before the user clicks "Build notes".
   useEffect(() => {
-    if (zkWarmupRef.current) return;
-    zkWarmupRef.current = true;
+    if (zkWarmupSingleton) {
+      void zkWarmupSingleton.then(() => setZkWarmup("ready"));
+      return;
+    }
     setZkWarmup("warming");
-    ensureCircuitsProxy();
-    generateUtxoKeypair()
+    warmupZk()
       .then(() => setZkWarmup("ready"))
       .catch(() => setZkWarmup("idle"));
   }, []);

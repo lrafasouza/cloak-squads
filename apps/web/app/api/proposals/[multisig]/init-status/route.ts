@@ -6,10 +6,6 @@ import { NextResponse } from "next/server";
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.devnet.solana.com";
 const SQUADS_PROGRAM_ID = process.env.NEXT_PUBLIC_SQUADS_PROGRAM_ID;
 
-function serverConnection(): Connection {
-  return new Connection(RPC_URL, { commitment: "confirmed" });
-}
-
 export type InitStatusResponse = {
   hasPendingInit: boolean;
   pendingTxIndex: string | null;
@@ -32,11 +28,12 @@ export async function GET(_request: Request, context: { params: Promise<{ multis
 
   const multisigPda = new PublicKey(multisigAddress);
 
+  const connection = new Connection(RPC_URL, { commitment: "confirmed" });
+
   // 1. Read on-chain Multisig account to get transaction index range
   let onChainTxIndex: bigint;
   let onChainStaleTxIndex: bigint;
   try {
-    const connection = serverConnection();
     const ms = await multisig.accounts.Multisig.fromAccountAddress(connection, multisigPda);
     onChainTxIndex = BigInt(ms.transactionIndex.toString());
     onChainStaleTxIndex = BigInt(ms.staleTransactionIndex.toString());
@@ -46,7 +43,6 @@ export async function GET(_request: Request, context: { params: Promise<{ multis
   }
 
   // 2. Scan transaction indexes from stale+1 to current for pending proposals
-  const connection = serverConnection();
   let hasPendingInit = false;
   let pendingTxIndex: string | null = null;
   let pendingProposalPda: string | null = null;

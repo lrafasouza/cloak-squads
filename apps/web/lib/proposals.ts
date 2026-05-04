@@ -167,26 +167,20 @@ export async function loadOnchainProposalSummaries(params: {
         let title = "";
         let txType: ProposalSummaryType = "onchain";
 
-        try {
-          const configTx = await squadsMultisig.accounts.ConfigTransaction.fromAccountAddress(
-            connection,
-            transactionPda,
-          );
-          title = parseConfigActionTitle(configTx.actions as unknown[]);
+        const [configTxResult, vaultTxResult] = await Promise.allSettled([
+          squadsMultisig.accounts.ConfigTransaction.fromAccountAddress(connection, transactionPda),
+          squadsMultisig.accounts.VaultTransaction.fromAccountAddress(connection, transactionPda),
+        ]);
+
+        if (configTxResult.status === "fulfilled") {
+          title = parseConfigActionTitle(configTxResult.value.actions as unknown[]);
           txType = "onchain";
-        } catch {
-          try {
-            const vaultTx = await squadsMultisig.accounts.VaultTransaction.fromAccountAddress(
-              connection,
-              transactionPda,
-            );
-            // Try to extract a readable title from the vault tx instructions
-            const ixCount = vaultTx.message.instructions.length;
-            title = ixCount > 0 ? `Vault transaction (${ixCount} instruction${ixCount > 1 ? "s" : ""})` : "Vault transaction";
-            txType = "onchain";
-          } catch {
-            title = "On-chain proposal";
-          }
+        } else if (vaultTxResult.status === "fulfilled") {
+          const ixCount = vaultTxResult.value.message.instructions.length;
+          title = ixCount > 0 ? `Vault transaction (${ixCount} instruction${ixCount > 1 ? "s" : ""})` : "Vault transaction";
+          txType = "onchain";
+        } else {
+          title = "On-chain proposal";
         }
 
         return {

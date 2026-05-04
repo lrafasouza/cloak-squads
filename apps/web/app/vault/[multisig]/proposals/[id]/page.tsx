@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/workspace";
 import { type ProposalStatusKind, readProposalStatus } from "@/lib/proposals";
 import { lamportsToSol } from "@/lib/sol";
+import { proposalCancel, proposalReject } from "@/lib/squads-sdk";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import type { CommitmentClaim } from "@cloak-squads/core/commitment";
@@ -16,7 +17,7 @@ import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
 import { detectTransactionType } from "@/lib/squads-sdk";
-import { ArrowLeft, CheckCircle2, ChevronRight, Circle, Copy, ExternalLink, ShieldCheck, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronRight, Circle, Copy, ExternalLink, Loader2, ShieldCheck, X, XCircle } from "lucide-react";
 import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 
@@ -140,6 +141,8 @@ export default function ProposalApprovalPage({
   const [threshold, setThreshold] = useState<number | null>(null);
   const [memberVote, setMemberVote] = useState<MemberVote>(null);
   const [transactionType, setTransactionType] = useState<"config" | "vault" | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -233,6 +236,32 @@ export default function ProposalApprovalPage({
     },
     [refreshStatus, addToast, queryClient, multisigParam],
   );
+
+  const handleCancel = useCallback(async () => {
+    if (!wallet.publicKey || !wallet.sendTransaction) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      const baseParams = {
+        connection,
+        wallet: { publicKey: wallet.publicKey, sendTransaction: wallet.sendTransaction },
+        multisigPda: new PublicKey(multisigParam),
+        transactionIndex: BigInt(id),
+      };
+      if (status === "approved") {
+        await proposalCancel(baseParams);
+      } else {
+        await proposalReject(baseParams);
+      }
+      addToast(status === "approved" ? "Proposal cancelled." : "Rejection vote submitted.", "info", 3000);
+      void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisigParam) });
+      setTimeout(() => void refreshStatus(), 1000);
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "Could not remove proposal.");
+    } finally {
+      setCancelling(false);
+    }
+  }, [connection, wallet, multisigParam, id, status, refreshStatus, addToast, queryClient]);
 
   const approveBlocked = (commitmentClaim !== null && commitmentState === "mismatch") || status !== "active";
   const executeBlocked = status !== "approved";
@@ -485,6 +514,28 @@ export default function ProposalApprovalPage({
                         ? `Needs ${Math.max(0, threshold - approvals)} more approval${Math.max(0, threshold - approvals) !== 1 ? "s" : ""}.`
                         : `Execute requires approved status. Current: ${status}.`}
                     </p>
+                  )}
+                  {(status === "active" || status === "approved") && (
+                    <div className="mt-4 border-t border-border/50 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => void handleCancel()}
+                        disabled={cancelling}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-signal-danger/30 bg-signal-danger/10 px-3 py-2.5 text-sm font-semibold text-signal-danger transition-colors hover:bg-signal-danger/20 hover:border-signal-danger/50 disabled:opacity-40"
+                      >
+                        {cancelling
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <X className="h-4 w-4" />}
+                        {cancelling
+                          ? (status === "approved" ? "Cancelling…" : "Rejecting…")
+                          : (status === "approved" ? "Cancel proposal" : "Reject proposal")}
+                      </button>
+                      {cancelError && (
+                        <p className="mt-2 rounded-md border border-signal-danger/30 bg-signal-danger/10 px-3 py-2 text-xs text-signal-danger">
+                          {cancelError}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </>
               )}

@@ -4,7 +4,7 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { type IncomeEntry, useVaultIncome } from "@/lib/hooks/useVaultIncome";
 import { type ProposalSummary, truncateAddress } from "@/lib/proposals";
 import { lamportsToSol } from "@/lib/sol";
-import { proposalCancel } from "@/lib/squads-sdk";
+import { proposalCancel, proposalReject } from "@/lib/squads-sdk";
 import { proposalSummariesQueryKey, useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
@@ -133,16 +133,16 @@ function ProposalQueueRow({
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
         <span className="text-xs font-medium text-ink-muted">{label}</span>
       </div>
-      <div className="relative flex items-center justify-end gap-1 z-20">
-        {p.status === "active" && onCancel && (
+      <div className="relative flex items-center justify-end gap-1.5 z-20">
+        {(p.status === "active" || p.status === "approved") && onCancel && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onCancel(p); }}
             disabled={cancelling}
-            title="Cancel proposal"
-            className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-signal-danger/15 hover:text-signal-danger disabled:opacity-40"
+            title={p.status === "approved" ? "Cancel proposal" : "Reject proposal"}
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-signal-danger/30 bg-signal-danger/10 text-signal-danger opacity-60 transition-all hover:opacity-100 hover:bg-signal-danger/20 hover:border-signal-danger/50 group-hover:opacity-80 disabled:opacity-30"
           >
-            {cancelling ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+            {cancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
           </button>
         )}
         <Link
@@ -213,16 +213,16 @@ function ProposalRow({
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
         <span className="text-sm text-ink-muted">{label}</span>
       </div>
-      <div className="relative flex items-center justify-end gap-1 z-20">
-        {!isHistory && p.status === "active" && onCancel && (
+      <div className="relative flex items-center justify-end gap-1.5 z-20">
+        {!isHistory && (p.status === "active" || p.status === "approved") && onCancel && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onCancel(p); }}
             disabled={cancelling}
-            title="Cancel proposal"
-            className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-signal-danger/15 hover:text-signal-danger disabled:opacity-40"
+            title={p.status === "approved" ? "Cancel proposal" : "Reject proposal"}
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-signal-danger/30 bg-signal-danger/10 text-signal-danger opacity-60 transition-all hover:opacity-100 hover:bg-signal-danger/20 hover:border-signal-danger/50 group-hover:opacity-80 disabled:opacity-30"
           >
-            {cancelling ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+            {cancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
           </button>
         )}
         {isHistory && onHide && (
@@ -321,6 +321,7 @@ export default function TransactionsPage({
   const [cancelTarget, setCancelTarget] = useState<ProposalSummary | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const cancelAction = cancelTarget?.status === "approved" ? "cancel" : "reject";
 
   const [archivedIds, setArchivedIds] = useState<Set<string>>(() => {
     try {
@@ -340,16 +341,21 @@ export default function TransactionsPage({
     setCancelling(true);
     setCancelError(null);
     try {
-      await proposalCancel({
+      const baseParams = {
         connection,
         wallet: { publicKey: wallet.publicKey, sendTransaction: wallet.sendTransaction },
         multisigPda: multisigAddress,
         transactionIndex: BigInt(cancelTarget.transactionIndex),
-      });
+      };
+      if (cancelTarget.status === "approved") {
+        await proposalCancel(baseParams);
+      } else {
+        await proposalReject(baseParams);
+      }
       await queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
       setCancelTarget(null);
     } catch (err) {
-      setCancelError(err instanceof Error ? err.message : "Could not cancel proposal.");
+      setCancelError(err instanceof Error ? err.message : "Could not remove proposal.");
     } finally {
       setCancelling(false);
     }
@@ -545,7 +551,8 @@ export default function TransactionsPage({
                     multisig={multisig}
                     p={p}
                     isHistory={activeTab === "history"}
-                    {...(activeTab === "history" ? { onHide: hideProposal } : {})}
+                    {...(activeTab === "history" ? { onHide: hideProposal } : { onCancel: (target: ProposalSummary) => setCancelTarget(target) })}
+                    cancelling={cancelling && cancelTarget?.id === p.id}
                   />
                 ))}
               </div>
@@ -556,9 +563,13 @@ export default function TransactionsPage({
 
       <ConfirmModal
         open={cancelTarget !== null}
-        title="Cancel proposal"
-        description={`Cancel proposal #${cancelTarget?.transactionIndex}? This action cannot be undone and will be recorded on-chain.`}
-        confirmText="Cancel proposal"
+        title={cancelAction === "cancel" ? "Cancel proposal" : "Reject proposal"}
+        description={
+          cancelAction === "cancel"
+            ? `Cancel proposal #${cancelTarget?.transactionIndex}? This will void the approved proposal before execution. This action cannot be undone.`
+            : `Reject proposal #${cancelTarget?.transactionIndex}? Your rejection vote will be recorded on-chain and cannot be undone.`
+        }
+        confirmText={cancelAction === "cancel" ? "Cancel proposal" : "Reject proposal"}
         confirmVariant="destructive"
         isLoading={cancelling}
         onConfirm={() => void confirmCancel()}

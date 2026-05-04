@@ -19,13 +19,13 @@ const SQUADS_PROGRAM_ID = process.env.NEXT_PUBLIC_SQUADS_PROGRAM_ID ?? "";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function fetchParsedTx(
+async function fetchParsedTxBatch(
   connection: Connection,
-  signature: string,
+  signatures: string[],
   attempt = 0,
-): Promise<ParsedTransactionWithMeta | null> {
+): Promise<(ParsedTransactionWithMeta | null)[]> {
   try {
-    return await connection.getParsedTransaction(signature, {
+    return await connection.getParsedTransactions(signatures, {
       commitment: "confirmed",
       maxSupportedTransactionVersion: 0,
     });
@@ -33,9 +33,9 @@ async function fetchParsedTx(
     const is429 = err instanceof Error && err.message.includes("429");
     if (is429 && attempt < 3) {
       await delay(600 * Math.pow(2, attempt));
-      return fetchParsedTx(connection, signature, attempt + 1);
+      return fetchParsedTxBatch(connection, signatures, attempt + 1);
     }
-    return null;
+    return signatures.map(() => null);
   }
 }
 
@@ -79,27 +79,25 @@ export async function GET(
       );
     }
 
+    const txs = await fetchParsedTxBatch(connection, sigs.map((s) => s.signature));
+
     const entries: IncomeEntry[] = [];
 
-    for (const sig of sigs) {
-      if (entries.length >= limit) break;
-
-      const tx = await fetchParsedTx(connection, sig.signature);
-      if (!tx || !tx.meta || tx.meta.err) {
-        await delay(80);
-        continue;
-      }
+    for (let i = 0; i < txs.length && entries.length < limit; i++) {
+      const tx = txs[i];
+      const sig = sigs[i];
+      if (!tx || !tx.meta || tx.meta.err || !sig) continue;
 
       const accounts = tx.transaction.message.accountKeys;
       const vaultIdx = accounts.findIndex((a) => a.pubkey.toBase58() === vaultAddress);
-      if (vaultIdx === -1) { await delay(80); continue; }
+      if (vaultIdx === -1) continue;
 
       const pre = tx.meta.preBalances[vaultIdx];
       const post = tx.meta.postBalances[vaultIdx];
-      if (pre === undefined || post === undefined) { await delay(80); continue; }
+      if (pre === undefined || post === undefined) continue;
       const diff = post - pre;
 
-      if (diff < 100_000) { await delay(80); continue; }
+      if (diff < 100_000) continue;
 
       let from = "Unknown";
       let amountLamports = diff;
@@ -126,8 +124,6 @@ export async function GET(
         from,
         blockTime: sig.blockTime ?? Math.floor(Date.now() / 1000),
       });
-
-      await delay(120);
     }
 
     return NextResponse.json(

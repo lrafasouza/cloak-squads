@@ -2,6 +2,7 @@
 
 import {
   getProposalPdaForIndex,
+  isProposalPendingStatus,
   loadOnchainProposalSummaries,
   loadPersistedProposalSummaries,
   mergeProposalSummaries,
@@ -51,31 +52,32 @@ export function useProposalSummaries(multisig: string) {
     if (!multisigAddress) return;
 
     const queryKey = proposalSummariesQueryKey(multisig);
-    const proposalIds = new Set<number>();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const invalidate = () => {
-      void queryClient.invalidateQueries({ queryKey });
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey });
+      }, 300);
     };
 
-    const multisigSubscription = connection.onAccountChange(
-      multisigAddress,
-      invalidate,
-      "confirmed",
-    );
-    proposalIds.add(multisigSubscription);
+    const subIds: number[] = [];
+
+    subIds.push(connection.onAccountChange(multisigAddress, invalidate, "confirmed"));
 
     for (const proposal of query.data ?? []) {
+      if (!isProposalPendingStatus(proposal.status)) continue;
       try {
         const index = BigInt(proposal.transactionIndex);
         const proposalPda = getProposalPdaForIndex(multisigAddress, index);
-        const subId = connection.onAccountChange(proposalPda, invalidate, "confirmed");
-        proposalIds.add(subId);
+        subIds.push(connection.onAccountChange(proposalPda, invalidate, "confirmed"));
       } catch {
         // Ignore malformed transaction indices.
       }
     }
 
     return () => {
-      for (const subId of proposalIds) {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      for (const subId of subIds) {
         void connection.removeAccountChangeListener(subId).catch(() => undefined);
       }
     };

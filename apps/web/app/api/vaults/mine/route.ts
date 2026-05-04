@@ -2,7 +2,6 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
 const MAX_MEMBER_SLOTS = 4;
-const STAGGER_MS = 500;
 const MAX_RETRIES = 1;
 const RETRY_DELAY_MS = 2000;
 
@@ -12,10 +11,6 @@ const RPC_URL =
   "https://api.mainnet-beta.solana.com";
 const SQUADS_PROGRAM_ID =
   process.env.NEXT_PUBLIC_SQUADS_PROGRAM_ID ?? "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf";
-
-function stagger(ms: number) {
-  return new Promise<void>((r) => setTimeout(r, ms));
-}
 
 async function fetchOffset(
   connection: Connection,
@@ -37,7 +32,7 @@ async function fetchOffset(
         msg.includes("429") || msg.includes("Too Many Requests") || msg.includes("rate");
       if (attempt < MAX_RETRIES && isRetryable) {
         console.warn(`[api/vaults/mine] offset ${offset} 429, retrying…`);
-        await stagger(RETRY_DELAY_MS);
+        await new Promise<void>((r) => setTimeout(r, RETRY_DELAY_MS));
         continue;
       }
       console.error(`[api/vaults/mine] offset ${offset} skipped:`, msg.slice(0, 120));
@@ -80,8 +75,8 @@ export async function GET(request: Request) {
   const seen = new Set<string>();
   const vaults: string[] = [];
 
-  const promises = offsets.map((offset, i) =>
-    stagger(i * STAGGER_MS).then(() => fetchOffset(connection, programId, offset, ownerBase58)),
+  const promises = offsets.map((offset) =>
+    fetchOffset(connection, programId, offset, ownerBase58),
   );
 
   const results = await Promise.all(promises);

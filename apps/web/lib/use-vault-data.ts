@@ -40,11 +40,11 @@ export function useVaultData(multisig: string) {
       const [vaultPda] = squadsVaultPda(multisigPk, squadsProgram);
       const [cofreAddress] = cofrePda(multisigPk, gatekeeperProgramId);
 
-      const [ms, vaultAccount, cofreAccount] = await Promise.all([
+      const [ms, accountInfos] = await Promise.all([
         multisigSdk.accounts.Multisig.fromAccountAddress(connection, multisigPk),
-        connection.getAccountInfo(vaultPda),
-        connection.getAccountInfo(cofreAddress),
+        connection.getMultipleAccountsInfo([vaultPda, cofreAddress]),
       ]);
+      const [vaultAccount, cofreAccount] = accountInfos;
 
       const balanceLamports = vaultAccount?.lamports ?? 0;
 

@@ -257,7 +257,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   const [inboxOpen, setInboxOpen] = useState(false);
-  const executedCount = proposals.filter((proposal) => proposal.status === "executed").length;
+  const executedCount = useMemo(
+    () => proposals.filter((p) => p.status === "executed").length,
+    [proposals],
+  );
 
   /* Auto-close mobile nav after 10 seconds */
   useEffect(() => {
