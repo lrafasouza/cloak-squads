@@ -4,14 +4,14 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 /**
- * Aegis logo system.
+ * Aegis logo system — Brand Deliverable v1.
  *
- * - `<Logo />`: monograma Æ + wordmark `aegis` lowercase, horizontal.
+ * - `<Logo />`: lockup Æ + Aegis. Æ in EB Garamond 600 gold-leaf champagne;
+ *   Aegis in EB Garamond 600 white.
  * - `<Logo variant="monogram" />`: só o Æ (favicon, app icon, watermark).
- * - `<Logo variant="wordmark" />`: só `aegis` em Fraunces bold.
+ * - `<Logo variant="wordmark" />`: só `Aegis` em EB Garamond 600.
  *
- * Uma cor (currentColor) — herda do contexto. Em telas com fundo escuro, aplique `text-ink`
- * ou `text-accent` no parent.
+ * Brand spec: https://api.anthropic.com/v1/design/h/2GLCu6TDhvNF7noPfN5obg
  */
 
 type LogoVariant = "full" | "monogram" | "wordmark";
@@ -25,7 +25,7 @@ interface LogoProps {
 
 const sizes: Record<NonNullable<LogoProps["size"]>, { mono: string; word: string; gap: string }> = {
   sm: { mono: "text-xl", word: "text-base", gap: "gap-2" },
-  md: { mono: "text-2xl", word: "text-lg", gap: "gap-2.5" },
+  md: { mono: "text-[30px]", word: "text-xl", gap: "gap-2.5" },
   lg: { mono: "text-4xl", word: "text-2xl", gap: "gap-3" },
 };
 
@@ -38,10 +38,11 @@ export function Logo({ variant = "full", className, href = "/", size = "md" }: L
         <span
           aria-hidden={variant === "monogram" ? undefined : true}
           className={cn(
-            "font-display font-bold leading-none tracking-tight",
+            "font-garamond font-semibold leading-none",
             "text-accent",
             s.mono,
           )}
+          style={{ letterSpacing: "-0.02em" }}
         >
           Æ
         </span>
@@ -49,11 +50,11 @@ export function Logo({ variant = "full", className, href = "/", size = "md" }: L
       {variant !== "monogram" && (
         <span
           className={cn(
-            "font-display font-semibold leading-none",
+            "font-garamond font-semibold leading-none",
             "text-ink",
             s.word,
           )}
-          style={{ letterSpacing: "-0.02em" }}
+          style={{ letterSpacing: "-0.005em" }}
         >
           Aegis
         </span>

@@ -61,6 +61,7 @@ const config: Config = {
       },
       fontFamily: {
         display: ["var(--font-display)", "Fraunces", "ui-serif", "Georgia", "serif"],
+        garamond: ["var(--font-garamond)", "EB Garamond", "Georgia", "serif"],
         sans: ["var(--font-sans)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "Geist Mono", "ui-monospace", "Menlo", "monospace"],
       },

@@ -1,0 +1,16 @@
+{
+  "name": "Aegis",
+  "short_name": "Aegis",
+  "description": "Private execution for shared treasuries on Solana",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07070a",
+  "theme_color": "#0a0a0c",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

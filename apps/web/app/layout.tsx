@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import "./globals.css";
@@ -8,16 +9,35 @@ import { ToastProvider } from "@/components/ui/toast-provider";
 import { TransactionProgressProvider } from "@/components/ui/transaction-progress";
 import { WalletProviders } from "@/components/wallet/WalletProviders";
 import { Toaster } from "sonner";
-import { fontDisplay, fontMono, fontSans } from "./fonts";
+import { fontDisplay, fontGaramond, fontMono, fontSans } from "./fonts";
 
-export const metadata = {
-  title: "Aegis",
-  description: "Private execution for shared treasuries on Solana",
+export const metadata: Metadata = {
+  title: "Aegis — Private execution for shared treasuries",
+  description:
+    "Private multisig payments on Solana. Single-use execution licenses for Squads vaults, settled privately through Cloak Protocol.",
+  metadataBase: new URL("https://aegis.fi"),
+  openGraph: {
+    type: "website",
+    url: "https://aegis.fi/",
+    title: "Aegis — Private execution for shared treasuries",
+    description:
+      "Single-use execution licenses for Squads multisigs on Solana, settled privately through Cloak.",
+    siteName: "Aegis",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Aegis — Private execution for shared treasuries",
+    description: "Single-use execution licenses for Squads multisigs on Solana.",
+    creator: "@aegis_fi",
+  },
+  manifest: "/site.webmanifest",
+  robots: "index, follow",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${fontDisplay.variable} ${fontSans.variable} ${fontMono.variable}`}>
+    <html lang="en" className={`${fontDisplay.variable} ${fontGaramond.variable} ${fontSans.variable} ${fontMono.variable}`}>
       <body className="min-h-screen bg-bg text-ink font-sans antialiased">
         <ErrorBoundary>
           <QueryProvider>

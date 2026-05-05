@@ -54,7 +54,7 @@ export function useProposalSummaries(multisig: string) {
     const invalidate = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        void queryClient.invalidateQueries({ queryKey });
+        void queryClient.refetchQueries({ queryKey, type: "active" });
       }, 300);
     };
 

@@ -5,6 +5,7 @@ export type ExecutionHistoryItem = {
   recipient?: string;
   recipientCount?: number;
   amount: string;
+  tokenMint?: string;
   status: "success" | "error";
   signature?: string;
   cloakSignature?: string;

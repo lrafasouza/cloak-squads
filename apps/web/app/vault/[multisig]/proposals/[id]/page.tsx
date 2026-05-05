@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/workspace";
 import { type ProposalStatusKind, readProposalStatus } from "@/lib/proposals";
-import { lamportsToSol } from "@/lib/sol";
+import { SOL_MINT, formatRawAmount } from "@/lib/tokens";
 import { proposalCancel, proposalReject } from "@/lib/squads-sdk";
 import { detectTransactionType } from "@/lib/squads-sdk";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
@@ -41,7 +41,7 @@ type ProposalDraft = {
   recipient: string;
   memo: string;
   payloadHash: number[];
-  invariants: { commitment: number[] };
+  invariants: { commitment: number[]; tokenMint?: string };
 };
 
 type PayrollRecipient = {
@@ -51,7 +51,7 @@ type PayrollRecipient = {
   amount: string;
   memo?: string;
   payloadHash: number[];
-  invariants: { commitment: number[] };
+  invariants: { commitment: number[]; tokenMint?: string };
 };
 
 type PayrollDraft = {
@@ -489,8 +489,7 @@ export default function ProposalApprovalPage({
                                 <CopyAddress address={r.wallet} />
                               </td>
                               <td className="py-3 pr-4 text-right font-mono tabular-nums text-ink">
-                                {lamportsToSol(r.amount)}{" "}
-                                <span className="text-ink-muted">SOL</span>
+                                {formatRawAmount(r.amount, r.invariants.tokenMint ?? SOL_MINT)}
                               </td>
                               <td className="py-3 text-ink-subtle">{r.memo || "—"}</td>
                             </tr>
@@ -502,8 +501,10 @@ export default function ProposalApprovalPage({
                               Total
                             </td>
                             <td className="pt-3 text-right font-mono font-semibold tabular-nums text-ink">
-                              {lamportsToSol(payrollDraft.totalAmount)}{" "}
-                              <span className="text-ink-muted">SOL</span>
+                              {formatRawAmount(
+                                payrollDraft.totalAmount,
+                                payrollDraft.recipients[0]?.invariants.tokenMint ?? SOL_MINT,
+                              )}
                             </td>
                             <td />
                           </tr>
@@ -551,8 +552,7 @@ export default function ProposalApprovalPage({
                         Amount
                       </dt>
                       <dd className="font-mono text-lg font-bold tabular-nums text-ink">
-                        {lamportsToSol(draft.amount)}{" "}
-                        <span className="text-sm font-medium text-ink-muted">SOL</span>
+                        {formatRawAmount(draft.amount, draft.invariants.tokenMint ?? SOL_MINT)}
                       </dd>
                     </div>
                     <div className="border-t border-border/50 pt-4">

@@ -2,8 +2,9 @@
 
 import { ReceiveModal } from "@/components/vault/ReceiveModal";
 import { SendModal } from "@/components/vault/SendModal";
+import { SwapModal } from "@/components/vault/SwapModal";
 import { cn } from "@/lib/utils";
-import { ArrowDownToLine, ArrowUpFromLine, BookOpen, Zap } from "lucide-react";
+import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, BookOpen, Zap } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -20,6 +21,13 @@ const actions = [
     label: "Send",
     description: "Transfer out",
     icon: ArrowUpFromLine,
+    variant: "default" as const,
+  },
+  {
+    id: "swap",
+    label: "Swap",
+    description: "Swap tokens",
+    icon: ArrowLeftRight,
     variant: "default" as const,
   },
   {
@@ -46,6 +54,7 @@ export function QuickActionBar({ multisig }: QuickActionBarProps) {
   const base = `/vault/${multisig}`;
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
+  const [swapOpen, setSwapOpen] = useState(false);
 
   return (
     <>
@@ -96,6 +105,13 @@ export function QuickActionBar({ multisig }: QuickActionBarProps) {
               </button>
             );
           }
+          if (action.id === "swap") {
+            return (
+              <button key={action.id} type="button" onClick={() => setSwapOpen(true)} className={cardClass}>
+                {inner}
+              </button>
+            );
+          }
           return (
             <Link key={action.id} href={`${base}/${action.id}`} className={cardClass}>
               {inner}
@@ -106,6 +122,7 @@ export function QuickActionBar({ multisig }: QuickActionBarProps) {
 
       <ReceiveModal multisig={multisig} open={receiveOpen} onOpenChange={setReceiveOpen} />
       <SendModal multisig={multisig} open={sendOpen} onOpenChange={setSendOpen} />
+      <SwapModal multisig={multisig} open={swapOpen} onOpenChange={setSwapOpen} />
     </>
   );
 }

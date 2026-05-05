@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import {
+  ArrowLeftRight,
   BookOpen,
   BookUser,
   FileText,
@@ -48,6 +49,7 @@ interface NavItem {
 
 const PRIMARY_NAV: NavItem[] = [
   { label: "Dashboard", href: "", icon: LayoutDashboard },
+  { label: "Swap", href: "/swap", icon: ArrowLeftRight },
   { label: "Transactions", href: "/proposals", icon: List },
   { label: "Members", href: "/members", icon: Users },
 ];
@@ -390,14 +392,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <TooltipTrigger asChild>
                 <div className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-3 text-xs font-medium text-ink-muted cursor-default">
                   <Wallet className="h-3.5 w-3.5" />
-                  <span className="tabular-nums">
-                    {usdValue ?? `${balanceSol} SOL`}
-                  </span>
+                  <span className="tabular-nums">{usdValue ?? `${balanceSol} SOL`}</span>
                 </div>
               </TooltipTrigger>
               {usdValue != null && (
                 <TooltipContent side="bottom">
-                  <span className="tabular-nums">{balanceSol} SOL · {usdcUi} USDC</span>
+                  <span className="tabular-nums">
+                    {balanceSol} SOL · {usdcUi} USDC
+                  </span>
                 </TooltipContent>
               )}
             </Tooltip>

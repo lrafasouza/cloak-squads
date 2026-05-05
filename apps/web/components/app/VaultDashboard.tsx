@@ -7,15 +7,18 @@ import { CofreInitBanner } from "@/components/vault/CofreInitBanner";
 import { OverviewCard } from "@/components/vault/OverviewCard";
 import { PendingProposalsCard } from "@/components/vault/PendingProposalsCard";
 import { PrivacyFlowModal, PrivacyFlowTrigger } from "@/components/vault/PrivacyFlowModal";
-import { QuickActionBar } from "@/components/vault/QuickActionBar";
+import { ReceiveModal } from "@/components/vault/ReceiveModal";
 import { RecentActivityCard } from "@/components/vault/RecentActivityCard";
+import { SendModal } from "@/components/vault/SendModal";
+import { SwapModal } from "@/components/vault/SwapModal";
 import { useRecentActivity } from "@/lib/hooks/useRecentActivity";
 import { truncateAddress } from "@/lib/proposals";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
 import { useVaultMetadata } from "@/lib/use-vault-metadata";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, Copy, Lock, Shield, Users } from "lucide-react";
+import { AlertTriangle, BookOpen, Check, Copy, Lock, Shield, Users, Zap } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 function DashboardVaultIdentity({ multisig }: { multisig: string }) {
@@ -54,11 +57,7 @@ function DashboardVaultIdentity({ multisig }: { multisig: string }) {
           aria-label="Copy vault address"
           title={copiedAddress ? "Copied" : multisig}
         >
-          {copiedAddress ? (
-            <Check className="h-3 w-3 text-accent" />
-          ) : (
-            <Copy className="h-3 w-3" />
-          )}
+          {copiedAddress ? <Check className="h-3 w-3 text-accent" /> : <Copy className="h-3 w-3" />}
         </button>
       </div>
     </div>
@@ -71,6 +70,9 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
   const { data: proposals = [] } = useProposalSummaries(multisig);
   const { activity, isLoading: activityLoading } = useRecentActivity(multisig, 5);
   const [privacyFlowOpen, setPrivacyFlowOpen] = useState(false);
+  const [receiveOpen, setReceiveOpen] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
+  const [swapOpen, setSwapOpen] = useState(false);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["vault-data", multisig] });
@@ -133,13 +135,31 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
         usdcUi={data.usdcUi}
         cofreInitialized={data.cofreInitialized}
         onRefresh={refresh}
+        onReceive={() => setReceiveOpen(true)}
+        onSend={() => setSendOpen(true)}
+        onSwap={() => setSwapOpen(true)}
       />
+
+      {/* Secondary actions */}
+      <div className="flex items-center gap-3">
+        <Link
+          href={`/vault/${multisig}/invoice`}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border/60 bg-surface px-4 py-3 text-sm font-medium text-ink transition-all hover:border-accent/15 hover:text-accent"
+        >
+          <BookOpen className="h-4 w-4" strokeWidth={1.5} />
+          Invoice
+        </Link>
+        <Link
+          href={`/vault/${multisig}/payroll`}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border/60 bg-surface px-4 py-3 text-sm font-medium text-accent transition-all hover:border-accent/20 hover:bg-accent/[0.03]"
+        >
+          <Zap className="h-4 w-4" strokeWidth={1.5} />
+          Payroll
+        </Link>
+      </div>
 
       {/* Privacy flow explainer */}
       <PrivacyFlowTrigger onClick={() => setPrivacyFlowOpen(true)} />
-
-      {/* Quick actions */}
-      <QuickActionBar multisig={multisig} />
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-3">
@@ -162,13 +182,13 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
       <PendingProposalsCard multisig={multisig} proposals={proposals} />
 
       {/* Activity — full width */}
-      <RecentActivityCard
-        multisig={multisig}
-        activity={activity}
-        isLoading={activityLoading}
-      />
+      <RecentActivityCard multisig={multisig} activity={activity} isLoading={activityLoading} />
 
       <PrivacyFlowModal open={privacyFlowOpen} onOpenChange={setPrivacyFlowOpen} />
+
+      <ReceiveModal multisig={multisig} open={receiveOpen} onOpenChange={setReceiveOpen} />
+      <SendModal multisig={multisig} open={sendOpen} onOpenChange={setSendOpen} />
+      <SwapModal multisig={multisig} open={swapOpen} onOpenChange={setSwapOpen} />
     </div>
   );
 }

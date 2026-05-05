@@ -39,6 +39,7 @@ import {
   normalizeLicenseStatus,
 } from "@/lib/operator-license-state";
 import { lamportsToSol } from "@/lib/sol";
+import { SOL_MINT, formatRawAmount } from "@/lib/tokens";
 import { simulateAndOptimize } from "@/lib/tx-optimization";
 import { proposalSummariesQueryKey, useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
@@ -87,6 +88,7 @@ type DraftSummary = {
   type: "single" | "payroll";
   recipientCount?: number;
   totalAmount?: string;
+  invariants?: { tokenMint?: string };
 };
 
 type CommitmentClaim = {
@@ -705,7 +707,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         : "";
     if (!suppressProgress) startTransaction({
       title: isPayroll ? "Executing payroll transfer" : "Executing private transfer",
-      description: `${lamportsToSol(draft.invariants.amount)} SOL${transferLabel}. This may take longer while the privacy shield is prepared.`,
+      description: `${formatRawAmount(draft.invariants.amount, draft.invariants.tokenMint)}${transferLabel}. This may take longer while the privacy shield is prepared.`,
       steps: [
         {
           id: "prepare",
@@ -1003,6 +1005,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           type: "single",
           recipient: loadedDraft.recipient,
           amount: loadedDraft.amount,
+          tokenMint: loadedDraft.invariants.tokenMint,
           status: "success",
           ...(sig ? { signature: sig } : {}),
           ...(cloakSignature ? { cloakSignature } : {}),
@@ -1212,8 +1215,11 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const isPayroll = payrollDraft !== null;
   const lowOperatorSol = operatorBalanceLamports !== null && operatorBalanceLamports < 10_000_000;
 
-  // Budget calculation: total SOL needed for all pending drafts
+  // Budget: only SOL-denominated drafts count against operator's SOL balance.
+  // USDC drafts are pre-funded into the operator's token account by the vault proposal.
   const totalNeededLamports = queueDrafts.reduce((sum, draft) => {
+    const tokenMint = draft.invariants?.tokenMint ?? SOL_MINT;
+    if (tokenMint !== SOL_MINT) return sum;
     const amt = BigInt(
       draft.type === "payroll" ? (draft.totalAmount ?? "0") : (draft.amount ?? "0"),
     );
@@ -1551,7 +1557,10 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                               : "Transfer"}
                         </p>
                         <p className="text-right font-mono text-sm text-ink">
-                          {lamportsToSol(d.totalAmount ?? d.amount)} SOL
+                          {formatRawAmount(
+                            d.type === "payroll" ? (d.totalAmount ?? d.amount) : d.amount,
+                            d.invariants?.tokenMint ?? SOL_MINT,
+                          )}
                         </p>
                         <div className="flex items-center justify-end gap-1.5">
                           <span
@@ -1632,7 +1641,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   <p className="text-xs text-ink-muted">
                     {isPayroll
                       ? `${payrollDraft?.recipientCount} recipients`
-                      : `${lamportsToSol(loadedDraft?.amount ?? "0")} SOL`}
+                      : formatRawAmount(loadedDraft?.amount ?? "0", loadedDraft?.invariants.tokenMint ?? SOL_MINT)}
                   </p>
                 </div>
                 <button
@@ -1656,7 +1665,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 {/* Transfer details / Payroll table */}
                 {loadedDraft && !isPayroll && (
                   <dl className="grid gap-2 text-sm">
-                    <DetailRow label="Amount" value={`${lamportsToSol(loadedDraft.amount)} SOL`} />
+                    <DetailRow label="Amount" value={formatRawAmount(loadedDraft.amount, loadedDraft.invariants.tokenMint)} />
                     <DetailRow label="Recipient" value={loadedDraft.recipient} mono />
                     <DetailRow label="Status" value={proposalStatusMessage ?? "Ready to execute"} />
                   </dl>
@@ -1690,7 +1699,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                                 <td className="px-3 py-2 text-ink-muted">{i + 1}</td>
                                 <td className="px-3 py-2 text-ink">{r.name}</td>
                                 <td className="px-3 py-2 text-right font-mono tabular-nums text-ink">
-                                  {lamportsToSol(r.amount)} SOL
+                                  {formatRawAmount(r.amount, r.invariants?.tokenMint ?? SOL_MINT)}
                                 </td>
                                 <td className="px-3 py-2">
                                   {!step || step.status === "pending" ? (
@@ -1907,7 +1916,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                     </p>
                   </div>
                   <p className="text-right font-mono text-sm text-ink">
-                    {lamportsToSol(item.amount)} SOL
+                    {formatRawAmount(item.amount, item.tokenMint ?? SOL_MINT)}
                   </p>
                   <div className="flex justify-end">
                     {item.signature ? (

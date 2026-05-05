@@ -370,12 +370,17 @@ export default function TransactionsPage({
     } catch { /* ignore */ }
   }
 
+  const isOperatorOnly = (p: ProposalSummary) => p.hasDraft && p.status === "executed";
+
   const grouped = useMemo(() => {
-    const queue = proposals.filter((p) => p.status === "active" || p.status === "approved");
+    const queue = proposals.filter(
+      (p) => (p.status === "active" || p.status === "approved") && !isOperatorOnly(p),
+    );
     const history = proposals.filter(
       (p) =>
         (p.status === "executed" || p.status === "rejected" || p.status === "cancelled") &&
-        !archivedIds.has(p.id),
+        !archivedIds.has(p.id) &&
+        !isOperatorOnly(p),
     );
     const drafts = proposals.filter((p) => p.status === "draft" || (!p.status && p.hasDraft));
     return { queue, history, drafts };
