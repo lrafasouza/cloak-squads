@@ -44,8 +44,10 @@ async function getRedisClient() {
 
   try {
     // Use Upstash Redis SDK if available, otherwise use fetch-based REST API
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { Redis } = await import("@upstash/redis" as any);
+    // Hide module name from bundler to avoid build-time "Module not found" errors
+    // when @upstash/redis is not installed.
+    const moduleName = "@upstash/redis";
+    const { Redis } = await import(moduleName);
     redisClient = new Redis({ url: redisUrl, token: process.env.REDIS_TOKEN ?? "" });
     return redisClient;
   } catch {

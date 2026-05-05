@@ -15,6 +15,7 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "types": ["node"],
     "paths": {
       "@cloak-squads/core": ["./packages/core/src"],
       "@cloak-squads/core/*": ["./packages/core/src/*"]
