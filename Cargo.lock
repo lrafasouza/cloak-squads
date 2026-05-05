@@ -657,7 +657,6 @@ name = "cloak-gatekeeper"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
- "solana-program 1.18.26",
 ]
 
 [[package]]
@@ -665,7 +664,6 @@ name = "cloak-squads-test-harness"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
- "solana-program 1.18.26",
 ]
 
 [[package]]
@@ -2074,60 +2072,6 @@ dependencies = [
  "solana-sha256-hasher",
 ]
 
-[[package]]
-name = "solana-program"
-version = "1.18.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c10f4588cefd716b24a1a40dd32c278e43a560ab8ce4de6b5805c9d113afdfa1"
-dependencies = [
- "ark-bn254",
- "ark-ec",
- "ark-ff",
- "ark-serialize",
- "base64 0.21.7",
- "bincode",
- "bitflags",
- "blake3",
- "borsh 0.10.4",
- "borsh 0.9.3",
- "borsh 1.6.1",
- "bs58 0.4.0",
- "bv",
- "bytemuck",
- "cc",
- "console_error_panic_hook",
- "console_log",
- "curve25519-dalek 3.2.1",
- "getrandom 0.2.17",
- "itertools",
- "js-sys",
- "lazy_static",
- "libc",
- "libsecp256k1",
- "light-poseidon",
- "log",
- "memoffset",
- "num-bigint",
- "num-derive",
- "num-traits",
- "parking_lot",
- "rand 0.8.6",
- "rustc_version",
- "rustversion",
- "serde",
- "serde_bytes",
- "serde_derive",
- "serde_json",
- "sha2 0.10.9",
- "sha3",
- "solana-frozen-abi",
- "solana-frozen-abi-macro",
- "solana-sdk-macro 1.18.26",
- "thiserror 1.0.69",
- "tiny-bip39",
- "wasm-bindgen",
- "zeroize",
-]
 
 [[package]]
 name = "solana-program"
