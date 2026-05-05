@@ -11,7 +11,6 @@ import {
   createSolanaRpc,
 } from "@solana/kit";
 import {
-  ComputeBudgetProgram,
   PublicKey,
   TransactionInstruction,
   TransactionMessage,
@@ -100,11 +99,7 @@ async function buildOrcaDevnetSwap(rawSwapData: Record<string, unknown>, walletA
   const message = new TransactionMessage({
     payerKey: vaultPda,
     recentBlockhash: blockhash,
-    instructions: [
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }),
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 }),
-      ...swapIxs,
-    ],
+    instructions: swapIxs,
   }).compileToV0Message();
 
   const tx = new VersionedTransaction(message);

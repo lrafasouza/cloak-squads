@@ -115,6 +115,23 @@ model PayrollDraft {
   @@index([cofreAddress])
 }
 
+model SwapDraft {
+  id               String   @id @default(uuid())
+  cofreAddress     String
+  transactionIndex String
+  inputMint        String
+  outputMint       String
+  inputAmount      String
+  outputAmount     String
+  inputSymbol      String
+  outputSymbol     String
+  memo             String?
+  createdAt        DateTime @default(now())
+
+  @@unique([cofreAddress, transactionIndex])
+  @@index([cofreAddress])
+}
+
 model AddressBookEntry {
   id          String   @id @default(uuid())
   ownerPubkey String

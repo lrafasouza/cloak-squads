@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import nacl from "tweetnacl";
-import { test } from "node:test";
+import { test } from "vitest";
 
 function encryptViewKeyForSigner(viewKey: Uint8Array, signerPublicKey: Uint8Array) {
   const ephemeralKp = nacl.box.keyPair();

@@ -948,9 +948,14 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           await new Promise<void>((resolve) => { setTimeout(resolve, 2000); });
           return executeSingle(draft, doCloakDeposit, depositCacheKey, invoiceId, _attempt + 1);
         }
-        const message = `Cloak deposit failed: ${msg}`;
-        failTransaction(message);
-        throw new Error(message);
+        // Translate cryptic SDK PDA errors into actionable messages.
+        const humanMsg = msg.includes("Merkle tree account not found")
+          ? "Cloak shield pool not initialized for this token on the current network. " +
+            "Only SOL private sends are supported on devnet. " +
+            "The proposal must be refunded — use the Refund button below."
+          : `Cloak deposit failed: ${msg}`;
+        failTransaction(humanMsg);
+        throw new Error(humanMsg);
       }
     } else {
       updateStep("prepare", { status: "success" });

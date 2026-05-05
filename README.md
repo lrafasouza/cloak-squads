@@ -1,10 +1,10 @@
 # Aegis
 
-**Private Treasury Operations on Solana. Built on Squads Protocol v4.**
+**Privacy infrastructure for every Solana treasury. Built on Squads, powered by Cloak.**
 
 Every Squads vault transfer is public by default — block explorers show the exact recipient, amount, and memo. For DAOs and teams managing payroll, vendor payments, or strategic investments, this is a real problem: counterparties can front-run trades, salary structures are exposed, and operational security is zero.
 
-Aegis is an extension layer for Squads Protocol v4. It adds privacy primitives, payroll automation, invoicing, and scoped audit access on top of the multisig standard already securing $10B+ in Solana treasuries. Members approve through the normal Squads flow. A custom on-chain gatekeeper program issues single-use, time-limited licenses. A registered operator uses those licenses to route payments through the **Cloak protocol** — a zero-knowledge shield pool that breaks the on-chain link between sender and recipient.
+Aegis is the privacy layer that any Solana multisig can integrate — extending Squads first, with CPI hooks for Realms and custom multisigs next. It turns approval-gated multisig payments into cryptographically unlinkable, auditable, compliance-ready transfers — without changing how teams already vote. A custom on-chain gatekeeper program issues single-use, time-limited licenses. A registered operator uses those licenses to route payments through the **Cloak protocol** — a zero-knowledge shield pool that breaks the on-chain link between sender and recipient.
 
 **Live demo:** [https://aegis-web-iiv0.onrender.com](https://aegis-web-iiv0.onrender.com) (devnet)
 
@@ -113,6 +113,25 @@ The privacy guarantee is the same as any zk-SNARK shield pool: it depends on the
 
 ---
 
+## Compliance & Auditability
+
+Aegis is designed around **confidentiality, not anonymity** — the framing the Solana Foundation adopted in its March 2026 enterprise privacy framework. That distinction matters for real-world adoption: full anonymity carries regulatory risk; confidentiality with selective disclosure is defensible for payroll, B2B payments, and institutional treasury operations.
+
+Every privacy feature in Aegis includes a corresponding auditability mechanism:
+
+| Feature | Confidentiality | Auditability mechanism |
+|---|---|---|
+| Private Send | Recipient and amount hidden from public | Proposer retains UTXO private key; can prove payment to auditor |
+| Payroll Batches | Individual salaries not visible on-chain | Operator log + per-recipient execution receipts |
+| Stealth Invoices | Vendor wallet not exposed in proposal | Invoice record in vault DB; auditor link reveals claimant |
+| Audit Links | No public exposure | Time-limited, scoped read access granted to accountant or regulator; revocable anytime |
+
+Audit links support granular access controls: `amounts_only`, `time_ranged`, and `full_history` scopes — so a treasury can share exactly what a regulator needs, nothing more. Each link is Ed25519-signed and expires automatically.
+
+This architecture means Aegis private payments are not a black box. They are *selectively transparent* — hidden from the public chain, but auditable by parties the vault explicitly authorizes.
+
+---
+
 ## Built on Squads Protocol
 
 Aegis is built on top of **Squads Protocol v4** using the `@sqds/multisig` SDK (v2.1.4). We do not replace or reimplement Squads — we extend it.
@@ -124,14 +143,14 @@ Aegis is built on top of **Squads Protocol v4** using the `@sqds/multisig` SDK (
 - Transaction execution via the Squads vault PDA
 - Member management and role configuration
 
-### What Aegis adds on top (the extension layer)
+### What Aegis adds on top (the privacy layer)
 
 - **Privacy via Cloak** — zero-knowledge shield pool routing that breaks the on-chain link between your vault and recipients
 - **Payroll automation** — CSV import, batch proposals, and per-recipient execution
 - **Stealth invoicing** — secret claim links where recipients withdraw without exposing their wallet
-- **Scoped audit links** — time-limited, revocable read access for accountants and regulators
+- **Scoped audit links** — time-limited, revocable read access for accountants and regulators, delivering compliance-ready confidentiality without full anonymity
 
-Your existing Squads vault, members, thresholds, and approval flow remain completely unchanged. Aegis proposals are standard Squads vault transactions that call the Aegis gatekeeper program.
+Your existing Squads vault, members, thresholds, and approval flow remain completely unchanged. Aegis proposals are standard Squads vault transactions that call the Aegis gatekeeper program. The same gatekeeper licensing model is designed to be integrated by Realms and custom multisig protocols via CPI — Squads is the first integration, not the last.
 
 - **Squads:** [https://squads.so](https://squads.so)
 - **Squads docs:** [https://docs.squads.so](https://docs.squads.so)

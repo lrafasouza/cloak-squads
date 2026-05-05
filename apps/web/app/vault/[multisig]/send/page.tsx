@@ -30,10 +30,12 @@ import { computePayloadHash } from "@cloak-squads/core/hashing";
 import { cofrePda } from "@cloak-squads/core/pda";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import {
+  CLOAK_PROGRAM_ID,
   NATIVE_SOL_MINT,
   computeUtxoCommitment,
   createUtxo,
   generateUtxoKeypair,
+  getShieldPoolPDAs,
 } from "@cloak.dev/sdk-devnet";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import {
@@ -346,12 +348,24 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         );
       }
 
-      updateStep("validate", { status: "success" });
-      updateStep("commitment", { status: "running" });
-
-      // Build UTXO commitment — mint-aware
+      // Verify the Cloak shield pool is initialized for this mint on-chain before
+      // creating the proposal. Skipping this check lets the proposal get created but
+      // the operator will always fail at execution time with a cryptic PDA error.
       if (!selectedToken) throw new Error("Select a token.");
       const cloakMint = isSol ? NATIVE_SOL_MINT : new PublicKey(selectedToken.mint);
+      if (!isSol) {
+        const { merkleTree } = getShieldPoolPDAs(CLOAK_PROGRAM_ID, cloakMint);
+        const merkleInfo = await connection.getAccountInfo(merkleTree);
+        if (!merkleInfo) {
+          throw new Error(
+            `Cloak shield pool not initialized for ${tokenLabel} on this network. ` +
+              `Only SOL private sends are supported on devnet. Use Public Send for ${tokenLabel} transfers.`,
+          );
+        }
+      }
+
+      updateStep("validate", { status: "success" });
+      updateStep("commitment", { status: "running" });
       const keypair = await generateUtxoKeypair();
       const utxo = await createUtxo(tokenUnits, keypair, cloakMint);
       const commitmentBigInt = await computeUtxoCommitment(utxo);
@@ -659,7 +673,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
 
                   <div className="mt-1.5 flex gap-2">
                     {isPrivate ? (
-                      <div className="flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink">
+                      <div className="flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink">
                         <TokenLogo symbol="SOL" size={16} />
                         SOL
                       </div>
@@ -685,9 +699,10 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                       disabled={pending}
                     />
                   </div>
+
                   {isPrivate && (
                     <p className="mt-1.5 text-xs text-ink-muted">
-                      Private sends currently support SOL only. Use Public Send for token transfers.
+                      Private sends route through the Cloak shielded pool. USDC private sends are available on mainnet.
                     </p>
                   )}
 
@@ -718,7 +733,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                   </InlineAlert>
                 )}
 
-                {recipientNeedsAta && !isSol && (
+                {!isPrivate && recipientNeedsAta && !isSol && (
                   <InlineAlert tone="warning">
                     Recipient has no {tokenLabel} token account. The vault will pay ~0.002 SOL to
                     create one automatically.

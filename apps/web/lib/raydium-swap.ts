@@ -2,7 +2,14 @@
 
 import { publicEnv } from "@/lib/env";
 import { SOL_MINT, USDC_MINT } from "@/lib/tokens";
-import { Transaction, TransactionInstruction, VersionedTransaction } from "@solana/web3.js";
+import {
+  ComputeBudgetProgram,
+  Transaction,
+  TransactionInstruction,
+  VersionedTransaction,
+} from "@solana/web3.js";
+
+const COMPUTE_BUDGET_PROGRAM_ID = ComputeBudgetProgram.programId.toBase58();
 
 const API_BASE = "/api";
 const FETCH_TIMEOUT_MS = 10_000;
@@ -108,7 +115,9 @@ export async function getRaydiumSwapInstructions(
   const transactions = data?.data ?? [];
   if (!transactions.length) throw new Error("No swap transaction returned from Raydium");
 
-  return transactions.flatMap((tx) => extractInstructions(tx.transaction));
+  return transactions
+    .flatMap((tx) => extractInstructions(tx.transaction))
+    .filter((ix) => ix.programId.toBase58() !== COMPUTE_BUDGET_PROGRAM_ID);
 }
 
 export function formatSwapPreview(

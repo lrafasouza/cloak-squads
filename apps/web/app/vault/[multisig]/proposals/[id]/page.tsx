@@ -44,6 +44,16 @@ type ProposalDraft = {
   invariants: { commitment: number[]; tokenMint?: string };
 };
 
+type SwapDraft = {
+  inputMint: string;
+  outputMint: string;
+  inputAmount: string;
+  outputAmount: string;
+  inputSymbol: string;
+  outputSymbol: string;
+  memo?: string;
+};
+
 type PayrollRecipient = {
   id: string;
   name: string;
@@ -232,6 +242,7 @@ export default function ProposalApprovalPage({
   const [draftError, setDraftError] = useState<number | null>(null);
   const [draft, setDraft] = useState<ProposalDraft | null>(null);
   const [payrollDraft, setPayrollDraft] = useState<PayrollDraft | null>(null);
+  const [swapDraft, setSwapDraft] = useState<SwapDraft | null>(null);
   const [commitmentClaim, setCommitmentClaim] = useState<CommitmentClaim | null>(null);
   const [, setCommitmentClaims] = useState<Map<string, CommitmentClaim>>(new Map());
   const [status, setStatus] = useState<ProposalStatusKind | "loading" | "missing">("loading");
@@ -265,36 +276,40 @@ export default function ProposalApprovalPage({
     setDraftLoading(true);
     setDraftError(null);
     try {
-      const singleResponse = await fetchWithAuth(
-        `/api/proposals/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}?includeSensitive=true`,
-      );
-      if (singleResponse.ok) {
-        if (!cancelled) {
+      const [singleResponse, payrollResponse, swapResponse] = await Promise.all([
+        fetchWithAuth(
+          `/api/proposals/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}?includeSensitive=true`,
+        ),
+        fetchWithAuth(
+          `/api/payrolls/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}?includeSensitive=true`,
+        ),
+        fetch(
+          `/api/swaps/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
+        ),
+      ]);
+
+      if (!cancelled) {
+        if (singleResponse.ok) {
           setDraft((await singleResponse.json()) as ProposalDraft);
           setPayrollDraft(null);
-          setDraftLoading(false);
-        }
-        return;
-      }
-      const payrollResponse = await fetchWithAuth(
-        `/api/payrolls/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}?includeSensitive=true`,
-      );
-      if (payrollResponse.ok) {
-        if (!cancelled) {
+          setSwapDraft(null);
+        } else if (payrollResponse.ok) {
           setPayrollDraft((await payrollResponse.json()) as PayrollDraft);
           setDraft(null);
-          setDraftLoading(false);
+          setSwapDraft(null);
+        } else if (swapResponse.ok) {
+          setSwapDraft((await swapResponse.json()) as SwapDraft);
+          setDraft(null);
+          setPayrollDraft(null);
+        } else {
+          setDraft(null);
+          setPayrollDraft(null);
+          setSwapDraft(null);
+          const anyUnavailable = [singleResponse, payrollResponse, swapResponse].some(
+            (r) => r.status === 503,
+          );
+          setDraftError(anyUnavailable ? 503 : singleResponse.status);
         }
-        return;
-      }
-      if (!cancelled) {
-        setDraft(null);
-        setPayrollDraft(null);
-        setDraftError(
-          singleResponse.status === 503 || payrollResponse.status === 503
-            ? 503
-            : singleResponse.status,
-        );
         setDraftLoading(false);
       }
     } catch (error: unknown) {
@@ -302,6 +317,7 @@ export default function ProposalApprovalPage({
       if (!cancelled) {
         setDraft(null);
         setPayrollDraft(null);
+        setSwapDraft(null);
         setDraftError(0);
         setDraftLoading(false);
       }
@@ -408,6 +424,7 @@ export default function ProposalApprovalPage({
   const executeBlocked = status !== "approved";
   const executeComplete = status === "executed" || executeSignature !== null;
   const isPayroll = payrollDraft !== null;
+  const isSwap = swapDraft !== null;
 
   const displayStatus = status === "loading" || status === "missing" ? "unknown" : status;
 
@@ -432,7 +449,13 @@ export default function ProposalApprovalPage({
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-semibold tracking-tight text-ink">
-                {isPayroll ? "Payroll batch" : transactionType === "config" ? "Config" : "Transfer"}{" "}
+                {isPayroll
+                  ? "Payroll batch"
+                  : isSwap
+                    ? "Swap"
+                    : transactionType === "config"
+                      ? "Config"
+                      : "Transfer"}{" "}
                 #{id}
               </h1>
               <StatusBadge status={displayStatus} />
@@ -454,9 +477,11 @@ export default function ProposalApprovalPage({
                 <h2 className="text-sm font-semibold text-ink">
                   {isPayroll
                     ? "Payroll recipients"
-                    : transactionType === "config"
-                      ? "Configuration"
-                      : "Transfer details"}
+                    : isSwap
+                      ? "Swap details"
+                      : transactionType === "config"
+                        ? "Configuration"
+                        : "Transfer details"}
                 </h2>
               </div>
 
@@ -545,6 +570,33 @@ export default function ProposalApprovalPage({
                   ) : (
                     <InlineAlert>No persisted payroll draft found for this proposal.</InlineAlert>
                   )
+                ) : swapDraft ? (
+                  <dl className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+                        From
+                      </dt>
+                      <dd className="font-mono text-lg font-bold tabular-nums text-ink">
+                        {formatRawAmount(swapDraft.inputAmount, swapDraft.inputMint)}
+                      </dd>
+                    </div>
+                    <div className="border-t border-border/50 pt-4 flex items-center justify-between">
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+                        To (est.)
+                      </dt>
+                      <dd className="font-mono text-lg font-bold tabular-nums text-ink">
+                        {formatRawAmount(swapDraft.outputAmount, swapDraft.outputMint)}
+                      </dd>
+                    </div>
+                    {swapDraft.memo && (
+                      <div className="border-t border-border/50 pt-4">
+                        <dt className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+                          Memo
+                        </dt>
+                        <dd className="text-sm text-ink">{swapDraft.memo}</dd>
+                      </div>
+                    )}
+                  </dl>
                 ) : draft ? (
                   <dl className="space-y-4">
                     <div className="flex items-start justify-between">
@@ -602,21 +654,16 @@ export default function ProposalApprovalPage({
                       </div>
                     </dl>
                   </div>
-                ) : draftError ? (
+                ) : draftError === 503 ? (
                   <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-signal-warn/10">
                       <AlertTriangle className="h-6 w-6 text-signal-warn" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-sm font-semibold text-ink">
-                        {draftError === 503
-                          ? "Database temporarily unavailable"
-                          : "Could not load transfer details"}
-                      </p>
+                      <p className="text-sm font-semibold text-ink">Database temporarily unavailable</p>
                       <p className="max-w-xs text-xs text-ink-muted">
-                        {draftError === 503
-                          ? "The database is currently unreachable. The proposal details are stored on-chain and can still be executed by signers."
-                          : "Something went wrong while fetching the proposal details. You can still vote and execute the proposal."}
+                        The database is currently unreachable. The proposal details are stored
+                        on-chain and can still be executed by signers.
                       </p>
                     </div>
                     <button
@@ -627,6 +674,17 @@ export default function ProposalApprovalPage({
                       <RefreshCw className="h-3.5 w-3.5" />
                       Retry
                     </button>
+                  </div>
+                ) : draftError === 404 || draftError !== null ? (
+                  <div className="flex items-start gap-3 rounded-lg bg-surface-2 p-4">
+                    <Settings className="mt-0.5 h-4 w-4 shrink-0 text-ink-muted" />
+                    <div>
+                      <p className="text-sm font-semibold text-ink">Vault proposal</p>
+                      <p className="mt-0.5 text-xs text-ink-muted">
+                        No off-chain details stored for this proposal. You can still vote and
+                        execute it using the on-chain data.
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   <InlineAlert>
@@ -645,7 +703,7 @@ export default function ProposalApprovalPage({
                 {[
                   {
                     label: "Draft loaded",
-                    done: draft !== null || payrollDraft !== null,
+                    done: draft !== null || payrollDraft !== null || swapDraft !== null,
                     current: false,
                   },
                   {
@@ -726,7 +784,7 @@ export default function ProposalApprovalPage({
                       Type
                     </dt>
                     <dd className="text-ink-muted">
-                      {isPayroll ? "Payroll batch" : "Private send"}
+                      {isPayroll ? "Payroll batch" : isSwap ? "Token swap" : "Private send"}
                     </dd>
                   </div>
                 </dl>
@@ -810,7 +868,7 @@ export default function ProposalApprovalPage({
                       )}
                     </div>
                   </div>
-                  {transactionType !== "config" && (
+                  {transactionType !== "config" && !isSwap && (
                     <div className="flex items-start gap-2.5 rounded-lg border border-signal-warn/25 bg-signal-warn/10 px-3.5 py-3">
                       <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-signal-warn" />
                       <div>
