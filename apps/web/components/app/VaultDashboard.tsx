@@ -1,7 +1,6 @@
 "use client";
 
 import { EmptyState } from "@/components/ui/empty-state";
-import { StatCard } from "@/components/ui/stat-card";
 import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import { CofreInitBanner } from "@/components/vault/CofreInitBanner";
 import { OverviewCard } from "@/components/vault/OverviewCard";
@@ -17,8 +16,7 @@ import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
 import { useVaultMetadata } from "@/lib/use-vault-metadata";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, BookOpen, Check, Copy, Lock, Shield, Users, Zap } from "lucide-react";
-import Link from "next/link";
+import { AlertTriangle, Check, Copy } from "lucide-react";
 import { useState } from "react";
 
 function DashboardVaultIdentity({ multisig }: { multisig: string }) {
@@ -115,15 +113,11 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
   return (
     <div className="space-y-6 p-4 md:p-6">
       {/* Header — identity row */}
-      <div className="relative">
-        {/* Subtle golden radial glow behind header */}
-        <div className="pointer-events-none absolute -left-6 -top-6 h-32 w-64 bg-radial-fade opacity-60" />
-        <div className="relative flex items-center gap-3">
-          <div className="rounded-xl ring-1 ring-accent/20">
-            <VaultIdenticon seed={multisig} size={44} className="rounded-xl" />
-          </div>
-          <DashboardVaultIdentity multisig={multisig} />
+      <div className="flex items-center gap-3">
+        <div className="rounded-xl ring-1 ring-accent/20">
+          <VaultIdenticon seed={multisig} size={44} className="rounded-xl" />
         </div>
+        <DashboardVaultIdentity multisig={multisig} />
       </div>
 
       {!data.cofreInitialized && <CofreInitBanner multisig={multisig} />}
@@ -139,43 +133,75 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
         onSwap={() => setSwapOpen(true)}
       />
 
-      {/* Secondary actions */}
-      <div className="flex items-center gap-3">
-        <Link
-          href={`/vault/${multisig}/invoice`}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border/60 bg-surface px-4 py-3 text-sm font-medium text-ink transition-all hover:border-accent/15 hover:text-accent"
-        >
-          <BookOpen className="h-4 w-4" strokeWidth={1.5} />
-          Invoice
-        </Link>
-        <Link
-          href={`/vault/${multisig}/payroll`}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border/60 bg-surface px-4 py-3 text-sm font-medium text-accent transition-all hover:border-accent/20 hover:bg-accent/[0.03]"
-        >
-          <Zap className="h-4 w-4" strokeWidth={1.5} />
-          Payroll
-        </Link>
+      {/* Governance + Cloak block */}
+      <div className="rounded-2xl border border-border/60 bg-surface transition-colors duration-200 hover:border-accent/15">
+        {/* Threshold row */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4 p-5">
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">Governance</p>
+            <p className="mt-2 font-display text-3xl font-semibold tabular-nums tracking-tight text-ink">
+              {data.threshold}/{data.memberCount}
+            </p>
+            <p className="mt-0.5 text-xs text-ink-muted">Required signatures</p>
+          </div>
+
+          <div className="h-10 w-px bg-border/60" />
+
+          {/* Approval dots */}
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">Members</p>
+            <div className="flex items-center gap-1.5">
+              {Array.from({ length: Math.min(data.memberCount, 8) }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-2 w-2 rounded-full transition-colors ${i < data.threshold ? "bg-accent" : "bg-border-strong"}`}
+                />
+              ))}
+              {data.memberCount > 8 && (
+                <span className="text-[10px] text-ink-subtle">+{data.memberCount - 8}</span>
+              )}
+              <span className="ml-1 text-xs text-ink-muted">{data.memberCount}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Cloak row — separado, com identidade própria */}
+        <div className="flex items-center justify-between border-t border-border/50 px-5 py-3.5">
+          <div className="flex items-center gap-2.5">
+            <div
+              className={`flex h-6 w-6 items-center justify-center rounded-md ${
+                data.cofreInitialized ? "bg-accent/10" : "bg-surface-2"
+              }`}
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  data.cofreInitialized ? "bg-accent animate-pulse" : "bg-ink-subtle/50"
+                }`}
+              />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-ink">
+                Cloak — Privacy Layer
+              </p>
+              <p className="text-[10px] text-ink-subtle">
+                {data.cofreInitialized ? "Shielded transactions enabled" : "Not initialized — set up to enable private sends"}
+              </p>
+            </div>
+          </div>
+          <span
+            className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+              data.cofreInitialized
+                ? "bg-accent/10 text-accent"
+                : "bg-surface-2 text-ink-subtle"
+            }`}
+          >
+            {data.cofreInitialized ? "Active" : "Inactive"}
+          </span>
+        </div>
       </div>
 
       {/* Privacy flow explainer */}
       <PrivacyFlowTrigger onClick={() => setPrivacyFlowOpen(true)} />
-
-      {/* Stats row */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard label="Members" value={data.memberCount} icon={Users} />
-        <StatCard
-          label="Threshold"
-          value={`${data.threshold}/${data.memberCount}`}
-          icon={Shield}
-          sub={`${Math.round((data.threshold / data.memberCount) * 100)}%`}
-        />
-        <StatCard
-          label="Cloak (Gatekeeper)"
-          value={data.cofreInitialized ? "Active" : "Inactive"}
-          icon={Lock}
-          sub={data.cofreInitialized ? "Protected" : "Pending"}
-        />
-      </div>
 
       {/* Pending proposals — below the main grid */}
       <PendingProposalsCard multisig={multisig} proposals={proposals} />

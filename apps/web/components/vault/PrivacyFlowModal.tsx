@@ -69,47 +69,6 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 260, damping: 24 } },
 };
 
-function ParticleField() {
-  const [particles] = useState(() =>
-    Array.from({ length: 18 }, (_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: 1.5 + Math.random() * 2.5,
-      duration: 4 + Math.random() * 6,
-      delay: Math.random() * 4,
-    })),
-  );
-
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px]">
-      {particles.map((p) => (
-        <motion.div
-          key={p.id}
-          className="absolute rounded-full"
-          style={{
-            left: `${p.x}%`,
-            top: `${p.y}%`,
-            width: p.size,
-            height: p.size,
-            background: `hsl(39 49% 60% / ${0.15 + Math.random() * 0.25})`,
-          }}
-          animate={{
-            opacity: [0.2, 0.8, 0.2],
-            scale: [1, 1.8, 1],
-            y: [0, -12, 0],
-          }}
-          transition={{
-            duration: p.duration,
-            repeat: Infinity,
-            delay: p.delay,
-            ease: "easeInOut",
-          }}
-        />
-      ))}
-    </div>
-  );
-}
 
 export function PrivacyFlowModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const [activeStep, setActiveStep] = useState(0);
@@ -164,12 +123,7 @@ export function PrivacyFlowModal({ open, onOpenChange }: { open: boolean; onOpen
             exit="exit"
             onClick={(e) => e.stopPropagation()}
           >
-            <ParticleField />
-
-            {/* Header glow */}
-            <div className="pointer-events-none absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-accent/10 blur-3xl" />
-
-            <div className="relative flex h-full flex-col items-center justify-start pt-6 sm:justify-center sm:pt-0">
+            <div className="flex h-full flex-col items-center justify-start pt-6 sm:justify-center sm:pt-0">
               <div className="w-full max-w-2xl px-5 py-6 sm:px-8 sm:py-8">
                 {/* Close */}
                 <div className="flex items-center justify-end">

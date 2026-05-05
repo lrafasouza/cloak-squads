@@ -64,13 +64,7 @@ export function OverviewCard({
       : null;
 
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-border/60 bg-surface shadow-raise-1 transition-all duration-300 hover:border-accent/20 hover:shadow-accent-glow">
-      {/* Golden accent top bar */}
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
-
-      {/* Ambient glow */}
-      <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-accent/[0.04] blur-3xl" />
-
+    <div className="group relative overflow-hidden rounded-2xl border border-border/60 bg-surface shadow-raise-1 transition-colors duration-200 hover:border-accent/20">
       <div className="relative p-6 md:p-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -96,14 +90,14 @@ export function OverviewCard({
           {totalUsdFormatted != null ? (
             <NumberFlow
               value={totalUsd ?? 0}
-              className="font-display text-2xl font-bold tabular-nums tracking-tight text-ink md:text-3xl"
+              className="font-display text-4xl font-semibold tabular-nums tracking-tight text-ink md:text-5xl"
               prefix="$"
               locales="en-US"
               format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
               transformTiming={{ duration: 400, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
             />
           ) : (
-            <span className="font-display text-2xl font-bold tabular-nums tracking-tight text-ink md:text-3xl">
+            <span className="font-display text-4xl font-semibold tabular-nums tracking-tight text-ink md:text-5xl">
               —
             </span>
           )}
@@ -169,26 +163,29 @@ export function OverviewCard({
 
         {/* Quick Actions */}
         <div className="mt-6 grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            onClick={onReceive}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-surface-2 px-2 py-2.5 text-xs font-medium text-ink transition-all hover:border-accent/20 hover:text-accent sm:gap-2 sm:px-3 sm:text-sm"
-          >
-            <ArrowDownToLine className="h-4 w-4" strokeWidth={1.5} />
-            Deposit
-          </button>
+          {/* Send — primary action */}
           <button
             type="button"
             onClick={onSend}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-surface-2 px-2 py-2.5 text-xs font-medium text-ink transition-all hover:border-accent/20 hover:text-accent sm:gap-2 sm:px-3 sm:text-sm"
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-accent px-2 py-2.5 text-xs font-semibold text-accent-ink transition-colors hover:bg-accent-hover sm:gap-2 sm:px-3 sm:text-sm"
           >
             <ArrowUpFromLine className="h-4 w-4" strokeWidth={1.5} />
             Send
           </button>
+          {/* Deposit — ghost */}
+          <button
+            type="button"
+            onClick={onReceive}
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-transparent px-2 py-2.5 text-xs font-medium text-ink-muted transition-colors hover:border-border-strong hover:text-ink sm:gap-2 sm:px-3 sm:text-sm"
+          >
+            <ArrowDownToLine className="h-4 w-4" strokeWidth={1.5} />
+            Deposit
+          </button>
+          {/* Swap — ghost */}
           <button
             type="button"
             onClick={onSwap}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-surface-2 px-2 py-2.5 text-xs font-medium text-ink transition-all hover:border-accent/20 hover:text-accent sm:gap-2 sm:px-3 sm:text-sm"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-transparent px-2 py-2.5 text-xs font-medium text-ink-muted transition-colors hover:border-border-strong hover:text-ink sm:gap-2 sm:px-3 sm:text-sm"
           >
             <ArrowLeftRight className="h-4 w-4" strokeWidth={1.5} />
             Swap

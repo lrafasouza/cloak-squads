@@ -612,58 +612,53 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                   />
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-[160px_1fr]">
-                  <div>
-                    <div className="flex items-baseline justify-between">
-                      <Label htmlFor="amount">Amount ({tokenLabel})</Label>
-                      <span className="text-xs text-ink-muted">
-                        Available:{" "}
-                        <button
-                          type="button"
-                          className="font-mono text-accent hover:underline disabled:opacity-50"
-                          onClick={handleMaxAmount}
-                          disabled={pending || !selectedToken}
-                        >
-                          {selectedToken
-                            ? `${selectedToken.uiBalance} ${selectedToken.symbol}`
-                            : "—"}
-                        </button>
-                      </span>
-                    </div>
-                    <div className="mt-1.5 flex gap-2">
-                      <TokenDropdown
-                        tokens={tokens}
-                        selectedMint={selectedMint}
-                        onSelect={handleTokenSelect}
-                        disabled={pending}
-                        loading={tokensLoading}
-                      />
-                      <Input
-                        id="amount"
-                        type="number"
-                        step={amountStep}
-                        min={amountMin}
-                        placeholder={amountPlaceholder}
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        className="font-mono"
-                      />
-                    </div>
+                <div>
+                  <div className="flex items-baseline justify-between">
+                    <Label htmlFor="amount">Amount</Label>
+                    <button
+                      type="button"
+                      className="text-xs font-mono text-accent hover:text-accent-hover disabled:opacity-50"
+                      onClick={handleMaxAmount}
+                      disabled={pending || !selectedToken}
+                    >
+                      {selectedToken
+                        ? `${selectedToken.uiBalance} ${selectedToken.symbol} available`
+                        : "—"}
+                    </button>
                   </div>
-
-                  <div>
-                    <Label htmlFor="recipient">Recipient wallet</Label>
+                  <div className="mt-1.5 flex gap-2">
+                    <TokenDropdown
+                      tokens={tokens}
+                      selectedMint={selectedMint}
+                      onSelect={handleTokenSelect}
+                      disabled={pending}
+                      loading={tokensLoading}
+                    />
                     <Input
-                      id="recipient"
-                      type="text"
-                      autoComplete="off"
-                      spellCheck={false}
-                      value={recipientWallet}
-                      onChange={(e) => setRecipientWallet(e.target.value)}
-                      placeholder="Solana wallet address"
-                      className="mt-1.5 font-mono"
+                      id="amount"
+                      type="number"
+                      step={amountStep}
+                      min={amountMin}
+                      placeholder={amountPlaceholder}
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      className="flex-1 font-mono"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="recipient">Recipient wallet</Label>
+                  <Input
+                    id="recipient"
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={recipientWallet}
+                    onChange={(e) => setRecipientWallet(e.target.value)}
+                    placeholder="Solana wallet address"
+                    className="mt-1.5 font-mono"
+                  />
                 </div>
 
                 <ProofGenerationState currentStep={proofStep} complete={false} error={error} />

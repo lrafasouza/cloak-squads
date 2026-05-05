@@ -48,21 +48,21 @@ interface NavItem {
 
 const PRIMARY_NAV: NavItem[] = [
   { label: "Dashboard", href: "", icon: LayoutDashboard },
-  { label: "Swap", href: "/swap", icon: ArrowLeftRight },
-  { label: "Transactions", href: "/proposals", icon: List },
-  { label: "Members", href: "/members", icon: Users },
-];
-
-const PRIVACY_NAV: NavItem[] = [
   { label: "Send Private", href: "/send", icon: Send },
+  { label: "Swap", href: "/swap", icon: ArrowLeftRight },
   { label: "Payroll", href: "/payroll", icon: FileText },
   { label: "Operator", href: "/operator", icon: Key },
   { label: "Invoices", href: "/invoice", icon: BookOpen },
+];
+
+const PRIVACY_NAV: NavItem[] = [
+  { label: "Transactions", href: "/proposals", icon: List },
+  { label: "Members", href: "/members", icon: Users },
+  { label: "Address Book", href: "/address-book", icon: BookUser },
   { label: "Audit", href: "/audit", icon: Shield },
 ];
 
 const BOTTOM_NAV: NavItem[] = [
-  { label: "Address Book", href: "/address-book", icon: BookUser },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -162,10 +162,10 @@ function SidebarContent({
           ))}
         </div>
 
-        {/* Privacy section */}
+        {/* Tools section */}
         <div>
           <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle/70">
-            Privacy
+            Tools
           </p>
           <div className="flex flex-col gap-0.5">
             {PRIVACY_NAV.map((item) => (
@@ -198,15 +198,10 @@ function SidebarContent({
               {...(onClose ? { onClick: onClose } : {})}
             />
           ))}
-          <Link
-            href="https://docs.aegis.cloak.dev"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-ink-subtle/70 transition-colors hover:bg-surface-2 hover:text-ink"
-          >
+          <div className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-ink-subtle/70">
             <HelpCircle className="h-4 w-4 shrink-0 text-ink-subtle/70" />
             Help & Docs
-          </Link>
+          </div>
         </div>
       </div>
     </div>

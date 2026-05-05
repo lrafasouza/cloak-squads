@@ -12,7 +12,7 @@ const CLUSTER_SUFFIX =
   publicEnv.NEXT_PUBLIC_SOLANA_CLUSTER === "mainnet-beta" ? "" : "?cluster=devnet";
 
 const PROPOSAL_STATUS = {
-  executed: { dot: "bg-signal-success", label: "Executed", cls: "text-signal-success" },
+  executed: { dot: "bg-signal-positive", label: "Executed", cls: "text-signal-positive" },
   rejected: { dot: "bg-signal-danger", label: "Rejected", cls: "text-signal-danger" },
   cancelled: { dot: "bg-ink-subtle", label: "Cancelled", cls: "text-ink-subtle" },
 } as const;
@@ -137,7 +137,7 @@ function IncomeRow({
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-0.5">
-        <span className="font-mono text-sm font-semibold tabular-nums text-signal-success">
+        <span className="font-mono text-sm font-semibold tabular-nums text-signal-positive">
           +{amountSol} <span className="text-xs font-normal text-ink-subtle">SOL</span>
         </span>
         <span className="text-[10px] text-ink-subtle">{time}</span>
@@ -160,22 +160,16 @@ export function RecentActivityCard({
   if (!isLoading && activity.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-surface transition-all duration-300 hover:border-accent/10">
+    <div className="rounded-2xl border border-border/60 bg-surface transition-colors duration-200 hover:border-accent/15">
       <div className="flex items-center justify-between border-b border-border/50 px-6 py-5">
-        <div>
-          <h3 className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">
-            Recent Activity
-          </h3>
-          <p className="mt-0.5 text-xs text-ink-muted">
-            {isLoading ? "Loading…" : `${activity.length} transactions`}
-          </p>
-        </div>
+        <h3 className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">
+          Recent Activity
+        </h3>
         <Link
           href={`/vault/${multisig}/proposals`}
-          className="inline-flex items-center gap-1 text-xs font-medium text-accent transition-colors hover:text-accent-hover"
+          className="text-xs text-ink-subtle transition-colors hover:text-accent"
         >
           View all
-          <ArrowUpRight className="h-3 w-3" />
         </Link>
       </div>
 

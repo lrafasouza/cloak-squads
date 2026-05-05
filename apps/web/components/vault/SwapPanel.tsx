@@ -294,15 +294,11 @@ export function SwapPanel({ multisig }: SwapPanelProps) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      {/* Devnet notice */}
       {isDevnet() && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-          <p className="text-xs text-amber-500/90">
-            Devnet — swaps use the Orca Whirlpool SOL/USDC pool. Get devnet USDC at{" "}
-            <span className="font-medium">faucet.circle.com</span>.
-          </p>
-        </div>
+        <p className="text-xs text-muted-foreground/60">
+          Devnet · Orca SOL/USDC pool ·{" "}
+          <span className="underline underline-offset-2">faucet.circle.com</span>
+        </p>
       )}
       {/* From Card */}
       <div className="rounded-xl border border-border bg-surface p-4">
