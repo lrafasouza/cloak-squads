@@ -2,7 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
-import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
+import { ensureCircuitsProxy, prefetchCircuits } from "@/lib/cloak-circuits-proxy";
+import { useUnloadGuard } from "@/lib/use-unload-guard";
 import { translateCloakProgress } from "@/lib/cloak-progress";
 import { lamportsToSol } from "@/lib/sol";
 import { statusBadge } from "@/lib/status-labels";
@@ -82,7 +83,17 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
   const [claimState, setClaimState] = useState<ClaimState>("loading");
   const [error, setError] = useState<string | null>(null);
   const [claiming, setClaiming] = useState(false);
+
+  // Block tab close while a ZK proof / withdraw is in progress.
+  useUnloadGuard(claiming);
   const [secretKey, setSecretKey] = useState<Uint8Array | null>(null);
+
+  // Pre-fetch ZK circuits as soon as the page mounts so the ~12MB of wasm/zkey
+  // is in the browser cache by the time the user clicks "Claim". Without this,
+  // the proof step has to download circuits + generate proof serially (~30s+).
+  useEffect(() => {
+    prefetchCircuits();
+  }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally runs once on mount; window.location is not reactive
   useEffect(() => {

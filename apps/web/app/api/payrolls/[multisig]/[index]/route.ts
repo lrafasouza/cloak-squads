@@ -1,7 +1,19 @@
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
-import { requireVaultOperator } from "@/lib/vault-membership";
+import { requireVaultMember, requireVaultOperator } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
+
+const SENSITIVE_CLAIM_FIELDS = ["keypairPrivateKey", "blinding", "r", "sk_spend"];
+
+function publicClaim(raw: string): unknown {
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const safe: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (SENSITIVE_CLAIM_FIELDS.includes(key)) continue;
+    safe[key] = value;
+  }
+  return safe;
+}
 
 export async function GET(
   request: Request,
@@ -10,7 +22,6 @@ export async function GET(
   const { multisig, index } = await params;
 
   try {
-    // Validate multisig address
     new PublicKey(multisig);
   } catch {
     return NextResponse.json({ error: "Invalid multisig address." }, { status: 400 });
@@ -22,8 +33,15 @@ export async function GET(
 
   const url = new URL(request.url);
   const includeSensitive = url.searchParams.get("includeSensitive") === "true";
+
+  // Tier the access:
+  //   - includeSensitive=true → operator-only (UTXO secrets)
+  //   - default               → vault member (public claim invariants for verification)
   if (includeSensitive) {
     const auth = await requireVaultOperator(multisig);
+    if (auth instanceof NextResponse) return auth;
+  } else {
+    const auth = await requireVaultMember(multisig);
     if (auth instanceof NextResponse) return auth;
   }
 
@@ -61,10 +79,11 @@ export async function GET(
         }
 
         try {
-          commitmentClaim =
-            includeSensitive && r.commitmentClaim !== null
+          if (r.commitmentClaim !== null) {
+            commitmentClaim = includeSensitive
               ? JSON.parse(r.commitmentClaim)
-              : undefined;
+              : publicClaim(r.commitmentClaim);
+          }
         } catch {
           commitmentClaim = undefined;
         }

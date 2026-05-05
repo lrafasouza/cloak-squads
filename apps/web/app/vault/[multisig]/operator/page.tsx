@@ -21,7 +21,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
+import { ensureCircuitsProxy, prefetchCircuits } from "@/lib/cloak-circuits-proxy";
+import { useUnloadGuard } from "@/lib/use-unload-guard";
 import { publicEnv } from "@/lib/env";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
@@ -391,6 +392,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const [executionHistory, setExecutionHistory] = useState<ExecutionHistoryItem[]>([]);
   const [executing, setExecuting] = useState(false);
+
+  // Block tab close while a ZK proof / transaction is in progress.
+  useUnloadGuard(executing);
   const [payrollComplete, setPayrollComplete] = useState(false);
   const [refunding, setRefunding] = useState(false);
   const [refundError, setRefundError] = useState<string | null>(null);
@@ -460,6 +464,13 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   useEffect(() => {
     void fetchOperator();
   }, [fetchOperator]);
+
+  // Pre-fetch ZK circuits the moment the operator dashboard opens.
+  // The operator will likely run a deposit (transact) in this session — having
+  // the wasm + zkey already cached saves 5–10 seconds when they click Execute.
+  useEffect(() => {
+    prefetchCircuits();
+  }, []);
 
   useEffect(() => {
     const address = registeredOperator ?? wallet.publicKey?.toBase58();

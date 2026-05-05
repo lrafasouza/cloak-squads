@@ -72,3 +72,38 @@ export function ensureCircuitsProxy() {
   patchFetch();
   initialized = true;
 }
+
+/**
+ * Pre-warm the browser cache with the ZK circuit artifacts that the Cloak SDK
+ * will need when the user triggers a deposit or withdraw.
+ *
+ * Call this on mount of pages that may execute proofs (operator, claim) so the
+ * ~12MB of wasm + zkey is already in HTTP cache by the time the user clicks
+ * "Execute". Saves 5–10 seconds of wall-clock time on the proof flow.
+ *
+ * Safe to call multiple times — uses a per-tab guard.
+ */
+let prefetchStarted = false;
+const CIRCUITS_TO_PREFETCH = [
+  // Transaction circuit (deposit/transact)
+  `${PROXY_BASE_PATH}/0.1.0/transaction_js/transaction.wasm`,
+  `${PROXY_BASE_PATH}/0.1.0/transaction_final.zkey`,
+  // Withdraw circuit (claim)
+  `${PROXY_BASE_PATH}/0.1.0/withdraw_js/withdraw.wasm`,
+  `${PROXY_BASE_PATH}/0.1.0/withdraw_final.zkey`,
+];
+
+export function prefetchCircuits() {
+  if (typeof window === "undefined") return;
+  if (prefetchStarted) return;
+  prefetchStarted = true;
+
+  ensureCircuitsProxy();
+
+  // Fetch in background; ignore failures (the SDK will try again later if needed).
+  for (const url of CIRCUITS_TO_PREFETCH) {
+    fetch(url, { cache: "force-cache" }).catch(() => {
+      /* prefetch is best-effort */
+    });
+  }
+}

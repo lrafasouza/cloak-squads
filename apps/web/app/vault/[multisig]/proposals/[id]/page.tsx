@@ -42,6 +42,9 @@ type ProposalDraft = {
   memo: string;
   payloadHash: number[];
   invariants: { commitment: number[]; tokenMint?: string };
+  // Member-tier (default GET) returns this with public fields only;
+  // operator-tier GET (?includeSensitive=true) adds keypairPrivateKey/blinding.
+  commitmentClaim?: CommitmentClaim;
 };
 
 type SwapDraft = {
@@ -62,6 +65,7 @@ type PayrollRecipient = {
   memo?: string;
   payloadHash: number[];
   invariants: { commitment: number[]; tokenMint?: string };
+  commitmentClaim?: CommitmentClaim;
 };
 
 type PayrollDraft = {
@@ -271,17 +275,39 @@ export default function ProposalApprovalPage({
     }
   }, [multisigParam, id]);
 
+  // Co-signer fallback: if sessionStorage doesn't have the proposer's local cache
+  // (e.g. a different signer opening this proposal in another browser), use the
+  // public claim returned by the API (no secrets, just verifiable invariants).
+  useEffect(() => {
+    if (commitmentClaim) return;
+    if (draft?.commitmentClaim) {
+      setCommitmentClaim(draft.commitmentClaim as CommitmentClaim);
+      return;
+    }
+    if (payrollDraft?.recipients?.length) {
+      const map = new Map<string, CommitmentClaim>();
+      payrollDraft.recipients.forEach((r, i) => {
+        if (r.commitmentClaim) map.set(i.toString(), r.commitmentClaim as CommitmentClaim);
+      });
+      if (map.size > 0) setCommitmentClaims(map);
+    }
+  }, [commitmentClaim, draft, payrollDraft]);
+
   const loadDraft = useCallback(async () => {
     const cancelled = false;
     setDraftLoading(true);
     setDraftError(null);
     try {
+      // Member-tier fetch: returns commitmentClaim with public invariants
+      // (commitment, amount, recipient_vk, token_mint, keypairPublicKey) so any
+      // co-signer can verify what they're approving — but WITHOUT secrets
+      // (keypairPrivateKey, blinding) which only the operator needs to execute.
       const [singleResponse, payrollResponse, swapResponse] = await Promise.all([
         fetchWithAuth(
-          `/api/proposals/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}?includeSensitive=true`,
+          `/api/proposals/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
         ),
         fetchWithAuth(
-          `/api/payrolls/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}?includeSensitive=true`,
+          `/api/payrolls/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
         ),
         fetchWithAuth(
           `/api/swaps/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,

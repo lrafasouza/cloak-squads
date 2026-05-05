@@ -26,8 +26,15 @@ export async function GET(
 
   const url = new URL(request.url);
   const includeSensitive = url.searchParams.get("includeSensitive") === "true";
+
+  // Tier the access:
+  //   - includeSensitive=true → operator-only (UTXO secrets)
+  //   - default               → vault member (public claim invariants for verification before signing)
   if (includeSensitive) {
     const auth = await requireVaultOperator(multisig);
+    if (auth instanceof NextResponse) return auth;
+  } else {
+    const auth = await requireVaultMember(multisig);
     if (auth instanceof NextResponse) return auth;
   }
 
@@ -40,7 +47,14 @@ export async function GET(
       return NextResponse.json({ error: "Proposal draft not found." }, { status: 404 });
     }
 
-    return NextResponse.json(serializeDraft(draft, { includeSensitive }));
+    return NextResponse.json(
+      serializeDraft(draft, {
+        includeSensitive,
+        // Members get the public claim (commitment, amount, recipient_vk, token_mint, keypairPublicKey)
+        // so they can verify what they're signing without seeing UTXO secrets.
+        includePublicClaim: !includeSensitive,
+      }),
+    );
   } catch (error) {
     console.error("[api/proposals] get failed:", error);
     return NextResponse.json({ error: "Could not load proposal draft." }, { status: 500 });
