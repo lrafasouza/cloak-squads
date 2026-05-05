@@ -6,7 +6,6 @@ import {
   WhirlpoolContext,
   buildWhirlpoolClient,
   swapQuoteByInputToken,
-  swapIx,
   SwapUtils,
 } from "@orca-so/whirlpools-sdk";
 import { Connection, Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
