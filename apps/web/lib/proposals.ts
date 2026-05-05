@@ -72,12 +72,16 @@ export function readProposalStatus(status: unknown): ProposalStatusKind {
   return "unknown";
 }
 
+type FetchFn = (input: string | URL, init?: RequestInit) => Promise<Response>;
+
 export async function loadPersistedProposalSummaries(
   multisigAddress: PublicKey,
+  fetchFn: FetchFn = fetch,
 ): Promise<ProposalSummary[]> {
+  const base = multisigAddress.toBase58();
   const [singleRes, payrollRes] = await Promise.all([
-    fetch(`/api/proposals/${encodeURIComponent(multisigAddress.toBase58())}`),
-    fetch(`/api/payrolls/${encodeURIComponent(multisigAddress.toBase58())}`),
+    fetchFn(`/api/proposals/${encodeURIComponent(base)}`),
+    fetchFn(`/api/payrolls/${encodeURIComponent(base)}`),
   ]);
 
   const singleDrafts: ProposalSummary[] = singleRes.ok

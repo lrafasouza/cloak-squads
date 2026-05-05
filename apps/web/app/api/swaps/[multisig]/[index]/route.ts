@@ -1,4 +1,5 @@
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
+import { requireVaultMember } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
@@ -13,6 +14,9 @@ export async function GET(
   } catch {
     return NextResponse.json({ error: "Invalid multisig address." }, { status: 400 });
   }
+
+  const auth = await requireVaultMember(multisig);
+  if (auth instanceof NextResponse) return auth;
 
   if (!isPrismaAvailable()) {
     return NextResponse.json({ error: "Database unavailable." }, { status: 503 });

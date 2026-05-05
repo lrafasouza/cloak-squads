@@ -168,9 +168,10 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
 
     const loadRealData = async () => {
       try {
+        const auditParam = `auditLinkId=${encodeURIComponent(linkId)}`;
         const [singleRes, payrollRes] = await Promise.all([
-          fetch(`/api/proposals/${encodeURIComponent(metadata.cofreAddress)}`),
-          fetch(`/api/payrolls/${encodeURIComponent(metadata.cofreAddress)}`),
+          fetch(`/api/proposals/${encodeURIComponent(metadata.cofreAddress)}?${auditParam}`),
+          fetch(`/api/payrolls/${encodeURIComponent(metadata.cofreAddress)}?${auditParam}`),
         ]);
 
         const realTxs: FilteredAuditTransaction[] = [];
@@ -205,7 +206,7 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
 
         // Also fetch archived drafts to detect failed/cancelled proposals
         try {
-          const archivedRes = await fetch(`/api/proposals/${encodeURIComponent(metadata.cofreAddress)}?includeArchived=true`);
+          const archivedRes = await fetch(`/api/proposals/${encodeURIComponent(metadata.cofreAddress)}?includeArchived=true&${auditParam}`);
           if (archivedRes.ok) {
             const archivedDrafts = (await archivedRes.json()) as Array<{ amount: string; recipient: string; createdAt: string; archivedAt?: string | null }>;
             for (const d of archivedDrafts) {

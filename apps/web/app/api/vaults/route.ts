@@ -1,4 +1,5 @@
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
+import { requireVaultMember } from "@/lib/vault-membership";
 import { requireWalletAuth } from "@/lib/wallet-auth";
 import { Prisma } from "@prisma/client";
 import { PublicKey } from "@solana/web3.js";
@@ -83,9 +84,6 @@ const vaultMetadataSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const auth = await requireWalletAuth();
-  if (auth instanceof NextResponse) return auth;
-
   if (!isPrismaAvailable()) {
     return NextResponse.json({ error: "Database unavailable." }, { status: 503 });
   }
@@ -104,6 +102,10 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+
+  // Membership check after body validation (cofreAddress must be parsed first).
+  const auth = await requireVaultMember(parsed.data.cofreAddress);
+  if (auth instanceof NextResponse) return auth;
 
   try {
     const vault = await prisma.vault.upsert({

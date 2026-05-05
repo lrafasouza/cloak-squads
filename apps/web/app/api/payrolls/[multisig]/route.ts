@@ -1,9 +1,10 @@
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
+import { requireVaultMember, verifyAuditLinkAccess } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ multisig: string }> },
 ) {
   const { multisig } = await params;
@@ -13,6 +14,19 @@ export async function GET(
     new PublicKey(multisig);
   } catch {
     return NextResponse.json({ error: "Invalid multisig address." }, { status: 400 });
+  }
+
+  const url = new URL(request.url);
+  const auditLinkId = url.searchParams.get("auditLinkId");
+
+  if (auditLinkId) {
+    const allowed = await verifyAuditLinkAccess(multisig, auditLinkId);
+    if (!allowed) {
+      return NextResponse.json({ error: "Invalid or expired audit link." }, { status: 403 });
+    }
+  } else {
+    const auth = await requireVaultMember(multisig);
+    if (auth instanceof NextResponse) return auth;
   }
 
   if (!isPrismaAvailable()) {

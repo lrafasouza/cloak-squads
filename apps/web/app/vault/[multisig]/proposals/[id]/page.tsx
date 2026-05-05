@@ -283,7 +283,7 @@ export default function ProposalApprovalPage({
         fetchWithAuth(
           `/api/payrolls/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}?includeSensitive=true`,
         ),
-        fetch(
+        fetchWithAuth(
           `/api/swaps/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
         ),
       ]);

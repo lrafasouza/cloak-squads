@@ -5,6 +5,7 @@ import {
   loadPersistedProposalSummaries,
   mergeProposalSummaries,
 } from "@/lib/proposals";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,6 +18,7 @@ export function proposalSummariesQueryKey(multisig: string) {
 export function useProposalSummaries(multisig: string) {
   const { connection } = useConnection();
   const queryClient = useQueryClient();
+  const { fetchWithAuth } = useWalletAuth();
 
   const multisigAddress = useMemo(() => {
     try {
@@ -38,7 +40,7 @@ export function useProposalSummaries(multisig: string) {
       if (!multisigAddress) return [];
 
       const [persisted, onchain] = await Promise.all([
-        loadPersistedProposalSummaries(multisigAddress),
+        loadPersistedProposalSummaries(multisigAddress, fetchWithAuth),
         loadOnchainProposalSummaries({ connection, multisigAddress }),
       ]);
 

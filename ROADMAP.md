@@ -21,13 +21,13 @@ Todas as features principais estão funcionando end-to-end em devnet:
 
 Estes itens bloqueiam qualquer deploy em mainnet ou uso com usuários reais.
 
-### S1 — Membership check em todos os endpoints
-**Problema:** `requireWalletAuth` verifica apenas a assinatura criptográfica, mas não confere se a wallet é membro do multisig. Qualquer wallet autenticada pode criar drafts em vaults de terceiros.  
-**Fix:** Injetar `requireVaultMember(cofreAddress)` em todos os POSTs que criam dados associados a um vault.
+### S1 — Membership check em todos os endpoints ✅
+~~**Problema:** `requireWalletAuth` verifica apenas a assinatura criptográfica, mas não confere se a wallet é membro do multisig. Qualquer wallet autenticada pode criar drafts em vaults de terceiros.~~  
+**Implementado:** `requireVaultMember(cofreAddress)` injetado em todos os endpoints de leitura e escrita de dados de vault. Endpoints de proposals e payrolls têm dual-auth (membership OR audit link válido). `verifyAuditLinkAccess` centralizado em `vault-membership.ts`. GET `/api/vaults/[multisig]` entrega `settings` somente para membros autenticados.
 
-### S2 — Gate de operador para dados sensíveis
-**Problema:** O parâmetro `?includeSensitive=true` em `/api/proposals/[ms]/[index]` retorna `commitmentClaim` (chave privada do UTXO) para qualquer wallet autenticada.  
-**Fix:** Apenas a wallet registrada como operador do Cofre pode acessar dados sensíveis. Verificar contra o campo `operator` do Cofre on-chain.
+### S2 — Gate de operador para dados sensíveis ✅
+~~**Problema:** O parâmetro `?includeSensitive=true` em `/api/proposals/[ms]/[index]` retorna `commitmentClaim` (chave privada do UTXO) para qualquer wallet autenticada.~~  
+**Implementado:** `requireVaultOperator(multisig)` guarda `?includeSensitive=true`; wallets não-operadoras recebem 403.
 
 ### S3 — Cifrar UTXO secrets no banco
 **Problema:** `StealthInvoice` armazena `utxoPrivateKey` e `utxoBlinding` em texto claro no PostgreSQL.  

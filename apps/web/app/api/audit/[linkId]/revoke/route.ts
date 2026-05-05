@@ -1,23 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireWalletAuth } from "@/lib/wallet-auth";
-import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
-import { z } from "zod";
-
-const revokeSchema = z.object({
-  issuedBy: z.string().refine(
-    (val) => {
-      try {
-        new PublicKey(val);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    { message: "Invalid issuer address" },
-  ),
-  signature: z.string().min(64).max(256),
-});
 
 export async function POST(request: Request, context: { params: Promise<{ linkId: string }> }) {
   const auth = await requireWalletAuth();
@@ -25,19 +8,11 @@ export async function POST(request: Request, context: { params: Promise<{ linkId
 
   const { linkId } = await context.params;
 
-  let body: unknown;
+  // Consume (and ignore) any body — revoke auth is determined solely by the wallet signature.
   try {
-    body = await request.json();
+    await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
-
-  const parsed = revokeSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Invalid revoke request.", details: parsed.error.flatten() },
-      { status: 400 },
-    );
+    /* no body is fine */
   }
 
   try {
@@ -49,7 +24,8 @@ export async function POST(request: Request, context: { params: Promise<{ linkId
       return NextResponse.json({ error: "Audit link not found." }, { status: 404 });
     }
 
-    if (link.issuedBy !== parsed.data.issuedBy) {
+    // Only the wallet that issued the link (proven by wallet signature in headers) may revoke it.
+    if (auth.publicKey !== link.issuedBy) {
       return NextResponse.json({ error: "Only the issuer can revoke this link." }, { status: 403 });
     }
 

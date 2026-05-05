@@ -1,5 +1,6 @@
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
-import { requireWalletAuth } from "@/lib/wallet-auth";
+import { getMultisigMembers, requireVaultMember } from "@/lib/vault-membership";
+import { verifyWalletAuth } from "@/lib/wallet-auth";
 import { Prisma } from "@prisma/client";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
@@ -19,9 +20,22 @@ export async function GET(_request: Request, context: { params: Promise<{ multis
   }
 
   try {
+    // Check if caller is an authenticated vault member — if so, include sensitive settings.
+    // Public callers (vault metadata enrichment, etc.) still get basic info without secrets.
+    const authResult = await verifyWalletAuth();
+    let isMember = false;
+    if (authResult.ok) {
+      try {
+        const { members } = await getMultisigMembers(multisig);
+        isMember = members.includes(authResult.publicKey);
+      } catch {
+        // RPC unavailable — treat as non-member for settings
+      }
+    }
+
     const vault = await prisma.vault.findUnique({
       where: { cofreAddress: multisig },
-      include: { settings: true },
+      include: { settings: isMember },
     });
 
     return NextResponse.json(vault);
@@ -47,9 +61,6 @@ const updateSchema = z.object({
 });
 
 export async function PATCH(request: Request, context: { params: Promise<{ multisig: string }> }) {
-  const auth = await requireWalletAuth();
-  if (auth instanceof NextResponse) return auth;
-
   const { multisig } = await context.params;
 
   try {
@@ -57,6 +68,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ multi
   } catch {
     return NextResponse.json({ error: "Invalid vault address." }, { status: 400 });
   }
+
+  const auth = await requireVaultMember(multisig);
+  if (auth instanceof NextResponse) return auth;
 
   if (!isPrismaAvailable()) {
     return NextResponse.json({ error: "Database unavailable." }, { status: 503 });

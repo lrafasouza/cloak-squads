@@ -8,6 +8,7 @@
  * Replace the in-memory cache with Redis (Upstash) before mainnet.
  */
 import { publicEnv } from "@/lib/env";
+import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { requireWalletAuth } from "@/lib/wallet-auth";
 import * as multisigSdk from "@sqds/multisig";
 import { PublicKey } from "@solana/web3.js";
@@ -134,6 +135,24 @@ export async function requireVaultOperator(
       { error: "Could not verify operator status." },
       { status: 500 },
     );
+  }
+}
+
+/**
+ * Verify that a given audit link ID is valid for the given multisig.
+ * Used as an alternative to wallet membership for external auditors on the public audit page.
+ * Returns true only if the link exists, belongs to the multisig, and has not expired.
+ */
+export async function verifyAuditLinkAccess(
+  multisigAddress: string,
+  auditLinkId: string,
+): Promise<boolean> {
+  if (!isPrismaAvailable()) return false;
+  try {
+    const link = await prisma.auditLink.findUnique({ where: { id: auditLinkId } });
+    return !!link && link.expiresAt >= new Date() && link.cofreAddress === multisigAddress;
+  } catch {
+    return false;
   }
 }
 
