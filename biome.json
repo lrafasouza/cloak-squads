@@ -1,7 +1,7 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "files": {
-    "ignore": ["**/target/**", "target/**", "node_modules/**", ".turbo/**", ".anchor/**", ".next/**"]
+    "ignore": ["**/target/**", "target/**", "node_modules/**", ".turbo/**", ".anchor/**"]
   },
   "organizeImports": { "enabled": true },
   "linter": { "enabled": true, "rules": { "recommended": true } },

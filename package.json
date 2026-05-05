@@ -53,7 +53,6 @@
   },
   "dependencies": {
     "@cloak.dev/sdk-devnet": "0.1.5-devnet.1",
-    "@solana/spl-token": "^0.4.14",
     "@sqds/multisig": "^2.1.4"
   }
 }

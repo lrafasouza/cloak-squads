@@ -1,14 +1,11 @@
 "use client";
 
-import { publicEnv } from "@/lib/env";
-import { SOL_MINT, USDC_MINT } from "@/lib/tokens";
 import { Transaction, TransactionInstruction, VersionedTransaction } from "@solana/web3.js";
+import { SOL_MINT, USDC_MINT } from "@/lib/tokens";
 
 const JUPITER_API_BASE = "/api";
 const DEFAULT_DECIMALS = 6;
 const FETCH_TIMEOUT_MS = 10_000;
-
-const IS_DEVNET = publicEnv.NEXT_PUBLIC_SOLANA_CLUSTER === "devnet";
 
 export interface JupiterQuote {
   inputMint: string;
@@ -41,19 +38,21 @@ export interface JupiterQuote {
   expireAt: string;
 }
 
-function extractInstructionsFromTransaction(transactionBase64: string): TransactionInstruction[] {
+function extractInstructionsFromTransaction(
+  transactionBase64: string
+): TransactionInstruction[] {
   const buffer = Buffer.from(transactionBase64, "base64");
-
+  
   // Try VersionedTransaction first
   try {
     const versionedTx = VersionedTransaction.deserialize(buffer);
     const message = versionedTx.message;
-
+    
     return message.compiledInstructions.map((ix) => {
       const accountKeys = message.staticAccountKeys;
       const programId = accountKeys[ix.programIdIndex];
       if (!programId) throw new Error("Invalid program ID index in transaction");
-
+      
       return new TransactionInstruction({
         programId,
         keys: ix.accountKeyIndexes.map((idx) => {
@@ -88,13 +87,10 @@ export async function getJupiterQuote({
   slippageBps?: number;
   taker?: string;
 }): Promise<JupiterQuote> {
+  const url = new URL(`${window.location.origin}${JUPITER_API_BASE}/jupiter-quote`);
   if (!/^\d+$/.test(amount) || amount === "0") {
     throw new Error("amount must be a positive integer string");
   }
-
-  // Use Orca on devnet, Jupiter on mainnet
-  const endpoint = IS_DEVNET ? "/orca-quote" : "/jupiter-quote";
-  const url = new URL(`${window.location.origin}${JUPITER_API_BASE}${endpoint}`);
 
   url.searchParams.set("inputMint", inputMint);
   url.searchParams.set("outputMint", outputMint);
@@ -110,46 +106,13 @@ export async function getJupiterQuote({
   clearTimeout(timeoutId);
   if (!response.ok) {
     const errorText = await response.text().catch(() => "Unknown error");
-    throw new Error(`Swap quote failed: ${response.status} ${errorText}`);
+    throw new Error(`Jupiter quote failed: ${response.status} ${errorText}`);
   }
 
   return response.json();
 }
 
-export async function getSwapInstructions(
-  quoteResponse: JupiterQuote,
-  userPublicKey?: string,
-): Promise<TransactionInstruction[]> {
-  // On devnet, fetch instructions from Orca swap endpoint
-  if (IS_DEVNET) {
-    if (!userPublicKey) {
-      throw new Error("userPublicKey is required for devnet Orca swaps.");
-    }
-    // Orca devnet: instructions are returned via the /orca-swap endpoint
-    const url = `${window.location.origin}${JUPITER_API_BASE}/orca-swap`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quoteResponse, userPublicKey }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => "Unknown error");
-        throw new Error(`Orca swap build failed: ${response.status} ${errorText}`);
-      }
-      const data = await response.json();
-      return data.instructions;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw error;
-    }
-  }
-
-  // Mainnet: extract from serialized transaction
+export function getSwapInstructions(quoteResponse: JupiterQuote): TransactionInstruction[] {
   if (!quoteResponse.transaction) {
     throw new Error("Quote does not contain a transaction. Make sure to provide a taker address.");
   }
@@ -158,7 +121,7 @@ export async function getSwapInstructions(
 
 export function formatSwapPreview(
   quote: JupiterQuote,
-  outputDecimals: number = DEFAULT_DECIMALS,
+  outputDecimals: number = DEFAULT_DECIMALS
 ): {
   outAmountUi: string;
   priceImpact: string;
@@ -169,7 +132,9 @@ export function formatSwapPreview(
     maximumFractionDigits: 6,
   });
   const priceImpact = Number(quote.priceImpactPct).toFixed(4);
-  const routeLabel = quote.routePlan.map((step) => step.swapInfo.label).join(" → ");
+  const routeLabel = quote.routePlan
+    .map((step) => step.swapInfo.label)
+    .join(" → ");
 
   return { outAmountUi, priceImpact, routeLabel };
 }

@@ -18,7 +18,6 @@ import { createVaultProposal } from "@/lib/squads-sdk";
 import { SOL_MINT, USDC_DECIMALS, USDC_MINT, tokenAmountToUnits } from "@/lib/tokens";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import * as multisigSdk from "@sqds/multisig";
 import { ArrowLeftRight, Loader2 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -269,12 +268,7 @@ export function SwapModal({
       updateStep("quote", { status: "success" });
       updateStep("build", { status: "running" });
 
-      const [vaultPda] = multisigSdk.getVaultPda({
-        multisigPda: multisigAddress,
-        index: 0,
-      });
-
-      const swapInstructions = await getSwapInstructions(quote, vaultPda.toBase58());
+      const swapInstructions = getSwapInstructions(quote);
 
       updateStep("build", { status: "success" });
       updateStep("squads", { status: "running" });
