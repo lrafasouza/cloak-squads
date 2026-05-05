@@ -401,21 +401,40 @@ The Squads Vault PDA is program-owned and cannot sign arbitrary outbound transac
 
 **For USDC and other SPL tokens:** the proposal pre-funds the operator's associated token account in the same atomic execution.
 
-This is the cleanest possible design given the program-owned vault constraint, without waiting for upstream Cloak CPI support. See [ROADMAP.md](./ROADMAP.md) for future architectural improvements.
+This is the cleanest possible design given the program-owned vault constraint, without waiting for upstream Cloak CPI support.
 
 ---
 
-## Documentation
+## Roadmap
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system architecture and data flows
-- [`docs/SECURITY.md`](docs/SECURITY.md) — trust model and threat analysis
-- [`docs/DEMO.md`](docs/DEMO.md) — demo runbook
-- [`docs/TECH_DEBT.md`](docs/TECH_DEBT.md) — known debt and trade-offs
-- [`docs/DEVNET_TESTING.md`](docs/DEVNET_TESTING.md) — testing guide
-- [`ROADMAP.md`](./ROADMAP.md) — what's next
+### Now — Devnet (done)
+- [x] Private send via Cloak shield pool
+- [x] Atomic vault → operator auto-funding in a single approved execution
+- [x] Payroll batches (CSV upload, batch license proposal, per-recipient operator execution)
+- [x] Stealth invoices with secret claim links
+- [x] Scoped audit links (Ed25519-signed, time-limited, revocable)
+- [x] Token swap proposals (SOL ↔ USDC via Raydium / Orca, routed through Squads multisig approval)
+- [x] Vault import from existing Squads multisigs
+- [x] Member management (add/remove, change threshold)
+
+### Next — Mainnet readiness
+- [ ] Per-cluster RPC routing — mainnet vaults, devnet Cloak (until mainnet program validation)
+- [ ] Mainnet Cloak API parity validation (`transact()` + `fullWithdraw()` against mainnet program)
+- [ ] Dedicated RPC (Helius/QuickNode) — public endpoint too rate-limited for `getProgramAccounts`
+- [ ] Managed PostgreSQL (Render/Supabase)
+- [ ] 2-of-N hardening — move `commitmentClaim` from `sessionStorage` to encrypted DB so co-signers can independently verify before approving
+- [ ] Gatekeeper program security audit
+
+### Later — New features
+- [ ] SPL token privacy beyond SOL — USDC and other tokens through Cloak (dependent on protocol support)
+- [ ] Aegis MCP server — expose vault operations to AI agents (balance check, proposal creation, operator batch execution with human-in-the-loop)
+- [ ] Role-based permissions — viewer, proposer, approver, operator with invite links
+- [ ] Activity notifications — webhook + email for proposals and executions
+- [ ] Realms / Governance integration via CPI
+- [ ] Cloak CPI — program-signed deposit from vault execution, eliminating the operator hop entirely
 
 ---
 
 ## Project Status
 
-Working devnet prototype. The private send, payroll, stealth invoice, and audit link flows are all functional end-to-end on devnet, including atomic vault → operator auto-funding. Active focus: mainnet vault import and production deployment. See [ROADMAP.md](./ROADMAP.md).
+Working devnet prototype. The private send, payroll, stealth invoice, and audit link flows are all functional end-to-end on devnet, including atomic vault → operator auto-funding.
