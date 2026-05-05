@@ -51,10 +51,16 @@ jobs:
         with:
           workspaces: . -> target
 
-      - name: Install Solana
+      - name: Install Solana CLI (Anza)
         run: |
-          sh -c "$(curl -sSfL https://release.solana.com/v1.18.26/install)"
+          sh -c "$(curl -sSfL https://release.anza.xyz/v1.18.26/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Verify cargo-build-sbf is available
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version
+          cargo-build-sbf --version
 
       - name: Install Anchor CLI
         run: cargo install --version 0.31.1 anchor-cli --locked
@@ -62,7 +68,9 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
 
       - name: Build Anchor programs
-        run: anchor build
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          anchor build
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
