@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { checkRateLimitAsync } from "@/lib/rate-limit";
+import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { requireVaultMember } from "@/lib/vault-membership";
 import { Prisma } from "@prisma/client";
 import { PublicKey } from "@solana/web3.js";
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
   const hdrs = await headers();
   const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
   const ip = (raw.split(",")[0] ?? raw).trim();
-  if (!(await checkRateLimitAsync(ip))) {
+  if (!(await checkRateLimitAsync(rateLimitBucket(ip, "stealth-write", auth.publicKey), "write"))) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 

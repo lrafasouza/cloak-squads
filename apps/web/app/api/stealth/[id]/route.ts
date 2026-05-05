@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { decryptField, isEncrypted } from "@/lib/field-crypto";
 import { requireVaultMember } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
@@ -40,12 +39,10 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         expiresAt: invoice.expiresAt.toISOString(),
         createdAt: invoice.createdAt.toISOString(),
         claimedAt: invoice.claimedAt?.toISOString() ?? null,
-        // UTXO data for vault management — decrypt blinding, never expose private key
+        // UTXO public data only — blinding factor and private key are NOT exposed here;
+        // they are only returned via POST /claim-data after full challenge-response auth.
         utxoAmount: invoice.utxoAmount,
         utxoPublicKey: invoice.utxoPublicKey,
-        utxoBlinding: invoice.utxoBlinding
-          ? (isEncrypted(invoice.utxoBlinding) ? decryptField(invoice.utxoBlinding) : invoice.utxoBlinding)
-          : null,
         utxoMint: invoice.utxoMint,
         utxoLeafIndex: invoice.utxoLeafIndex,
         utxoCommitment: invoice.utxoCommitment,

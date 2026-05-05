@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { checkChallenge, consumeChallenge } from "@/lib/claim-challenge";
 import { decryptField, isEncrypted } from "@/lib/field-crypto";
-import { checkRateLimitAsync } from "@/lib/rate-limit";
+import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { requireWalletAuth } from "@/lib/wallet-auth";
 import bs58 from "bs58";
 import { headers } from "next/headers";
@@ -10,9 +10,6 @@ import nacl from "tweetnacl";
 import { z } from "zod";
 
 const claimDataSchema = z.object({
-  // Challenge-response: client proves ownership of the stealth keypair
-  // by sending the challenge nonce + their derived public key + a signature
-  // over the challenge using the Ed25519 key derived from the box seed.
   challengeId: z.string().min(1),
   derivedPubkey: z.string().min(1),
   challengeSignature: z.string().min(1),
@@ -31,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const hdrs = await headers();
   const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
   const ip = (raw.split(",")[0] ?? raw).trim();
-  if (!(await checkRateLimitAsync(ip))) {
+  if (!(await checkRateLimitAsync(rateLimitBucket(ip, "claim-data", auth.publicKey), "signature"))) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
@@ -61,6 +58,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
+    // All invoices must have signPubkey — legacy invoices were voided by migration.
+    if (!invoice.signPubkey) {
+      return NextResponse.json(
+        { error: "Invoice is not eligible for claim (missing signing key). Please request a new invoice." },
+        { status: 403 },
+      );
+    }
+
     // Step 1: Verify the derived public key matches the stored stealthPubkey
     if (parsed.data.derivedPubkey !== invoice.stealthPubkey) {
       return NextResponse.json(
@@ -69,7 +74,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    // Step 2: Verify the challenge exists and is valid
+    // Step 2: Verify the challenge exists, is valid, and has not been used
     const challenge = checkChallenge(id, parsed.data.challengeId);
     if (!challenge) {
       return NextResponse.json(
@@ -78,32 +83,31 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    // Step 3: Verify the Ed25519 signature over the challenge
-    // The signPubkey was derived at invoice creation from the same seed as the box keypair.
-    if (!invoice.signPubkey) {
-      // Legacy invoices without signPubkey — skip challenge verification but consume challenge
-      consumeChallenge(id);
-    } else {
-      const signatureBytes = base64urlDecode(parsed.data.challengeSignature);
-      const signPubkeyBytes = bs58.decode(invoice.signPubkey);
-
-      const validSig = nacl.sign.detached.verify(
-        challenge,
-        signatureBytes,
-        signPubkeyBytes,
+    // Step 3: Consume challenge (one-time use)
+    const consumed = await consumeChallenge(id, parsed.data.challengeId);
+    if (!consumed) {
+      return NextResponse.json(
+        { error: "Challenge already used. Request a new challenge." },
+        { status: 403 },
       );
-
-      if (!validSig) {
-        consumeChallenge(id);
-        return NextResponse.json(
-          { error: "Invalid challenge signature." },
-          { status: 403 },
-        );
-      }
     }
 
-    // Consume the challenge (one-time use)
-    consumeChallenge(id);
+    // Step 4: Verify the Ed25519 signature over the challenge nonce
+    const signatureBytes = base64urlDecode(parsed.data.challengeSignature);
+    const signPubkeyBytes = bs58.decode(invoice.signPubkey);
+
+    const validSig = nacl.sign.detached.verify(
+      challenge,
+      signatureBytes,
+      signPubkeyBytes,
+    );
+
+    if (!validSig) {
+      return NextResponse.json(
+        { error: "Invalid challenge signature." },
+        { status: 403 },
+      );
+    }
 
     if (invoice.status === "claimed") {
       return NextResponse.json(
@@ -136,13 +140,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    // Decrypt sensitive fields that were encrypted at rest
-    const utxoPrivateKey = invoice.utxoPrivateKey
-      ? (isEncrypted(invoice.utxoPrivateKey) ? decryptField(invoice.utxoPrivateKey) : invoice.utxoPrivateKey)
-      : null;
-    const utxoBlinding = invoice.utxoBlinding
-      ? (isEncrypted(invoice.utxoBlinding) ? decryptField(invoice.utxoBlinding) : invoice.utxoBlinding)
-      : null;
+    const utxoPrivateKey = isEncrypted(invoice.utxoPrivateKey)
+      ? decryptField(invoice.utxoPrivateKey)
+      : invoice.utxoPrivateKey;
+    const utxoBlinding = isEncrypted(invoice.utxoBlinding)
+      ? decryptField(invoice.utxoBlinding)
+      : invoice.utxoBlinding;
 
     return NextResponse.json({
       utxoAmount: invoice.utxoAmount,

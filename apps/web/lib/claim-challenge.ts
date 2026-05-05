@@ -10,13 +10,15 @@
  * 5. Server verifies: HMAC token is valid + not expired, derivedPubkey matches
  *    stealthPubkey, and Ed25519 signature over the nonce is valid
  *
- * Using HMAC-signed tokens instead of an in-memory Map avoids losing state
- * across HMR reloads in development and across serverless instances in production.
+ * One-time enforcement: consumeChallenge marks the challengeId as used in Redis
+ * (TTL = 2 × CHALLENGE_TTL_MS). Without Redis, consume is a no-op — acceptable
+ * degradation for dev/test environments; the TTL window limits replay risk.
  */
 
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
 
 const CHALLENGE_TTL_MS = 60_000;
+const CONSUME_TTL_SECS = 120; // 2× TTL — covers full challenge validity window
 
 function getSecret(): string {
   const s = process.env.JWT_SIGNING_SECRET;
@@ -35,6 +37,55 @@ function signPayload(payload: string): string {
   return createHmac("sha256", getSecret()).update(payload).digest("base64url");
 }
 
+/** Stable hash of a challengeId for use as a Redis key. */
+function challengeHash(challengeId: string): string {
+  return createHash("sha256").update(challengeId).digest("hex").slice(0, 40);
+}
+
+// ── Redis one-time consume ──────────────────────────────────────
+
+type SimpleRedis = {
+  set: (key: string, value: string, opts?: { ex?: number; nx?: boolean }) => Promise<string | null>;
+};
+
+let _redis: SimpleRedis | null | undefined = undefined; // undefined = not yet resolved
+
+async function getRedis(): Promise<SimpleRedis | null> {
+  if (_redis !== undefined) return _redis;
+
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) {
+    _redis = null;
+    return null;
+  }
+
+  try {
+    const moduleName = "@upstash/redis";
+    const { Redis } = await import(moduleName);
+    _redis = new Redis({ url: redisUrl, token: process.env.REDIS_TOKEN ?? "" }) as SimpleRedis;
+    return _redis;
+  } catch {
+    // Fallback: REST API
+    _redis = {
+      async set(key: string, _value: string, opts?: { ex?: number; nx?: boolean }) {
+        const parts = [redisUrl, "set", encodeURIComponent(key), "1"];
+        const query: string[] = [];
+        if (opts?.ex) query.push(`EX=${opts.ex}`);
+        if (opts?.nx) query.push("NX");
+        const url = parts.join("/") + (query.length ? `?${query.join("&")}` : "");
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${process.env.REDIS_TOKEN ?? ""}` },
+        });
+        const data = (await res.json()) as { result: string | null };
+        return data.result;
+      },
+    };
+    return _redis;
+  }
+}
+
+// ── Public API ──────────────────────────────────────────────────
+
 /**
  * Generate a signed challenge token for a given invoice ID.
  * Returns { challengeId (signed token), challenge (base64url nonce) }.
@@ -48,10 +99,8 @@ export function createChallenge(invoiceId: string): {
   const nonce = base64urlEncode(nonceBytes);
   const expiresAt = Date.now() + CHALLENGE_TTL_MS;
 
-  // payload = invoiceId|nonce|expiresAt
   const payload = `${invoiceId}|${nonce}|${expiresAt}`;
   const sig = signPayload(payload);
-  // challengeId encodes all fields needed for verification — no server storage needed
   const challengeId = `${Buffer.from(payload).toString("base64url")}.${sig}`;
 
   return { challengeId, challenge: nonce };
@@ -60,8 +109,6 @@ export function createChallenge(invoiceId: string): {
 /**
  * Verify and decode a challenge token.
  * Returns the nonce bytes if valid, null if expired or tampered.
- * Does NOT consume (stateless — no one-time enforcement, but replay window is
- * limited to TTL and requires a valid wallet auth + Ed25519 key to exploit).
  */
 export function checkChallenge(invoiceId: string, challengeId: string): Uint8Array | null {
   try {
@@ -74,7 +121,6 @@ export function checkChallenge(invoiceId: string, challengeId: string): Uint8Arr
     const payload = Buffer.from(encodedPayload, "base64url").toString("utf8");
     const expectedSig = signPayload(payload);
 
-    // Constant-time comparison to prevent timing attacks
     if (!timingSafeEqual(Buffer.from(receivedSig), Buffer.from(expectedSig))) return null;
 
     const parts = payload.split("|");
@@ -88,7 +134,6 @@ export function checkChallenge(invoiceId: string, challengeId: string): Uint8Arr
     const expiresAt = Number(expiresAtStr);
     if (Number.isNaN(expiresAt) || Date.now() > expiresAt) return null;
 
-    // Decode the nonce back to bytes
     const padding = "=".repeat((4 - (nonce.length % 4)) % 4);
     const base64 = nonce.replace(/-/g, "+").replace(/_/g, "/") + padding;
     return Uint8Array.from(Buffer.from(base64, "base64"));
@@ -98,9 +143,17 @@ export function checkChallenge(invoiceId: string, challengeId: string): Uint8Arr
 }
 
 /**
- * No-op: stateless tokens don't need explicit deletion.
- * Kept for API compatibility with the claim-data route.
+ * Atomically mark a challenge as consumed (one-time use).
+ * Returns true if this is the first use, false if already consumed.
+ *
+ * Without Redis: always returns true (no-op, acceptable for dev/test).
  */
-export function consumeChallenge(_invoiceId: string): void {
-  // intentionally empty — tokens expire by TTL
+export async function consumeChallenge(invoiceId: string, challengeId: string): Promise<boolean> {
+  const redis = await getRedis();
+  if (!redis) return true; // no Redis — degrade gracefully
+
+  const key = `chal-used:${invoiceId}:${challengeHash(challengeId)}`;
+  const result = await redis.set(key, "1", { ex: CONSUME_TTL_SECS, nx: true });
+  // SET NX returns "OK" (or 1 via some clients) on first use, null when key exists
+  return result === "OK" || (result as unknown) === 1;
 }

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { checkRateLimitAsync } from "@/lib/rate-limit";
+import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { requireWalletAuth } from "@/lib/wallet-auth";
 import { PublicKey } from "@solana/web3.js";
 import { headers } from "next/headers";
@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const hdrs = await headers();
   const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
   const ip = (raw.split(",")[0] ?? raw).trim();
-  if (!(await checkRateLimitAsync(ip))) {
+  if (!(await checkRateLimitAsync(rateLimitBucket(ip, "stealth-claim", auth.publicKey), "write"))) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 

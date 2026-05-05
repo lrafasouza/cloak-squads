@@ -16,6 +16,9 @@ const serverEnvSchema = z.object({
   FALLBACK_RPC_URL: z.string().url().optional(),
   REDIS_URL: z.string().url().optional(),
   REDIS_TOKEN: z.string().optional(),
+  // S6: accept v1 (legacy) wallet signatures during rollout transition.
+  // Set to "false" after 7 days in production to enforce v2-only.
+  ALLOW_LEGACY_AUTH: z.enum(["true", "false"]).default("true"),
 });
 
 export const publicEnv = publicEnvSchema.parse({
@@ -35,6 +38,7 @@ export function getServerEnv() {
     FALLBACK_RPC_URL: process.env.FALLBACK_RPC_URL,
     REDIS_URL: process.env.REDIS_URL,
     REDIS_TOKEN: process.env.REDIS_TOKEN,
+    ALLOW_LEGACY_AUTH: process.env.ALLOW_LEGACY_AUTH,
   });
 }
 

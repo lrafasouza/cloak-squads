@@ -1,5 +1,5 @@
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
-import { checkRateLimitAsync } from "@/lib/rate-limit";
+import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { requireWalletAuth } from "@/lib/wallet-auth";
 import { PublicKey } from "@solana/web3.js";
 import { headers } from "next/headers";
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   const hdrs = await headers();
   const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
   const ip = (raw.split(",")[0] ?? raw).trim();
-  if (!(await checkRateLimitAsync(`ab:${ip}`, 30, 60_000))) {
+  if (!(await checkRateLimitAsync(rateLimitBucket(ip, "addr-write", auth.publicKey), "write"))) {
     return NextResponse.json({ error: "Rate limited" }, { status: 429 });
   }
 

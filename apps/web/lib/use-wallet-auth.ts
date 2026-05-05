@@ -3,87 +3,81 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useCallback, useRef } from "react";
 
-const AUTH_STORAGE_KEY = "aegis-wallet-auth";
-const AUTH_TTL_SECS = 4 * 60; // re-sign every 4 min (server allows 5)
-const SIGN_COOLDOWN_MS = 60 * 1000; // wait 60s after a failed sign attempt
-
-type StoredAuth = {
-  publicKey: string;
-  signature: string; // base58
-  timestamp: number; // unix seconds
-  nonce: string;
-};
-
 /**
- * Hook that provides an authenticated fetch wrapper.
- * Automatically signs an auth message with the connected wallet
- * and attaches the signature to outgoing API requests.
+ * Wallet auth hook — signs each API request with an endpoint-bound Ed25519 signature.
  *
- * Guards against race conditions and spam:
- *   - Deduplicates concurrent signMessage calls (single in-flight Promise)
- *   - Backs off for 60s after a rejection/wallet error
- *   - Only attempts signing when wallet.connected is true
+ * Signature format (v2):
+ *   aegis:v2:{pubkey}:{ts}:{nonce}:{METHOD}:{/path}:{bodyHash}
+ *
+ * bodyHash = base64url(sha256(body)) or "-" for requests without a body (GET/HEAD).
+ *
+ * The signature is per-request (no cross-request cache). Phantom signs silently
+ * after the initial wallet connection; other wallets may show a prompt — in that
+ * case upgrade to session-key auth (S7) will be introduced.
+ *
+ * UX guards:
+ *   - 60s cooldown after user rejects the sign prompt (prevents spam)
+ *   - Concurrent calls for the same URL+method+body are deduplicated
  */
+
+const SIGN_COOLDOWN_MS = 60 * 1000;
+
+async function computeBodyHash(body: BodyInit | null | undefined): Promise<string> {
+  if (!body) return "-";
+  let bytes: Uint8Array;
+  if (typeof body === "string") {
+    bytes = new TextEncoder().encode(body);
+  } else if (body instanceof Uint8Array) {
+    bytes = new Uint8Array(body.buffer as ArrayBuffer, body.byteOffset, body.byteLength);
+  } else if (body instanceof ArrayBuffer) {
+    bytes = new Uint8Array(body);
+  } else {
+    // FormData, Blob, ReadableStream — treat as opaque; no body hash
+    return "-";
+  }
+  if (bytes.length === 0) return "-";
+  // Ensure a plain ArrayBuffer for SubtleCrypto (Uint8Array.buffer may be ArrayBufferLike)
+  const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const hashBuffer = await crypto.subtle.digest("SHA-256", buf);
+  const hashBytes = new Uint8Array(hashBuffer);
+  // base64url encode
+  const binary = String.fromCharCode(...hashBytes);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+function normalizePath(input: string | URL): string {
+  const url =
+    typeof input === "string"
+      ? new URL(input, typeof window !== "undefined" ? window.location.origin : "http://localhost")
+      : input;
+  return url.pathname.replace(/\/$/, "") || "/";
+}
+
 export function useWalletAuth() {
   const wallet = useWallet();
-  const cachedRef = useRef<StoredAuth | null>(null);
-  const signingPromiseRef = useRef<Promise<Record<string, string> | null> | null>(null);
   const lastFailureRef = useRef<number>(0);
+  // Dedup map: key = "METHOD:path:bodyHash" → in-flight promise
+  const pendingRef = useRef<Map<string, Promise<Record<string, string> | null>>>(new Map());
 
-  /** Get or create a valid auth token, signing with wallet if needed. */
-  const getAuthHeaders = useCallback(async (): Promise<Record<string, string> | null> => {
-    if (!wallet.publicKey || !wallet.signMessage || !wallet.connected) return null;
+  const signRequest = useCallback(
+    async (
+      method: string,
+      path: string,
+      bodyHash: string,
+    ): Promise<Record<string, string> | null> => {
+      if (!wallet.publicKey || !wallet.signMessage || !wallet.connected) return null;
 
-    const pubKeyB58 = wallet.publicKey.toBase58();
-    const now = Math.floor(Date.now() / 1000);
+      if (Date.now() - lastFailureRef.current < SIGN_COOLDOWN_MS) return null;
 
-    // Check cache + localStorage for a still-valid token
-    if (cachedRef.current && cachedRef.current.publicKey === pubKeyB58) {
-      if (now - cachedRef.current.timestamp < AUTH_TTL_SECS) {
-        return {
-          "x-solana-pubkey": cachedRef.current.publicKey,
-          "x-solana-signature": cachedRef.current.signature,
-          "x-solana-timestamp": String(cachedRef.current.timestamp),
-          "x-solana-nonce": cachedRef.current.nonce,
-        };
-      }
-    }
+      const pubKeyB58 = wallet.publicKey.toBase58();
+      const timestamp = Math.floor(Date.now() / 1000);
+      const nonce = crypto.randomUUID();
+      const normalizedMethod = method.toUpperCase();
+      const normalizedPath = path.replace(/\/$/, "") || "/";
 
-    try {
-      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (stored) {
-        const parsed: StoredAuth = JSON.parse(stored);
-        if (parsed.publicKey === pubKeyB58 && now - parsed.timestamp < AUTH_TTL_SECS) {
-          cachedRef.current = parsed;
-          return {
-            "x-solana-pubkey": parsed.publicKey,
-            "x-solana-signature": parsed.signature,
-            "x-solana-timestamp": String(parsed.timestamp),
-            "x-solana-nonce": parsed.nonce,
-          };
-        }
-      }
-    } catch {
-      // ignore parse errors
-    }
+      const message = `aegis:v2:${pubKeyB58}:${timestamp}:${nonce}:${normalizedMethod}:${normalizedPath}:${bodyHash}`;
+      const messageBytes = new TextEncoder().encode(message);
 
-    // Cooldown after failure — prevents spam when user rejects or wallet is busy
-    if (Date.now() - lastFailureRef.current < SIGN_COOLDOWN_MS) {
-      return null;
-    }
-
-    // Deduplicate: if another call is already signing, wait for it
-    if (signingPromiseRef.current) {
-      return signingPromiseRef.current;
-    }
-
-    const timestamp = now;
-    const nonce = crypto.randomUUID();
-    const message = `aegis:${pubKeyB58}:${timestamp}:${nonce}`;
-    const messageBytes = new TextEncoder().encode(message);
-
-    const signPromise = (async (): Promise<Record<string, string> | null> => {
-      if (!wallet.signMessage) return null;
       let signature: Uint8Array;
       try {
         signature = await wallet.signMessage(messageBytes);
@@ -92,49 +86,46 @@ export function useWalletAuth() {
         return null;
       }
 
-      const bs58Module = await import("bs58");
-      const signatureB58 = bs58Module.default.encode(signature);
-
-      const auth: StoredAuth = {
-        publicKey: pubKeyB58,
-        signature: signatureB58,
-        timestamp,
-        nonce,
-      };
-
-      cachedRef.current = auth;
-      try {
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
-      } catch {
-        // ignore storage errors
-      }
+      const { default: bs58 } = await import("bs58");
+      const signatureB58 = bs58.encode(signature);
 
       return {
-        "x-solana-pubkey": auth.publicKey,
-        "x-solana-signature": auth.signature,
-        "x-solana-timestamp": String(auth.timestamp),
-        "x-solana-nonce": auth.nonce,
+        "x-solana-pubkey": pubKeyB58,
+        "x-solana-signature": signatureB58,
+        "x-solana-timestamp": String(timestamp),
+        "x-solana-nonce": nonce,
+        "x-solana-method": normalizedMethod,
+        "x-solana-path": normalizedPath,
+        "x-solana-body-hash": bodyHash,
       };
-    })();
+    },
+    [wallet.publicKey, wallet.signMessage, wallet.connected],
+  );
 
-    signingPromiseRef.current = signPromise;
-    try {
-      const result = await signPromise;
-      return result;
-    } finally {
-      signingPromiseRef.current = null;
-    }
-  }, [wallet.publicKey, wallet.signMessage, wallet.connected]);
-
-  /** Authenticated fetch — adds wallet signature headers automatically. */
+  /** Authenticated fetch — computes bodyHash and signs each request. */
   const fetchWithAuth = useCallback(
     async (input: string | URL, init?: RequestInit): Promise<Response> => {
-      const authHeaders = await getAuthHeaders();
+      const method = (init?.method ?? "GET").toUpperCase();
+      const path = normalizePath(input);
+      const bodyHash = await computeBodyHash(init?.body);
+      const dedupeKey = `${method}:${path}:${bodyHash}`;
+
+      // Dedup: if the same (method+path+body) is being signed concurrently, reuse
+      const pending = pendingRef.current.get(dedupeKey);
+      let authHeadersPromise: Promise<Record<string, string> | null>;
+      if (pending) {
+        authHeadersPromise = pending;
+      } else {
+        authHeadersPromise = signRequest(method, path, bodyHash);
+        pendingRef.current.set(dedupeKey, authHeadersPromise);
+        authHeadersPromise.finally(() => pendingRef.current.delete(dedupeKey));
+      }
+
+      const authHeaders = await authHeadersPromise;
 
       const mergedHeaders: Record<string, string> = {
         ...(init?.headers as Record<string, string> | undefined),
       };
-
       if (authHeaders) {
         Object.assign(mergedHeaders, authHeaders);
       }
@@ -144,8 +135,16 @@ export function useWalletAuth() {
         headers: mergedHeaders,
       });
     },
-    [getAuthHeaders],
+    [signRequest],
   );
+
+  /**
+   * Legacy: returns headers for the NEXT request without a body.
+   * Prefer fetchWithAuth for full endpoint binding.
+   */
+  const getAuthHeaders = useCallback(async (): Promise<Record<string, string> | null> => {
+    return signRequest("GET", "/", "-");
+  }, [signRequest]);
 
   return { fetchWithAuth, getAuthHeaders };
 }

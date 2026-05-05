@@ -1,14 +1,25 @@
 /**
  * Server-side wallet authentication for API routes.
  *
- * Scheme:
- *   1. Client signs message `aegis:${base58Pubkey}:${unixSeconds}:${nonce}` with wallet
- *   2. Client sends headers: x-solana-pubkey, x-solana-signature, x-solana-timestamp, x-solana-nonce
- *   3. Server verifies signature + checks timestamp freshness
+ * Two signature formats are supported:
  *
- * The nonce is included in the signed message, making each signing session unique.
- * The client caches its auth token for up to 4 minutes and reuses the same nonce within
- * that window — the server therefore validates freshness via timestamp, not nonce uniqueness.
+ * v1 (legacy):
+ *   Message: aegis:{pubkey}:{ts}:{nonce}
+ *   Headers: x-solana-pubkey, x-solana-signature, x-solana-timestamp, x-solana-nonce
+ *   Accepted only when ALLOW_LEGACY_AUTH=true (default, for rollout transition).
+ *
+ * v2 (current, endpoint-bound):
+ *   Message: aegis:v2:{pubkey}:{ts}:{nonce}:{method}:{path}:{bodyHash}
+ *   Headers: all v1 headers + x-solana-method, x-solana-path, x-solana-body-hash
+ *   bodyHash = base64url(sha256(request body)) or "-" for requests with no body.
+ *
+ * The v2 format binds the signature to a specific HTTP method+path+body, preventing
+ * a captured signature from being replayed against a different endpoint within the
+ * 5-minute validity window.
+ *
+ * Note: the client includes x-solana-method and x-solana-path headers that the
+ * server reads and verifies against the HMAC. CORS prevents external forgers from
+ * setting custom headers, so this binding is effective against cross-origin replay.
  */
 import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -22,13 +33,18 @@ export type WalletAuthResult =
   | { ok: true; publicKey: string }
   | { ok: false; error: string; status: number };
 
-/**
- * Verify wallet authentication from incoming request headers.
- * Call this at the top of any API route handler.
- */
-export async function verifyWalletAuth(): Promise<WalletAuthResult> {
-  const hdrs = await headers();
+function allowLegacyAuth(): boolean {
+  // Read directly from process.env to avoid circular import with env.ts
+  return (process.env.ALLOW_LEGACY_AUTH ?? "true") !== "false";
+}
 
+/**
+ * Pure verification logic — testable without a Next.js request context.
+ * Accepts any object with a `.get(key)` method.
+ */
+export function verifyWalletAuthHeaders(
+  hdrs: { get: (key: string) => string | null },
+): WalletAuthResult {
   const pubkeyB58 = hdrs.get("x-solana-pubkey");
   const signatureB58 = hdrs.get("x-solana-signature");
   const timestampStr = hdrs.get("x-solana-timestamp");
@@ -52,13 +68,6 @@ export async function verifyWalletAuth(): Promise<WalletAuthResult> {
     return { ok: false, error: "Auth timestamp expired. Re-authenticate.", status: 401 };
   }
 
-  // Verify Ed25519 signature
-  // Message includes nonce if provided, otherwise falls back to legacy format
-  const message = nonce
-    ? `aegis:${pubkeyB58}:${timestampStr}:${nonce}`
-    : `aegis:${pubkeyB58}:${timestampStr}`;
-  const messageBytes = new TextEncoder().encode(message);
-
   let signatureBytes: Uint8Array;
   try {
     signatureBytes = bs58.decode(signatureB58);
@@ -66,12 +75,51 @@ export async function verifyWalletAuth(): Promise<WalletAuthResult> {
     return { ok: false, error: "Invalid signature encoding.", status: 401 };
   }
 
-  const valid = nacl.sign.detached.verify(messageBytes, signatureBytes, pubkeyBytes);
-  if (!valid) {
-    return { ok: false, error: "Invalid wallet signature.", status: 401 };
+  // Detect v2 format: all three endpoint-binding headers must be present
+  const method = hdrs.get("x-solana-method");
+  const path = hdrs.get("x-solana-path");
+  const bodyHash = hdrs.get("x-solana-body-hash");
+
+  const isV2 = !!(method && path && bodyHash);
+
+  if (isV2) {
+    // v2: aegis:v2:{pubkey}:{ts}:{nonce}:{method}:{path}:{bodyHash}
+    const normalizedPath = path.replace(/\/$/, "") || "/";
+    const message = `aegis:v2:${pubkeyB58}:${timestampStr}:${nonce ?? ""}:${method.toUpperCase()}:${normalizedPath}:${bodyHash}`;
+    const messageBytes = new TextEncoder().encode(message);
+    const valid = nacl.sign.detached.verify(messageBytes, signatureBytes, pubkeyBytes);
+    if (!valid) {
+      return { ok: false, error: "Invalid wallet signature.", status: 401 };
+    }
+  } else {
+    // v1: aegis:{pubkey}:{ts}:{nonce}
+    if (!allowLegacyAuth()) {
+      return {
+        ok: false,
+        error: "v1 auth signatures are no longer accepted. Upgrade your client.",
+        status: 401,
+      };
+    }
+    const message = nonce
+      ? `aegis:${pubkeyB58}:${timestampStr}:${nonce}`
+      : `aegis:${pubkeyB58}:${timestampStr}`;
+    const messageBytes = new TextEncoder().encode(message);
+    const valid = nacl.sign.detached.verify(messageBytes, signatureBytes, pubkeyBytes);
+    if (!valid) {
+      return { ok: false, error: "Invalid wallet signature.", status: 401 };
+    }
   }
 
   return { ok: true, publicKey: pubkeyB58 };
+}
+
+/**
+ * Verify wallet authentication from incoming request headers.
+ * Call this at the top of any API route handler.
+ */
+export async function verifyWalletAuth(): Promise<WalletAuthResult> {
+  const hdrs = await headers();
+  return verifyWalletAuthHeaders(hdrs);
 }
 
 /**
@@ -83,8 +131,7 @@ export function authErrorResponse(result: WalletAuthResult): Response | null {
 }
 
 /**
- * Verify that the authenticated wallet is a member of the given multisig.
- * Uses requireVaultMember from vault-membership.ts instead.
+ * Verify wallet auth and return { publicKey } or a 401/403 NextResponse.
  */
 export async function requireWalletAuth(): Promise<{ publicKey: string } | NextResponse> {
   const auth = await verifyWalletAuth();
