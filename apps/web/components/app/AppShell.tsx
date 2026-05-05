@@ -213,8 +213,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const multisig = params?.multisig ?? "";
   const base = `/vault/${multisig}`;
-  const { publicKey } = useWallet();
+  const { publicKey, connecting } = useWallet();
   const { data: vault, isLoading: vaultLoading } = useVaultData(multisig);
+
+  // Wallet adapter restores autoConnect state after mount; during the first
+  // ~600ms `publicKey` may be null even though the user is logged in. Wait
+  // briefly before falling through to the "connect your wallet" gate to avoid
+  // a jarring flash + duplicate sign-in prompt on every navigation.
+  const [walletRestoreWaited, setWalletRestoreWaited] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setWalletRestoreWaited(true), 700);
+    return () => clearTimeout(timer);
+  }, []);
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { data: vaultMeta } = useVaultMetadata(multisig);
@@ -298,12 +308,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   /* ── Membership gate state (computed after all hooks) ── */
   const walletAddress = publicKey?.toBase58();
+  const walletRestoring = connecting || (!walletAddress && !walletRestoreWaited);
   const isBlocked =
     !!multisig &&
-    (vaultLoading || !vault || !walletAddress || !vault.members.includes(walletAddress));
+    (vaultLoading ||
+      walletRestoring ||
+      !vault ||
+      !walletAddress ||
+      !vault.members.includes(walletAddress));
 
   if (isBlocked) {
-    if (vaultLoading) {
+    if (vaultLoading || walletRestoring) {
       return (
         <div className="flex h-screen w-screen items-center justify-center bg-bg">
           <Spinner className="h-8 w-8 text-ink-subtle" />

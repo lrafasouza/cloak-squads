@@ -1,90 +1,95 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 /**
- * Wallet auth hook — signs each API request with an endpoint-bound Ed25519 signature.
+ * Wallet auth hook — session-cookie based.
  *
- * Signature format (v2):
- *   aegis:v2:{pubkey}:{ts}:{nonce}:{METHOD}:{/path}:{bodyHash}
+ * On the first authenticated request after connecting (or on session expiry),
+ * the user signs ONE `aegis:session:` message with their wallet. The server
+ * (`/api/auth/login`) verifies it and sets an httpOnly `aegis-session` cookie
+ * valid for ~30 minutes. All subsequent `fetchWithAuth` calls send the cookie
+ * automatically — no further wallet popups.
  *
- * bodyHash = base64url(sha256(body)) or "-" for requests without a body (GET/HEAD).
- *
- * The signature is per-request (no cross-request cache). Phantom signs silently
- * after the initial wallet connection; other wallets may show a prompt — in that
- * case upgrade to session-key auth (S7) will be introduced.
+ * On 401 (e.g., server restart, secret rotation), the session is cleared and a
+ * fresh sign-in is attempted exactly once before bubbling the error.
  *
  * UX guards:
- *   - 60s cooldown after user rejects the sign prompt (prevents spam)
- *   - Concurrent calls for the same URL+method+body are deduplicated
+ *   - 60s cooldown after the user rejects the sign prompt (prevents spam).
+ *   - Concurrent calls share a single in-flight login promise.
  */
 
 const SIGN_COOLDOWN_MS = 60 * 1000;
+const SESSION_REFRESH_BEFORE_MS = 60 * 1000; // re-login if <1m of session left
+const SESSION_STORAGE_KEY = "aegis:wallet-session";
 
-async function computeBodyHash(body: BodyInit | null | undefined): Promise<string> {
-  if (!body) return "-";
-  let bytes: Uint8Array;
-  if (typeof body === "string") {
-    bytes = new TextEncoder().encode(body);
-  } else if (body instanceof Uint8Array) {
-    bytes = new Uint8Array(body.buffer as ArrayBuffer, body.byteOffset, body.byteLength);
-  } else if (body instanceof ArrayBuffer) {
-    bytes = new Uint8Array(body);
-  } else {
-    // FormData, Blob, ReadableStream — treat as opaque; no body hash
-    return "-";
+type SessionInfo = { publicKey: string; expiresAt: number };
+
+function loadSession(): SessionInfo | null {
+  if (typeof sessionStorage === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as SessionInfo;
+    if (
+      typeof parsed?.publicKey !== "string" ||
+      typeof parsed?.expiresAt !== "number" ||
+      Date.now() + SESSION_REFRESH_BEFORE_MS >= parsed.expiresAt
+    ) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
   }
-  if (bytes.length === 0) return "-";
-  // Ensure a plain ArrayBuffer for SubtleCrypto (Uint8Array.buffer may be ArrayBufferLike)
-  const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-  const hashBuffer = await crypto.subtle.digest("SHA-256", buf);
-  const hashBytes = new Uint8Array(hashBuffer);
-  // base64url encode
-  const binary = String.fromCharCode(...hashBytes);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
-function normalizePath(input: string | URL): string {
-  const url =
-    typeof input === "string"
-      ? new URL(input, typeof window !== "undefined" ? window.location.origin : "http://localhost")
-      : input;
-  const path = url.pathname.replace(/\/$/, "") || "/";
-  // Include search/query string in the signed path so a captured signature
-  // cannot be replayed against the same path with a different query (e.g.
-  // ?includeSensitive=true).
-  return path + (url.search || "");
+function saveSession(info: SessionInfo) {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(info));
+  } catch {
+    /* ignore quota / disabled storage */
+  }
+}
+
+function clearSession() {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function useWalletAuth() {
   const wallet = useWallet();
+  const sessionPromiseRef = useRef<Promise<SessionInfo | null> | null>(null);
   const lastFailureRef = useRef<number>(0);
-  // Dedup map: key = "METHOD:path:bodyHash" → in-flight promise
-  const pendingRef = useRef<Map<string, Promise<Record<string, string> | null>>>(new Map());
 
-  const signRequest = useCallback(
-    async (
-      method: string,
-      path: string,
-      bodyHash: string,
-    ): Promise<Record<string, string> | null> => {
-      if (!wallet.publicKey || !wallet.signMessage || !wallet.connected) return null;
+  const ensureSession = useCallback(async (): Promise<SessionInfo | null> => {
+    if (!wallet.publicKey || !wallet.signMessage || !wallet.connected) return null;
 
-      if (Date.now() - lastFailureRef.current < SIGN_COOLDOWN_MS) return null;
+    const pubkey = wallet.publicKey.toBase58();
 
-      const pubKeyB58 = wallet.publicKey.toBase58();
+    const current = loadSession();
+    if (current && current.publicKey === pubkey) return current;
+
+    if (sessionPromiseRef.current) return sessionPromiseRef.current;
+
+    if (Date.now() - lastFailureRef.current < SIGN_COOLDOWN_MS) return null;
+
+    const promise = (async (): Promise<SessionInfo | null> => {
       const timestamp = Math.floor(Date.now() / 1000);
       const nonce = crypto.randomUUID();
-      const normalizedMethod = method.toUpperCase();
-      const normalizedPath = path.replace(/\/$/, "") || "/";
+      const message = `aegis:session:${pubkey}:${timestamp}:${nonce}`;
 
-      const message = `aegis:v2:${pubKeyB58}:${timestamp}:${nonce}:${normalizedMethod}:${normalizedPath}:${bodyHash}`;
-      const messageBytes = new TextEncoder().encode(message);
-
+      const signMessage = wallet.signMessage;
+      if (!signMessage) return null;
       let signature: Uint8Array;
       try {
-        signature = await wallet.signMessage(messageBytes);
+        signature = await signMessage(new TextEncoder().encode(message));
       } catch {
         lastFailureRef.current = Date.now();
         return null;
@@ -93,62 +98,86 @@ export function useWalletAuth() {
       const { default: bs58 } = await import("bs58");
       const signatureB58 = bs58.encode(signature);
 
-      return {
-        "x-solana-pubkey": pubKeyB58,
-        "x-solana-signature": signatureB58,
-        "x-solana-timestamp": String(timestamp),
-        "x-solana-nonce": nonce,
-        "x-solana-method": normalizedMethod,
-        "x-solana-path": normalizedPath,
-        "x-solana-body-hash": bodyHash,
-      };
-    },
-    [wallet.publicKey, wallet.signMessage, wallet.connected],
-  );
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicKey: pubkey, signature: signatureB58, timestamp, nonce }),
+        credentials: "include",
+      });
 
-  /** Authenticated fetch — computes bodyHash and signs each request. */
+      if (!res.ok) {
+        lastFailureRef.current = Date.now();
+        return null;
+      }
+
+      const json = (await res.json().catch(() => null)) as { expiresAt?: number } | null;
+      const expiresAt =
+        typeof json?.expiresAt === "number" ? json.expiresAt : Date.now() + 30 * 60 * 1000;
+      const info: SessionInfo = { publicKey: pubkey, expiresAt };
+      saveSession(info);
+      return info;
+    })();
+
+    sessionPromiseRef.current = promise;
+    promise.finally(() => {
+      sessionPromiseRef.current = null;
+    });
+    return promise;
+  }, [wallet.publicKey, wallet.signMessage, wallet.connected]);
+
+  /** Authenticated fetch — relies on the session cookie set by /api/auth/login. */
   const fetchWithAuth = useCallback(
     async (input: string | URL, init?: RequestInit): Promise<Response> => {
-      const method = (init?.method ?? "GET").toUpperCase();
-      const path = normalizePath(input);
-      const bodyHash = await computeBodyHash(init?.body);
-      const dedupeKey = `${method}:${path}:${bodyHash}`;
+      // Establish/refresh session if needed before firing the request.
+      // If the user rejects the sign prompt, we still attempt the request — the
+      // server will return 401 which the caller can surface to the user.
+      await ensureSession();
 
-      // Dedup: if the same (method+path+body) is being signed concurrently, reuse
-      const pending = pendingRef.current.get(dedupeKey);
-      let authHeadersPromise: Promise<Record<string, string> | null>;
-      if (pending) {
-        authHeadersPromise = pending;
-      } else {
-        authHeadersPromise = signRequest(method, path, bodyHash);
-        pendingRef.current.set(dedupeKey, authHeadersPromise);
-        authHeadersPromise.finally(() => pendingRef.current.delete(dedupeKey));
+      const doFetch = () =>
+        fetch(input, {
+          ...init,
+          credentials: "include",
+        });
+
+      let res = await doFetch();
+
+      // Session may have been invalidated server-side (restart, secret rotation,
+      // cookie cleared). Try one more time with a fresh sign-in.
+      if (res.status === 401 && wallet.connected) {
+        clearSession();
+        const fresh = await ensureSession();
+        if (fresh) res = await doFetch();
       }
 
-      const authHeaders = await authHeadersPromise;
-
-      const mergedHeaders: Record<string, string> = {
-        ...(init?.headers as Record<string, string> | undefined),
-      };
-      if (authHeaders) {
-        Object.assign(mergedHeaders, authHeaders);
-      }
-
-      return fetch(input, {
-        ...init,
-        headers: mergedHeaders,
-      });
+      return res;
     },
-    [signRequest],
+    [ensureSession, wallet.connected],
   );
 
+  // Clear stored session when wallet disconnects or switches accounts.
+  useEffect(() => {
+    if (!wallet.connected) {
+      clearSession();
+      // Best-effort cookie clear; ignore errors if endpoint is offline.
+      void fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
+      return;
+    }
+    const stored = loadSession();
+    const current = wallet.publicKey?.toBase58();
+    if (stored && current && stored.publicKey !== current) {
+      clearSession();
+    }
+  }, [wallet.connected, wallet.publicKey]);
+
   /**
-   * Legacy: returns headers for the NEXT request without a body.
-   * Prefer fetchWithAuth for full endpoint binding.
+   * Backwards-compat shim. Previously returned signed v2 headers; with session
+   * cookies, headers are not needed — the cookie is attached automatically.
+   * Returning an empty header map keeps existing callers working.
    */
   const getAuthHeaders = useCallback(async (): Promise<Record<string, string> | null> => {
-    return signRequest("GET", "/", "-");
-  }, [signRequest]);
+    const session = await ensureSession();
+    return session ? {} : null;
+  }, [ensureSession]);
 
   return { fetchWithAuth, getAuthHeaders };
 }

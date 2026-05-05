@@ -1,31 +1,29 @@
 /**
  * Server-side wallet authentication for API routes.
  *
- * Two signature formats are supported:
+ * Three auth paths are accepted (checked in order):
  *
- * v1 (legacy):
- *   Message: aegis:{pubkey}:{ts}:{nonce}
- *   Headers: x-solana-pubkey, x-solana-signature, x-solana-timestamp, x-solana-nonce
- *   Accepted only when ALLOW_LEGACY_AUTH=true (default, for rollout transition).
+ * 1. Session cookie (preferred — set by `/api/auth/login`):
+ *    Cookie `aegis-session` carries an HMAC-signed `{pubkey, exp}` token.
+ *    Issued after a single `aegis:session:` wallet signature; valid for 30
+ *    minutes. Eliminates per-request `signMessage` popups.
  *
- * v2 (current, endpoint-bound):
- *   Message: aegis:v2:{pubkey}:{ts}:{nonce}:{method}:{path}:{bodyHash}
- *   Headers: all v1 headers + x-solana-method, x-solana-path, x-solana-body-hash
- *   bodyHash = base64url(sha256(request body)) or "-" for requests with no body.
+ * 2. v2 per-request signature (endpoint-bound):
+ *    Message: aegis:v2:{pubkey}:{ts}:{nonce}:{method}:{path}:{bodyHash}
+ *    Headers: x-solana-pubkey, x-solana-signature, x-solana-timestamp,
+ *             x-solana-nonce, x-solana-method, x-solana-path, x-solana-body-hash
+ *    Used by clients that haven't (yet) upgraded to session cookies.
  *
- * The v2 format binds the signature to a specific HTTP method+path+body, preventing
- * a captured signature from being replayed against a different endpoint within the
- * 5-minute validity window.
- *
- * Note: the client includes x-solana-method and x-solana-path headers that the
- * server reads and verifies against the HMAC. CORS prevents external forgers from
- * setting custom headers, so this binding is effective against cross-origin replay.
+ * 3. v1 legacy signature:
+ *    Message: aegis:{pubkey}:{ts}:{nonce}
+ *    Accepted only when ALLOW_LEGACY_AUTH=true.
  */
+import { SESSION_COOKIE_NAME, verifySessionToken } from "./auth-session";
 import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
-import nacl from "tweetnacl";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
+import nacl from "tweetnacl";
 
 const AUTH_WINDOW_SECS = 5 * 60; // 5 minutes
 
@@ -42,16 +40,20 @@ function allowLegacyAuth(): boolean {
  * Pure verification logic — testable without a Next.js request context.
  * Accepts any object with a `.get(key)` method.
  */
-export function verifyWalletAuthHeaders(
-  hdrs: { get: (key: string) => string | null },
-): WalletAuthResult {
+export function verifyWalletAuthHeaders(hdrs: {
+  get: (key: string) => string | null;
+}): WalletAuthResult {
   const pubkeyB58 = hdrs.get("x-solana-pubkey");
   const signatureB58 = hdrs.get("x-solana-signature");
   const timestampStr = hdrs.get("x-solana-timestamp");
   const nonce = hdrs.get("x-solana-nonce");
 
   if (!pubkeyB58 || !signatureB58 || !timestampStr) {
-    return { ok: false, error: "Wallet authentication required. Connect your wallet.", status: 401 };
+    return {
+      ok: false,
+      error: "Wallet authentication required. Connect your wallet.",
+      status: 401,
+    };
   }
 
   // Validate pubkey
@@ -121,8 +123,21 @@ export function verifyWalletAuthHeaders(
 /**
  * Verify wallet authentication from incoming request headers.
  * Call this at the top of any API route handler.
+ *
+ * Checks the session cookie first (set by /api/auth/login). Falls back to
+ * per-request v1/v2 signature headers if no valid session cookie is present.
  */
 export async function verifyWalletAuth(): Promise<WalletAuthResult> {
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
+    const session = verifySessionToken(sessionCookie?.value);
+    if (session) {
+      return { ok: true, publicKey: session.publicKey };
+    }
+  } catch {
+    // fall through to header-based auth
+  }
   const hdrs = await headers();
   return verifyWalletAuthHeaders(hdrs);
 }
