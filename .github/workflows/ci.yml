@@ -53,7 +53,7 @@ jobs:
 
       - name: Install Solana CLI (Anza)
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v2.1.4/install)"
+          sh -c "$(curl -sSfL https://release.anza.xyz/v2.3.13/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       - name: Verify cargo-build-sbf is available
