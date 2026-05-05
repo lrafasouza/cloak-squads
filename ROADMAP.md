@@ -1,114 +1,124 @@
 # Aegis Roadmap
 
-## P0 — Fix What We Sell
+## Status atual — Devnet funcional
 
-### Mainnet Vault Import
+Todas as features principais estão funcionando end-to-end em devnet:
 
-**Problem:** Vault discovery (`/api/vaults/mine`) correctly scans on-chain for multisigs where the connected wallet is a member and surfaces them. But when the user clicks one, `useVaultData()` reads the multisig account from the app's configured RPC — which points to **devnet**. Mainnet vaults don't exist on devnet, so the user sees "Unable to verify access."
-
-**Why it matters:** Every real Squads team has vaults on mainnet. Without this, Aegis can't be used with any production multisig. This is the single most important adoption blocker.
-
-**Options:**
-
-- **Option A — Per-cluster config:** Make the app configurable. Vault dashboard reads from the cluster where the multisig lives. Privacy features remain devnet-only until the Cloak mainnet program is validated.
-- **Option B — Dual-connection architecture:** `mainnetConnection` for reading vault/proposal data, `devnetConnection` for Cloak operations. Transparent to the user; routing happens in the SDK layer.
-
-Both options require a dedicated mainnet RPC (Helius or QuickNode) — the public endpoint is too rate-limited for `getProgramAccounts` scans.
-
-**Status:** Architecture decided (Option B), implementation in progress.
+| Feature | Status |
+|---------|--------|
+| F1 — Private Send | ✅ Funcional |
+| F2 — Payroll batch (até 10 recipients) | ✅ Funcional |
+| F3 — Audit links escopados | ✅ Funcional |
+| F4 — Stealth invoices com claim links | ✅ Funcional |
+| F5 — Token swap proposals (SOL ↔ USDC) | ✅ Funcional |
+| Vault management, settings, address book | ✅ Funcional |
+| Atomic vault → operator auto-funding | ✅ Funcional |
+| Member management via Squads config proposals | ✅ Funcional |
 
 ---
 
-### Privacy: Vault → Operator Auto-Funding (Implemented)
+## P0 — Segurança (bloqueadores para produção)
 
-**Constraint:** `transact()` (the Cloak shield deposit) must be signed by a regular wallet. The Squads Vault PDA is program-owned and cannot sign arbitrary outbound transactions.
+Estes itens bloqueiam qualquer deploy em mainnet ou uso com usuários reais.
 
-**Implemented solution — atomic auto-funding:** Every private-send proposal now bundles two on-chain effects into the single approved Squads execution:
+### S1 — Membership check em todos os endpoints
+**Problema:** `requireWalletAuth` verifica apenas a assinatura criptográfica, mas não confere se a wallet é membro do multisig. Qualquer wallet autenticada pode criar drafts em vaults de terceiros.  
+**Fix:** Injetar `requireVaultMember(cofreAddress)` em todos os POSTs que criam dados associados a um vault.
 
-1. Transfer the payment amount from the vault PDA to the operator wallet (SOL via SystemProgram, SPL via the operator's ATA).
-2. Issue the gatekeeper license bound to the UTXO commitment.
+### S2 — Gate de operador para dados sensíveis
+**Problema:** O parâmetro `?includeSensitive=true` em `/api/proposals/[ms]/[index]` retorna `commitmentClaim` (chave privada do UTXO) para qualquer wallet autenticada.  
+**Fix:** Apenas a wallet registrada como operador do Cofre pode acessar dados sensíveis. Verificar contra o campo `operator` do Cofre on-chain.
 
-The operator picks up the funds and the license atomically and immediately calls `transact()`. From the user's perspective, private sends behave exactly like public sends — the vault balance funds the payment, and the operator only needs ~0.05 SOL for transaction fees.
+### S3 — Cifrar UTXO secrets no banco
+**Problema:** `StealthInvoice` armazena `utxoPrivateKey` e `utxoBlinding` em texto claro no PostgreSQL.  
+**Fix:** Cifrar com AES-256-GCM usando uma chave derivada do `JWT_SIGNING_SECRET`. Descriptografar apenas no momento de entrega ao operador autenticado.
 
-**Trade-off accepted:** the on-chain trace shows `vault → operator → Cloak pool → recipient`. Each hop is visible, but the Groth16 proof system breaks the cryptographic link between the vault deposit and the recipient withdrawal. The privacy guarantee comes from the Cloak pool's anonymity set, not from hiding the operator hop. This is documented honestly in the README's Privacy Model table.
+### S4 — Challenge-response no claim de stealth invoices
+**Problema:** A chave privada do UTXO (`#sk=...`) fica no fragment da URL do claim link. Se o backend loggar a requisição, ela fica exposta.  
+**Fix:** Implementar challenge-response: recipient assina um nonce de 60s com a chave do claim; backend valida a assinatura antes de retornar os dados do UTXO.
 
-**Future improvement (P2):** Cloak CPI support — if the Cloak protocol exposes a program-signed deposit instruction, the gatekeeper could CPI directly into Cloak from the vault execution, eliminating the operator hop entirely. Tracking this with the Cloak team.
+### S5 — Rate limiting distribuído
+**Problema:** Rate limiting atual é in-memory por processo. Em multi-instance (Render, Fly.io), o limite não é compartilhado. Sem eviction, pode causar leak de memória.  
+**Fix:** Migrar para Redis (Upstash) — `REDIS_URL` já está no `.env.example`, só falta a implementação.
 
----
-
-## P1 — Production Readiness
-
-### Mainnet Deployment
-
-- Switch `NEXT_PUBLIC_SOLANA_CLUSTER=mainnet-beta`
-- Validate the full private send flow against the mainnet Cloak program (`transact()` + `fullWithdraw()` API parity)
-- Dedicated mainnet RPC (Helius or QuickNode)
-- Managed PostgreSQL (Render or Supabase)
-- Application monitoring and alerting
-- Security audit of the gatekeeper program
-- Mainnet smoke tests with real SOL before launch
-
-### 2-of-N Hardening
-
-- End-to-end tested on devnet with a 2-of-3 multisig
-- Remaining gap: `commitmentClaim` is stored in the proposer's `sessionStorage` only — co-signers can't independently verify commitments before approving
-- Fix: move commitmentClaim verification to the off-chain DB (encrypted, accessible to all members)
-- Regression tests for multi-member flows (propose, approve, execute from different wallets)
-
-### UI/UX Polish
-
-- Mobile-responsive dashboard
-- Better error states for RPC failures and Cloak relay timeouts
-- Loading skeletons for all data-dependent views
-- Consistent number formatting (SOL amounts, USD equivalents, lamport display)
-- Surface the atomic vault → operator auto-funding step in the proposal review UI, so members understand exactly what they're approving
+### S6 — Replay protection por endpoint
+**Problema:** O header `X-Signature` é válido por 5 minutos em qualquer endpoint. Uma signature capturada pode ser reutilizada em endpoints diferentes durante a janela.  
+**Fix:** Incluir `method + path + body_hash` no payload assinado, verificar no servidor.
 
 ---
 
-## P2 — New Features
+## P1 — Mainnet readiness
 
-### Aegis MCP (Model Context Protocol)
+### Infraestrutura
+- [ ] **RPC dedicado** — Helius ou QuickNode (o endpoint público é rate-limited para `getProgramAccounts`)
+- [ ] **PostgreSQL gerenciado** — Render Postgres ou Supabase em produção
+- [ ] **Variáveis de ambiente de produção** — `NEXT_PUBLIC_SOLANA_CLUSTER=mainnet-beta`, relay URL do Cloak mainnet
+- [ ] **Monitoramento** — alertas para falhas de RPC, relay Cloak timeout, latência de proof
 
-Build an MCP server that exposes Aegis vault operations to AI agents.
+### Cloak mainnet
+- [ ] Validar parity da API — `transact()` + `fullWithdraw()` contra o programa mainnet do Cloak
+- [ ] Confirmar relay URL de produção com o time Cloak
+- [ ] Smoke tests com SOL real antes do launch
 
-Capabilities:
-- Check vault balance and member list
-- Create and list payment proposals
-- View pending operator queue
-- Execute operator batch (with human-in-the-loop approval gate)
+### Clustering por rede
+- [ ] **Dual-connection** — `mainnetConnection` para ler dados do vault/proposta, `devnetConnection` para operações Cloak até a validação do programa mainnet
+- [ ] Vault discovery funciona em mainnet; o bloqueio atual é o dashboard ler do cluster errado após o import
 
-Use cases: AI treasury management, compliance reporting, automated payroll scheduling.
+### Hardening 2-of-N
+- [ ] `commitmentClaim` armazenado apenas no `sessionStorage` do proposer — co-signers não conseguem verificar o commitment antes de aprovar
+- [ ] **Fix:** mover o `commitmentClaim` para o banco (cifrado), acessível a todos os membros do vault autenticados
+- [ ] Testes regressivos com multisig 2-of-3 (proposta por A, aprovação por B, execução pelo operador)
 
-Implementation: Node.js MCP server wrapping the existing Squads SDK + gatekeeper client + Aegis API.
-
-### Deeper Cloak Integration
-
-The current integration covers the core deposit/withdraw cycle. Future depth:
-
-- **SPL token privacy:** Extend `transact()` + `fullWithdraw()` beyond native SOL to support USDC and other SPL tokens (dependent on Cloak protocol support)
-- **Time-locked private transfers:** Issue a license with a future TTL so the operator can only execute after a specific block height — useful for vesting schedules
-- **Multi-hop privacy:** `vault → Cloak deposit → Cloak withdraw → new Cloak deposit → recipient` for higher anonymity sets on larger transfers
-- **Privacy pools for recurring payroll:** Batch multiple payroll cycles through the same Cloak pool entry to blend the anonymity sets
-
-### Team Management
-
-- Member onboarding flows with invite links
-- Role-based permissions: viewer, proposer, approver, operator
-- Activity notifications (webhook + email) for proposals and executions
-- Operator wallet rotation procedure with on-chain `set_operator` instruction
-
-### Integrations
-
-- Squads v5 compatibility when released
-- Realms/DAO integration for governance-controlled vaults
-- Cross-program invocation from other Solana programs via the gatekeeper
+### Auditoria do programa gatekeeper
+- [ ] Auditoria externa do `programs/cloak-gatekeeper` antes de qualquer uso com fundos reais
+- [ ] Cobrir especificamente: replay de licença, edge cases de TTL, invariants validation
 
 ---
 
-## Open Questions
+## P2 — UX e features pendentes
 
-- **Cloak mainnet API parity:** Does the mainnet Cloak program support the same `transact()` + `fullWithdraw()` API as devnet? Relay URL and program ID differ — need full validation before mainnet launch.
-- **Operator economics:** Who funds the operator wallet? Should Aegis charge a small protocol fee to cover operator SOL costs? Or is the operator a designated team member who manages their own balance?
-- **Compliance jurisdiction:** How do audit links interact with regulatory requirements in different jurisdictions? Scope controls (amounts_only, time_ranged) were designed with this in mind but need legal review.
-- **Key recovery:** What happens if the operator wallet is lost between license issuance and execution? The license expires (15 min TTL) and the proposal must be re-executed, but this requires a new Squads vote. Emergency operator rotation needs a documented procedure.
-- **Anonymity set size:** On devnet the Cloak pool has limited activity — anonymity sets are small. Mainnet pool depth needs evaluation before claiming production-grade privacy.
+### UX / Produto
+- [ ] **Auto-execute para threshold=1** — pular tela de "aguardando aprovação" em vaults 1-of-1
+- [ ] **Ocultar nav do Operador** para wallets que não são operadoras do vault
+- [ ] **Real-time status** — Helius webhook ou WebSocket para atualizar status de proposta sem polling
+- [ ] **Filtros na lista de propostas** — busca por recipient, range de data, status, token
+- [ ] **Preview de fee** no painel do operador antes de executar
+- [ ] **Worker para execução ZK** — a prova ZK (~30s) trava o frontend; mover para Service Worker ou Web Worker
+
+### SPL tokens e swaps
+- [ ] **Privacidade para SPL tokens** — estender `transact()` + `fullWithdraw()` para USDC e outros tokens (dependente de suporte do protocolo Cloak)
+- [ ] **Histórico de swaps** na tela `/swap` usando o `SwapDraft` persistido no banco
+
+### Gerenciamento de equipe
+- [ ] **Permissões por role** — viewer, proposer, approver, operador
+- [ ] **Invite links** para adicionar novos membros com fluxo guiado
+- [ ] **Notificações** — webhook e email para propostas criadas, aprovadas, executadas
+
+### Integrações
+- [ ] **Aegis MCP server** — expor operações de vault para agentes de IA: checar saldo, criar proposta, executar fila do operador (com human-in-the-loop)
+- [ ] **Realms / Governance** — integração via CPI para vaults controlados por DAO
+- [ ] **Squads v5** — compatibilidade quando lançado
+
+---
+
+## P3 — Arquitetura futura
+
+### Cloak CPI
+Se o protocolo Cloak expuser uma instrução de depósito que pode ser assinada por programa (CPI), o gatekeeper poderá chamar diretamente o `transact()` a partir da execução do vault — eliminando o hop intermediário do operador.  
+**Resultado:** `vault → Cloak pool → recipient` sem nenhum relay visível on-chain.  
+**Status:** Tracking com o time Cloak.
+
+### Payloads com time-lock
+Emitir licença com TTL futuro — o operador só pode executar após um bloco específico. Útil para vesting schedules e pagamentos programados.
+
+### Multi-hop para sets de anonimato maiores
+`vault → Cloak deposit → Cloak withdraw → novo Cloak deposit → recipient` — aumenta o set de anonimato para transferências grandes. Dependente de suporte no SDK Cloak.
+
+---
+
+## Questões em aberto
+
+- **Operator economics:** Quem abastece a wallet do operador com SOL para fees? O vault auto-funde o valor do pagamento, mas o operador precisa de ~0.05 SOL por execução para fees. Avaliar protocolo de fee pequeno ou modelo de operador como membro designado da equipe.
+- **Key recovery:** Se a wallet do operador for perdida entre a emissão da licença (TTL 15 min) e a execução, a proposta precisa ser re-executada com um novo voto Squads. Documentar procedimento de rotação de emergência.
+- **Anonymity set em produção:** No devnet, o pool Cloak tem atividade limitada — sets de anonimato pequenos. Precisa avaliar a profundidade do pool mainnet antes de afirmar privacidade de nível produção.
+- **Jurisdição de compliance:** Como os audit links interagem com requisitos regulatórios por jurisdição? Os controles de scope (`amounts_only`, `time_ranged`) foram projetados com isso em mente, mas precisam de revisão legal.

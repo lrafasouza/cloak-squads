@@ -407,31 +407,35 @@ This is the cleanest possible design given the program-owned vault constraint, w
 
 ## Roadmap
 
-### Now — Devnet (done)
+### Done — Devnet
 - [x] Private send via Cloak shield pool
 - [x] Atomic vault → operator auto-funding in a single approved execution
-- [x] Payroll batches (CSV upload, batch license proposal, per-recipient operator execution)
+- [x] Payroll batches (CSV upload, per-recipient operator execution, up to 10 recipients)
 - [x] Stealth invoices with secret claim links
 - [x] Scoped audit links (Ed25519-signed, time-limited, revocable)
-- [x] Token swap proposals (SOL ↔ USDC via Raydium / Orca, routed through Squads multisig approval)
+- [x] Token swap proposals (SOL ↔ USDC via Raydium / Orca)
 - [x] Vault import from existing Squads multisigs
 - [x] Member management (add/remove, change threshold)
+- [x] Address book, webhook settings, per-vault RPC override
 
-### Next — Mainnet readiness
-- [ ] Per-cluster RPC routing — mainnet vaults, devnet Cloak (until mainnet program validation)
-- [ ] Mainnet Cloak API parity validation (`transact()` + `fullWithdraw()` against mainnet program)
-- [ ] Dedicated RPC (Helius/QuickNode) — public endpoint too rate-limited for `getProgramAccounts`
-- [ ] Managed PostgreSQL (Render/Supabase)
-- [ ] 2-of-N hardening — move `commitmentClaim` from `sessionStorage` to encrypted DB so co-signers can independently verify before approving
+### Next — Security + Mainnet
+- [ ] Membership checks on all API endpoints (any authed wallet can currently write to any vault)
+- [ ] Operator-only gate for sensitive data (`commitmentClaim` / UTXO keys)
+- [ ] Encrypt UTXO private keys at rest in PostgreSQL
+- [ ] Challenge-response for stealth invoice claims
+- [ ] Distributed rate limiting via Redis
+- [ ] Dedicated RPC (Helius/QuickNode) + managed PostgreSQL
+- [ ] Mainnet Cloak API parity validation
 - [ ] Gatekeeper program security audit
+- [ ] 2-of-N hardening — move `commitmentClaim` to encrypted DB for co-signer verification
 
 ### Later — New features
-- [ ] SPL token privacy beyond SOL — USDC and other tokens through Cloak (dependent on protocol support)
-- [ ] Aegis MCP server — expose vault operations to AI agents (balance check, proposal creation, operator batch execution with human-in-the-loop)
-- [ ] Role-based permissions — viewer, proposer, approver, operator with invite links
-- [ ] Activity notifications — webhook + email for proposals and executions
+- [ ] SPL token privacy — USDC and other tokens through Cloak (dependent on protocol support)
+- [ ] Aegis MCP server — vault operations for AI agents with human-in-the-loop gate
+- [ ] Role-based permissions (viewer, proposer, approver, operator) + invite links
+- [ ] Activity notifications — webhook + email
 - [ ] Realms / Governance integration via CPI
-- [ ] Cloak CPI — program-signed deposit from vault execution, eliminating the operator hop entirely
+- [ ] Cloak CPI — program-signed deposit eliminating the operator hop
 
 ---
 
