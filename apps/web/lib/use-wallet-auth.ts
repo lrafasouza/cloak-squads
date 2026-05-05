@@ -50,7 +50,11 @@ function normalizePath(input: string | URL): string {
     typeof input === "string"
       ? new URL(input, typeof window !== "undefined" ? window.location.origin : "http://localhost")
       : input;
-  return url.pathname.replace(/\/$/, "") || "/";
+  const path = url.pathname.replace(/\/$/, "") || "/";
+  // Include search/query string in the signed path so a captured signature
+  // cannot be replayed against the same path with a different query (e.g.
+  // ?includeSensitive=true).
+  return path + (url.search || "");
 }
 
 export function useWalletAuth() {

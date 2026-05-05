@@ -83,8 +83,13 @@ export function verifyWalletAuthHeaders(
   const isV2 = !!(method && path && bodyHash);
 
   if (isV2) {
-    // v2: aegis:v2:{pubkey}:{ts}:{nonce}:{method}:{path}:{bodyHash}
-    const normalizedPath = path.replace(/\/$/, "") || "/";
+    // v2: aegis:v2:{pubkey}:{ts}:{nonce}:{method}:{path+query}:{bodyHash}
+    // Path may contain a query string (e.g. /api/payrolls/X/Y?includeSensitive=true).
+    // We trim trailing slash on the pathname only; query is left as-is.
+    const queryStart = path.indexOf("?");
+    const pathname = queryStart >= 0 ? path.slice(0, queryStart) : path;
+    const search = queryStart >= 0 ? path.slice(queryStart) : "";
+    const normalizedPath = (pathname.replace(/\/$/, "") || "/") + search;
     const message = `aegis:v2:${pubkeyB58}:${timestampStr}:${nonce ?? ""}:${method.toUpperCase()}:${normalizedPath}:${bodyHash}`;
     const messageBytes = new TextEncoder().encode(message);
     const valid = nacl.sign.detached.verify(messageBytes, signatureBytes, pubkeyBytes);

@@ -74,7 +74,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    // Step 2: Verify the challenge exists, is valid, and has not been used
+    // Step 2: Verify the challenge HMAC is valid and not expired
     const challenge = checkChallenge(id, parsed.data.challengeId);
     if (!challenge) {
       return NextResponse.json(
@@ -83,16 +83,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    // Step 3: Consume challenge (one-time use)
-    const consumed = await consumeChallenge(id, parsed.data.challengeId);
-    if (!consumed) {
-      return NextResponse.json(
-        { error: "Challenge already used. Request a new challenge." },
-        { status: 403 },
-      );
-    }
-
-    // Step 4: Verify the Ed25519 signature over the challenge nonce
+    // Step 3: Verify the Ed25519 signature over the challenge nonce.
+    // We verify BEFORE consuming so that invalid signatures from anyone
+    // who somehow obtained the challengeId cannot DoS legitimate claimers
+    // by burning their challenge.
     const signatureBytes = base64urlDecode(parsed.data.challengeSignature);
     const signPubkeyBytes = bs58.decode(invoice.signPubkey);
 
@@ -105,6 +99,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!validSig) {
       return NextResponse.json(
         { error: "Invalid challenge signature." },
+        { status: 403 },
+      );
+    }
+
+    // Step 4: Atomically consume the challenge (one-time use).
+    // SET NX EX is race-safe: concurrent valid requests with the same challenge
+    // will see exactly one consumed=true; the rest get 403.
+    const consumed = await consumeChallenge(id, parsed.data.challengeId);
+    if (!consumed) {
+      return NextResponse.json(
+        { error: "Challenge already used. Request a new challenge." },
         { status: 403 },
       );
     }

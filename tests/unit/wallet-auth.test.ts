@@ -147,6 +147,29 @@ describe("v2 signature (endpoint-bound)", () => {
     if (!result.ok) expect(result.status).toBe(401);
   });
 
+  test("query string is part of the signed path (sig with ?foo=1 differs from path without query)", () => {
+    const kp = makeKeypair();
+    const pubkey = bs58.encode(kp.publicKey);
+    const ts = String(nowSecs());
+    const nonce = crypto.randomUUID();
+
+    // Signed for /api/payrolls/X/Y (no query)
+    const message = `aegis:v2:${pubkey}:${ts}:${nonce}:GET:/api/payrolls/X/Y:-`;
+    const sig = signMessage(message, kp.secretKey);
+
+    // Attacker tries to add ?includeSensitive=true to the path header
+    const result = verifyWalletAuthHeaders(makeHeaders({
+      "x-solana-pubkey": pubkey,
+      "x-solana-signature": sig,
+      "x-solana-timestamp": ts,
+      "x-solana-nonce": nonce,
+      "x-solana-method": "GET",
+      "x-solana-path": "/api/payrolls/X/Y?includeSensitive=true",
+      "x-solana-body-hash": "-",
+    }));
+    expect(result.ok).toBe(false);
+  });
+
   test("trailing slash in path is normalized (same sig as without slash)", () => {
     const kp = makeKeypair();
     const pubkey = bs58.encode(kp.publicKey);
@@ -165,6 +188,29 @@ describe("v2 signature (endpoint-bound)", () => {
       "x-solana-nonce": nonce,
       "x-solana-method": "GET",
       "x-solana-path": "/api/vaults/", // trailing slash stripped by server
+      "x-solana-body-hash": "-",
+    }));
+    expect(result.ok).toBe(true);
+  });
+
+  test("path with trailing slash before query is normalized", () => {
+    const kp = makeKeypair();
+    const pubkey = bs58.encode(kp.publicKey);
+    const ts = String(nowSecs());
+    const nonce = crypto.randomUUID();
+
+    // Client signs with no trailing slash + query
+    const message = `aegis:v2:${pubkey}:${ts}:${nonce}:GET:/api/vaults?x=1:-`;
+    const sig = signMessage(message, kp.secretKey);
+
+    // Server receives path with trailing slash + same query
+    const result = verifyWalletAuthHeaders(makeHeaders({
+      "x-solana-pubkey": pubkey,
+      "x-solana-signature": sig,
+      "x-solana-timestamp": ts,
+      "x-solana-nonce": nonce,
+      "x-solana-method": "GET",
+      "x-solana-path": "/api/vaults/?x=1",
       "x-solana-body-hash": "-",
     }));
     expect(result.ok).toBe(true);

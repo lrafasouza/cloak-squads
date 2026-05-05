@@ -93,3 +93,41 @@ describe("consumeChallenge (no Redis — no-op)", () => {
     expect(second).toBe(true);
   });
 });
+
+describe("consumeChallenge with mocked Redis (one-time enforcement)", () => {
+  test("first consume returns true, second returns false", async () => {
+    const callLog: Array<{ key: string; value: string; opts?: { nx?: boolean; ex?: number } }> = [];
+    const store = new Map<string, string>();
+    const fakeRedis = {
+      set: async (key: string, value: string, opts?: { nx?: boolean; ex?: number }) => {
+        callLog.push({ key, value, opts });
+        if (opts?.nx && store.has(key)) return null;
+        store.set(key, value);
+        return "OK";
+      },
+    };
+
+    process.env.REDIS_URL = "https://fake.upstash.io";
+    process.env.REDIS_TOKEN = "test";
+    vi.resetModules();
+    vi.doMock("@upstash/redis", () => ({ Redis: function () { return fakeRedis; } }));
+
+    const { createChallenge, consumeChallenge } = await import("../../apps/web/lib/claim-challenge");
+    const { challengeId } = createChallenge("invoice-redis");
+
+    const first = await consumeChallenge("invoice-redis", challengeId);
+    expect(first).toBe(true);
+
+    const second = await consumeChallenge("invoice-redis", challengeId);
+    expect(second).toBe(false);
+
+    // Verify both calls used SET NX EX
+    expect(callLog).toHaveLength(2);
+    expect(callLog[0].opts?.nx).toBe(true);
+    expect(callLog[0].opts?.ex).toBeGreaterThan(0);
+
+    delete process.env.REDIS_URL;
+    delete process.env.REDIS_TOKEN;
+    vi.doUnmock("@upstash/redis");
+  });
+});
