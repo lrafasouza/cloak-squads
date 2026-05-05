@@ -1509,75 +1509,183 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 </div>
               ) : (
                 <>
-                  <div
-                    className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
-                    style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 6rem 5rem" }}
-                  >
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
-                      #
-                    </span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
-                      Type
-                    </span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
-                      Details
-                    </span>
-                    <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
-                      Amount
-                    </span>
-                    <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
-                      Status
-                    </span>
-                    <span />
+                  {/* Desktop table */}
+                  <div className="hidden md:block">
+                    <div
+                      className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
+                      style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 6rem 5rem" }}
+                    >
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        #
+                      </span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Type
+                      </span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Details
+                      </span>
+                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Amount
+                      </span>
+                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Status
+                      </span>
+                      <span />
+                    </div>
+                    <div className="divide-y divide-border/40">
+                      {queueDrafts.map((d) => (
+                        <div
+                          key={d.id}
+                          className="grid items-center gap-4 px-5 py-3"
+                          style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 6rem 5rem" }}
+                        >
+                          <span className="font-mono text-sm text-ink-subtle">
+                            #{d.transactionIndex}
+                          </span>
+                          <span
+                            className={`inline-flex w-fit items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                              d.type === "payroll"
+                                ? "bg-accent-soft text-accent"
+                                : "bg-surface-2 text-ink-muted"
+                            }`}
+                          >
+                            {d.type.toUpperCase()}
+                          </span>
+                          <p className="truncate text-sm text-ink">
+                            {d.type === "payroll"
+                              ? `${d.recipientCount ?? 0} recipients`
+                              : d.recipient
+                                ? `${d.recipient.slice(0, 8)}...${d.recipient.slice(-8)}`
+                                : "Transfer"}
+                          </p>
+                          <p className="text-right font-mono text-sm text-ink">
+                            {formatRawAmount(
+                              d.type === "payroll" ? (d.totalAmount ?? d.amount) : d.amount,
+                              d.invariants?.tokenMint ?? SOL_MINT,
+                            )}
+                          </p>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${statusDot((d as unknown as { proposalStatus?: string }).proposalStatus ?? "unknown")}`}
+                            />
+                            <span className="text-xs text-ink-muted">
+                              {statusLabel(
+                                (d as unknown as { proposalStatus?: string }).proposalStatus ??
+                                  "unknown",
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              className="text-xs px-2 py-1 h-auto"
+                              onClick={() => {
+                                setTxIndex(d.transactionIndex);
+                                void (async () => {
+                                  setLoadedDraft(null);
+                                  setPayrollDraft(null);
+                                  setError(null);
+                                  setSignature(null);
+                                  setExecutionSteps([]);
+                                  try {
+                                    const singleResponse = await fetchDraftWithFallback(
+                                      `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
+                                    );
+                                    if (singleResponse.ok) {
+                                      const draft = (await singleResponse.json()) as SingleDraft;
+                                      setLoadedDraft(draft);
+                                      void checkOnChainStatus(d.transactionIndex, draft);
+                                      return;
+                                    }
+                                    const payrollResponse = await fetchDraftWithFallback(
+                                      `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
+                                    );
+                                    if (payrollResponse.ok) {
+                                      const draft = (await payrollResponse.json()) as PayrollDraft;
+                                      setPayrollDraft(draft);
+                                      setExecutionSteps(
+                                        draft.recipients.map((_, i) => ({
+                                          index: i,
+                                          status: "pending",
+                                        })),
+                                      );
+                                      void checkOnChainStatus(d.transactionIndex, draft);
+                                      return;
+                                    }
+                                    setError(
+                                      `No persisted draft found for proposal #${d.transactionIndex}.`,
+                                    );
+                                  } catch (caught) {
+                                    setError(
+                                      caught instanceof Error
+                                        ? caught.message
+                                        : "Could not load proposal draft.",
+                                    );
+                                  }
+                                })();
+                              }}
+                            >
+                              Load
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="divide-y divide-border/40">
+
+                  {/* Mobile cards */}
+                  <div className="md:hidden p-3 space-y-3">
                     {queueDrafts.map((d) => (
                       <div
                         key={d.id}
-                        className="grid items-center gap-4 px-5 py-3"
-                        style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 6rem 5rem" }}
+                        className="rounded-xl border border-border/60 bg-surface p-4 transition-colors active:bg-surface-2"
                       >
-                        <span className="font-mono text-sm text-ink-subtle">
-                          #{d.transactionIndex}
-                        </span>
-                        <span
-                          className={`inline-flex w-fit items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
-                            d.type === "payroll"
-                              ? "bg-accent-soft text-accent"
-                              : "bg-surface-2 text-ink-muted"
-                          }`}
-                        >
-                          {d.type.toUpperCase()}
-                        </span>
-                        <p className="truncate text-sm text-ink">
-                          {d.type === "payroll"
-                            ? `${d.recipientCount ?? 0} recipients`
-                            : d.recipient
-                              ? `${d.recipient.slice(0, 8)}...${d.recipient.slice(-8)}`
-                              : "Transfer"}
-                        </p>
-                        <p className="text-right font-mono text-sm text-ink">
-                          {formatRawAmount(
-                            d.type === "payroll" ? (d.totalAmount ?? d.amount) : d.amount,
-                            d.invariants?.tokenMint ?? SOL_MINT,
-                          )}
-                        </p>
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${statusDot((d as unknown as { proposalStatus?: string }).proposalStatus ?? "unknown")}`}
-                          />
-                          <span className="text-xs text-ink-muted">
-                            {statusLabel(
-                              (d as unknown as { proposalStatus?: string }).proposalStatus ??
-                                "unknown",
-                            )}
-                          </span>
-                        </div>
-                        <div className="flex justify-end">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono text-xs text-ink-subtle">
+                                #{d.transactionIndex}
+                              </span>
+                              <span
+                                className={`inline-flex w-fit items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                                  d.type === "payroll"
+                                    ? "bg-accent-soft text-accent"
+                                    : "bg-surface-2 text-ink-muted"
+                                }`}
+                              >
+                                {d.type.toUpperCase()}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-sm text-ink">
+                              {d.type === "payroll"
+                                ? `${d.recipientCount ?? 0} recipients`
+                                : d.recipient
+                                  ? `${d.recipient.slice(0, 8)}...${d.recipient.slice(-8)}`
+                                  : "Transfer"}
+                            </p>
+                            <p className="mt-0.5 font-mono text-xs text-ink-muted">
+                              {formatRawAmount(
+                                d.type === "payroll" ? (d.totalAmount ?? d.amount) : d.amount,
+                                d.invariants?.tokenMint ?? SOL_MINT,
+                              )}
+                            </p>
+                            <div className="mt-1 flex items-center gap-1.5">
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${statusDot((d as unknown as { proposalStatus?: string }).proposalStatus ?? "unknown")}`}
+                              />
+                              <span className="text-xs text-ink-muted">
+                                {statusLabel(
+                                  (d as unknown as { proposalStatus?: string }).proposalStatus ??
+                                    "unknown",
+                                )}
+                              </span>
+                            </div>
+                          </div>
                           <Button
                             type="button"
                             variant="secondary"
-                            className="text-xs px-2 py-1 h-auto"
+                            className="shrink-0 text-xs px-2 py-1 h-auto"
                             onClick={() => {
                               setTxIndex(d.transactionIndex);
                               void (async () => {

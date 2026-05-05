@@ -298,7 +298,7 @@ export function SwapPanel({ multisig }: SwapPanelProps) {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             disabled={pending}
-            className="flex-1 border-0 bg-transparent p-0 text-2xl font-medium placeholder:text-ink-muted/40 focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="flex-1 border-0 bg-transparent p-0 text-xl font-medium placeholder:text-ink-muted/40 focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-2xl"
           />
           <TokenDropdown
             tokens={tokens}
@@ -333,7 +333,7 @@ export function SwapPanel({ multisig }: SwapPanelProps) {
           <span className="text-sm text-ink-muted">To (estimated)</span>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex-1 text-2xl font-medium text-ink">
+          <div className="flex-1 text-xl font-medium text-ink sm:text-2xl">
             {preview ? preview.outAmountUi : "0.00"}
           </div>
           <TokenDropdown

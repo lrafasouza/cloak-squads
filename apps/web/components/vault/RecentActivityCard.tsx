@@ -96,7 +96,7 @@ function ProposalRow({ multisig, p }: { multisig: string; p: ProposalSummary }) 
         </div>
       </div>
 
-      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100" />
+      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-ink-subtle opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100" />
     </Link>
   );
 }
@@ -143,7 +143,7 @@ function IncomeRow({
         <span className="text-[10px] text-ink-subtle">{time}</span>
       </div>
 
-      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100" />
+      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-ink-subtle opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100" />
     </a>
   );
 }

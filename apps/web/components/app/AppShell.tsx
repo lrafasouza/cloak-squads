@@ -1,6 +1,5 @@
 "use client";
 
-import { BottomNav } from "@/components/app/BottomNav";
 import { VaultSelector } from "@/components/app/VaultSelector";
 import { Logo } from "@/components/brand/Logo";
 import { Spinner } from "@/components/ui/skeleton";
@@ -360,29 +359,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Main area */}
       <div className="flex flex-1 flex-col min-w-0">
-        {/* Topbar — mobile only trigger + inbox */}
+        {/* Topbar — mobile only trigger + wallet + inbox */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-white/[0.04] bg-surface/[0.6] px-4 backdrop-blur-xl md:hidden">
-          <button
-            type="button"
-            onClick={() => setMobileNavOpen(true)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:bg-surface-2"
-            aria-label="Open navigation"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-          <Logo href="/" variant="monogram" size="sm" />
-          <button
-            type="button"
-            onClick={() => setInboxOpen(true)}
-            className="relative inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:bg-surface-2"
-          >
-            <Key className="h-4 w-4" />
-            {inboxItems.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[9px] font-bold text-accent-ink">
-                {inboxItems.length}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:bg-surface-2"
+              aria-label="Open navigation"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <Logo href="/" variant="monogram" size="sm" />
+          </div>
+          <div className="flex items-center gap-2">
+            <ClientWalletButton />
+            <button
+              type="button"
+              onClick={() => setInboxOpen(true)}
+              className="relative inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:bg-surface-2"
+            >
+              <Key className="h-4 w-4" />
+              {inboxItems.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[9px] font-bold text-accent-ink">
+                  {inboxItems.length}
+                </span>
+              )}
+            </button>
+          </div>
         </header>
 
         {/* Desktop topbar */}
@@ -413,7 +417,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto pb-20 md:pb-0">{children}</main>
+        <main className="flex-1 overflow-auto">{children}</main>
       </div>
 
       {/* Mobile nav drawer */}
@@ -425,7 +429,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="absolute inset-0 bg-bg/80 backdrop-blur-sm"
             onClick={() => setMobileNavOpen(false)}
           />
-          <aside className="absolute left-0 top-0 h-full w-72 border-r border-white/[0.04] bg-surface/[0.85] shadow-raise-2 backdrop-blur-xl">
+          <aside className="absolute left-0 top-0 h-full w-[85vw] max-w-80 border-r border-white/[0.04] bg-surface/[0.85] shadow-raise-2 backdrop-blur-xl overflow-y-auto">
             <div className="absolute right-3 top-3">
               <button
                 type="button"
@@ -448,8 +452,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Bottom nav (mobile only) */}
-      <BottomNav />
 
       {/* Inbox sheet (shared) */}
       <OperatorInboxSheet

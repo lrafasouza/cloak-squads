@@ -326,11 +326,11 @@ function ContactRow({
         </div>
         <div className="mt-0.5 font-mono text-xs text-ink-muted">{abbrev(entry.address)}</div>
       </div>
-      <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+      <div className="flex shrink-0 items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
         <button
           type="button"
           onClick={() => setIsEditing(true)}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-surface-2 hover:text-ink transition-colors"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:bg-surface-2 hover:text-ink transition-colors"
           aria-label="Edit contact"
           title="Edit contact"
         >
@@ -339,7 +339,7 @@ function ContactRow({
         <button
           type="button"
           onClick={() => onDelete(entry.id)}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-signal-danger/15 hover:text-signal-danger transition-colors"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:bg-signal-danger/15 hover:text-signal-danger transition-colors"
           aria-label="Delete contact"
           title="Delete contact"
         >

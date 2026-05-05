@@ -109,7 +109,7 @@ export default function SwapPage({ params }: { params: Promise<{ multisig: strin
             </Panel>
 
             {/* Time range selector */}
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center justify-center gap-2 px-4">
               {[1, 7, 30].map((d) => (
                 <button
                   key={d}

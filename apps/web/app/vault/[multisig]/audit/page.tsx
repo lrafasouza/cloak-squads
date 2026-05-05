@@ -645,7 +645,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                               )}
                             </div>
 
-                            <div className="flex shrink-0 gap-2">
+                            <div className="flex flex-wrap shrink-0 gap-2">
                               <button
                                 type="button"
                                 onClick={() => exportToCSV(link)}
@@ -681,12 +681,12 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                                   <p className="text-[11px] font-medium uppercase tracking-wider text-ink-subtle">
                                     Shareable link
                                   </p>
-                                  <div className="mt-1.5 flex items-center gap-2">
+                                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
                                     <input
                                       type="text"
                                       readOnly
                                       value={shareUrl}
-                                      className="flex-1 rounded-md border border-border bg-bg px-3 py-1.5 font-mono text-[11px] text-ink-muted"
+                                      className="min-w-0 flex-1 rounded-md border border-border bg-bg px-3 py-1.5 font-mono text-[11px] text-ink-muted"
                                     />
                                     <button
                                       type="button"

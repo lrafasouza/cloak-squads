@@ -80,13 +80,12 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 p-6">
+      <div className="space-y-6 p-4 md:p-6">
         <div className="h-12 w-48 shimmer-bg rounded-lg" />
         {/* Balance skeleton */}
         <div className="h-40 shimmer-bg rounded-2xl" />
         {/* Quick actions skeleton */}
-        <div className="grid grid-cols-4 gap-3">
-          <div className="h-24 shimmer-bg rounded-2xl" />
+        <div className="grid grid-cols-3 gap-3">
           <div className="h-24 shimmer-bg rounded-2xl" />
           <div className="h-24 shimmer-bg rounded-2xl" />
           <div className="h-24 shimmer-bg rounded-2xl" />
@@ -114,7 +113,7 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 md:p-6">
       {/* Header — identity row */}
       <div className="relative">
         {/* Subtle golden radial glow behind header */}
@@ -162,7 +161,7 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
       <PrivacyFlowTrigger onClick={() => setPrivacyFlowOpen(true)} />
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard label="Members" value={data.memberCount} icon={Users} />
         <StatCard
           label="Threshold"

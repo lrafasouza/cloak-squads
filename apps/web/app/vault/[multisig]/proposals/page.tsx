@@ -305,6 +305,212 @@ function IncomeRow({ entry }: { entry: IncomeEntry }) {
   );
 }
 
+/* ── Mobile cards ── */
+function ProposalQueueMobileCard({
+  multisig,
+  p,
+  onCancel,
+  cancelling,
+}: {
+  multisig: string;
+  p: ProposalSummary;
+  onCancel?: (p: ProposalSummary) => void;
+  cancelling?: boolean;
+}) {
+  const description =
+    p.type === "payroll"
+      ? `${p.recipientCount ?? "?"} recipients`
+      : p.amount && p.amount !== "0"
+        ? `${lamportsToSol(p.amount)} SOL`
+        : p.title || p.memo || "Configuration change";
+
+  const recipient =
+    p.type === "single" && p.recipient ? truncateAddress(p.recipient) : null;
+
+  const dot = STATUS_DOT[p.status ?? "draft"] ?? "bg-ink-subtle";
+  const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "—";
+
+  return (
+    <div className="relative rounded-xl border border-border/60 bg-surface p-4 transition-colors active:bg-surface-2">
+      <Link
+        href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
+        className="absolute inset-0 rounded-xl"
+        aria-label={`View proposal #${p.transactionIndex}`}
+      />
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs font-medium text-ink-subtle">
+              #{p.transactionIndex}
+            </span>
+            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+            <span className="text-xs font-medium text-ink-muted">{label}</span>
+          </div>
+          <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
+            <KindIcon type={p.type} />
+            {KIND_LABEL[p.type]}
+          </div>
+          <p className="mt-1 text-sm font-medium text-ink">{description}</p>
+          {recipient && (
+            <p className="mt-0.5 font-mono text-xs text-ink-subtle">{recipient}</p>
+          )}
+          {p.approvals != null && p.threshold != null && (
+            <div className="mt-2">
+              <ApprovalDots approvals={p.approvals} threshold={p.threshold} />
+            </div>
+          )}
+        </div>
+        <div className="relative z-20 flex shrink-0 flex-col items-end gap-2">
+          <Link
+            href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink shadow-raise-1"
+          >
+            {p.status === "active" ? "Sign" : p.status === "approved" ? "Execute" : "View"}
+          </Link>
+          {(p.status === "active" || p.status === "approved") && onCancel && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onCancel(p); }}
+              disabled={cancelling}
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-signal-danger/30 bg-signal-danger/10 text-signal-danger disabled:opacity-30"
+            >
+              {cancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProposalMobileCard({
+  multisig,
+  p,
+  isHistory,
+  onCancel,
+  onHide,
+  cancelling,
+}: {
+  multisig: string;
+  p: ProposalSummary;
+  isHistory?: boolean;
+  onCancel?: (p: ProposalSummary) => void;
+  onHide?: (id: string) => void;
+  cancelling?: boolean;
+}) {
+  const description =
+    p.type === "payroll"
+      ? `${p.recipientCount ?? "?"} recipients · ${lamportsToSol(p.totalAmount ?? "0")} SOL`
+      : p.amount && p.amount !== "0"
+        ? `${lamportsToSol(p.amount)} SOL → ${truncateAddress(p.recipient)}`
+        : p.title || p.memo || "Configuration change";
+
+  const dot = STATUS_DOT[p.status ?? "draft"] ?? "bg-ink-subtle";
+  const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "—";
+
+  return (
+    <div className="relative rounded-xl border border-border/60 bg-surface p-4 transition-colors active:bg-surface-2">
+      <Link
+        href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
+        className="absolute inset-0 rounded-xl"
+        aria-label={`View proposal #${p.transactionIndex}`}
+      />
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs font-medium text-ink-subtle">
+              #{p.transactionIndex}
+            </span>
+            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+            <span className="text-xs font-medium text-ink-muted">{label}</span>
+          </div>
+          <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
+            <KindIcon type={p.type} />
+            {KIND_LABEL[p.type]}
+          </div>
+          <p className="mt-1 text-sm text-ink">{description}</p>
+          {p.memo && p.type !== "single" && (
+            <p className="mt-0.5 truncate text-xs text-ink-subtle">{p.memo}</p>
+          )}
+          {p.approvals != null && p.threshold != null && (
+            <div className="mt-2">
+              <ApprovalDots approvals={p.approvals} threshold={p.threshold} />
+            </div>
+          )}
+        </div>
+        <div className="relative z-20 flex shrink-0 flex-col items-end gap-2">
+          {!isHistory && (p.status === "active" || p.status === "approved") && onCancel && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onCancel(p); }}
+              disabled={cancelling}
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-signal-danger/30 bg-signal-danger/10 text-signal-danger disabled:opacity-30"
+            >
+              {cancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+            </button>
+          )}
+          {isHistory && onHide && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onHide(p.id); }}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-ink-subtle hover:bg-surface-3 hover:text-ink"
+            >
+              <EyeOff className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <Link
+            href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink shadow-raise-1"
+          >
+            View
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IncomeMobileCard({ entry }: { entry: IncomeEntry }) {
+  const solAmount = lamportsToSol(entry.amountLamports);
+  const explorerUrl = `https://solscan.io/tx/${entry.signature}${CLUSTER}`;
+
+  return (
+    <div className="relative rounded-xl border border-border/60 bg-surface p-4 transition-colors active:bg-surface-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-signal-positive/15">
+              <ArrowDownToLine className="h-3 w-3 text-signal-positive" />
+            </span>
+            <span className="font-mono text-sm font-semibold text-signal-positive tabular-nums">
+              +{solAmount} SOL
+            </span>
+          </div>
+          <p className="mt-1 truncate font-mono text-xs text-ink-muted">
+            {entry.from === "Unknown" ? (
+              <span className="text-ink-subtle italic">Unknown sender</span>
+            ) : (
+              truncateAddress(entry.from)
+            )}
+          </p>
+          <p className="mt-0.5 text-xs text-ink-muted tabular-nums">{formatDate(entry.blockTime)}</p>
+        </div>
+        <a
+          href={explorerUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 rounded-md border border-border-strong px-2.5 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+        >
+          Solscan
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export default function TransactionsPage({
   params,
 }: {
@@ -450,8 +656,8 @@ export default function TransactionsPage({
           ))}
         </div>
 
-        {/* Scrollable area — prevents horizontal overflow on mobile */}
-        <div className="overflow-x-auto">
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
           <div className="min-w-[640px]">
             {/* Column headers */}
             {activeTab === "income" ? (
@@ -568,6 +774,72 @@ export default function TransactionsPage({
               })()
             )}
           </div>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden p-3 space-y-3">
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-ink-muted">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">Loading…</span>
+            </div>
+          ) : activeTab === "income" ? (
+            incomeEntries.length === 0 ? (
+              <div className="py-16 text-center">
+                <p className="text-sm font-medium text-ink-muted">No incoming transfers yet</p>
+                <p className="mt-1 text-xs text-ink-subtle">
+                  SOL sent directly to this vault will appear here.
+                </p>
+              </div>
+            ) : (
+              incomeEntries.map((entry) => (
+                <IncomeMobileCard key={entry.signature} entry={entry} />
+              ))
+            )
+          ) : activeTab === "queue" ? (
+            grouped.queue.length === 0 ? (
+              <div className="py-16 text-center">
+                <p className="text-sm font-medium text-ink-muted">No pending transactions</p>
+                <p className="mt-1 text-xs text-ink-subtle">
+                  New proposals will appear here once submitted.
+                </p>
+              </div>
+            ) : (
+              grouped.queue.map((p) => (
+                <ProposalQueueMobileCard
+                  key={p.id}
+                  multisig={multisig}
+                  p={p}
+                  onCancel={(target: ProposalSummary) => setCancelTarget(target)}
+                  cancelling={cancelling && cancelTarget?.id === p.id}
+                />
+              ))
+            )
+          ) : (
+            (() => {
+              const items = grouped[activeTab as Exclude<TabId, "income" | "queue">] ?? [];
+              return items.length === 0 ? (
+                <div className="py-16 text-center">
+                  <p className="text-sm font-medium text-ink-muted">
+                    {activeTab === "history"
+                      ? "No history yet"
+                      : "No drafts saved"}
+                  </p>
+                </div>
+              ) : (
+                items.map((p) => (
+                  <ProposalMobileCard
+                    key={p.id}
+                    multisig={multisig}
+                    p={p}
+                    isHistory={activeTab === "history"}
+                    {...(activeTab === "history" ? { onHide: hideProposal } : { onCancel: (target: ProposalSummary) => setCancelTarget(target) })}
+                    cancelling={cancelling && cancelTarget?.id === p.id}
+                  />
+                ))
+              );
+            })()
+          )}
         </div>
       </div>
 

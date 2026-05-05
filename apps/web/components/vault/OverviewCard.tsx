@@ -84,7 +84,7 @@ export function OverviewCard({
           <button
             type="button"
             onClick={onRefresh}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-ink-subtle opacity-0 transition-all hover:bg-surface-2 hover:text-ink group-hover:opacity-100"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-ink-subtle opacity-100 transition-all hover:bg-surface-2 hover:text-ink md:opacity-0 md:group-hover:opacity-100"
             aria-label="Refresh balance"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -172,7 +172,7 @@ export function OverviewCard({
           <button
             type="button"
             onClick={onReceive}
-            className="flex items-center justify-center gap-2 rounded-xl border border-border/60 bg-surface-2 px-3 py-2.5 text-sm font-medium text-ink transition-all hover:border-accent/20 hover:text-accent"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-surface-2 px-2 py-2.5 text-xs font-medium text-ink transition-all hover:border-accent/20 hover:text-accent sm:gap-2 sm:px-3 sm:text-sm"
           >
             <ArrowDownToLine className="h-4 w-4" strokeWidth={1.5} />
             Deposit
@@ -180,7 +180,7 @@ export function OverviewCard({
           <button
             type="button"
             onClick={onSend}
-            className="flex items-center justify-center gap-2 rounded-xl border border-border/60 bg-surface-2 px-3 py-2.5 text-sm font-medium text-ink transition-all hover:border-accent/20 hover:text-accent"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-surface-2 px-2 py-2.5 text-xs font-medium text-ink transition-all hover:border-accent/20 hover:text-accent sm:gap-2 sm:px-3 sm:text-sm"
           >
             <ArrowUpFromLine className="h-4 w-4" strokeWidth={1.5} />
             Send
@@ -188,7 +188,7 @@ export function OverviewCard({
           <button
             type="button"
             onClick={onSwap}
-            className="flex items-center justify-center gap-2 rounded-xl border border-border/60 bg-surface-2 px-3 py-2.5 text-sm font-medium text-ink transition-all hover:border-accent/20 hover:text-accent"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-surface-2 px-2 py-2.5 text-xs font-medium text-ink transition-all hover:border-accent/20 hover:text-accent sm:gap-2 sm:px-3 sm:text-sm"
           >
             <ArrowLeftRight className="h-4 w-4" strokeWidth={1.5} />
             Swap

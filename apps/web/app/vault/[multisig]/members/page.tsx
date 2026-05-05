@@ -205,7 +205,8 @@ export default function MembersPage({
           </InlineAlert>
         )}
 
-        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-raise-1">
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-hidden rounded-xl border border-border bg-surface shadow-raise-1">
           <div
             className="grid items-center gap-4 border-b border-border/50 px-6 py-3"
             style={{ gridTemplateColumns: "3rem 1fr 10rem 5rem" }}
@@ -271,6 +272,67 @@ export default function MembersPage({
               );
             })}
           </div>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden space-y-3">
+          {data.members.map((addr, i) => {
+            const isMe = addr === wallet.publicKey?.toBase58();
+            return (
+              <div
+                key={addr}
+                className="rounded-xl border border-border/60 bg-surface p-4 transition-colors active:bg-surface-2"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs text-ink-subtle">#{i + 1}</span>
+                      <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent">
+                        Signer
+                      </span>
+                      {isMe && (
+                        <span className="rounded-full border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                          You
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 break-all font-mono text-sm text-ink">
+                      {addr}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(addr)}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy
+                  </button>
+                  <a
+                    href={`https://solana.fm/address/${addr}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    View
+                  </a>
+                  {data.memberCount > 1 && !isMe && (
+                    <button
+                      type="button"
+                      onClick={() => setRemoveTarget(addr)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-signal-danger/30 px-3 py-2 text-xs font-medium text-signal-danger transition-colors hover:bg-signal-danger/10"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <p className="text-xs leading-relaxed text-ink-subtle">

@@ -21,7 +21,7 @@ export function SiteHeader({ className, showWallet = true, minimal = false }: { 
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className={cn("sticky top-0 z-40 px-4 pt-3 md:px-6", className)}>
+    <div className={cn("relative sticky top-0 z-40 px-4 pt-3 md:px-6", className)}>
       {/* Glass shell navbar — Brand Deliverable §02 */}
       <header
         className={cn(
@@ -53,11 +53,6 @@ export function SiteHeader({ className, showWallet = true, minimal = false }: { 
             {/* Desktop actions */}
             <div className="hidden items-center gap-3.5 md:flex">
               {/* Status pill — Brand Deliverable §02 */}
-              <span className="inline-flex items-center gap-2 rounded-full border border-[#2a2a31] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-ink-subtle">
-                <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_hsl(var(--accent))]" />
-                Devnet live
-              </span>
-
               {showWallet && <ClientWalletButton />}
               {!isVaultPage && (
                 <Link
@@ -89,9 +84,9 @@ export function SiteHeader({ className, showWallet = true, minimal = false }: { 
         )}
       </header>
 
-      {/* Mobile menu */}
+      {/* Mobile menu — absolute overlay so it floats over content */}
       {mobileOpen && !minimal && (
-        <div className="mx-auto mt-2 max-w-[1100px] rounded-[18px] border border-border bg-bg/95 backdrop-blur-xl md:hidden">
+        <div className="absolute left-0 right-0 top-full z-50 mx-4 mt-2 rounded-[18px] border border-border bg-bg/95 backdrop-blur-xl md:hidden">
           <nav className="flex flex-col px-4 py-3">
             {nav.map((item) => (
               <Link

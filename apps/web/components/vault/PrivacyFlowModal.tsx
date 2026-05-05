@@ -156,7 +156,7 @@ export function PrivacyFlowModal({ open, onOpenChange }: { open: boolean; onOpen
           {/* Modal */}
           <motion.div
             className={cn(
-              "relative z-10 h-screen w-screen overflow-y-auto border border-accent/20 bg-surface shadow-raise-2",
+              "relative z-10 h-screen max-h-[100dvh] w-screen overflow-y-auto border border-accent/20 bg-surface shadow-raise-2",
             )}
             variants={modalVariants}
             initial="hidden"
@@ -169,8 +169,8 @@ export function PrivacyFlowModal({ open, onOpenChange }: { open: boolean; onOpen
             {/* Header glow */}
             <div className="pointer-events-none absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-accent/10 blur-3xl" />
 
-            <div className="relative flex h-full flex-col items-center justify-center">
-              <div className="w-full max-w-2xl px-8 py-8">
+            <div className="relative flex h-full flex-col items-center justify-start pt-6 sm:justify-center sm:pt-0">
+              <div className="w-full max-w-2xl px-5 py-6 sm:px-8 sm:py-8">
                 {/* Close */}
                 <div className="flex items-center justify-end">
                   <button
@@ -188,7 +188,7 @@ export function PrivacyFlowModal({ open, onOpenChange }: { open: boolean; onOpen
                   <span className="text-xs font-semibold uppercase tracking-eyebrow text-ink-subtle">
                     How it works
                   </span>
-                  <h2 className="mt-2 font-display text-3xl leading-tight text-ink">
+                  <h2 className="mt-2 font-display text-2xl leading-tight text-ink sm:text-3xl">
                     Privacy Flow
                   </h2>
                   <p className="mt-2 max-w-lg text-base leading-relaxed text-ink-muted">
@@ -287,7 +287,7 @@ export function PrivacyFlowModal({ open, onOpenChange }: { open: boolean; onOpen
 
                 {/* Operator warning callout */}
                 <motion.div
-                  className="mt-8 rounded-2xl border border-accent/20 bg-accent-soft/30 p-5"
+                  className="mt-6 rounded-2xl border border-accent/20 bg-accent-soft/30 p-4 sm:mt-8 sm:p-5"
                   variants={itemVariants}
                 >
                   <div className="flex items-start gap-3">

@@ -152,7 +152,7 @@ function InlineEditField({
             className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink placeholder:text-ink-subtle focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/20"
           />
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             disabled={saving}
@@ -259,7 +259,7 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
         <p className="text-xs text-ink-muted">{truncateAddress(multisig)}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard label="Members" value={data.memberCount} icon={Users} />
         <StatCard
           label="Threshold"
@@ -272,7 +272,6 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
           value={activeProposals}
           icon={Shield}
           sub={activeProposals > 0 ? "Awaiting approval" : "None"}
-          className="col-span-2 sm:col-span-1"
         />
       </div>
 

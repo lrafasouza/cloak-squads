@@ -716,20 +716,22 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                     type="checkbox"
                     checked={confirmChecked}
                     onChange={(e) => setConfirmChecked(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-border accent-accent"
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-accent"
                   />
-                  I confirm the recipient address and{" "}
-                  <span className="font-mono font-medium text-ink">
-                    {amount || "0"} {tokenLabel}
-                  </span>{" "}
-                  amount are correct before creating this proposal.
+                  <span className="flex-1">
+                    I confirm the recipient address and{" "}
+                    <span className="font-mono font-medium text-ink">
+                      {amount || "0"} {tokenLabel}
+                    </span>{" "}
+                    amount are correct before creating this proposal.
+                  </span>
                 </label>
 
                 {/* Actions */}
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Link
                     href={`/vault/${multisig}`}
-                    className="inline-flex shrink-0 items-center justify-center rounded-md border border-border-strong bg-transparent px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2"
+                    className="inline-flex w-full shrink-0 items-center justify-center rounded-md border border-border-strong bg-transparent px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2 sm:w-auto"
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Back
