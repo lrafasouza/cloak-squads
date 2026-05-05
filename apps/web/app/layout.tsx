@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     siteName: "Aegis",
     locale: "en_US",
     images: [{
-      url: "/og.png?v=2",
+      url: "/og.jpg?v=3",
       width: 1200,
       height: 630,
       alt: "Aegis — Private execution for shared treasuries",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     title: "Aegis — Private execution for shared treasuries",
     description: "Private multisig payments on Solana. Single-use execution licenses for Squads vaults, settled privately through Cloak Protocol.",
     creator: "@aegis_fi",
-    images: ["/og.png?v=2"],
+    images: ["/og.jpg?v=3"],
   },
   manifest: "/site.webmanifest",
   robots: "index, follow",

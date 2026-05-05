@@ -20,7 +20,7 @@ export default function Icon() {
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: "#0a0a0c",
-          borderRadius: "50%",
+          borderRadius: 7,
           border: "1px solid #1f1f25",
         }}
       >
