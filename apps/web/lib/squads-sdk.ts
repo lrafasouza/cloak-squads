@@ -30,6 +30,9 @@ export type BrowserSquadsWallet = {
     connection: Connection,
     options?: SendOptions,
   ) => Promise<string>;
+  signTransaction?:
+    | (<T extends Transaction | VersionedTransaction>(transaction: T) => Promise<T>)
+    | undefined;
 };
 
 export function assertBrowserSquadsWallet(
@@ -179,10 +182,14 @@ export async function createVaultProposal(params: {
   });
 
   // Surface real on-chain errors, but tolerate sim-only artifacts (no signers,
-  // expired blockhash) so we don't block legitimate vault TXs.
+  // expired blockhash, accounts created at runtime by Squads) so we don't block
+  // legitimate vault TXs. For multi-ix proposals (e.g. swaps) we always proceed
+  // since simulation can't model ephemeral accounts created by the proposal.
   if (simulationErr && params.instructions.length === 1) {
     const errStr = JSON.stringify(simulationErr);
     const tolerated =
+      errStr === "{}" ||
+      errStr === "null" ||
       errStr.includes("BlockhashNotFound") ||
       errStr.includes("signature verification") ||
       errStr.includes("AccountNotFound");
@@ -193,13 +200,34 @@ export async function createVaultProposal(params: {
     log("[squads-sdk] simulation produced tolerated error, proceeding:", errStr);
   }
 
-  const tx = new Transaction().add(...budgetIxs, ...coreIxs);
-  tx.feePayer = params.wallet.publicKey;
-  tx.recentBlockhash = latestBlockhash.blockhash;
+  // Use V0 versioned transaction for the outer tx so that swap proposals
+  // (which embed multi-ix swap routes) don't exceed the 1232-byte legacy limit.
+  const outerMessage = new TransactionMessage({
+    payerKey: params.wallet.publicKey,
+    recentBlockhash: latestBlockhash.blockhash,
+    instructions: [...budgetIxs, ...coreIxs],
+  }).compileToV0Message();
+  const tx = new VersionedTransaction(outerMessage);
+  log(
+    "[squads-sdk] outer tx size (bytes):",
+    tx.serialize().length,
+    "static keys:",
+    outerMessage.staticAccountKeys.length,
+  );
 
   let signature: string;
   try {
-    signature = await params.wallet.sendTransaction(tx, params.connection);
+    if (typeof params.wallet.signTransaction === "function") {
+      // Sign manually + send raw so we get the RPC's real error message instead
+      // of the adapter's opaque WalletSendTransactionError when preflight fails.
+      const signed = await params.wallet.signTransaction(tx);
+      signature = await params.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: "confirmed",
+      });
+    } else {
+      signature = await params.wallet.sendTransaction(tx, params.connection);
+    }
   } catch (sendErr) {
     logError("[squads-sdk] sendTransaction error:", sendErr);
     if (sendErr && typeof sendErr === "object") {
@@ -616,16 +644,29 @@ export async function createRemoveMemberProposal(params: {
   wallet: BrowserSquadsWallet;
   multisigPda: PublicKey;
   memberToRemove: PublicKey;
+  /**
+   * If provided, a ChangeThreshold action is bundled into the same config
+   * transaction. Required when the current threshold would exceed the new
+   * member count after removal (Squads rejects such state with InvalidThreshold).
+   */
+  newThreshold?: number;
   memo?: string;
 }): Promise<{ signature: string; transactionIndex: bigint }> {
   assertBrowserSquadsWallet(params.wallet);
   const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
 
+  const actions: multisig.types.ConfigAction[] = [
+    { __kind: "RemoveMember", oldMember: params.memberToRemove },
+  ];
+  if (typeof params.newThreshold === "number") {
+    actions.push({ __kind: "ChangeThreshold", newThreshold: params.newThreshold });
+  }
+
   const configIx = multisig.instructions.configTransactionCreate({
     multisigPda: params.multisigPda,
     transactionIndex,
     creator: params.wallet.publicKey,
-    actions: [{ __kind: "RemoveMember", oldMember: params.memberToRemove }],
+    actions,
     memo: params.memo ?? "Remove member",
   });
 

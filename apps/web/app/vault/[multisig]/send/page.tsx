@@ -598,7 +598,10 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
               <button
                 key={mode}
                 type="button"
-                onClick={() => setSendMode(mode)}
+                onClick={() => {
+                  setSendMode(mode);
+                  if (mode === "private") setSelectedMint(SOL_MINT);
+                }}
                 className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
                   sendMode === mode ? "bg-accent-soft text-accent" : "text-ink-muted hover:text-ink"
                 }`}
@@ -655,13 +658,20 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                   </div>
 
                   <div className="mt-1.5 flex gap-2">
-                    <TokenDropdown
-                      tokens={tokens}
-                      selectedMint={selectedMint}
-                      onSelect={handleTokenSelect}
-                      disabled={pending}
-                      loading={tokensLoading}
-                    />
+                    {isPrivate ? (
+                      <div className="flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink">
+                        <TokenLogo symbol="SOL" size={16} />
+                        SOL
+                      </div>
+                    ) : (
+                      <TokenDropdown
+                        tokens={tokens}
+                        selectedMint={selectedMint}
+                        onSelect={handleTokenSelect}
+                        disabled={pending}
+                        loading={tokensLoading}
+                      />
+                    )}
                     <Input
                       id="amount"
                       type="number"
@@ -675,6 +685,11 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                       disabled={pending}
                     />
                   </div>
+                  {isPrivate && (
+                    <p className="mt-1.5 text-xs text-ink-muted">
+                      Private sends currently support SOL only. Use Public Send for token transfers.
+                    </p>
+                  )}
 
                   {usdPreview && <p className="mt-1.5 text-xs text-ink-muted">{usdPreview}</p>}
                 </div>

@@ -100,6 +100,12 @@ export function SendModal({
   const isSol = selectedMint === SOL_MINT;
   const tokenLabel = selectedToken?.symbol ?? "SOL";
 
+  // Devnet Cloak shielded pool is only initialized for SOL. Force public mode
+  // for any SPL token until additional shielded pools are deployed.
+  useEffect(() => {
+    if (!isSol && mode === "private") setMode("public");
+  }, [isSol, mode]);
+
   const amountStep = isSol ? "0.000000001" : "0.000001";
   const amountMin = isSol ? "0.000000001" : "0.000001";
   const amountPlaceholder = isSol ? "0.0" : "0.00";
@@ -485,19 +491,34 @@ export function SendModal({
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6 pt-4">
           <div className="inline-flex rounded-lg border border-border bg-surface p-1">
-            {(["private", "public"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => !pending && setMode(m)}
-                className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-                  mode === m ? "bg-accent-soft text-accent" : "text-ink-muted hover:text-ink"
-                }`}
-              >
-                {m === "private" ? "Private" : "Public"}
-              </button>
-            ))}
+            {(["private", "public"] as const).map((m) => {
+              const privateDisabled = m === "private" && !isSol;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => !pending && !privateDisabled && setMode(m)}
+                  disabled={pending || privateDisabled}
+                  title={
+                    privateDisabled
+                      ? "Private transfers are only available for SOL on devnet."
+                      : undefined
+                  }
+                  className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    mode === m ? "bg-accent-soft text-accent" : "text-ink-muted hover:text-ink"
+                  }`}
+                >
+                  {m === "private" ? "Private" : "Public"}
+                </button>
+              );
+            })}
           </div>
+          {!isSol && (
+            <p className="text-xs text-ink-muted">
+              Private transfers are only available for SOL on devnet (the SPL shielded pool isn't
+              initialized yet). {tokenLabel} sends fall back to public mode.
+            </p>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="sm-recipient">Recipient address</Label>

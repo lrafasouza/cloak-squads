@@ -95,18 +95,29 @@ export default function MembersPage({
   }
 
   async function handleRemoveMember() {
-    if (submittingRef.current || !wallet.publicKey || !multisigPda || !wallet.sendTransaction || !removeTarget) return;
+    if (submittingRef.current || !wallet.publicKey || !multisigPda || !wallet.sendTransaction || !removeTarget || !data) return;
     submittingRef.current = true;
     setRemoveLoading(true);
     try {
+      const newMemberCount = data.memberCount - 1;
+      // Squads rejects threshold > member count (InvalidThreshold). Lower it in the same tx.
+      const needsThresholdChange = data.threshold > newMemberCount;
+      const newThreshold = needsThresholdChange ? Math.max(1, newMemberCount) : null;
       await createRemoveMemberProposal({
         connection,
         wallet: { publicKey: wallet.publicKey, sendTransaction: wallet.sendTransaction },
         multisigPda,
         memberToRemove: new PublicKey(removeTarget),
-        memo: `Remove member ${removeTarget.slice(0, 8)}…`,
+        ...(newThreshold !== null ? { newThreshold } : {}),
+        memo:
+          newThreshold !== null
+            ? `Remove member ${removeTarget.slice(0, 8)}… and lower threshold to ${newThreshold}`
+            : `Remove member ${removeTarget.slice(0, 8)}…`,
       });
-      await queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) }),
+        queryClient.invalidateQueries({ queryKey: ["vault-data", multisig] }),
+      ]);
       setRemoveTarget(null);
     } catch (err) {
       console.error(err);
@@ -390,7 +401,18 @@ export default function MembersPage({
       <ConfirmModal
         open={removeTarget !== null}
         title="Remove member"
-        description={`Propose removal of ${removeTarget ? removeTarget.slice(0, 8) + "…" : "this member"}? This creates a config proposal that all required members must sign.`}
+        description={(() => {
+          const who = removeTarget ? removeTarget.slice(0, 8) + "…" : "this member";
+          if (!data) return `Propose removal of ${who}?`;
+          const newCount = data.memberCount - 1;
+          const willLower = data.threshold > newCount;
+          const base = `Propose removal of ${who}? This creates a config proposal that all required members must sign.`;
+          if (willLower) {
+            const newThreshold = Math.max(1, newCount);
+            return `${base} The threshold will also be lowered to ${newThreshold}/${newCount} so the vault remains valid after removal.`;
+          }
+          return base;
+        })()}
         confirmText="Create removal proposal"
         confirmVariant="destructive"
         isLoading={removeLoading}

@@ -17,8 +17,10 @@
     "@cloak.dev/sdk-devnet": "0.1.5-devnet.0",
     "@coral-xyz/anchor": "^0.31.1",
     "@number-flow/react": "^0.6.0",
+    "@orca-so/whirlpools": "^7.0.2",
     "@prisma/client": "^5.22.0",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@solana/kit": "5.5.1",
     "@solana/spl-token": "^0.4.14",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
@@ -32,6 +34,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.20",
+    "bn.js": "^5.2.3",
     "bs58": "^6.0.0",
     "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.0",
@@ -59,5 +62,8 @@
     "vaul": "^1.1.2",
     "zod": "^3.23.8",
     "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.2.0"
   }
 }

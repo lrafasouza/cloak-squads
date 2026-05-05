@@ -59,7 +59,7 @@ export default function SwapPage({ params }: { params: Promise<{ multisig: strin
               <PanelHeader
                 icon={ArrowLeftRight}
                 title="Swap"
-                description="SOL ↔ USDC via Jupiter"
+                description="SOL ↔ USDC via Orca"
               />
               <PanelBody>
                 <SwapPanel multisig={multisig} />

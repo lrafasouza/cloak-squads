@@ -2,12 +2,12 @@ import { publicEnv } from "@/lib/env";
 
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 
-// On devnet, the only USDC with an initialized Cloak shield pool is the mock mint.
-// On mainnet, use Circle USDC.
+// On devnet, use the mint paired with SOL in the Orca Whirlpool devnet pool
+// (3KBZiL2g8C7tiJ32hTv5v3KM7aK9htpqTw4cTXz1HvPt). On mainnet, use Circle USDC.
 export const USDC_MINT =
   publicEnv.NEXT_PUBLIC_SOLANA_CLUSTER === "mainnet-beta"
     ? "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-    : "61ro7AExqfk4dZYoCyRzTahahCC2TdUUZ4M5epMPunJf";
+    : "BRjpCHtyQLNCo8gqRUr8jtdAj5AjPYQaoqbvcZiHok1k";
 
 export const USDC_DECIMALS = 6;
 

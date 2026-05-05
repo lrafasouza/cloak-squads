@@ -19,22 +19,20 @@ Both options require a dedicated mainnet RPC (Helius or QuickNode) — the publi
 
 ---
 
-### Privacy: Operator Funding Model
+### Privacy: Vault → Operator Auto-Funding (Implemented)
 
-**Problem:** `transact()` (the Cloak shield deposit) is signed and paid for by the **operator wallet**, not the Squads vault. The Vault PDA is program-owned by Squads and cannot sign Cloak deposit transactions.
+**Constraint:** `transact()` (the Cloak shield deposit) must be signed by a regular wallet. The Squads Vault PDA is program-owned and cannot sign arbitrary outbound transactions.
 
-This creates a confusing UX mismatch:
-- Dashboard shows "Total Balance: 5 SOL" (vault balance)
-- Public send draws from vault balance ✓
-- Private send requires the operator to hold separate SOL ✗
+**Implemented solution — atomic auto-funding:** Every private-send proposal now bundles two on-chain effects into the single approved Squads execution:
 
-**Why it matters:** Users expect private sends to behave like public ones from a funding perspective. The current model is confusing and breaks the mental model of "my vault's balance pays for this."
+1. Transfer the payment amount from the vault PDA to the operator wallet (SOL via SystemProgram, SPL via the operator's ATA).
+2. Issue the gatekeeper license bound to the UTXO commitment.
 
-**Paths forward:**
+The operator picks up the funds and the license atomically and immediately calls `transact()`. From the user's perspective, private sends behave exactly like public sends — the vault balance funds the payment, and the operator only needs ~0.05 SOL for transaction fees.
 
-1. **Transparent operator pre-fund (chosen short-term):** Add a "Fund Operator" proposal type that transfers SOL from vault to operator. Show clearly in the UI that this pre-fund step is required for privacy. Document that this is by design — the pre-fund is a separate, auditable event; the actual payment is private. This is the most honest approach without upstream protocol changes.
-2. **Vault → Operator inline transfer:** Transfer SOL from vault to operator as the first step of private send execution. Creates one public record (vault→operator), then the Cloak deposit is the second step. Partially defeats privacy but removes the separate funding ceremony.
-3. **Cloak CPI support (long-term):** Wait for/contribute to Cloak supporting program-signed deposits via CPI from Squads. This is the cleanest architectural solution but requires upstream protocol changes.
+**Trade-off accepted:** the on-chain trace shows `vault → operator → Cloak pool → recipient`. Each hop is visible, but the Groth16 proof system breaks the cryptographic link between the vault deposit and the recipient withdrawal. The privacy guarantee comes from the Cloak pool's anonymity set, not from hiding the operator hop. This is documented honestly in the README's Privacy Model table.
+
+**Future improvement (P2):** Cloak CPI support — if the Cloak protocol exposes a program-signed deposit instruction, the gatekeeper could CPI directly into Cloak from the vault execution, eliminating the operator hop entirely. Tracking this with the Cloak team.
 
 ---
 
@@ -63,7 +61,7 @@ This creates a confusing UX mismatch:
 - Better error states for RPC failures and Cloak relay timeouts
 - Loading skeletons for all data-dependent views
 - Consistent number formatting (SOL amounts, USD equivalents, lamport display)
-- Operator funding model UX — clear "Fund Operator" flow with vault proposal
+- Surface the atomic vault → operator auto-funding step in the proposal review UI, so members understand exactly what they're approving
 
 ---
 

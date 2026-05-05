@@ -17,6 +17,26 @@ const nextConfig = {
     // Reduz workers baseado em memória disponível
     memoryBasedWorkersCount: true,
   },
+  // Mark Orca SDK + @solana/kit as server-side externals so Next.js doesn't bundle
+  // their WASM/native deps (whirlpools-core uses WASM, kit packages are ESM).
+  serverExternalPackages: [
+    "@orca-so/whirlpools",
+    "@orca-so/whirlpools-client",
+    "@orca-so/whirlpools-core",
+    "@orca-so/tx-sender",
+    "@solana/kit",
+    "@solana/rpc",
+    "@solana/addresses",
+    "@solana/signers",
+    "@solana/instructions",
+    "@solana/transactions",
+    "@solana/transaction-messages",
+    "@solana/sysvars",
+    "@solana-program/system",
+    "@solana-program/token",
+    "@solana-program/token-2022",
+    "@solana-program/memo",
+  ],
   // Limita workers do webpack
   webpack: (config, { isServer }) => {
     // Explicit @/ alias for environments where tsconfig paths aren't picked up

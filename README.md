@@ -19,7 +19,7 @@ The app runs on devnet. Here's the fastest path to see the full private payment 
 **Prerequisites:**
 1. Install [Phantom](https://phantom.app) or [Solflare](https://solflare.com)
 2. Switch your wallet to **Devnet** (Settings → Developer Settings → Devnet)
-3. Fund with devnet SOL: [faucet.solana.com](https://faucet.solana.com) (you need two wallets — one proposer, one operator)
+3. Fund both wallets with devnet SOL: [faucet.solana.com](https://faucet.solana.com). The vault wallet pays the actual transfer amount; the operator wallet only needs ~0.05 SOL for transaction fees (the vault auto-funds the payment value into the operator on proposal execution).
 
 **Fastest flow to test (2 wallets):**
 
@@ -87,12 +87,29 @@ Any wallet with a block explorer can watch your vault in real time. Aegis breaks
 ```
 1. A member proposes a private payment (send, payroll, or stealth invoice).
 2. Squads members approve through the normal threshold flow.
-3. On execution, the vault calls the gatekeeper program.
-4. The gatekeeper issues a time-limited, hash-locked license.
-5. The operator deposits funds into the Cloak shield pool (transact).
-6. The operator consumes the license and routes the withdrawal to the recipient (fullWithdraw).
-   The on-chain record shows: operator → Cloak pool. Nothing links vault to recipient.
+3. On execution, the vault atomically:
+   (a) transfers the payment amount from the vault PDA to the operator wallet
+   (b) calls the gatekeeper, which issues a time-limited, hash-locked license
+4. The operator deposits the just-received funds into the Cloak shield pool (transact).
+5. The operator consumes the license and routes the withdrawal to the recipient (fullWithdraw).
+   The on-chain trace shows: vault → operator → Cloak pool → recipient.
+   No on-chain proof links the vault deposit to the recipient withdrawal —
+   that link is broken by the Cloak shield pool's anonymity set.
 ```
+
+### Privacy Model: What's Hidden, What's Visible
+
+Aegis is honest about its threat model. An on-chain observer can see each hop, but cannot prove correlation between the vault and the recipient.
+
+| Step | Visible on-chain | Hidden |
+|---|---|---|
+| Proposal creation | Squads tx index, member signers | Recipient address, amount intent (only commitment hash) |
+| Proposal execution | `Vault → Operator: amount` | — |
+| Cloak deposit | `Operator → Cloak pool: amount` | UTXO contents, recipient |
+| Cloak withdraw | `Cloak pool → Recipient: amount` | Origin UTXO, depositor |
+| **Net effect** | Vault and recipient are **not correlatable** without breaking the Groth16 proof system | — |
+
+The privacy guarantee is the same as any zk-SNARK shield pool: it depends on the **anonymity set** of the Cloak pool, not on hiding the operator hop. The operator is a known, public relay — that's by design. What the operator cannot do is link a specific vault deposit to a specific recipient withdrawal.
 
 ---
 
@@ -306,7 +323,7 @@ pnpm -F web dev
 
 Open [http://localhost:3000](http://localhost:3000), connect a **devnet wallet** (Phantom or Solflare), and create or import a Squads multisig.
 
-To test the full private send flow you need two devnet wallets: one as a multisig member/proposer and one as the registered operator. The operator wallet needs devnet SOL to fund the Cloak deposit.
+To test the full private send flow you need two devnet wallets: one as a multisig member/proposer and one as the registered operator. The operator wallet only needs devnet SOL for transaction fees (~0.05 SOL is plenty) — the vault auto-funds the payment amount into the operator wallet as part of the proposal execution.
 
 ---
 
@@ -353,15 +370,19 @@ To test the full private send flow you need two devnet wallets: one as a multisi
 
 ---
 
-## Known Limitation: Operator Funding Model
+## Vault → Operator Auto-Funding
 
-The Cloak deposit (`transact()`) is funded by the **operator wallet**, not the Squads vault. This is an architectural constraint: the Vault PDA is program-owned by Squads and cannot sign Cloak deposit transactions directly.
+The Squads Vault PDA is program-owned and cannot sign arbitrary outbound transactions — including Cloak's `transact()` deposit. Aegis solves this transparently in a single approved proposal:
 
-This means:
-- **Public sends** draw from vault balance (correct)
-- **Private sends** require the operator to hold SOL to fund the Cloak deposit
+1. The proposal Squads members approve **already includes** a vault → operator SOL transfer for the exact payment amount.
+2. When the proposal executes, the gatekeeper issues the license **and** the vault funds land in the operator wallet atomically.
+3. The operator (which can already sign transactions because it's a regular wallet) immediately deposits those funds into the Cloak shield pool.
 
-The intended solution is making this operator pre-funding explicit in the UI — a vault proposal that transfers SOL from the vault to the operator, documented as the privacy funding step. See [ROADMAP.md](./ROADMAP.md) for the full options.
+**Result:** from the user's perspective, private sends behave identically to public sends — the vault balance funds the payment, no separate operator funding ceremony is required. The operator only needs SOL for transaction fees (~0.05 SOL covers many executions).
+
+**For USDC and other SPL tokens:** the proposal pre-funds the operator's associated token account in the same atomic execution.
+
+This is the cleanest possible design given the program-owned vault constraint, without waiting for upstream Cloak CPI support. See [ROADMAP.md](./ROADMAP.md) for future architectural improvements.
 
 ---
 
@@ -378,4 +399,4 @@ The intended solution is making this operator pre-funding explicit in the UI —
 
 ## Project Status
 
-Working devnet prototype. The private send, payroll, stealth invoice, and audit link flows are all functional end-to-end on devnet. Active focus: mainnet vault import, operator funding UX, and production deployment. See [ROADMAP.md](./ROADMAP.md).
+Working devnet prototype. The private send, payroll, stealth invoice, and audit link flows are all functional end-to-end on devnet, including atomic vault → operator auto-funding. Active focus: mainnet vault import and production deployment. See [ROADMAP.md](./ROADMAP.md).

@@ -374,18 +374,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-2">
             <ClientWalletButton />
-            <button
-              type="button"
-              onClick={() => setInboxOpen(true)}
-              className="relative inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:bg-surface-2"
-            >
-              <Key className="h-4 w-4" />
-              {inboxItems.length > 0 && (
+            {inboxItems.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setInboxOpen(true)}
+                className="relative inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:bg-surface-2"
+              >
+                <Key className="h-4 w-4" />
                 <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[9px] font-bold text-accent-ink">
                   {inboxItems.length}
                 </span>
-              )}
-            </button>
+              </button>
+            )}
           </div>
         </header>
 
@@ -408,11 +408,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </Tooltip>
           </TooltipProvider>
-          <OperatorInboxButton
-            count={inboxItems.length}
-            open={inboxOpen}
-            onOpenChange={setInboxOpen}
-          />
+          {inboxItems.length > 0 && (
+            <OperatorInboxButton
+              count={inboxItems.length}
+              open={inboxOpen}
+              onOpenChange={setInboxOpen}
+            />
+          )}
           <ClientWalletButton />
         </header>
 

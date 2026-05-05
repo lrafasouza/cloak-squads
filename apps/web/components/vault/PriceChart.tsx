@@ -24,6 +24,7 @@ export function PriceChart({ data, loading }: PriceChartProps) {
     if (!chartContainerRef.current || chartRef.current) return;
 
     const chart = createChart(chartContainerRef.current, {
+      autoSize: true,
       layout: {
         background: { color: "transparent" },
         textColor: "#8B8B8B",
@@ -65,20 +66,7 @@ export function PriceChart({ data, loading }: PriceChartProps) {
     chartRef.current = chart;
     seriesRef.current = series;
 
-    const handleResize = () => {
-      if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-          height: chartContainerRef.current.clientHeight,
-        });
-      }
-    };
-
-    const ro = new ResizeObserver(handleResize);
-    if (chartContainerRef.current) ro.observe(chartContainerRef.current);
-
     return () => {
-      ro.disconnect();
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -95,17 +83,14 @@ export function PriceChart({ data, loading }: PriceChartProps) {
     chartRef.current?.timeScale().fitContent();
   }, [data]);
 
-  if (loading) {
-    return (
-      <div className="flex h-80 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent/20 border-t-accent" />
-      </div>
-    );
-  }
-
   return (
     <div className="relative h-80 w-full">
       <div ref={chartContainerRef} className="h-full w-full" />
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/40">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent/20 border-t-accent" />
+        </div>
+      )}
     </div>
   );
 }

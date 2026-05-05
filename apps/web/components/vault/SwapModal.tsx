@@ -13,12 +13,20 @@ import { Input } from "@/components/ui/input";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { TokenDropdown } from "@/components/vault/TokenDropdown";
 import { useVaultTokens } from "@/lib/hooks/useVaultTokens";
-import { formatSwapPreview, getJupiterQuote, getSwapInstructions } from "@/lib/jupiter-swap";
+import { PROPOSAL_RENT_THRESHOLD_SOL, useWalletSolBalance } from "@/lib/hooks/useWalletSolBalance";
+import {
+  SWAP_PROVIDER,
+  type RaydiumQuote,
+  formatSwapPreview,
+  getRaydiumQuote,
+  getRaydiumSwapInstructions,
+  isDevnet,
+} from "@/lib/raydium-swap";
 import { createVaultProposal } from "@/lib/squads-sdk";
 import { SOL_MINT, USDC_DECIMALS, USDC_MINT, tokenAmountToUnits } from "@/lib/tokens";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { ArrowLeftRight, Loader2 } from "lucide-react";
+import { ArrowLeftRight, Info, Loader2 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const SLIPPAGE_OPTIONS = [
@@ -50,12 +58,13 @@ export function SwapModal({
   const { startTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
   const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig);
+  const { sol: walletSol, insufficientForProposal } = useWalletSolBalance();
 
   const [amount, setAmount] = useState("");
   const [inputMint, setInputMint] = useState(SOL_MINT);
   const [outputMint, setOutputMint] = useState(USDC_MINT);
   const [slippageBps, setSlippageBps] = useState(50);
-  const [quote, setQuote] = useState<Awaited<ReturnType<typeof getJupiterQuote>> | null>(null);
+  const [quote, setQuote] = useState<RaydiumQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -161,12 +170,11 @@ export function SwapModal({
       setQuoteError(null);
       try {
         const units = tokenAmountToUnits(amount, inputDecimals);
-        const q = await getJupiterQuote({
+        const q = await getRaydiumQuote({
           inputMint,
           outputMint,
           amount: units.toString(),
           slippageBps,
-          ...(multisigAddress ? { taker: multisigAddress.toBase58() } : {}),
         });
         if (mountedRef.current && currentRequestId === requestIdRef.current) {
           setQuote(q);
@@ -185,7 +193,7 @@ export function SwapModal({
     }, 400); // Debounce
 
     return () => clearTimeout(timeout);
-  }, [amount, inputMint, outputMint, slippageBps, multisigAddress, inputDecimals]);
+  }, [amount, inputMint, outputMint, slippageBps, inputDecimals]);
 
   const preview = useMemo(() => {
     if (!quote) return null;
@@ -206,15 +214,6 @@ export function SwapModal({
       return;
     }
 
-    // Validate quote is not expired
-    if (quote.expireAt) {
-      const expireTime = new Date(quote.expireAt).getTime();
-      if (Number.isNaN(expireTime) || Date.now() > expireTime) {
-        setError("Quote has expired. Please wait for a fresh quote.");
-        return;
-      }
-    }
-
     let units: bigint;
     try {
       units = tokenAmountToUnits(amount, inputDecimals);
@@ -227,8 +226,7 @@ export function SwapModal({
       return;
     }
 
-    // Verify quote matches current amount
-    if (quote.inAmount !== units.toString()) {
+    if (quote.inputAmount !== units.toString()) {
       setError("Quote does not match current amount. Please wait for a fresh quote.");
       return;
     }
@@ -244,12 +242,12 @@ export function SwapModal({
     setPending(true);
     startTransaction({
       title: `Creating ${selectedInputToken?.symbol} → ${selectedOutputToken?.symbol} swap proposal`,
-      description: "Building swap instructions via Jupiter and creating a Squads vault proposal.",
+      description: `Building swap instructions via ${SWAP_PROVIDER} and creating a Squads vault proposal.`,
       steps: [
         {
           id: "quote",
-          title: "Get Jupiter quote",
-          description: "Fetching optimal swap route from Jupiter.",
+          title: `Confirm ${SWAP_PROVIDER} quote`,
+          description: "Finalizing the swap route.",
         },
         {
           id: "build",
@@ -268,7 +266,11 @@ export function SwapModal({
       updateStep("quote", { status: "success" });
       updateStep("build", { status: "running" });
 
-      const swapInstructions = getSwapInstructions(quote);
+      const [vaultPda] = (await import("@sqds/multisig")).getVaultPda({
+        multisigPda: multisigAddress,
+        index: 0,
+      });
+      const swapInstructions = await getRaydiumSwapInstructions(quote, vaultPda.toBase58());
 
       updateStep("build", { status: "success" });
       updateStep("squads", { status: "running" });
@@ -308,12 +310,22 @@ export function SwapModal({
             Swap {selectedInputToken?.symbol} → {selectedOutputToken?.symbol}
           </DialogTitle>
           <DialogDescription>
-            Swap {selectedInputToken?.symbol} for {selectedOutputToken?.symbol} via Jupiter. Creates
-            a vault proposal for multisig approval.
+            Swap {selectedInputToken?.symbol} for {selectedOutputToken?.symbol} via {SWAP_PROVIDER}.
+            Creates a vault proposal for multisig approval.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-6 pt-4">
+          {/* Devnet notice */}
+          {isDevnet() && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+              <p className="text-xs text-amber-500/90">
+                Devnet — swaps use the Orca Whirlpool SOL/USDC pool. Get devnet USDC at{" "}
+                <span className="font-medium">faucet.circle.com</span>.
+              </p>
+            </div>
+          )}
           {/* ── From Card ── */}
           <div className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-1 flex items-center justify-between">
@@ -416,7 +428,7 @@ export function SwapModal({
           {quoteLoading && (
             <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-4 py-3">
               <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
-              <span className="text-sm text-ink-muted">Fetching quote from Jupiter...</span>
+              <span className="text-sm text-ink-muted">Fetching quote from {SWAP_PROVIDER}...</span>
             </div>
           )}
 
@@ -461,6 +473,19 @@ export function SwapModal({
             </p>
           )}
 
+          {wallet.publicKey && insufficientForProposal && (
+            <div className="flex items-start gap-2 rounded-lg border border-signal-danger/30 bg-signal-danger/10 px-3 py-2.5">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-signal-danger" />
+              <p className="text-xs leading-relaxed text-signal-danger">
+                Your connected wallet has only{" "}
+                <span className="font-mono font-medium">{(walletSol ?? 0).toFixed(6)} SOL</span>.
+                Creating a proposal needs at least{" "}
+                <span className="font-mono font-medium">{PROPOSAL_RENT_THRESHOLD_SOL} SOL</span> to
+                cover account rent + fees. Top up your wallet and try again.
+              </p>
+            </div>
+          )}
+
           <div className="rounded-lg border border-border bg-surface-2 px-3 py-2.5">
             <p className="text-xs leading-relaxed text-ink-muted">
               This creates a <span className="font-medium text-ink">multisig swap proposal</span>.
@@ -472,7 +497,9 @@ export function SwapModal({
           <DialogFooter className="p-0 pt-0">
             <Button
               type="submit"
-              disabled={pending || !amount || !quote || !wallet.publicKey}
+              disabled={
+                pending || !amount || !quote || !wallet.publicKey || insufficientForProposal
+              }
               className="w-full gap-2"
             >
               <ArrowLeftRight className="h-4 w-4" />

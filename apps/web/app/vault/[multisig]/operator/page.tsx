@@ -60,8 +60,19 @@ import {
   transact,
 } from "@cloak.dev/sdk-devnet";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
+import {
+  createAssociatedTokenAccountInstruction,
+  createTransferCheckedInstruction,
+  getAssociatedTokenAddress,
+  getMint,
+} from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction, type VersionedTransaction } from "@solana/web3.js";
+import {
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  type VersionedTransaction,
+} from "@solana/web3.js";
 import * as squadsMultisig from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -381,6 +392,10 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const [executionHistory, setExecutionHistory] = useState<ExecutionHistoryItem[]>([]);
   const [executing, setExecuting] = useState(false);
   const [payrollComplete, setPayrollComplete] = useState(false);
+  const [refunding, setRefunding] = useState(false);
+  const [refundError, setRefundError] = useState<string | null>(null);
+  const [refundConfirmOpen, setRefundConfirmOpen] = useState(false);
+  const [refundSignature, setRefundSignature] = useState<string | null>(null);
   const [pendingDrafts, setPendingDrafts] = useState<DraftSummary[]>([]);
   const [draftOnChainStatus, setDraftOnChainStatus] = useState<ProposalStatus>("loading");
   const [licenseStatus, setLicenseStatus] = useState<OperatorLicenseStatus>("idle");
@@ -1035,6 +1050,95 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     } finally {
       setPending(false);
       setExecuting(false);
+    }
+  }
+
+  async function refundToVault() {
+    if (!loadedDraft || !wallet.publicKey || !multisigAddress || !wallet.sendTransaction) return;
+    if (licenseStatus === "consumed") {
+      setRefundError(
+        "This proposal has already been delivered (license consumed). No refund is needed.",
+      );
+      return;
+    }
+    if (licenseStatus !== "active" && licenseStatus !== "expired") {
+      setRefundError(
+        "Vault funds have not reached the operator yet. Refund is only available after the multisig executes the proposal.",
+      );
+      return;
+    }
+    setRefunding(true);
+    setRefundError(null);
+    try {
+      const mint = new PublicKey(loadedDraft.invariants.tokenMint);
+      const amount = BigInt(loadedDraft.amount);
+      const [vaultPda] = squadsMultisig.getVaultPda({
+        multisigPda: multisigAddress,
+        index: 0,
+      });
+
+      const tx = new Transaction();
+      const isNativeSol = mint.equals(NATIVE_SOL_MINT);
+      if (isNativeSol) {
+        tx.add(
+          SystemProgram.transfer({
+            fromPubkey: wallet.publicKey,
+            toPubkey: vaultPda,
+            lamports: amount,
+          }),
+        );
+      } else {
+        const operatorAta = await getAssociatedTokenAddress(mint, wallet.publicKey);
+        const vaultAta = await getAssociatedTokenAddress(mint, vaultPda, true);
+        const vaultAtaInfo = await connection.getAccountInfo(vaultAta);
+        if (!vaultAtaInfo) {
+          tx.add(
+            createAssociatedTokenAccountInstruction(
+              wallet.publicKey,
+              vaultAta,
+              vaultPda,
+              mint,
+            ),
+          );
+        }
+        const mintInfo = await getMint(connection, mint);
+        tx.add(
+          createTransferCheckedInstruction(
+            operatorAta,
+            mint,
+            vaultAta,
+            wallet.publicKey,
+            amount,
+            mintInfo.decimals,
+          ),
+        );
+      }
+      tx.feePayer = wallet.publicKey;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      const sig = await wallet.sendTransaction(tx, connection);
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      await connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        "confirmed",
+      );
+
+      setRefundSignature(sig);
+      markProposalExecuted(multisig, txIndex);
+      void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
+      void fetchPendingDrafts();
+      setRefundConfirmOpen(false);
+      setLoadedDraft(null);
+      setPayrollDraft(null);
+      setTxIndex("");
+      setError(null);
+      setSignature(null);
+      setCloakSignature(null);
+      setWithdrawSignature(null);
+      setExecutionSteps([]);
+    } catch (err) {
+      setRefundError(err instanceof Error ? err.message : "Refund failed.");
+    } finally {
+      setRefunding(false);
     }
   }
 
@@ -1856,15 +1960,36 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 {/* Execute form — hidden after successful single or payroll execution */}
                 {!signature && !payrollComplete && (
                   <form onSubmit={execute} className="space-y-2">
-                    <Button type="submit" disabled={!canExecute}>
-                      {pending
-                        ? isPayroll
-                          ? "Executing batch…"
-                          : "Executing…"
-                        : isPayroll
-                          ? "Execute batch"
-                          : "Execute transfer"}
-                    </Button>
+                        <div className="flex flex-wrap gap-2">
+                      <Button type="submit" disabled={!canExecute}>
+                        {pending
+                          ? isPayroll
+                            ? "Executing batch…"
+                            : "Executing…"
+                          : isPayroll
+                            ? "Execute batch"
+                            : "Execute transfer"}
+                      </Button>
+                      {loadedDraft &&
+                        !isPayroll &&
+                        (licenseStatus === "active" || licenseStatus === "expired") && (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                              setRefundError(null);
+                              setRefundConfirmOpen(true);
+                            }}
+                            disabled={pending || refunding || !wallet.publicKey}
+                            title="Return vault-funded amount from operator back to the vault. Use only when the Cloak delivery cannot complete."
+                          >
+                            {refunding ? "Refunding…" : "Refund to vault"}
+                          </Button>
+                        )}
+                    </div>
+                    {refundError ? (
+                      <p className="text-xs text-signal-danger">{refundError}</p>
+                    ) : null}
                     {!wallet.publicKey ? (
                       <p className="text-xs text-signal-warn">
                         Connect the registered operator wallet.
@@ -2093,6 +2218,85 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Refund confirmation modal */}
+      <Dialog
+        open={refundConfirmOpen}
+        onOpenChange={(v) => {
+          if (!refunding) setRefundConfirmOpen(v);
+        }}
+      >
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>Refund stuck transfer to vault?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 p-6 pt-4 text-sm text-ink-muted">
+            <p>
+              The proposal&apos;s on-chain transfer already moved{" "}
+              <span className="font-medium text-ink">
+                {loadedDraft
+                  ? formatRawAmount(loadedDraft.amount, loadedDraft.invariants.tokenMint)
+                  : "—"}
+              </span>{" "}
+              from the vault to the operator wallet, but the Cloak shielded delivery cannot
+              complete (e.g., no shielded pool initialized for this token). Refunding sends
+              those funds back from the operator wallet to the vault and removes this
+              proposal from your operator queue.
+            </p>
+            <p className="text-xs">
+              This signs a single transfer with the connected wallet. The recipient will
+              receive nothing — you can resubmit later via Public mode if needed.
+            </p>
+            {refundError ? (
+              <p className="rounded-md bg-signal-danger/10 px-3 py-2 text-xs text-signal-danger">
+                {refundError}
+              </p>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setRefundConfirmOpen(false)}
+                disabled={refunding}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => void refundToVault()}
+                disabled={refunding}
+              >
+                {refunding ? "Refunding…" : "Refund to vault"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {refundSignature && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border border-signal-positive/30 bg-surface px-4 py-3 shadow-raise-2">
+          <p className="text-sm font-semibold text-ink">Refund confirmed</p>
+          <p className="mt-1 text-xs text-ink-muted">
+            Funds returned to the vault.{" "}
+            <a
+              href={transactionExplorerUrl(refundSignature)}
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent hover:underline"
+            >
+              View transaction
+            </a>
+          </p>
+          <button
+            type="button"
+            onClick={() => setRefundSignature(null)}
+            className="mt-2 text-xs text-ink-subtle hover:text-ink"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
     </WorkspacePage>
   );
