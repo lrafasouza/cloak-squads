@@ -7,7 +7,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { useSolPrice } from "@/lib/hooks/useSolPrice";
 import { useVaultBalance } from "@/lib/hooks/useVaultBalance";
-import { isProposalExecuted } from "@/lib/operator-execution-history";
 import { isProposalPendingStatus } from "@/lib/proposals";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
@@ -235,14 +234,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         })
       : null;
 
+  const [executedMap, setExecutedMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!multisig) return;
+    const readMap = () => {
+      try {
+        const raw = localStorage.getItem(`aegis:operator-executed-map:${multisig}`);
+        setExecutedMap(raw ? (JSON.parse(raw) as Record<string, boolean>) : {});
+      } catch {
+        setExecutedMap({});
+      }
+    };
+    readMap();
+    window.addEventListener("aegis:operator-executed", readMap);
+    return () => window.removeEventListener("aegis:operator-executed", readMap);
+  }, [multisig]);
+
   const inboxItems = useMemo(
     () =>
       proposals
         .filter((p) => {
           if (!p.hasDraft) return false;
+          if (executedMap[p.transactionIndex]) return false;
           if (isProposalPendingStatus(p.status)) return true;
-          if (p.status === "executed" && !isProposalExecuted(multisig, p.transactionIndex))
-            return true;
+          if (p.status === "executed") return true;
           return false;
         })
         .map(
@@ -256,7 +272,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             status: p.status === "executed" ? "executed" : "pending",
           }),
         ),
-    [proposals, multisig],
+    [proposals, multisig, executedMap],
   );
 
   const [inboxOpen, setInboxOpen] = useState(false);

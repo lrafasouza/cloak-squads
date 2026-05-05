@@ -47,6 +47,7 @@ export function markProposalExecuted(multisig: string, transactionIndex: string)
     const map = raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
     map[transactionIndex] = true;
     localStorage.setItem(key, JSON.stringify(map));
+    window.dispatchEvent(new CustomEvent("aegis:operator-executed"));
   } catch {
     // Best effort.
   }
