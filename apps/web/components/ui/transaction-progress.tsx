@@ -1,18 +1,20 @@
 "use client";
 
+import { ProofGenerationState } from "@/components/proof/ProofGenerationState";
 import { Button } from "@/components/ui/button";
+import type { ProofStepId } from "@/lib/cloak-progress";
 import { publicEnv } from "@/lib/env";
 import { cn } from "@/lib/utils";
+import { Check, Copy, ExternalLink, Loader2, WalletCards, X, XCircle } from "lucide-react";
 import {
-  Check,
-  Copy,
-  ExternalLink,
-  Loader2,
-  WalletCards,
-  X,
-  XCircle,
-} from "lucide-react";
-import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+  type ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { AutoCloseIndicator } from "./auto-close-indicator";
 
@@ -35,6 +37,7 @@ type TransactionState = {
   status: TransactionStatus;
   detail?: string;
   proofProgress?: number;
+  proofStep?: ProofStepId | null;
   steps: TransactionStep[];
 };
 
@@ -136,7 +139,9 @@ function SuccessToast({
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(onClose, SUCCESS_AUTO_CLOSE_MS);
@@ -151,7 +156,9 @@ function SuccessToast({
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-eyebrow text-signal-positive">Success</p>
-          <h2 className="mt-0.5 font-display text-base font-semibold text-ink">{transaction.title}</h2>
+          <h2 className="mt-0.5 font-display text-base font-semibold text-ink">
+            {transaction.title}
+          </h2>
           {transaction.description && (
             <p className="mt-1 text-sm leading-5 text-ink-muted">{transaction.description}</p>
           )}
@@ -188,7 +195,8 @@ function TransactionModal({
   }, []);
 
   const canClose = transaction.status !== "running";
-  const autoCloseMs = transaction.status === "success" ? SUCCESS_AUTO_CLOSE_MS : ERROR_AUTO_CLOSE_MS;
+  const autoCloseMs =
+    transaction.status === "success" ? SUCCESS_AUTO_CLOSE_MS : ERROR_AUTO_CLOSE_MS;
 
   useEffect(() => {
     if (!canClose) return;
@@ -234,14 +242,16 @@ function TransactionModal({
                 )}
               </div>
               <div className="min-w-0">
-                <p className={cn(
-                  "text-eyebrow",
-                  transaction.status === "error"
-                    ? "text-signal-danger"
-                    : transaction.status === "success"
-                      ? "text-signal-positive"
-                      : "text-ink-muted",
-                )}>
+                <p
+                  className={cn(
+                    "text-eyebrow",
+                    transaction.status === "error"
+                      ? "text-signal-danger"
+                      : transaction.status === "success"
+                        ? "text-signal-positive"
+                        : "text-ink-muted",
+                  )}
+                >
                   {transaction.status === "running"
                     ? "Processing"
                     : transaction.status === "success"
@@ -266,7 +276,11 @@ function TransactionModal({
             </div>
             {canClose ? (
               <div className="flex items-center gap-2">
-                <AutoCloseIndicator durationMs={autoCloseMs} onComplete={onClose} paused={!canClose} />
+                <AutoCloseIndicator
+                  durationMs={autoCloseMs}
+                  onComplete={onClose}
+                  paused={!canClose}
+                />
                 <Button type="button" variant="ghost" onClick={onClose}>
                   Close
                 </Button>
@@ -311,7 +325,16 @@ function TransactionModal({
             </div>
           ) : null}
 
-          {typeof transaction.proofProgress === "number" && transaction.status === "running" ? (
+          {transaction.proofStep && transaction.status === "running" ? (
+            <div className="mb-4">
+              <ProofGenerationState
+                currentStep={transaction.proofStep ?? null}
+                {...(transaction.proofProgress !== undefined
+                  ? { proofProgress: transaction.proofProgress }
+                  : {})}
+              />
+            </div>
+          ) : typeof transaction.proofProgress === "number" && transaction.status === "running" ? (
             <div className="mb-4 rounded-lg border border-border bg-bg px-3 py-3">
               <div className="flex items-center justify-between text-xs text-ink-muted">
                 <span>Zero-knowledge proof</span>

@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ShieldX } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
@@ -13,16 +12,12 @@ import {
   WorkspaceHeader,
   WorkspacePage,
 } from "@/components/ui/workspace";
+import { ShieldX } from "lucide-react";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { ensureCircuitsProxy, prefetchCircuits } from "@/lib/cloak-circuits-proxy";
-import { useUnloadGuard } from "@/lib/use-unload-guard";
+import { getProofStepUpdate, translateCloakProgress } from "@/lib/cloak-progress";
 import { publicEnv } from "@/lib/env";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
@@ -43,6 +38,7 @@ import { lamportsToSol } from "@/lib/sol";
 import { SOL_MINT, formatRawAmount } from "@/lib/tokens";
 import { simulateAndOptimize } from "@/lib/tx-optimization";
 import { proposalSummariesQueryKey, useProposalSummaries } from "@/lib/use-proposal-summaries";
+import { useUnloadGuard } from "@/lib/use-unload-guard";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
@@ -68,17 +64,11 @@ import {
   getMint,
 } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import {
-  PublicKey,
-  SystemProgram,
-  Transaction,
-  type VersionedTransaction,
-} from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction, type VersionedTransaction } from "@solana/web3.js";
 import * as squadsMultisig from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { translateCloakProgress } from "@/lib/cloak-progress";
 import {
   type FormEvent,
   Suspense,
@@ -731,37 +721,38 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       : invoiceId
         ? " for invoice claim"
         : "";
-    if (!suppressProgress) startTransaction({
-      title: isPayroll ? "Executing payroll transfer" : "Executing private transfer",
-      description: `${formatRawAmount(draft.invariants.amount, draft.invariants.tokenMint)}${transferLabel}. This may take longer while the privacy shield is prepared.`,
-      steps: [
-        {
-          id: "prepare",
-          title: "Prepare private execution",
-          description: "Reconstructing the approved Cloak commitment and checking cached work.",
-        },
-        {
-          id: "deposit",
-          title: "Deposit into Cloak",
-          description: "Submitting the shielded deposit transaction.",
-          status: "pending",
-        },
-        {
-          id: "deliver",
-          title: draft.recipient ? "Deliver to recipient" : "Store claim data",
-          description: draft.recipient
-            ? "Securing the withdrawal and sending funds to the recipient."
-            : "Saving the private UTXO data so the invoice can be claimed.",
-          status: "pending",
-        },
-        {
-          id: "license",
-          title: "Finalize transfer",
-          description: "Submitting the approved transfer on-chain.",
-          status: "pending",
-        },
-      ],
-    });
+    if (!suppressProgress)
+      startTransaction({
+        title: isPayroll ? "Executing payroll transfer" : "Executing private transfer",
+        description: `${formatRawAmount(draft.invariants.amount, draft.invariants.tokenMint)}${transferLabel}. This may take longer while the privacy shield is prepared.`,
+        steps: [
+          {
+            id: "prepare",
+            title: "Prepare private execution",
+            description: "Reconstructing the approved Cloak commitment and checking cached work.",
+          },
+          {
+            id: "deposit",
+            title: "Deposit into Cloak",
+            description: "Submitting the shielded deposit transaction.",
+            status: "pending",
+          },
+          {
+            id: "deliver",
+            title: draft.recipient ? "Deliver to recipient" : "Store claim data",
+            description: draft.recipient
+              ? "Securing the withdrawal and sending funds to the recipient."
+              : "Saving the private UTXO data so the invoice can be claimed.",
+            status: "pending",
+          },
+          {
+            id: "license",
+            title: "Finalize transfer",
+            description: "Submitting the approved transfer on-chain.",
+            status: "pending",
+          },
+        ],
+      });
 
     const nullifier = Uint8Array.from(draft.invariants.nullifier);
     const commitment = Uint8Array.from(draft.invariants.commitment);
@@ -831,7 +822,11 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               keypair: { privateKey: bigint; publicKey: bigint };
             },
             {
-              onProgress: (message) => updateTransaction({ detail: translateCloakProgress(message) }),
+              onProgress: (message) =>
+                updateTransaction({
+                  detail: translateCloakProgress(message),
+                  ...getProofStepUpdate(message),
+                }),
               onProofProgress: (progress) => updateTransaction({ proofProgress: progress }),
             },
           );
@@ -928,7 +923,10 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               ...(cloakResult.merkleTree ? { cachedMerkleTree: cloakResult.merkleTree } : {}),
               onProgress: (s: string) => {
                 console.debug(`[cloak] withdraw ${s}`);
-                updateTransaction({ detail: translateCloakProgress(s) });
+                updateTransaction({
+                  detail: translateCloakProgress(s),
+                  ...getProofStepUpdate(s),
+                });
               },
               onProofProgress: (p: number) => {
                 console.debug(`[cloak] withdraw proof ${p}%`);
@@ -956,7 +954,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         const msg = caught instanceof Error ? caught.message : String(caught);
         if (msg.includes("stale") && _attempt < 2) {
           updateTransaction({ detail: "Note index stale, refreshing and retrying..." });
-          await new Promise<void>((resolve) => { setTimeout(resolve, 2000); });
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, 2000);
+          });
           return executeSingle(draft, doCloakDeposit, depositCacheKey, invoiceId, _attempt + 1);
         }
         // Translate cryptic SDK PDA errors into actionable messages.
@@ -981,7 +981,11 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       invariants: { nullifier, commitment, amount, tokenMint, recipientVkPub, nonce },
     });
 
-    const { budgetIxs, simulationErr, logs: simLogs } = await simulateAndOptimize({
+    const {
+      budgetIxs,
+      simulationErr,
+      logs: simLogs,
+    } = await simulateAndOptimize({
       connection,
       instructions: [ix],
       payer: wallet.publicKey,
@@ -1109,12 +1113,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         const vaultAtaInfo = await connection.getAccountInfo(vaultAta);
         if (!vaultAtaInfo) {
           tx.add(
-            createAssociatedTokenAccountInstruction(
-              wallet.publicKey,
-              vaultAta,
-              vaultPda,
-              mint,
-            ),
+            createAssociatedTokenAccountInstruction(wallet.publicKey, vaultAta, vaultPda, mint),
           );
         }
         const mintInfo = await getMint(connection, mint);
@@ -1171,7 +1170,14 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     startTransaction({
       title: "Executing payroll batch",
       description: `Processing ${payrollDraft.recipients.length} private transfer${payrollDraft.recipients.length !== 1 ? "s" : ""}.`,
-      steps: [{ id: "batch", title: "Batch execution in progress", description: "Each recipient is processed sequentially.", status: "running" }],
+      steps: [
+        {
+          id: "batch",
+          title: "Batch execution in progress",
+          description: "Each recipient is processed sequentially.",
+          status: "running",
+        },
+      ],
     });
 
     for (let i = 0; i < payrollDraft.recipients.length; i++) {
@@ -1243,7 +1249,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       markProposalExecuted(multisig, txIndex);
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
     } else {
-      failTransaction(lastError ?? `Executed ${completed}/${payrollDraft.recipientCount} recipients.`);
+      failTransaction(
+        lastError ?? `Executed ${completed}/${payrollDraft.recipientCount} recipients.`,
+      );
     }
   }
 
@@ -1270,7 +1278,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
     const totalRecipients = payrollDraft.recipients.length;
     // Count already-succeeded steps (before startIndex) using local snapshot to avoid stale reads
-    const alreadyDone = executionSteps.filter((s) => s.index < startIndex && s.status === "success").length;
+    const alreadyDone = executionSteps.filter(
+      (s) => s.index < startIndex && s.status === "success",
+    ).length;
     let completed = alreadyDone;
     let lastSig: string | undefined;
 
@@ -1346,9 +1356,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     return sum + amt;
   }, 0n);
   const operatorBalBigInt = BigInt(operatorBalanceLamports ?? 0);
-  const deficitLamports = totalNeededLamports > operatorBalBigInt
-    ? totalNeededLamports - operatorBalBigInt
-    : 0n;
+  const deficitLamports =
+    totalNeededLamports > operatorBalBigInt ? totalNeededLamports - operatorBalBigInt : 0n;
   const hasDeficit = deficitLamports > 0n;
 
   const [helpOpen, setHelpOpen] = useState(false);
@@ -1396,8 +1405,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               Wrong wallet connected
             </h1>
             <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-ink-muted">
-              The execution queue requires the registered operator wallet.
-              Connect the correct wallet to continue.
+              The execution queue requires the registered operator wallet. Connect the correct
+              wallet to continue.
             </p>
           </div>
 
@@ -1456,7 +1465,6 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               Change wallet
             </Button>
           </div>
-
         </div>
       </WorkspacePage>
     );
@@ -1545,14 +1553,18 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         {hasDeficit && !operatorBalanceLoading && (
           <InlineAlert tone="warning">
             Insufficient operator balance. Need{" "}
-            <span className="font-semibold">{lamportsToSol(deficitLamports)} SOL</span> more
-            to execute all pending transfers. The vault funds the operator automatically when proposals are created.
+            <span className="font-semibold">{lamportsToSol(deficitLamports)} SOL</span> more to
+            execute all pending transfers. The vault funds the operator automatically when proposals
+            are created.
           </InlineAlert>
         )}
         {operatorMismatch && wallet.publicKey ? (
           <InlineAlert tone="warning">
             <div className="space-y-1">
-              <div>The connected wallet is not the registered operator. Switch wallets before executing.</div>
+              <div>
+                The connected wallet is not the registered operator. Switch wallets before
+                executing.
+              </div>
               <div className="font-mono text-[11px] leading-5">
                 <div>
                   <span className="text-ink-subtle">Connected:</span>{" "}
@@ -1869,7 +1881,10 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   <p className="text-xs text-ink-muted">
                     {isPayroll
                       ? `${payrollDraft?.recipientCount} recipients`
-                      : formatRawAmount(loadedDraft?.amount ?? "0", loadedDraft?.invariants.tokenMint ?? SOL_MINT)}
+                      : formatRawAmount(
+                          loadedDraft?.amount ?? "0",
+                          loadedDraft?.invariants.tokenMint ?? SOL_MINT,
+                        )}
                   </p>
                 </div>
                 <button
@@ -1893,7 +1908,10 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 {/* Transfer details / Payroll table */}
                 {loadedDraft && !isPayroll && (
                   <dl className="grid gap-2 text-sm">
-                    <DetailRow label="Amount" value={formatRawAmount(loadedDraft.amount, loadedDraft.invariants.tokenMint)} />
+                    <DetailRow
+                      label="Amount"
+                      value={formatRawAmount(loadedDraft.amount, loadedDraft.invariants.tokenMint)}
+                    />
                     <DetailRow label="Recipient" value={loadedDraft.recipient} mono />
                     <DetailRow label="Status" value={proposalStatusMessage ?? "Ready to execute"} />
                   </dl>
@@ -1976,7 +1994,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 {/* Execute form — hidden after successful single or payroll execution */}
                 {!signature && !payrollComplete && (
                   <form onSubmit={execute} className="space-y-2">
-                        <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Button type="submit" disabled={!canExecute}>
                         {pending
                           ? isPayroll
@@ -2036,7 +2054,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 {isPayroll && payrollComplete && executionSteps.some((s) => s.signature) && (
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-signal-positive">
-                      Payroll complete — {executionSteps.filter((s) => s.status === "success").length}/{executionSteps.length} transfers confirmed
+                      Payroll complete —{" "}
+                      {executionSteps.filter((s) => s.status === "success").length}/
+                      {executionSteps.length} transfers confirmed
                     </p>
                     {executionSteps
                       .filter((s) => s.signature)
@@ -2197,11 +2217,11 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               <p className="font-semibold text-ink">Why does the operator need SOL?</p>
               <p>
                 Private transfers use <span className="font-medium text-ink">Cloak</span>, a
-                privacy-shielded pool. The Cloak protocol requires a wallet with a private
-                key to sign deposits. Because the vault PDA has no private key, the{" "}
-                <span className="font-medium text-ink">operator's wallet</span> deposits into
-                Cloak on behalf of the vault. This also severs the on-chain link between the
-                vault and the payment.
+                privacy-shielded pool. The Cloak protocol requires a wallet with a private key to
+                sign deposits. Because the vault PDA has no private key, the{" "}
+                <span className="font-medium text-ink">operator's wallet</span> deposits into Cloak
+                on behalf of the vault. This also severs the on-chain link between the vault and the
+                payment.
               </p>
             </div>
 
@@ -2209,7 +2229,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               <p className="text-ink-subtle">Private payment flow:</p>
               <p className="mt-2 text-ink">Vault → Operator (auto-funded in proposal)</p>
               <p className="text-ink">Operator wallet → Cloak pool</p>
-              <p className="text-ink-subtle">↓ (privacy shield keeps amount and recipient hidden)</p>
+              <p className="text-ink-subtle">
+                ↓ (privacy shield keeps amount and recipient hidden)
+              </p>
               <p className="text-ink">Cloak pool → Recipient</p>
             </div>
 
@@ -2254,14 +2276,14 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   ? formatRawAmount(loadedDraft.amount, loadedDraft.invariants.tokenMint)
                   : "—"}
               </span>{" "}
-              from the vault to the operator wallet, but the Cloak shielded delivery cannot
-              complete (e.g., no shielded pool initialized for this token). Refunding sends
-              those funds back from the operator wallet to the vault and removes this
-              proposal from your operator queue.
+              from the vault to the operator wallet, but the Cloak shielded delivery cannot complete
+              (e.g., no shielded pool initialized for this token). Refunding sends those funds back
+              from the operator wallet to the vault and removes this proposal from your operator
+              queue.
             </p>
             <p className="text-xs">
-              This signs a single transfer with the connected wallet. The recipient will
-              receive nothing — you can resubmit later via Public mode if needed.
+              This signs a single transfer with the connected wallet. The recipient will receive
+              nothing — you can resubmit later via Public mode if needed.
             </p>
             {refundError ? (
               <p className="rounded-md bg-signal-danger/10 px-3 py-2 text-xs text-signal-danger">
@@ -2313,7 +2335,6 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           </button>
         </div>
       )}
-
     </WorkspacePage>
   );
 }

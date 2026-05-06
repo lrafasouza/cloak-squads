@@ -3,10 +3,10 @@
 import { Button } from "@/components/ui/button";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ensureCircuitsProxy, prefetchCircuits } from "@/lib/cloak-circuits-proxy";
-import { useUnloadGuard } from "@/lib/use-unload-guard";
-import { translateCloakProgress } from "@/lib/cloak-progress";
+import { getProofStepUpdate, translateCloakProgress } from "@/lib/cloak-progress";
 import { lamportsToSol } from "@/lib/sol";
 import { statusBadge } from "@/lib/status-labels";
+import { useUnloadGuard } from "@/lib/use-unload-guard";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
 import {
@@ -226,7 +226,10 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         const body = (await challengeRes.json().catch(() => null)) as { error?: string } | null;
         throw new Error(body?.error ?? "Could not request claim challenge.");
       }
-      const { challengeId, challenge } = (await challengeRes.json()) as { challengeId: string; challenge: string };
+      const { challengeId, challenge } = (await challengeRes.json()) as {
+        challengeId: string;
+        challenge: string;
+      };
 
       // Step 2: Derive Ed25519 signing key from the same seed as the box keypair
       // The box secret key's first 32 bytes are the seed for both key types.
@@ -303,7 +306,10 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         depositorPublicKey: wallet.publicKey,
         onProgress: (s: string) => {
           console.debug(`[cloak-claim] ${s}`);
-          updateTransaction({ detail: translateCloakProgress(s) });
+          updateTransaction({
+            detail: translateCloakProgress(s),
+            ...getProofStepUpdate(s),
+          });
         },
         onProofProgress: (p: number) => {
           console.debug(`[cloak-claim] proof ${p}%`);

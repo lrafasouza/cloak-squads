@@ -1,3 +1,5 @@
+export type ProofStepId = "load-circuits" | "generate-witness" | "prove";
+
 const CLOAK_MESSAGE_MAP: [RegExp, string][] = [
   [/Validating transaction parameters/i, "Validating transfer parameters..."],
   [/Computing commitments/i, "Computing shielded commitment..."],
@@ -28,4 +30,50 @@ export function translateCloakProgress(raw: string): string {
     if (match) return `Generating proof... ${match[1]}%`;
   }
   return cleaned;
+}
+
+/**
+ * Map a raw Cloak SDK progress message to the corresponding ProofStepId.
+ * Returns null for messages that don't belong to the ZK proof pipeline
+ * (e.g. wallet-signing or submission steps after the proof is done).
+ */
+export function getProofStep(raw: string): ProofStepId | null {
+  const cleaned = raw.replace(/^\[cloak\]\s*/i, "").replace(/^withdraw\s*/i, "");
+  if (/Generating ZK proof|proof \d+%|Converting proof/i.test(cleaned)) return "prove";
+  if (/Fetching Merkle|Using on-chain|commitment indices/i.test(cleaned)) return "generate-witness";
+  if (
+    /Validating|Computing commit|external data hash|Building transaction|Fetching risk/i.test(
+      cleaned,
+    )
+  )
+    return "load-circuits";
+  return null;
+}
+
+/**
+ * Detects messages emitted AFTER the proof is done — wallet-signing, broadcast,
+ * confirmation, relay submission. UI uses these to dismiss the
+ * ProofGenerationState component once we've moved past the ZK phase.
+ */
+export function isPostProofMessage(raw: string): boolean {
+  const cleaned = raw.replace(/^\[cloak\]\s*/i, "").replace(/^withdraw\s*/i, "");
+  return /Submitting (deposit|to relay)|Sending transaction|Confirming transaction|Waiting for wallet signature|Transaction (submitted|confirmed)|Submit \d+\/\d+\] Root/i.test(
+    cleaned,
+  );
+}
+
+/**
+ * Computes the patch to apply to TransactionState.proofStep based on a Cloak
+ * progress message. Returns an empty object when the message is unrelated to
+ * the ZK lifecycle (so the existing proofStep is preserved).
+ *
+ *   - proof-phase message → { proofStep: <id> }
+ *   - post-proof message  → { proofStep: null }  (clears the UI)
+ *   - anything else       → {}                    (no change)
+ */
+export function getProofStepUpdate(raw: string): { proofStep?: ProofStepId | null } {
+  const step = getProofStep(raw);
+  if (step) return { proofStep: step };
+  if (isPostProofMessage(raw)) return { proofStep: null };
+  return {};
 }

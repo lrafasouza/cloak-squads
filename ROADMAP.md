@@ -29,21 +29,21 @@ Estes itens bloqueiam qualquer deploy em mainnet ou uso com usuários reais.
 ~~**Problema:** O parâmetro `?includeSensitive=true` em `/api/proposals/[ms]/[index]` retorna `commitmentClaim` (chave privada do UTXO) para qualquer wallet autenticada.~~  
 **Implementado:** `requireVaultOperator(multisig)` guarda `?includeSensitive=true`; wallets não-operadoras recebem 403.
 
-### S3 — Cifrar UTXO secrets no banco
-**Problema:** `StealthInvoice` armazena `utxoPrivateKey` e `utxoBlinding` em texto claro no PostgreSQL.  
-**Fix:** Cifrar com AES-256-GCM usando uma chave derivada do `JWT_SIGNING_SECRET`. Descriptografar apenas no momento de entrega ao operador autenticado.
+### S3 — Cifrar UTXO secrets no banco ✅
+~~**Problema:** `StealthInvoice` armazena `utxoPrivateKey` e `utxoBlinding` em texto claro no PostgreSQL.~~  
+**Implementado:** Envelope versionado `v1.{base64}` com AES-256-GCM derivado do `JWT_SIGNING_SECRET`. `decryptField` aceita legacy e v1. Descriptografia ocorre apenas na entrega ao operador autenticado.
 
-### S4 — Challenge-response no claim de stealth invoices
-**Problema:** A chave privada do UTXO (`#sk=...`) fica no fragment da URL do claim link. Se o backend loggar a requisição, ela fica exposta.  
-**Fix:** Implementar challenge-response: recipient assina um nonce de 60s com a chave do claim; backend valida a assinatura antes de retornar os dados do UTXO.
+### S4 — Challenge-response no claim de stealth invoices ✅
+~~**Problema:** A chave privada do UTXO (`#sk=...`) fica no fragment da URL do claim link. Se o backend loggar a requisição, ela fica exposta.~~  
+**Implementado:** Redis SET NX EX 120s — challenge consumido uma única vez. Ed25519 verificado antes de consumir o challenge (evita burn de challenge por assinatura inválida).
 
-### S5 — Rate limiting distribuído
-**Problema:** Rate limiting atual é in-memory por processo. Em multi-instance (Render, Fly.io), o limite não é compartilhado. Sem eviction, pode causar leak de memória.  
-**Fix:** Migrar para Redis (Upstash) — `REDIS_URL` já está no `.env.example`, só falta a implementação.
+### S5 — Rate limiting distribuído ✅
+~~**Problema:** Rate limiting atual é in-memory por processo. Em multi-instance (Render, Fly.io), o limite não é compartilhado. Sem eviction, pode causar leak de memória.~~  
+**Implementado:** Redis atômico SET NX EX; perfis `default:30`, `write:10`, `challenge:20`, `signature:60`; composite buckets por IP + pubkey; fallback in-memory sem Redis.
 
-### S6 — Replay protection por endpoint
-**Problema:** O header `X-Signature` é válido por 5 minutos em qualquer endpoint. Uma signature capturada pode ser reutilizada em endpoints diferentes durante a janela.  
-**Fix:** Incluir `method + path + body_hash` no payload assinado, verificar no servidor.
+### S6 — Replay protection por endpoint ✅
+~~**Problema:** O header `X-Signature` é válido por 5 minutos em qualquer endpoint. Uma signature capturada pode ser reutilizada em endpoints diferentes durante a janela.~~  
+**Implementado:** Payload v2 inclui `method + path + body_hash`; `verifyWalletAuthHeaders` valida binding. Session cookie httpOnly substitui assinatura por request em clients atualizados.
 
 ---
 
@@ -51,7 +51,7 @@ Estes itens bloqueiam qualquer deploy em mainnet ou uso com usuários reais.
 
 ### Infraestrutura
 - [ ] **RPC dedicado** — Helius ou QuickNode (o endpoint público é rate-limited para `getProgramAccounts`)
-- [ ] **PostgreSQL gerenciado** — Render Postgres ou Supabase em produção
+- [x] **PostgreSQL gerenciado** — Render Postgres em produção
 - [ ] **Variáveis de ambiente de produção** — `NEXT_PUBLIC_SOLANA_CLUSTER=mainnet-beta`, relay URL do Cloak mainnet
 - [ ] **Monitoramento** — alertas para falhas de RPC, relay Cloak timeout, latência de proof
 
@@ -64,9 +64,9 @@ Estes itens bloqueiam qualquer deploy em mainnet ou uso com usuários reais.
 - [ ] **Dual-connection** — `mainnetConnection` para ler dados do vault/proposta, `devnetConnection` para operações Cloak até a validação do programa mainnet
 - [ ] Vault discovery funciona em mainnet; o bloqueio atual é o dashboard ler do cluster errado após o import
 
-### Hardening 2-of-N
-- [ ] `commitmentClaim` armazenado apenas no `sessionStorage` do proposer — co-signers não conseguem verificar o commitment antes de aprovar
-- [ ] **Fix:** mover o `commitmentClaim` para o banco (cifrado), acessível a todos os membros do vault autenticados
+### Hardening 2-of-N ✅
+~~`commitmentClaim` armazenado apenas no `sessionStorage` do proposer — co-signers não conseguem verificar o commitment antes de aprovar~~  
+**Implementado:** Dual-tier — GET padrão entrega `commitmentClaim` público do banco (commitment, amount, recipient_vk) a qualquer membro autenticado; `?includeSensitive=true` exige `requireVaultOperator` e retorna secrets completos para UTXO reconstruction.  
 - [ ] Testes regressivos com multisig 2-of-3 (proposta por A, aprovação por B, execução pelo operador)
 
 ### Auditoria do programa gatekeeper
@@ -83,7 +83,7 @@ Estes itens bloqueiam qualquer deploy em mainnet ou uso com usuários reais.
 - [ ] **Real-time status** — Helius webhook ou WebSocket para atualizar status de proposta sem polling
 - [ ] **Filtros na lista de propostas** — busca por recipient, range de data, status, token
 - [ ] **Preview de fee** no painel do operador antes de executar
-- [ ] **Worker para execução ZK** — a prova ZK (~30s) trava o frontend; mover para Service Worker ou Web Worker
+- [x] **UX da prova ZK** — `prefetchCircuits()` no mount (salva 5–10s); `useUnloadGuard` bloqueia fechar aba; `ProofGenerationState` com 3 etapas integrado ao `TransactionModal`; spinner CSS puro (`animate-spin`) que continua no compositor thread mesmo com JS bloqueado; `getProofStep()` mapeia callbacks do SDK para a etapa correta. True Web Worker requer que o Cloak SDK exponha `groth16.prove` separado do `signTransaction` — deferred até suporte no SDK.
 
 ### SPL tokens e swaps
 - [ ] **Privacidade para SPL tokens** — estender `transact()` + `fullWithdraw()` para USDC e outros tokens (dependente de suporte do protocolo Cloak)
@@ -95,7 +95,55 @@ Estes itens bloqueiam qualquer deploy em mainnet ou uso com usuários reais.
 - [ ] **Notificações** — webhook e email para propostas criadas, aprovadas, executadas
 
 ### Integrações
-- [ ] **Aegis MCP server** — expor operações de vault para agentes de IA: checar saldo, criar proposta, executar fila do operador (com human-in-the-loop)
+
+#### Aegis MCP Server — Gerenciamento de tesouro por IA com privacidade nativa
+
+> **"O único MCP server de multisig em Solana com privacidade — agentes propõem, humanos aprovam, nada vaza."**
+
+O **Aegis MCP Server** conecta qualquer agente de IA (Claude, GPT-4o, Cursor, qualquer host compatível com MCP) ao seu vault Squads+Cloak via **Model Context Protocol** (spec `2025-11-25`). Um único comando instala; uma única assinatura de carteira autentica a sessão inteira.
+
+```bash
+npx -y @aegis/mcp-server
+```
+
+**Por que importa — e por que não existe nada igual:**
+
+| Capacidade | Aegis MCP | squads-mcp (concorrente) |
+|---|---|---|
+| Proposta de pagamento | ✅ SOL + USDC | ✅ |
+| Privacidade on-chain | ✅ `issue_license` via Cloak gatekeeper | ❌ |
+| Stealth invoices | ✅ criptografia NaCl (Diffie-Hellman) | ❌ |
+| Audit links escopados | ✅ full / amounts_only / time_ranged | ❌ |
+| Human-in-the-loop (Elicitation) | ✅ confirma acima de thresholds | ❌ |
+| Auth por sessão (sem popup a cada request) | ✅ cookie httpOnly 30 min | ❌ |
+
+**22 ferramentas em 5 grupos:**
+
+1. **Vault** — `list_vaults`, `get_vault`, `get_balance`, `get_members`
+2. **Proposals** — `create_proposal`, `approve_proposal`, `reject_proposal`, `list_proposals`, `get_proposal`
+3. **Payroll** — `create_payroll_proposal`, `list_payrolls`
+4. **Privacy** — `create_stealth_invoice`, `get_invoice_status`, `create_audit_link`
+5. **Operator** — `get_operator_queue`, `execute_next`, `get_execution_status`, `preflight_check`
+
+**O que um agente pode fazer com Aegis:**
+
+- _"Pague o salário de outubro para os 8 contribuidores do vault `X` usando os drafts aprovados"_ → agente cria payroll, aguarda aprovação humana via Elicitation, operador executa
+- _"Gere um stealth invoice de 500 USDC para a wallet `Y` e me dê o link de claim"_ → criptografia Diffie-Hellman, link opaco, sem rastro de destinatário on-chain
+- _"Crie um audit link dos últimos 30 dias, só valores, para o contador"_ → `amounts_only` + `time_ranged`, sem expor endereços nem memos
+- _"Cheque o saldo do vault e proponha um swap SOL→USDC se cair abaixo de 10 SOL"_ → pipeline autônoma com aprovação humana como gate
+
+**Arquitetura de segurança:**
+- Agente NUNCA executa — só propõe e consulta. Execução exige operador humano autenticado.
+- **Elicitation** bloqueia o agente e pede confirmação explícita do usuário para operações acima de 0.1 SOL, payrolls com 5+ destinatários, ou swaps acima de 1 SOL.
+- Session cookie httpOnly: a carteira assina **uma vez** na inicialização; todos os requests seguintes usam o cookie automaticamente — sem `signMessage` a cada chamada.
+- Sem acesso a chaves privadas. Sem execução de transações Cloak (ZK permanece na UI do operador).
+
+- [ ] Mover `buildIssueLicenseIxBrowser` para `packages/core/src/` (remover `"use client"`)
+- [ ] Implementar MCP server (`apps/mcp-server/`)
+- [ ] Publicar `@aegis/mcp-server` no npm
+- [ ] Documentação de onboarding no README
+
+#### Outras integrações
 - [ ] **Realms / Governance** — integração via CPI para vaults controlados por DAO
 - [ ] **Squads v5** — compatibilidade quando lançado
 

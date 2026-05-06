@@ -1,10 +1,11 @@
 "use client";
 
+import type { ProofStepId } from "@/lib/cloak-progress";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Check, Lock, Shield, Sparkles } from "lucide-react";
 
-export type ProofStepId = "load-circuits" | "generate-witness" | "prove";
+export type { ProofStepId };
 
 const STEPS: Array<{ id: ProofStepId; label: string; icon: typeof Lock }> = [
   { id: "load-circuits", label: "Preparing secure envelope", icon: Shield },
@@ -16,10 +17,12 @@ export function ProofGenerationState({
   currentStep,
   complete = false,
   error,
+  proofProgress,
 }: {
   currentStep: ProofStepId | null;
   complete?: boolean;
   error?: string | null;
+  proofProgress?: number;
 }) {
   const activeIndex = currentStep ? STEPS.findIndex((step) => step.id === currentStep) : -1;
 
@@ -58,22 +61,26 @@ export function ProofGenerationState({
               exit={{ scale: 0.8, opacity: 0 }}
               className="flex h-12 w-12 items-center justify-center rounded-full border border-accent/30 bg-accent-soft"
             >
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              >
-                <Shield className="h-5 w-5 text-accent" />
-              </motion.div>
+              {/* CSS animation — continues on the compositor thread even while JS is blocked by the ZK proof */}
+              <Shield className="h-5 w-5 text-accent animate-spin" />
             </motion.div>
           )}
         </AnimatePresence>
 
         <div>
           <h2 className="text-sm font-semibold text-ink">
-            {error ? "Could not secure transaction" : complete ? "Secured and ready" : "Securing your transaction"}
+            {error
+              ? "Could not secure transaction"
+              : complete
+                ? "Secured and ready"
+                : "Securing your transaction"}
           </h2>
           <p className="mt-0.5 text-xs text-ink-muted">
-            {error ? "Please try again" : complete ? "Privacy shield active" : "This keeps recipient and amount hidden on-chain"}
+            {error
+              ? "Please try again"
+              : complete
+                ? "Privacy shield active"
+                : "This keeps recipient and amount hidden on-chain"}
           </p>
         </div>
 
@@ -85,20 +92,13 @@ export function ProofGenerationState({
 
             return (
               <div key={step.id} className="flex items-center gap-2">
-                <motion.div
-                  animate={
-                    active
-                      ? { y: [0, -3, 0], opacity: 1 }
-                      : done
-                        ? { opacity: 1 }
-                        : { opacity: 0.35 }
-                  }
-                  transition={{ duration: 1.2, repeat: active ? Infinity : 0, ease: "easeInOut" }}
+                {/* CSS pulse on the active step — runs on the compositor thread, never freezes */}
+                <div
                   className={cn(
                     "flex flex-col items-center gap-1.5 rounded-lg border px-3 py-2 transition-colors",
-                    done && "border-accent/25 bg-accent-soft/50",
-                    active && "border-accent/40 bg-accent-soft",
-                    !done && !active && "border-border bg-surface-2",
+                    done && "border-accent/25 bg-accent-soft/50 opacity-100",
+                    active && "border-accent/40 bg-accent-soft opacity-100 animate-pulse",
+                    !done && !active && "border-border bg-surface-2 opacity-35",
                   )}
                 >
                   <StepIcon
@@ -119,7 +119,7 @@ export function ProofGenerationState({
                   >
                     Step {index + 1}
                   </span>
-                </motion.div>
+                </div>
 
                 {index < STEPS.length - 1 && (
                   <div
@@ -133,6 +133,22 @@ export function ProofGenerationState({
             );
           })}
         </div>
+
+        {currentStep === "prove" && typeof proofProgress === "number" && !complete && !error ? (
+          <div className="w-full">
+            <div className="flex items-center justify-between text-xs text-ink-muted">
+              <span>Zero-knowledge proof</span>
+              <span className="font-mono tabular-nums">{proofProgress}%</span>
+            </div>
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-2">
+              {/* CSS transition — width update fires in the brief windows when snarkjs yields */}
+              <div
+                className="h-full rounded-full bg-accent transition-[width] duration-500"
+                style={{ width: `${proofProgress}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
 
         {error ? <p className="text-xs text-signal-danger">{error}</p> : null}
       </div>
