@@ -34,7 +34,6 @@ import {
   Users,
   Wallet,
   X,
-  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
@@ -66,7 +65,6 @@ const GOVERNANCE_NAV: NavItem[] = [
 
 const PRIVACY_VAULT_NAV: NavItem[] = [
   { label: "Accounts", href: "/sub-vaults", icon: Layers },
-  { label: "Spending Limits", href: "/limits", icon: Zap },
   { label: "Address Book", href: "/address-book", icon: BookUser },
 ];
 

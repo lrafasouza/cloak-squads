@@ -14,81 +14,9 @@ import { truncateAddress } from "@/lib/proposals";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
 import { useVaultMetadata } from "@/lib/use-vault-metadata";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, Copy, Zap } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, Check, Copy } from "lucide-react";
 import { useState } from "react";
-
-type SpendingLimitRow = {
-  id: string;
-  spendingLimit: string;
-  amountRaw: string;
-  period: string;
-  members: string[];
-  destinations: string[];
-};
-
-function periodShort(p: string) {
-  switch (p) {
-    case "Day": return "/day";
-    case "Week": return "/week";
-    case "Month": return "/month";
-    case "OneTime": return " one-time";
-    default: return "";
-  }
-}
-
-function limportsToSol(raw: string) {
-  try {
-    return (Number(BigInt(raw)) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 4 });
-  } catch {
-    return raw;
-  }
-}
-
-function SpendingLimitsDashCard({ multisig }: { multisig: string }) {
-  const { data: limits = [] } = useQuery<SpendingLimitRow[]>({
-    queryKey: ["spending-limits", multisig],
-    queryFn: () => fetch(`/api/vaults/${multisig}/spending-limits`).then((r) => r.json()),
-    staleTime: 60_000,
-    enabled: !!multisig,
-  });
-
-  if (limits.length === 0) return null;
-
-  return (
-    <div className="rounded-2xl border border-border/60 bg-surface px-5 py-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/10">
-            <Zap className="h-3.5 w-3.5 text-accent" />
-          </div>
-          <p className="text-xs font-semibold text-ink">Spending Limits</p>
-        </div>
-        <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">
-          {limits.length} active
-        </span>
-      </div>
-      <div className="mt-3 space-y-2">
-        {limits.slice(0, 3).map((lim) => (
-          <div key={lim.id} className="flex items-center justify-between gap-2">
-            <span className="font-display text-sm font-semibold tabular-nums text-ink">
-              {limportsToSol(lim.amountRaw)} SOL
-              <span className="ml-1 text-xs font-normal text-ink-muted">{periodShort(lim.period)}</span>
-            </span>
-            <span className="text-[10px] text-ink-subtle">
-              {lim.members.length} signer{lim.members.length !== 1 ? "s" : ""}
-              {" · "}
-              {lim.destinations.length === 0 ? "any destination" : `${lim.destinations.length} dest.`}
-            </span>
-          </div>
-        ))}
-        {limits.length > 3 && (
-          <p className="text-[10px] text-ink-subtle">+{limits.length - 3} more</p>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function DashboardVaultIdentity({ multisig }: { multisig: string }) {
   const { data: vaultMeta } = useVaultMetadata(multisig);
@@ -271,8 +199,6 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
           </span>
         </div>
       </div>
-
-      <SpendingLimitsDashCard multisig={multisig} />
 
       {/* Pending proposals — below the main grid */}
       <PendingProposalsCard multisig={multisig} proposals={proposals} />

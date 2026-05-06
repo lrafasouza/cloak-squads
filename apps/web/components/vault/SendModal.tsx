@@ -41,10 +41,9 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
-import { buildSpendingLimitUseIx } from "@/lib/spending-limits";
-import { Send, Zap } from "lucide-react";
+import { Send } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 function randomBytes(length: number) {
@@ -63,34 +62,6 @@ function hexToBytes(hex: string) {
 }
 
 type SendMode = "private" | "public";
-
-type SpendingLimitRow = {
-  id: string;
-  spendingLimit: string;
-  vaultIndex: number;
-  mint: string;
-  amountRaw: string;
-  period: string;
-  members: string[];
-  destinations: string[];
-  /** Set by the API after on-chain reconcile. Falsy = pending / not on-chain — must not be offered to user. */
-  onChainExists?: boolean;
-};
-
-function lamportsToSolStr(raw: string) {
-  try { return (Number(BigInt(raw)) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 4 }); }
-  catch { return raw; }
-}
-
-function periodLabel(p: string) {
-  switch (p) {
-    case "Day": return "per day";
-    case "Week": return "per week";
-    case "Month": return "per month";
-    case "OneTime": return "one-time";
-    default: return p;
-  }
-}
 
 export function SendModal({
   multisig,
@@ -124,8 +95,6 @@ export function SendModal({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedMint, setSelectedMint] = useState<string>(SOL_TOKEN.mint);
-  const [spendingLimits, setSpendingLimits] = useState<SpendingLimitRow[]>([]);
-  const [useSpendingLimit, setUseSpendingLimit] = useState(false);
   const [selectedVaultIndex, setSelectedVaultIndex] = useState(defaultVaultIndex);
   const [destType, setDestType] = useState<"external" | "account">("external");
   const [destVaultIndex, setDestVaultIndex] = useState<number | null>(null);
@@ -193,39 +162,6 @@ export function SendModal({
       setDestVaultIndex(null);
     }
   }, [open, defaultRecipient, defaultAmount, defaultMode, defaultVaultIndex]);
-
-  useEffect(() => {
-    if (!open) return;
-    fetch(`/api/vaults/${multisig}/spending-limits`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then(setSpendingLimits)
-      .catch(() => {});
-  }, [open, multisig]);
-
-  const applicableLimit = useMemo<SpendingLimitRow | null>(() => {
-    if (!wallet.publicKey || mode !== "public" || !isSol) return null;
-    const memberStr = wallet.publicKey.toBase58();
-    // Native-SOL spending limits store mint = Pubkey::default() (system program ID)
-    // per Squads v4 convention.
-    const nativeSolMintStr = PublicKey.default.toBase58();
-    return (
-      spendingLimits.find(
-        (l) =>
-          // The on-chain SpendingLimit PDA must exist — DB-only rows are pending
-          // proposals that would fail with AccountNotInitialized at execute time.
-          l.onChainExists !== false &&
-          l.vaultIndex === selectedVaultIndex &&
-          l.mint === nativeSolMintStr &&
-          l.members.includes(memberStr) &&
-          (l.destinations.length === 0 ||
-            (recipient.trim() !== "" && l.destinations.includes(recipient.trim()))),
-      ) ?? null
-    );
-  }, [spendingLimits, wallet.publicKey, mode, isSol, recipient, selectedVaultIndex]);
-
-  useEffect(() => {
-    if (!applicableLimit) setUseSpendingLimit(false);
-  }, [applicableLimit]);
 
   const multisigAddress = useMemo(() => {
     try {
@@ -311,30 +247,14 @@ export function SendModal({
 
     setPending(true);
 
-    const isLimitSend = mode === "public" && useSpendingLimit && !!applicableLimit;
     startTransaction({
-      title: isLimitSend
-        ? `Sending ${amount} ${tokenLabel} via spending limit`
-        : `Creating ${mode === "public" ? "public" : "private"} ${tokenLabel} send proposal`,
-      description: isLimitSend
-        ? "Direct vault send — no proposal or approval needed."
-        : mode === "public"
+      title: `Creating ${mode === "public" ? "public" : "private"} ${tokenLabel} send proposal`,
+      description:
+        mode === "public"
           ? "Opening a standard Squads vault transfer proposal."
           : "Preparing your private transfer and opening a vault proposal.",
-      steps: isLimitSend
-        ? [
-            {
-              id: "validate",
-              title: "Validate",
-              description: `Checking balance and spending limit.`,
-            },
-            {
-              id: "send",
-              title: "Send",
-              description: "Signing and sending directly from vault.",
-            },
-          ]
-        : mode === "public"
+      steps:
+        mode === "public"
           ? [
               {
                 id: "validate",
@@ -392,56 +312,6 @@ export function SendModal({
             `Insufficient ${tokenLabel}. Need ${amount}, vault has ${selectedToken.uiBalance}.`,
           );
         }
-      }
-
-      if (mode === "public" && isLimitSend && applicableLimit) {
-        // Hard guard: reject before hitting the chain with a clear message
-        if (isSol && tokenUnits > BigInt(applicableLimit.amountRaw)) {
-          const limitSol = lamportsToSolStr(applicableLimit.amountRaw);
-          const msg = `Amount exceeds spending limit of ${limitSol} SOL ${periodLabel(applicableLimit.period)}. Reduce the amount or uncheck "Use spending limit" to create a proposal.`;
-          setError(msg);
-          failTransaction(msg);
-          setPending(false);
-          return;
-        }
-
-        // Direct send via spending limit — no proposal, 1 wallet signature
-        updateStep("validate", { status: "success" });
-        updateStep("send", { status: "running" });
-
-        const limitIx = buildSpendingLimitUseIx({
-          multisigPda: multisigAddress,
-          member: wallet.publicKey,
-          spendingLimitPda: new PublicKey(applicableLimit.spendingLimit),
-          vaultIndex: applicableLimit.vaultIndex,
-          destination: recipientPubkey,
-          amount: tokenUnits,
-          decimals: 9,
-          ...(memo.trim() ? { memo: memo.trim() } : {}),
-        });
-
-        const lbh = await connection.getLatestBlockhash();
-        const limitTx = new Transaction().add(limitIx);
-        limitTx.feePayer = wallet.publicKey;
-        limitTx.recentBlockhash = lbh.blockhash;
-
-        const limitSig = await wallet.sendTransaction(limitTx, connection);
-        await connection.confirmTransaction(
-          { signature: limitSig, blockhash: lbh.blockhash, lastValidBlockHeight: lbh.lastValidBlockHeight },
-          "confirmed",
-        );
-
-        updateStep("send", {
-          status: "success",
-          signature: limitSig,
-          description: `${amount} ${tokenLabel} sent directly.`,
-        });
-        completeTransaction({
-          title: `${tokenLabel} sent`,
-          description: `${amount} ${tokenLabel} sent directly to ${recipientPubkey.toBase58().slice(0, 8)}… (no approval needed).`,
-        });
-        handleClose(false);
-        return;
       }
 
       if (mode === "public") {
@@ -766,40 +636,6 @@ export function SendModal({
             </p>
           )}
 
-          {applicableLimit && (() => {
-            const limitSol = parseFloat(lamportsToSolStr(applicableLimit.amountRaw));
-            const sendSol = parseFloat(amount) || 0;
-            const exceedsLimit = useSpendingLimit && isSol && sendSol > limitSol && sendSol > 0;
-            return (
-              <div className={`rounded-lg border px-4 py-3 transition-colors ${exceedsLimit ? "border-signal-warn/40 bg-signal-warn/5" : "border-border bg-surface"}`}>
-                <div className="flex items-center gap-3">
-                  <Zap className={`h-4 w-4 flex-shrink-0 ${exceedsLimit ? "text-signal-warn" : "text-accent"}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-ink">
-                      Spending limit · {lamportsToSolStr(applicableLimit.amountRaw)} SOL{" "}
-                      {periodLabel(applicableLimit.period)}
-                    </p>
-                    <p className={`text-[10px] ${exceedsLimit ? "text-signal-warn" : "text-ink-subtle"}`}>
-                      {exceedsLimit
-                        ? `Exceeds limit by ${(sendSol - limitSol).toLocaleString("en-US", { maximumFractionDigits: 4 })} SOL — reduce amount or uncheck to create a proposal.`
-                        : "Skip approval — sends directly from vault."}
-                    </p>
-                  </div>
-                  <label className="flex cursor-pointer items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      checked={useSpendingLimit}
-                      onChange={(e) => setUseSpendingLimit(e.target.checked)}
-                      disabled={pending}
-                      className="h-3.5 w-3.5 accent-accent"
-                    />
-                    <span className="text-xs text-ink-muted">Use</span>
-                  </label>
-                </div>
-              </div>
-            );
-          })()}
-
           <div className="flex flex-col gap-1.5">
             <Label>Recipient</Label>
 
@@ -949,12 +785,10 @@ export function SendModal({
             >
               <Send className="h-4 w-4" />
               {pending
-                ? (useSpendingLimit && applicableLimit ? "Sending…" : "Creating proposal…")
-                : useSpendingLimit && applicableLimit
-                  ? `Send ${tokenLabel} now`
-                  : mode === "private"
-                    ? `Send ${tokenLabel} privately`
-                    : `Send ${tokenLabel}`}
+                ? "Creating proposal…"
+                : mode === "private"
+                  ? `Send ${tokenLabel} privately`
+                  : `Send ${tokenLabel}`}
             </Button>
           </DialogFooter>
         </form>
