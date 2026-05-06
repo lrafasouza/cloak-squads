@@ -27,8 +27,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid vault address." }, { status: 400 });
   }
 
-  const authError = await requireVaultMember(multisig);
-  if (authError) return authError;
+  const auth = await requireVaultMember(multisig);
+  if (auth instanceof NextResponse) return auth;
 
   if (!isPrismaAvailable()) {
     return NextResponse.json({ error: "Database unavailable." }, { status: 503 });
@@ -81,8 +81,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid vault address." }, { status: 400 });
   }
 
-  const authError = await requireVaultMember(multisig);
-  if (authError) return authError;
+  const auth = await requireVaultMember(multisig);
+  if (auth instanceof NextResponse) return auth;
 
   if (!isPrismaAvailable()) {
     return NextResponse.json({ error: "Database unavailable." }, { status: 503 });

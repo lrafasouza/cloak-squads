@@ -39,8 +39,8 @@ export async function GET(_req: Request, context: { params: Promise<{ multisig: 
 export async function POST(req: Request, context: { params: Promise<{ multisig: string }> }) {
   const { multisig } = await context.params;
 
-  const authError = await requireVaultMember(multisig);
-  if (authError) return authError;
+  const auth = await requireVaultMember(multisig);
+  if (auth instanceof NextResponse) return auth;
 
   if (!isPrismaAvailable()) {
     return NextResponse.json({ error: "Database unavailable." }, { status: 503 });

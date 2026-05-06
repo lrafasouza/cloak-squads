@@ -161,10 +161,13 @@ export function SendModal({
   const applicableLimit = useMemo<SpendingLimitRow | null>(() => {
     if (!wallet.publicKey || mode !== "public" || !isSol) return null;
     const memberStr = wallet.publicKey.toBase58();
+    // Native-SOL spending limits store mint = Pubkey::default() (system program ID)
+    // per Squads v4 convention.
+    const nativeSolMintStr = PublicKey.default.toBase58();
     return (
       spendingLimits.find(
         (l) =>
-          l.mint === SOL_MINT &&
+          l.mint === nativeSolMintStr &&
           l.members.includes(memberStr) &&
           (l.destinations.length === 0 ||
             (recipient.trim() !== "" && l.destinations.includes(recipient.trim()))),
@@ -335,15 +338,11 @@ export function SendModal({
         updateStep("validate", { status: "success" });
         updateStep("send", { status: "running" });
 
-        const [limitVaultPda] = multisigSdk.getVaultPda({
-          multisigPda: multisigAddress,
-          index: applicableLimit.vaultIndex,
-        });
         const limitIx = buildSpendingLimitUseIx({
           multisigPda: multisigAddress,
           member: wallet.publicKey,
           spendingLimitPda: new PublicKey(applicableLimit.spendingLimit),
-          vaultPda: limitVaultPda,
+          vaultIndex: applicableLimit.vaultIndex,
           destination: recipientPubkey,
           amount: tokenUnits,
           decimals: 9,

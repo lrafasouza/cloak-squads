@@ -4,11 +4,12 @@ import { translateOnchainError } from "@cloak-squads/core/onchain-error";
 import type { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { Transaction } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
-import { Period } from "@sqds/multisig/lib/generated/types/Period";
+import BN from "bn.js";
 import { simulateAndOptimize } from "@/lib/tx-optimization";
 import { assertBrowserSquadsWallet, nextTransactionIndex, type BrowserSquadsWallet } from "@/lib/squads-sdk";
 
-export { Period };
+export const Period = multisig.types.Period;
+export type Period = multisig.types.Period;
 
 export async function createAddSpendingLimitProposal(params: {
   connection: Connection;
@@ -40,11 +41,10 @@ export async function createAddSpendingLimitProposal(params: {
         createKey: params.createKey,
         vaultIndex: params.vaultIndex,
         mint: params.mint,
-        amount: params.amount,
+        amount: new BN(params.amount.toString()),
         period: params.period,
         members: params.members,
         destinations: params.destinations,
-        memo: params.memo ?? null,
       },
     ],
     memo: params.memo ?? "Add spending limit",
@@ -101,7 +101,6 @@ export async function createRemoveSpendingLimitProposal(params: {
       {
         __kind: "RemoveSpendingLimit",
         spendingLimit: params.spendingLimitPda,
-        memo: params.memo ?? null,
       },
     ],
     memo: params.memo ?? "Remove spending limit",
@@ -140,26 +139,37 @@ export async function createRemoveSpendingLimitProposal(params: {
   return { signature, transactionIndex };
 }
 
+/**
+ * Builds the spendingLimitUse instruction for a direct member-signed transfer
+ * from the vault, bypassing proposal/approval. SOL-only in v1: pass `mint`
+ * for SPL tokens.
+ *
+ * Note: amount is converted bigint→number; safe up to ~9 quadrillion lamports
+ * (Number.MAX_SAFE_INTEGER), well above SOL total supply.
+ */
 export function buildSpendingLimitUseIx(params: {
   multisigPda: PublicKey;
   member: PublicKey;
   spendingLimitPda: PublicKey;
-  vaultPda: PublicKey;
+  vaultIndex: number;
   destination: PublicKey;
   amount: bigint;
   decimals: number;
+  mint?: PublicKey;
   memo?: string;
 }): TransactionInstruction {
+  if (params.amount > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error("Amount exceeds Number.MAX_SAFE_INTEGER — cannot use spending limit.");
+  }
   return multisig.instructions.spendingLimitUse({
     multisigPda: params.multisigPda,
     member: params.member,
     spendingLimit: params.spendingLimitPda,
-    vault: params.vaultPda,
+    vaultIndex: params.vaultIndex,
     destination: params.destination,
-    args: {
-      amount: params.amount,
-      decimals: params.decimals,
-      memo: params.memo ?? null,
-    },
+    amount: Number(params.amount),
+    decimals: params.decimals,
+    ...(params.mint ? { mint: params.mint } : {}),
+    ...(params.memo ? { memo: params.memo } : {}),
   });
 }

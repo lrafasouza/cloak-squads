@@ -10,7 +10,6 @@ import { Period, createAddSpendingLimitProposal, createRemoveSpendingLimitPropos
 import { SOL_MINT } from "@/lib/tokens";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import * as multisigSdk from "@sqds/multisig";
 import { Plus, Trash2, Zap } from "lucide-react";
 import { use, useCallback, useEffect, useState } from "react";
 
@@ -64,7 +63,7 @@ export default function LimitsPage({
   // Form fields
   const [formAmount, setFormAmount] = useState("");
   const [formPeriod, setFormPeriod] = useState<typeof PERIODS[number]>("Day");
-  const [formMint, setFormMint] = useState(SOL_MINT);
+  const [formMint] = useState(SOL_MINT);
   const [formVaultIndex, setFormVaultIndex] = useState("0");
 
   const load = useCallback(async () => {
@@ -93,7 +92,11 @@ export default function LimitsPage({
     const multisigPk = new PublicKey(multisig);
     const createKey = Keypair.generate().publicKey;
     const periodEnum = Period[formPeriod as keyof typeof Period];
-    const mintPk = new PublicKey(formMint);
+    // Squads v4 native-SOL spending limit convention: store Pubkey::default()
+    // (32-zero-byte system program ID) so spendingLimitUse({ mint: undefined })
+    // matches at execution time. Wrapped-SOL mint would force the SPL ATA path.
+    const isNativeSol = formMint === SOL_MINT;
+    const mintPk = isNativeSol ? PublicKey.default : new PublicKey(formMint);
 
     setCreating(true);
     try {
