@@ -9,7 +9,7 @@ import type {
   Signer,
   TransactionInstruction,
 } from "@solana/web3.js";
-import { Transaction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
+import { SendTransactionError, Transaction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import { simulateAndOptimize } from "@/lib/tx-optimization";
 
@@ -463,6 +463,30 @@ export async function vaultTransactionExecute(params: {
     transactionIndex: params.transactionIndex,
     member: params.wallet.publicKey,
   });
+
+  // Squads SDK bug workaround: accountsForTransactionExecute only demotes the
+  // transaction's own source vault PDA from signer→non-signer. Inner messages
+  // can legitimately reference OTHER vault PDAs of the same multisig as signers
+  // (e.g. the gatekeeper license requires vault index 0 to sign even when the
+  // transfer comes from a different sub-vault — see issue_license.rs:14, where
+  // the program hardcodes index 0). Those are CPI-signed by Squads too, but
+  // the SDK leaves them marked as signers, so web3.js demands a real signature
+  // nobody can produce. Demote any vault PDA of this multisig in the keys.
+  const memberPubkey = params.wallet.publicKey;
+  const VAULT_INDEX_PROBE_LIMIT = 32;
+  const knownVaultPdas: PublicKey[] = [];
+  for (let i = 0; i < VAULT_INDEX_PROBE_LIMIT; i++) {
+    knownVaultPdas.push(multisig.getVaultPda({ multisigPda: params.multisigPda, index: i })[0]);
+  }
+  for (const key of instruction.keys) {
+    if (!key.isSigner) continue;
+    if (key.pubkey.equals(memberPubkey)) continue;
+    if (knownVaultPdas.some((v) => v.equals(key.pubkey))) {
+      key.isSigner = false;
+      log("[squads-sdk] demoted vault PDA from signer:", key.pubkey.toBase58());
+    }
+  }
+
   const latestBlockhash = await params.connection.getLatestBlockhash();
 
   // Single simulation: builds budget ixs AND surfaces on-chain errors. Wallet adapters
@@ -479,32 +503,88 @@ export async function vaultTransactionExecute(params: {
     throw new Error(translateOnchainError(raw));
   }
 
-  const message = new TransactionMessage({
-    payerKey: params.wallet.publicKey,
-    recentBlockhash: latestBlockhash.blockhash,
-    instructions: [...budgetIxs, instruction],
-  }).compileToV0Message(lookupTableAccounts);
-  const versionedTx = new VersionedTransaction(message);
-
+  let signature: string;
   try {
-    const signature = await params.wallet.sendTransaction(versionedTx, params.connection);
-    const { blockhash: confirmBh, lastValidBlockHeight } =
-      await params.connection.getLatestBlockhash();
-    await params.connection.confirmTransaction(
-      { signature, blockhash: confirmBh, lastValidBlockHeight },
-      "confirmed",
-    );
-    return signature;
+    if (lookupTableAccounts.length === 0 && typeof params.wallet.signTransaction === "function") {
+      // No LUTs — build a legacy Transaction, sign it, and send raw. Legacy
+      // serialization round-trips stably across wallets (V0 does not — Phantom
+      // and Standard Wallet Adapter re-encode V0 messages after signing, which
+      // breaks RPC sig-verify). Bypassing the adapter's sendTransaction also
+      // skips its internal preflight, which has been observed to fail with an
+      // empty SendTransactionError that hides the real RPC reason.
+      const legacyTx = new Transaction().add(...budgetIxs, instruction);
+      legacyTx.feePayer = params.wallet.publicKey;
+      legacyTx.recentBlockhash = latestBlockhash.blockhash;
+      const signed = await params.wallet.signTransaction(legacyTx);
+      signature = await params.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: "confirmed",
+      });
+    } else {
+      // Has LUTs (or no signTransaction) — use V0 + adapter.sendTransaction.
+      // The adapter handles V0+LUT signing natively; do NOT use signTransaction
+      // + sendRawTransaction here — V0+LUT fails RPC preflight sig-verify when
+      // re-encoded.
+      const message = new TransactionMessage({
+        payerKey: params.wallet.publicKey,
+        recentBlockhash: latestBlockhash.blockhash,
+        instructions: [...budgetIxs, instruction],
+      }).compileToV0Message(lookupTableAccounts);
+      const versionedTx = new VersionedTransaction(message);
+      signature = await params.wallet.sendTransaction(versionedTx, params.connection);
+    }
   } catch (sendErr) {
     logError("[squads-sdk] execute sendTransaction error:", sendErr);
+    // SendTransactionError has getLogs(); WalletSendTransactionError wraps the
+    // underlying error in .error (NOT .cause), so we need to unwrap it to reach
+    // the real RPC error and its logs.
+    const wrapped =
+      sendErr instanceof Error && "error" in sendErr
+        ? (sendErr as { error?: unknown }).error
+        : null;
+    const maybeSendTxErr =
+      sendErr instanceof SendTransactionError
+        ? sendErr
+        : wrapped instanceof SendTransactionError
+          ? wrapped
+          : null;
+    if (maybeSendTxErr) {
+      let sendLogs: string[] | null = null;
+      try { sendLogs = await maybeSendTxErr.getLogs(params.connection); } catch { /* ignore */ }
+      if (sendLogs && sendLogs.length > 0) {
+        logError("[squads-sdk]   on-chain logs:", sendLogs);
+        throw new Error(translateOnchainError(sendLogs.join("\n")));
+      }
+    }
     if (sendErr && typeof sendErr === "object") {
-      const anyErr = sendErr as { logs?: unknown; cause?: unknown; message?: unknown };
+      const anyErr = sendErr as {
+        logs?: unknown;
+        cause?: unknown;
+        message?: unknown;
+        error?: unknown;
+      };
       logError("[squads-sdk]   .logs:", anyErr.logs);
       logError("[squads-sdk]   .cause:", anyErr.cause);
       logError("[squads-sdk]   .message:", anyErr.message);
+      logError("[squads-sdk]   .error (wrapped):", anyErr.error);
+      if (wrapped && typeof wrapped === "object") {
+        const w = wrapped as { message?: unknown; logs?: unknown };
+        logError("[squads-sdk]   .error.message:", w.message);
+        logError("[squads-sdk]   .error.logs:", w.logs);
+      }
     }
-    throw new Error(translateOnchainError(sendErr));
+    // Prefer the wrapped error for translation — its message carries the
+    // real RPC failure (e.g. "Transaction simulation failed: ...").
+    throw new Error(translateOnchainError(wrapped ?? sendErr));
   }
+
+  const { blockhash: confirmBh, lastValidBlockHeight } =
+    await params.connection.getLatestBlockhash();
+  await params.connection.confirmTransaction(
+    { signature, blockhash: confirmBh, lastValidBlockHeight },
+    "confirmed",
+  );
+  return signature;
 }
 
 export async function configTransactionExecute(params: {
@@ -536,12 +616,46 @@ export async function configTransactionExecute(params: {
     throw new Error("Proposal not found on-chain. Did you create + approve it before executing?");
   }
 
+  // The Squads program requires spending limit PDAs as remaining accounts when
+  // executing AddSpendingLimit or RemoveSpendingLimit config actions. Auto-derive
+  // them by reading the ConfigTransaction on-chain so callers don't need to know.
+  let spendingLimits: PublicKey[] = params.spendingLimits ?? [];
+  if (spendingLimits.length === 0) {
+    const [transactionPda] = multisig.getTransactionPda({
+      multisigPda: params.multisigPda,
+      index: params.transactionIndex,
+    });
+    try {
+      const configTx = await multisig.accounts.ConfigTransaction.fromAccountAddress(
+        params.connection,
+        transactionPda,
+      );
+      spendingLimits = [];
+      for (const action of configTx.actions) {
+        if (multisig.types.isConfigActionAddSpendingLimit(action)) {
+          const [slPda] = multisig.getSpendingLimitPda({
+            multisigPda: params.multisigPda,
+            createKey: action.createKey,
+          });
+          spendingLimits.push(slPda);
+          log("[squads-sdk] derived AddSpendingLimit PDA:", slPda.toBase58());
+        } else if (multisig.types.isConfigActionRemoveSpendingLimit(action)) {
+          spendingLimits.push(action.spendingLimit);
+          log("[squads-sdk] derived RemoveSpendingLimit PDA:", action.spendingLimit.toBase58());
+        }
+      }
+    } catch (err) {
+      log("[squads-sdk] could not auto-derive spending limits from ConfigTransaction:", err);
+    }
+  }
+  log("[squads-sdk] configTransactionExecute spendingLimits:", spendingLimits.map((p) => p.toBase58()));
+
   const instruction = multisig.instructions.configTransactionExecute({
     multisigPda: params.multisigPda,
     transactionIndex: params.transactionIndex,
     member: params.wallet.publicKey,
     rentPayer: params.wallet.publicKey,
-    spendingLimits: params.spendingLimits ?? [],
+    spendingLimits,
   });
   const latestBlockhash = await params.connection.getLatestBlockhash();
 

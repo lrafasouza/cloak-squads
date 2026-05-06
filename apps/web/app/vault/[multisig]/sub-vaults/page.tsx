@@ -4,11 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
-import { WorkspaceHeader, WorkspacePage } from "@/components/ui/workspace";
+import {
+  EmptyPanel,
+  Panel,
+  PanelBody,
+  PanelHeader,
+  WorkspaceHeader,
+  WorkspacePage,
+} from "@/components/ui/workspace";
+import { SendModal } from "@/components/vault/SendModal";
+import { cn } from "@/lib/utils";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
+import { useVaultData } from "@/lib/use-vault-data";
 import { PublicKey } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
-import { Plus, Trash2 } from "lucide-react";
+import { ArrowUpFromLine, Check, Copy, Layers, Plus, Trash2 } from "lucide-react";
 import { use, useCallback, useEffect, useState } from "react";
 
 type SubVault = {
@@ -30,6 +40,113 @@ function deriveVaultPda(multisigAddress: string, index: number): string {
   }
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="inline-flex h-6 w-6 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+      aria-label="Copy address"
+    >
+      {copied ? (
+        <Check className="h-3 w-3 text-signal-positive" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+    </button>
+  );
+}
+
+function VaultCard({
+  name,
+  address,
+  badge,
+  balanceSol,
+  onDelete,
+  onSend,
+}: {
+  name: string;
+  address: string;
+  badge?: string;
+  balanceSol?: string;
+  onDelete?: () => void;
+  onSend?: () => void;
+}) {
+  const short =
+    address !== "–"
+      ? `${address.slice(0, 14)}…${address.slice(-8)}`
+      : "–";
+
+  const hasFunds = balanceSol !== undefined && Number.parseFloat(balanceSol) > 0;
+
+  return (
+    <div className="rounded-xl border border-border bg-surface px-5 py-4 transition-colors hover:border-border-strong">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-ink">{name}</p>
+            {badge && (
+              <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">
+                {badge}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <p className="font-mono text-[11px] text-ink-subtle">{short}</p>
+            {address !== "–" && <CopyButton text={address} />}
+          </div>
+          <p className="text-[10px] text-ink-subtle/60">
+            Receive-only address. Send funds here to deposit into this account.
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          {balanceSol !== undefined && (
+            <span
+              className={cn(
+                "font-mono text-sm font-semibold tabular-nums",
+                hasFunds ? "text-ink" : "text-ink-subtle/50",
+              )}
+            >
+              {hasFunds ? Number.parseFloat(balanceSol).toLocaleString("en-US", { maximumFractionDigits: 4 }) : "0"}{" "}
+              <span className="text-xs font-normal text-ink-subtle">SOL</span>
+            </span>
+          )}
+          <div className="flex items-center gap-1">
+            {onSend && (
+              <button
+                type="button"
+                onClick={onSend}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-accent/10 hover:text-accent"
+                aria-label={`Send from ${name}`}
+              >
+                <ArrowUpFromLine className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-surface-2 hover:text-signal-error"
+                aria-label={`Remove ${name}`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SubVaultsPage({
   params,
 }: {
@@ -38,13 +155,14 @@ export default function SubVaultsPage({
   const { multisig } = use(params);
   const { fetchWithAuth } = useWalletAuth();
   const { addToast } = useToast();
+  const { data: vaultData } = useVaultData(multisig);
 
   const [subVaults, setSubVaults] = useState<SubVault[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newIndex, setNewIndex] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [sendVaultIndex, setSendVaultIndex] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,10 +178,16 @@ export default function SubVaultsPage({
     load();
   }, [load]);
 
+  const nextIndex =
+    subVaults.length > 0
+      ? Math.max(...subVaults.map((sv) => sv.vaultIndex)) + 1
+      : 1;
+
+  const previewAddress = newName.trim() ? deriveVaultPda(multisig, nextIndex) : null;
+
   const handleCreate = async () => {
-    const idx = Number(newIndex);
-    if (!newName.trim() || !Number.isInteger(idx) || idx < 1) {
-      addToast("Enter a valid name and index (≥ 1).", "error");
+    if (!newName.trim()) {
+      addToast("Enter a name for the account.", "error");
       return;
     }
     setCreating(true);
@@ -71,15 +195,14 @@ export default function SubVaultsPage({
       const res = await fetchWithAuth(`/api/vaults/${multisig}/sub-vaults`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vaultIndex: idx, name: newName.trim() }),
+        body: JSON.stringify({ vaultIndex: nextIndex, name: newName.trim() }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to create sub-vault.");
+        throw new Error((data as { error?: string }).error ?? "Failed to create account.");
       }
-      addToast("Sub-vault created.", "success");
+      addToast("Account created.", "success");
       setNewName("");
-      setNewIndex("");
       setShowForm(false);
       await load();
     } catch (err) {
@@ -90,128 +213,191 @@ export default function SubVaultsPage({
   };
 
   const handleDelete = async (vaultIndex: number, name: string) => {
-    if (!confirm(`Delete sub-vault "${name}"? This only removes the label — funds on-chain are unaffected.`)) return;
+    const breakdown = vaultData?.subVaultBreakdown.find((b) => b.vaultIndex === vaultIndex);
+    const bal = Number.parseFloat(breakdown?.balanceSol ?? "0");
+    if (bal > 0) {
+      addToast(
+        `"${name}" holds ${bal.toLocaleString("en-US", { maximumFractionDigits: 4 })} SOL. Send funds to another account first, then remove the label.`,
+        "error",
+      );
+      return;
+    }
+    if (
+      !confirm(
+        `Remove "${name}"? This only deletes the label — on-chain funds are unaffected.`,
+      )
+    )
+      return;
     try {
-      const res = await fetchWithAuth(`/api/vaults/${multisig}/sub-vaults/${vaultIndex}`, {
-        method: "DELETE",
-      });
+      const res = await fetchWithAuth(
+        `/api/vaults/${multisig}/sub-vaults/${vaultIndex}`,
+        { method: "DELETE" },
+      );
       if (!res.ok && res.status !== 204) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to delete.");
+        throw new Error((data as { error?: string }).error ?? "Failed to remove.");
       }
-      addToast("Sub-vault removed.", "success");
+      addToast("Account removed.", "success");
       await load();
     } catch (err) {
       addToast(String(err instanceof Error ? err.message : err), "error");
     }
   };
 
+  const primaryAddress = deriveVaultPda(multisig, 0);
+
   return (
     <WorkspacePage>
       <WorkspaceHeader
-        eyebrow="Sub-vaults"
-        title="Vault PDAs"
-        description="Named vault PDAs within this multisig. Each index is a separate on-chain PDA — fund it directly to use it."
+        eyebrow="Accounts"
+        title="Accounts"
+        description="Each account is a separate on-chain address derived from your multisig. Label and fund them independently for treasury, grants, or operations."
       />
 
-      <div className="space-y-3">
-        {/* Main vault (index 0) always shown */}
-        <div className="rounded-xl border border-border bg-surface">
-          <div className="flex items-center justify-between px-5 py-4">
-            <div>
-              <p className="text-sm font-semibold text-ink">Main (index 0)</p>
-              <p className="mt-0.5 font-mono text-[10px] text-ink-subtle">
-                {deriveVaultPda(multisig, 0)}
-              </p>
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        {/* Left: vault list */}
+        <div className="space-y-3">
+          <VaultCard
+            name="Primary"
+            address={primaryAddress}
+            badge="Default"
+            onSend={() => setSendVaultIndex(0)}
+            {...(vaultData?.primaryBalanceSol !== undefined
+              ? { balanceSol: vaultData.primaryBalanceSol }
+              : {})}
+          />
+
+          {loading ? (
+            <div className="rounded-xl border border-border bg-surface px-5 py-4">
+              <p className="animate-pulse text-xs text-ink-subtle">Loading accounts…</p>
             </div>
-            <span className="rounded-full bg-signal-success/10 px-2.5 py-0.5 text-[10px] font-semibold text-signal-success">
-              Default
-            </span>
-          </div>
+          ) : subVaults.length === 0 ? (
+            <EmptyPanel
+              title="No additional accounts"
+              description="Add an account to separate your funds, for example a dedicated treasury or ops balance."
+              action={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowForm(true)}
+                  className="border border-dashed border-border"
+                >
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  Add account
+                </Button>
+              }
+            />
+          ) : (
+            subVaults.map((sv) => (
+              <VaultCard
+                key={sv.id}
+                name={sv.name}
+                address={deriveVaultPda(multisig, sv.vaultIndex)}
+                onDelete={() => handleDelete(sv.vaultIndex, sv.name)}
+                onSend={() => setSendVaultIndex(sv.vaultIndex)}
+                {...(() => {
+                  const b = vaultData?.subVaultBreakdown.find(
+                    (x) => x.vaultIndex === sv.vaultIndex,
+                  );
+                  return b ? { balanceSol: b.balanceSol } : {};
+                })()}
+              />
+            ))
+          )}
         </div>
 
-        {/* Named sub-vaults */}
-        {loading ? (
-          <p className="px-1 text-xs text-ink-subtle">Loading…</p>
-        ) : (
-          subVaults.map((sv) => (
-            <div
-              key={sv.id}
-              className="flex items-center justify-between rounded-xl border border-border bg-surface px-5 py-4"
-            >
-              <div>
-                <p className="text-sm font-semibold text-ink">
-                  {sv.name}{" "}
-                  <span className="text-ink-subtle">(index {sv.vaultIndex})</span>
-                </p>
-                <p className="mt-0.5 font-mono text-[10px] text-ink-subtle">
-                  {deriveVaultPda(multisig, sv.vaultIndex)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleDelete(sv.vaultIndex, sv.name)}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-ink-subtle hover:bg-surface-2 hover:text-signal-error"
-                aria-label={`Delete ${sv.name}`}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ))
-        )}
+        {/* Right: create panel (sticky) */}
+        <div className="lg:sticky lg:top-6 lg:self-start space-y-3">
+          <Panel>
+            <PanelHeader
+              icon={Layers}
+              title="Add account"
+              description="Gets its own on-chain address."
+            />
+            <PanelBody className="space-y-4">
+              {showForm ? (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sv-name">Account name</Label>
+                    <Input
+                      id="sv-name"
+                      placeholder="Treasury, Grants, Ops…"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleCreate();
+                      }}
+                      autoFocus
+                    />
+                  </div>
 
-        {/* Create form */}
-        {showForm ? (
-          <div className="rounded-xl border border-border bg-surface px-5 py-4 space-y-3">
-            <p className="text-sm font-semibold text-ink">New sub-vault</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="sv-name">Name</Label>
-                <Input
-                  id="sv-name"
-                  placeholder="Ops, Grants, Treasury…"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="sv-index">Index (≥ 1)</Label>
-                <Input
-                  id="sv-index"
-                  type="number"
-                  min={1}
-                  max={255}
-                  placeholder="1"
-                  value={newIndex}
-                  onChange={(e) => setNewIndex(e.target.value)}
-                />
-              </div>
-            </div>
-            {newIndex && Number.isInteger(Number(newIndex)) && Number(newIndex) >= 1 && (
-              <p className="font-mono text-[10px] text-ink-subtle">
-                PDA: {deriveVaultPda(multisig, Number(newIndex))}
-              </p>
-            )}
-            <div className="flex gap-2">
-              <Button onClick={handleCreate} disabled={creating} size="sm">
-                {creating ? "Creating…" : "Create"}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>
-                Cancel
-              </Button>
-            </div>
+                  {previewAddress && (
+                    <div className="rounded-lg border border-border bg-bg/40 px-3 py-2 space-y-0.5">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-ink-subtle">
+                        Address preview
+                      </p>
+                      <div className="flex items-center gap-1">
+                        <p className="font-mono text-[11px] text-ink">
+                          {previewAddress.slice(0, 16)}…{previewAddress.slice(-8)}
+                        </p>
+                        <CopyButton text={previewAddress} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleCreate}
+                      disabled={creating || !newName.trim()}
+                      size="sm"
+                      className="flex-1"
+                    >
+                      {creating ? "Creating…" : "Create account"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShowForm(false);
+                        setNewName("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowForm(true)}
+                  className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border px-4 py-3 text-left text-xs font-medium text-ink-subtle transition-colors hover:border-border-strong hover:text-ink"
+                >
+                  <Plus className="h-4 w-4 shrink-0" />
+                  New account
+                </button>
+              )}
+            </PanelBody>
+          </Panel>
+
+          <div className="rounded-xl border border-border bg-surface px-4 py-3 space-y-2">
+            <p className="text-xs font-semibold text-ink">Important</p>
+            <ul className={cn("space-y-1.5 text-[11px] text-ink-muted")}>
+              <li>• These are <strong className="text-ink">sub-accounts</strong> of this vault, not separate vaults</li>
+              <li>• You cannot "enter" them; manage everything from this vault</li>
+              <li>• Copy the address and send SOL/tokens to fund it</li>
+              <li>• Names are off-chain labels; removing one doesn't affect funds</li>
+            </ul>
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border px-5 py-4 text-left text-xs font-medium text-ink-subtle transition-colors hover:border-border-strong hover:text-ink"
-          >
-            <Plus className="h-4 w-4" />
-            Add sub-vault
-          </button>
-        )}
+        </div>
       </div>
+
+      <SendModal
+        multisig={multisig}
+        open={sendVaultIndex !== null}
+        onOpenChange={(v) => { if (!v) setSendVaultIndex(null); }}
+        defaultVaultIndex={sendVaultIndex ?? 0}
+        subVaultAccounts={subVaults.map((sv) => ({ vaultIndex: sv.vaultIndex, name: sv.name }))}
+      />
     </WorkspacePage>
   );
 }

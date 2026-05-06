@@ -171,8 +171,22 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [selectedMint, setSelectedMint] = useState<string>(SOL_TOKEN.mint);
   const [recipientNeedsAta, setRecipientNeedsAta] = useState(false);
+  const [selectedVaultIndex, setSelectedVaultIndex] = useState(0);
+  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
 
-  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig);
+  useEffect(() => {
+    fetch(`/api/vaults/${multisig}/sub-vaults`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Array<{ vaultIndex: number; name: string }>) => setSubVaultAccounts(data))
+      .catch(() => {});
+  }, [multisig]);
+
+  const allAccounts = useMemo(
+    () => [{ vaultIndex: 0, name: "Primary" }, ...subVaultAccounts],
+    [subVaultAccounts],
+  );
+
+  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig, selectedVaultIndex);
   const { data: solPrice } = useSolPrice();
 
   const selectedToken = useMemo(
@@ -280,7 +294,17 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       }
 
       const recipientPubkey = new PublicKey(recipient);
-      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
+
+      // Private sends route through Cloak's shielded pool which can only deliver
+      // to Ed25519 wallets. PDAs (off-curve) get accepted by the proposal flow
+      // but rejected by the relay at delivery time, stranding funds in the pool.
+      if (!PublicKey.isOnCurve(recipientPubkey.toBuffer())) {
+        throw new Error(
+          "Recipient is not an Ed25519 wallet (likely a PDA). Use Public Send for vault-to-vault transfers — Cloak can only deliver privately to standard wallets.",
+        );
+      }
+
+      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: selectedVaultIndex });
 
       // Derive amount in token-native units (lamports for SOL, micro-USDC for USDC)
       const decimals = selectedToken?.decimals ?? 9;
@@ -397,6 +421,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         multisigPda: multisigAddress,
         instructions: proposalInstructions,
         memo: `private send ${tokenLabel}`,
+        vaultIndex: selectedVaultIndex,
       });
 
       updateStep("squads", {
@@ -445,6 +470,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
             nonce: Array.from(invariants.nonce),
           },
           commitmentClaim,
+          vaultIndex: selectedVaultIndex,
         }),
       });
 
@@ -498,7 +524,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       }
 
       const recipientPubkey = new PublicKey(recipient);
-      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
+      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: selectedVaultIndex });
       const instructions = [];
 
       if (isSol) {
@@ -557,6 +583,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         multisigPda: multisigAddress,
         instructions,
         memo: memo || `Send ${amount} ${tokenLabel}`,
+        vaultIndex: selectedVaultIndex,
       });
 
       updateStep("squads", {
@@ -640,6 +667,33 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                 onSubmit={isPrivate ? handlePrivateSend : handlePublicSend}
                 className="space-y-5"
               >
+                {/* From account */}
+                {subVaultAccounts.length > 0 && (
+                  <div>
+                    <Label>From account</Label>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {allAccounts.map((acct) => (
+                        <button
+                          key={acct.vaultIndex}
+                          type="button"
+                          disabled={pending}
+                          onClick={() => {
+                            setSelectedVaultIndex(acct.vaultIndex);
+                            setAmount("");
+                          }}
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                            selectedVaultIndex === acct.vaultIndex
+                              ? "border-accent/40 bg-accent/10 text-accent"
+                              : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
+                          }`}
+                        >
+                          {acct.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Recipient */}
                 <div>
                   <Label htmlFor="recipient">Recipient</Label>

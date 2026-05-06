@@ -37,7 +37,6 @@ export default function CreateVaultPage() {
     draft,
     setName,
     setDescription,
-    setAvatar,
     addMember,
     removeMember,
     updateMember,
@@ -89,10 +88,8 @@ export default function CreateVaultPage() {
         <Step1Details
           name={state.name}
           description={state.description}
-          avatarDataUrl={state.avatarDataUrl}
           onName={setName}
           onDescription={setDescription}
-          onAvatar={setAvatar}
           onNext={next}
         />
       )}
@@ -117,7 +114,6 @@ export default function CreateVaultPage() {
           members={state.members}
           threshold={state.threshold}
           operator={state.operator}
-          avatarDataUrl={state.avatarDataUrl}
           createKeySecret={state.createKeySecret}
           createdMultisig={state.createdMultisig}
           bootstrapIndex={state.bootstrapIndex}

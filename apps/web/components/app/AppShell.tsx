@@ -18,6 +18,7 @@ import {
   ArrowLeftRight,
   BookOpen,
   BookUser,
+  ChevronDown,
   FileText,
   HelpCircle,
   Key,
@@ -25,6 +26,7 @@ import {
   LayoutDashboard,
   List,
   Menu,
+  RefreshCw,
   Send,
   Settings,
   Shield,
@@ -47,7 +49,7 @@ interface NavItem {
   icon: React.ElementType;
 }
 
-const PRIMARY_NAV: NavItem[] = [
+const WORKSPACE_NAV: NavItem[] = [
   { label: "Dashboard", href: "", icon: LayoutDashboard },
   { label: "Send Private", href: "/send", icon: Send },
   { label: "Swap", href: "/swap", icon: ArrowLeftRight },
@@ -56,14 +58,17 @@ const PRIMARY_NAV: NavItem[] = [
   { label: "Invoices", href: "/invoice", icon: BookOpen },
 ];
 
-const PRIVACY_NAV: NavItem[] = [
+const GOVERNANCE_NAV: NavItem[] = [
   { label: "Transactions", href: "/proposals", icon: List },
-  { label: "Sub-vaults", href: "/sub-vaults", icon: Layers },
+  { label: "Members", href: "/members", icon: Users },
+  { label: "Audit", href: "/audit", icon: Shield },
+];
+
+const PRIVACY_VAULT_NAV: NavItem[] = [
+  { label: "Accounts", href: "/sub-vaults", icon: Layers },
   { label: "Spending Limits", href: "/limits", icon: Zap },
   { label: "Privacy", href: "/privacy", icon: ShieldAlert },
-  { label: "Members", href: "/members", icon: Users },
   { label: "Address Book", href: "/address-book", icon: BookUser },
-  { label: "Audit", href: "/audit", icon: Shield },
 ];
 
 const BOTTOM_NAV: NavItem[] = [
@@ -122,20 +127,92 @@ function NavLink({
   );
 }
 
+/* ── Collapsible nav section ── */
+function CollapsibleSection({
+  label,
+  items,
+  base,
+  pathname,
+  badge,
+  badgeHref,
+  onClose,
+  storageKey,
+  defaultOpen = true,
+}: {
+  label: string;
+  items: NavItem[];
+  base: string;
+  pathname: string;
+  badge?: number;
+  badgeHref?: string;
+  onClose?: () => void;
+  storageKey: string;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved !== null) setOpen(saved === "true");
+    } catch {}
+  }, [storageKey]);
+
+  const toggle = () => {
+    setOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(storageKey, String(next)); } catch {}
+      return next;
+    });
+  };
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={toggle}
+        className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle/60 transition-colors hover:text-ink-subtle"
+      >
+        <span>{label}</span>
+        <ChevronDown
+          className={cn("h-3 w-3 transition-transform duration-200", open ? "" : "-rotate-90")}
+        />
+      </button>
+      <div
+        className="overflow-hidden transition-[max-height] duration-200"
+        style={{ maxHeight: open ? "500px" : "0px" }}
+      >
+        <div className="flex flex-col gap-0.5 pt-0.5">
+          {items.map((item) => (
+            <NavLink
+              key={item.label}
+              item={item}
+              base={base}
+              pathname={pathname}
+              {...(badge !== undefined && item.href === badgeHref ? { badge } : {})}
+              {...(onClose ? { onClick: onClose } : {})}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Sidebar content ── */
 function SidebarContent({
   multisig,
   vaultName,
   pathname,
   base,
-  inboxCount,
+  queueCount,
   onClose,
 }: {
   multisig: string;
   vaultName?: string | undefined;
   pathname: string;
   base: string;
-  inboxCount: number;
+  queueCount: number;
   onClose?: () => void;
 }) {
   return (
@@ -151,38 +228,35 @@ function SidebarContent({
       </div>
 
       {/* Primary nav */}
-      <nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-3 py-3">
-        {/* Main */}
-        <div className="flex flex-col gap-0.5">
-          {PRIMARY_NAV.map((item) => (
-            <NavLink
-              key={item.label}
-              item={item}
-              base={base}
-              pathname={pathname}
-              {...(item.href === "/proposals" && inboxCount > 0 ? { badge: inboxCount } : {})}
-              {...(onClose ? { onClick: onClose } : {})}
-            />
-          ))}
-        </div>
-
-        {/* Tools section */}
-        <div>
-          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle/70">
-            Tools
-          </p>
-          <div className="flex flex-col gap-0.5">
-            {PRIVACY_NAV.map((item) => (
-              <NavLink
-                key={item.label}
-                item={item}
-                base={base}
-                pathname={pathname}
-                {...(onClose ? { onClick: onClose } : {})}
-              />
-            ))}
-          </div>
-        </div>
+      <nav className="flex flex-1 flex-col gap-2 overflow-y-auto px-3 py-3">
+        <CollapsibleSection
+          label="Workspace"
+          items={WORKSPACE_NAV}
+          base={base}
+          pathname={pathname}
+          storageKey="aegis:nav:workspace"
+          defaultOpen
+          {...(onClose ? { onClose } : {})}
+        />
+        <CollapsibleSection
+          label="Governance"
+          items={GOVERNANCE_NAV}
+          base={base}
+          pathname={pathname}
+          {...(queueCount > 0 ? { badge: queueCount, badgeHref: "/proposals" } : {})}
+          storageKey="aegis:nav:governance"
+          defaultOpen
+          {...(onClose ? { onClose } : {})}
+        />
+        <CollapsibleSection
+          label="Privacy & Vault"
+          items={PRIVACY_VAULT_NAV}
+          base={base}
+          pathname={pathname}
+          storageKey="aegis:nav:privacy"
+          defaultOpen
+          {...(onClose ? { onClose } : {})}
+        />
       </nav>
 
       {/* Cloak banner */}
@@ -219,7 +293,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const multisig = params?.multisig ?? "";
   const base = `/vault/${multisig}`;
   const { publicKey, connecting } = useWallet();
-  const { data: vault, isLoading: vaultLoading } = useVaultData(multisig);
+  const { data: vault, isLoading: vaultLoading, refetch: refetchVault } = useVaultData(multisig);
 
   // Wallet adapter restores autoConnect state after mount; during the first
   // ~600ms `publicKey` may be null even though the user is logged in. Wait
@@ -266,6 +340,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("aegis:operator-executed", readMap);
   }, [multisig]);
 
+  const [dismissedInboxIds, setDismissedInboxIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!multisig) return;
+    try {
+      const raw = localStorage.getItem(`aegis:inbox-dismissed:${multisig}`);
+      setDismissedInboxIds(raw ? new Set(JSON.parse(raw) as string[]) : new Set());
+    } catch {
+      setDismissedInboxIds(new Set());
+    }
+  }, [multisig]);
+
+  const handleDismissInbox = (id: string) => {
+    setDismissedInboxIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      try {
+        localStorage.setItem(`aegis:inbox-dismissed:${multisig}`, JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleClearInbox = (ids: string[]) => {
+    setDismissedInboxIds((prev) => {
+      const next = new Set([...prev, ...ids]);
+      try {
+        localStorage.setItem(`aegis:inbox-dismissed:${multisig}`, JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  };
+
   const inboxItems = useMemo(
     () =>
       proposals
@@ -290,6 +397,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     [proposals, multisig, executedMap],
   );
 
+  const visibleInboxItems = useMemo(
+    () => inboxItems.filter((item) => !dismissedInboxIds.has(item.id)),
+    [inboxItems, dismissedInboxIds],
+  );
+
+  // Badge on the "Transactions" nav item — only active/approved proposals need
+  // user attention. Executed proposals live in History, not the Queue.
+  const queueCount = useMemo(
+    () => proposals.filter((p) => p.status === "active" || p.status === "approved").length,
+    [proposals],
+  );
+
   const [inboxOpen, setInboxOpen] = useState(false);
   const executedCount = useMemo(
     () => proposals.filter((p) => p.status === "executed").length,
@@ -301,11 +420,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const key = `aegis:executed-count:${multisig}`;
     const previous = Number(localStorage.getItem(key) ?? "0");
     if (previous > 0 && executedCount > previous) {
+      const delta = executedCount - previous;
       // eslint-disable-next-line no-console
       console.info(
-        `${executedCount - previous} signed proposal${
-          executedCount - previous === 1 ? " was" : "s were"
-        } executed by another member.`,
+        `${delta} signed proposal${delta === 1 ? "" : "s"} executed.`,
       );
     }
     localStorage.setItem(key, String(executedCount));
@@ -338,6 +456,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <p className="max-w-xs text-sm text-ink-muted">
             Could not load vault membership. Please check your connection and try again.
           </p>
+          <button
+            type="button"
+            onClick={() => void refetchVault()}
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Try again
+          </button>
         </div>
       );
     }
@@ -384,7 +510,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           vaultName={vaultName}
           pathname={pathname}
           base={base}
-          inboxCount={inboxItems.length}
+          queueCount={queueCount}
         />
       </aside>
 
@@ -405,7 +531,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-2">
             <ClientWalletButton />
-            {inboxItems.length > 0 && (
+            {visibleInboxItems.length > 0 && (
               <button
                 type="button"
                 onClick={() => setInboxOpen(true)}
@@ -413,7 +539,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <Key className="h-4 w-4" />
                 <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[9px] font-bold text-accent-ink">
-                  {inboxItems.length}
+                  {visibleInboxItems.length}
                 </span>
               </button>
             )}
@@ -439,9 +565,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </Tooltip>
           </TooltipProvider>
-          {inboxItems.length > 0 && (
+          {visibleInboxItems.length > 0 && (
             <OperatorInboxButton
-              count={inboxItems.length}
+              count={visibleInboxItems.length}
               open={inboxOpen}
               onOpenChange={setInboxOpen}
             />
@@ -478,7 +604,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               vaultName={vaultName}
               pathname={pathname}
               base={base}
-              inboxCount={inboxItems.length}
+              queueCount={queueCount}
               onClose={() => setMobileNavOpen(false)}
             />
           </aside>
@@ -491,8 +617,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         open={inboxOpen}
         onOpenChange={setInboxOpen}
         multisig={multisig}
-        items={inboxItems}
+        items={visibleInboxItems}
         loading={proposalsLoading}
+        onDismiss={handleDismissInbox}
+        onClearAll={() => handleClearInbox(visibleInboxItems.map((i) => i.id))}
       />
     </div>
   );

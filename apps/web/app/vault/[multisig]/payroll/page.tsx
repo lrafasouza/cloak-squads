@@ -264,6 +264,20 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     claimLinks: PayrollClaimLink[];
   } | null>(null);
   const [selectedMint, setSelectedMint] = useState<string>(SOL_TOKEN.mint);
+  const [selectedVaultIndex, setSelectedVaultIndex] = useState(0);
+  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
+
+  useEffect(() => {
+    fetch(`/api/vaults/${multisig}/sub-vaults`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Array<{ vaultIndex: number; name: string }>) => setSubVaultAccounts(data))
+      .catch(() => {});
+  }, [multisig]);
+
+  const allAccounts = useMemo(
+    () => [{ vaultIndex: 0, name: "Primary" }, ...subVaultAccounts],
+    [subVaultAccounts],
+  );
 
   /* ── Manual form ── */
   const [manualName, setManualName] = useState("");
@@ -274,7 +288,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   /* ── CSV paste toggle ── */
   const [showCsvTextarea, setShowCsvTextarea] = useState(false);
 
-  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig);
+  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig, selectedVaultIndex);
 
   const selectedToken = useMemo(
     () => tokens.find((t) => t.mint === selectedMint) ?? tokens[0],
@@ -457,6 +471,13 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       const notes: RecipientNote[] = [];
       for (const recipient of recipients) {
         const recipientPubkey = new PublicKey(recipient.wallet);
+        // Cloak relay can only deliver to Ed25519 wallets; reject PDAs early
+        // so we don't strand SOL in the shielded pool at execute time.
+        if (!PublicKey.isOnCurve(recipientPubkey.toBuffer())) {
+          throw new Error(
+            `${recipient.name || recipient.wallet.slice(0, 8)} is not an Ed25519 wallet (likely a PDA). Payroll private sends require standard wallets.`,
+          );
+        }
         const keypair = await generateUtxoKeypair();
         if (!selectedToken) throw new Error("Select a token.");
         const mint = isSol ? NATIVE_SOL_MINT : new PublicKey(selectedToken.mint);
@@ -566,7 +587,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       }
       if (!selectedToken) throw new Error("Select a token.");
 
-      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
+      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: selectedVaultIndex });
 
       // Balance check
       if (isSol) {
@@ -643,6 +664,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         multisigPda: multisigAddress,
         instructions: [...proposalInstructions, ...instructions],
         memo: `payroll batch (${parsedNotes.length} recipients)`,
+        vaultIndex: selectedVaultIndex,
       });
       updateStep("squads", {
         status: "success",
@@ -708,6 +730,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         memo: `payroll batch (${parsedNotes.length} recipients)`,
         totalAmount: totalAmountStr,
         mode,
+        vaultIndex: selectedVaultIndex,
         recipients: notesWithInvoices.map((n) => ({
           name: n.name,
           wallet: n.wallet,
@@ -945,6 +968,32 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         {/* ── RECIPIENTS TAB ── */}
         {activeTab === "recipients" && (
           <div className="space-y-6">
+            {/* From account — only when sub-vaults exist */}
+            {subVaultAccounts.length > 0 && (
+              <Panel>
+                <PanelHeader icon={UserPlus} title="Pay from" description="Source account for the payroll." />
+                <PanelBody>
+                  <div className="flex flex-wrap gap-1.5">
+                    {allAccounts.map((acct) => (
+                      <button
+                        key={acct.vaultIndex}
+                        type="button"
+                        disabled={pending}
+                        onClick={() => setSelectedVaultIndex(acct.vaultIndex)}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                          selectedVaultIndex === acct.vaultIndex
+                            ? "border-accent/40 bg-accent/10 text-accent"
+                            : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
+                        }`}
+                      >
+                        {acct.name}
+                      </button>
+                    ))}
+                  </div>
+                </PanelBody>
+              </Panel>
+            )}
+
             {/* Manual add form */}
             <Panel>
               <PanelHeader icon={UserPlus} title="Add recipient" />

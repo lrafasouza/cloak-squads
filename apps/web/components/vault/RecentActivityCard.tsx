@@ -7,6 +7,7 @@ import { lamportsToSol } from "@/lib/sol";
 import { cn } from "@/lib/utils";
 import { ArrowDownToLine, ArrowRightLeft, ArrowUpRight, Send, Users } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 const CLUSTER_SUFFIX =
   publicEnv.NEXT_PUBLIC_SOLANA_CLUSTER === "mainnet-beta" ? "" : "?cluster=devnet";
@@ -27,7 +28,15 @@ function relativeTime(ms: number): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function ProposalRow({ multisig, p }: { multisig: string; p: ProposalSummary }) {
+function ProposalRow({
+  multisig,
+  p,
+  sourceVaultName,
+}: {
+  multisig: string;
+  p: ProposalSummary;
+  sourceVaultName?: string | null;
+}) {
   const statusKey = p.status as keyof typeof PROPOSAL_STATUS;
   const status = PROPOSAL_STATUS[statusKey] ?? {
     dot: "bg-ink-subtle",
@@ -74,6 +83,11 @@ function ProposalRow({ multisig, p }: { multisig: string; p: ProposalSummary }) 
             {typeLabel}
           </span>
           <span className="font-mono text-[10px] text-ink-subtle">#{p.transactionIndex}</span>
+          {sourceVaultName && (
+            <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold text-accent">
+              {sourceVaultName}
+            </span>
+          )}
         </div>
         <p className="truncate text-sm font-medium text-ink">{detail}</p>
         {p.memo && p.type !== "single" && (
@@ -106,11 +120,13 @@ function IncomeRow({
   amountLamports,
   from,
   blockTime,
+  toLabel,
 }: {
   signature: string;
   amountLamports: number;
   from: string;
   blockTime: number;
+  toLabel?: string;
 }) {
   const amountSol = lamportsToSol(String(amountLamports));
   const time = relativeTime(blockTime * 1000);
@@ -128,9 +144,16 @@ function IncomeRow({
       </div>
 
       <div className="min-w-0 flex-1">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
-          Received
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+            Received
+          </span>
+          {toLabel && (
+            <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold text-accent">
+              {toLabel}
+            </span>
+          )}
+        </div>
         <p className="truncate font-mono text-sm font-medium text-ink">
           {from === "Unknown" ? "Unknown sender" : truncateAddress(from)}
         </p>
@@ -157,6 +180,18 @@ export function RecentActivityCard({
   activity: ActivityItem[];
   isLoading?: boolean;
 }) {
+  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
+  useEffect(() => {
+    fetch(`/api/vaults/${multisig}/sub-vaults`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Array<{ vaultIndex: number; name: string }>) => setSubVaultAccounts(data))
+      .catch(() => {});
+  }, [multisig]);
+  const resolveVaultName = (idx: number | undefined): string | null => {
+    if (idx === undefined || idx === 0) return null;
+    return subVaultAccounts.find((sv) => sv.vaultIndex === idx)?.name ?? `Vault #${idx}`;
+  };
+
   if (!isLoading && activity.length === 0) return null;
 
   return (
@@ -204,14 +239,20 @@ export function RecentActivityCard({
         ) : (
           activity.map((item) =>
             item.kind === "proposal" ? (
-              <ProposalRow key={item.data.id} multisig={multisig} p={item.data} />
+              <ProposalRow
+                key={item.data.id}
+                multisig={multisig}
+                p={item.data}
+                sourceVaultName={resolveVaultName(item.data.sourceVaultIndex)}
+              />
             ) : (
               <IncomeRow
-                key={item.signature}
+                key={`${item.signature}-${item.toLabel ?? "primary"}`}
                 signature={item.signature}
                 amountLamports={item.amountLamports}
                 from={item.from}
                 blockTime={item.blockTime}
+                {...(item.toLabel !== undefined ? { toLabel: item.toLabel } : {})}
               />
             ),
           )

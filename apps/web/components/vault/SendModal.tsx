@@ -74,6 +74,8 @@ type SpendingLimitRow = {
   period: string;
   members: string[];
   destinations: string[];
+  /** Set by the API after on-chain reconcile. Falsy = pending / not on-chain — must not be offered to user. */
+  onChainExists?: boolean;
 };
 
 function lamportsToSolStr(raw: string) {
@@ -98,6 +100,8 @@ export function SendModal({
   defaultRecipient = "",
   defaultAmount = "",
   defaultMode,
+  defaultVaultIndex = 0,
+  subVaultAccounts = [],
 }: {
   multisig: string;
   open: boolean;
@@ -105,6 +109,8 @@ export function SendModal({
   defaultRecipient?: string;
   defaultAmount?: string;
   defaultMode?: SendMode;
+  defaultVaultIndex?: number;
+  subVaultAccounts?: Array<{ vaultIndex: number; name: string }>;
 }) {
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -121,8 +127,38 @@ export function SendModal({
   const [selectedMint, setSelectedMint] = useState<string>(SOL_TOKEN.mint);
   const [spendingLimits, setSpendingLimits] = useState<SpendingLimitRow[]>([]);
   const [useSpendingLimit, setUseSpendingLimit] = useState(false);
+  const [selectedVaultIndex, setSelectedVaultIndex] = useState(defaultVaultIndex);
+  const [destType, setDestType] = useState<"external" | "account">("external");
+  const [destVaultIndex, setDestVaultIndex] = useState<number | null>(null);
 
-  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig);
+  const allAccounts = useMemo(
+    () => [
+      { vaultIndex: 0, name: "Primary" },
+      ...subVaultAccounts,
+    ],
+    [subVaultAccounts],
+  );
+
+  const multisigPk = useMemo(() => {
+    try { return new PublicKey(multisig); } catch { return null; }
+  }, [multisig]);
+
+  // Derive destination address when sending to another internal account
+  useEffect(() => {
+    if (destType !== "account" || destVaultIndex === null || !multisigPk) return;
+    const [pda] = multisigSdk.getVaultPda({ multisigPda: multisigPk, index: destVaultIndex });
+    setRecipient(pda.toBase58());
+  }, [destType, destVaultIndex, multisigPk]);
+
+  // If source changes to match destination, clear destination
+  useEffect(() => {
+    if (destType === "account" && destVaultIndex === selectedVaultIndex) {
+      setDestVaultIndex(null);
+      setRecipient("");
+    }
+  }, [selectedVaultIndex, destType, destVaultIndex]);
+
+  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig, selectedVaultIndex);
 
   const selectedToken = useMemo(
     () => tokens.find((t) => t.mint === selectedMint) ?? tokens[0],
@@ -138,6 +174,12 @@ export function SendModal({
     if (!isSol && mode === "private") setMode("public");
   }, [isSol, mode]);
 
+  // Force public mode when destination is an internal vault account.
+  // Cloak relay can only deliver to Ed25519 wallets; vault PDAs are off-curve.
+  useEffect(() => {
+    if (destType === "account" && mode === "private") setMode("public");
+  }, [destType, mode]);
+
   const amountStep = isSol ? "0.000000001" : "0.000001";
   const amountMin = isSol ? "0.000000001" : "0.000001";
   const amountPlaceholder = isSol ? "0.0" : "0.00";
@@ -147,8 +189,11 @@ export function SendModal({
       setRecipient(defaultRecipient);
       setAmount(defaultAmount);
       if (defaultMode) setMode(defaultMode);
+      setSelectedVaultIndex(defaultVaultIndex);
+      setDestType("external");
+      setDestVaultIndex(null);
     }
-  }, [open, defaultRecipient, defaultAmount, defaultMode]);
+  }, [open, defaultRecipient, defaultAmount, defaultMode, defaultVaultIndex]);
 
   useEffect(() => {
     if (!open) return;
@@ -167,13 +212,17 @@ export function SendModal({
     return (
       spendingLimits.find(
         (l) =>
+          // The on-chain SpendingLimit PDA must exist — DB-only rows are pending
+          // proposals that would fail with AccountNotInitialized at execute time.
+          l.onChainExists !== false &&
+          l.vaultIndex === selectedVaultIndex &&
           l.mint === nativeSolMintStr &&
           l.members.includes(memberStr) &&
           (l.destinations.length === 0 ||
             (recipient.trim() !== "" && l.destinations.includes(recipient.trim()))),
       ) ?? null
     );
-  }, [spendingLimits, wallet.publicKey, mode, isSol, recipient]);
+  }, [spendingLimits, wallet.publicKey, mode, isSol, recipient, selectedVaultIndex]);
 
   useEffect(() => {
     if (!applicableLimit) setUseSpendingLimit(false);
@@ -199,6 +248,9 @@ export function SendModal({
     setError(null);
     setMode("private");
     setSelectedMint(SOL_TOKEN.mint);
+    setSelectedVaultIndex(defaultVaultIndex);
+    setDestType("external");
+    setDestVaultIndex(null);
   };
 
   const handleClose = (v: boolean) => {
@@ -231,6 +283,16 @@ export function SendModal({
 
     if (!wallet.publicKey || !multisigAddress || !wallet.sendTransaction) {
       setError("Connect a wallet and open a valid multisig.");
+      return;
+    }
+
+    // Private mode requires an Ed25519 wallet recipient. PDAs (off-curve)
+    // would be silently accepted by the proposal flow but rejected by Cloak's
+    // relay at delivery time, leaving funds stuck in the shielded pool.
+    if (mode === "private" && !PublicKey.isOnCurve(recipientPubkey.toBuffer())) {
+      setError(
+        "Recipient is not an Ed25519 wallet (likely a PDA). Cloak can only deliver to standard wallets — switch to Public mode or use a different recipient.",
+      );
       return;
     }
 
@@ -311,7 +373,7 @@ export function SendModal({
     });
 
     try {
-      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
+      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: selectedVaultIndex });
 
       // Balance check
       if (isSol) {
@@ -334,6 +396,16 @@ export function SendModal({
       }
 
       if (mode === "public" && isLimitSend && applicableLimit) {
+        // Hard guard: reject before hitting the chain with a clear message
+        if (isSol && tokenUnits > BigInt(applicableLimit.amountRaw)) {
+          const limitSol = lamportsToSolStr(applicableLimit.amountRaw);
+          const msg = `Amount exceeds spending limit of ${limitSol} SOL ${periodLabel(applicableLimit.period)}. Reduce the amount or uncheck "Use spending limit" to create a proposal.`;
+          setError(msg);
+          failTransaction(msg);
+          setPending(false);
+          return;
+        }
+
         // Direct send via spending limit — no proposal, 1 wallet signature
         updateStep("validate", { status: "success" });
         updateStep("send", { status: "running" });
@@ -420,6 +492,7 @@ export function SendModal({
           multisigPda: multisigAddress,
           instructions,
           memo: memo.trim() || `Send ${amount} ${tokenLabel}`,
+          vaultIndex: selectedVaultIndex,
         });
 
         updateStep("squads", {
@@ -521,6 +594,7 @@ export function SendModal({
         multisigPda: multisigAddress,
         instructions: proposalInstructions,
         memo: memo.trim() || `private send ${tokenLabel}`,
+        vaultIndex: selectedVaultIndex,
       });
 
       const transactionIndex = result.transactionIndex.toString();
@@ -588,6 +662,7 @@ export function SendModal({
             nonce: Array.from(invariants.nonce),
           },
           commitmentClaim,
+          vaultIndex: selectedVaultIndex,
           ...memoEncryptedFields,
         }),
       });
@@ -625,20 +700,51 @@ export function SendModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6 pt-4">
+
+          {/* From account — only shown when sub-vaults exist */}
+          {subVaultAccounts.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <Label>From account</Label>
+              <div className="inline-flex flex-wrap gap-1.5">
+                {allAccounts.map((acct) => (
+                  <button
+                    key={acct.vaultIndex}
+                    type="button"
+                    disabled={pending}
+                    onClick={() => {
+                      setSelectedVaultIndex(acct.vaultIndex);
+                      setAmount("");
+                    }}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                      selectedVaultIndex === acct.vaultIndex
+                        ? "border-accent/40 bg-accent/10 text-accent"
+                        : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
+                    }`}
+                  >
+                    {acct.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="inline-flex rounded-lg border border-border bg-surface p-1">
             {(["private", "public"] as const).map((m) => {
-              const privateDisabled = m === "private" && !isSol;
+              const privateDisabledForToken = m === "private" && !isSol;
+              const privateDisabledForDest = m === "private" && destType === "account";
+              const privateDisabled = privateDisabledForToken || privateDisabledForDest;
+              const reason = privateDisabledForDest
+                ? "Vault accounts are off-curve PDAs — Cloak can't deliver to them. Use Public mode for vault-to-vault transfers."
+                : privateDisabledForToken
+                  ? "Private transfers are only available for SOL on devnet."
+                  : undefined;
               return (
                 <button
                   key={m}
                   type="button"
                   onClick={() => !pending && !privateDisabled && setMode(m)}
                   disabled={pending || privateDisabled}
-                  title={
-                    privateDisabled
-                      ? "Private transfers are only available for SOL on devnet."
-                      : undefined
-                  }
+                  title={reason}
                   className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                     mode === m ? "bg-accent-soft text-accent" : "text-ink-muted hover:text-ink"
                   }`}
@@ -654,44 +760,115 @@ export function SendModal({
               initialized yet). {tokenLabel} sends fall back to public mode.
             </p>
           )}
-
-          {applicableLimit && (
-            <div className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3">
-              <Zap className="h-4 w-4 flex-shrink-0 text-accent" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-ink">
-                  Spending limit · {lamportsToSolStr(applicableLimit.amountRaw)} SOL{" "}
-                  {periodLabel(applicableLimit.period)}
-                </p>
-                <p className="text-[10px] text-ink-subtle">
-                  Skip approval — sends directly from vault.
-                </p>
-              </div>
-              <label className="flex cursor-pointer items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={useSpendingLimit}
-                  onChange={(e) => setUseSpendingLimit(e.target.checked)}
-                  disabled={pending}
-                  className="h-3.5 w-3.5 accent-accent"
-                />
-                <span className="text-xs text-ink-muted">Use</span>
-              </label>
-            </div>
+          {isSol && destType === "account" && (
+            <p className="text-xs text-ink-muted">
+              Vault-to-vault transfers go through Public mode (multisig proposal). Private mode
+              requires an Ed25519 wallet recipient — vault PDAs are off-curve.
+            </p>
           )}
 
+          {applicableLimit && (() => {
+            const limitSol = parseFloat(lamportsToSolStr(applicableLimit.amountRaw));
+            const sendSol = parseFloat(amount) || 0;
+            const exceedsLimit = useSpendingLimit && isSol && sendSol > limitSol && sendSol > 0;
+            return (
+              <div className={`rounded-lg border px-4 py-3 transition-colors ${exceedsLimit ? "border-signal-warn/40 bg-signal-warn/5" : "border-border bg-surface"}`}>
+                <div className="flex items-center gap-3">
+                  <Zap className={`h-4 w-4 flex-shrink-0 ${exceedsLimit ? "text-signal-warn" : "text-accent"}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-ink">
+                      Spending limit · {lamportsToSolStr(applicableLimit.amountRaw)} SOL{" "}
+                      {periodLabel(applicableLimit.period)}
+                    </p>
+                    <p className={`text-[10px] ${exceedsLimit ? "text-signal-warn" : "text-ink-subtle"}`}>
+                      {exceedsLimit
+                        ? `Exceeds limit by ${(sendSol - limitSol).toLocaleString("en-US", { maximumFractionDigits: 4 })} SOL — reduce amount or uncheck to create a proposal.`
+                        : "Skip approval — sends directly from vault."}
+                    </p>
+                  </div>
+                  <label className="flex cursor-pointer items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={useSpendingLimit}
+                      onChange={(e) => setUseSpendingLimit(e.target.checked)}
+                      disabled={pending}
+                      className="h-3.5 w-3.5 accent-accent"
+                    />
+                    <span className="text-xs text-ink-muted">Use</span>
+                  </label>
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="sm-recipient">Recipient address</Label>
-            <Input
-              id="sm-recipient"
-              placeholder="Solana address"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              className="font-mono text-sm"
-              autoComplete="off"
-              spellCheck={false}
-              disabled={pending}
-            />
+            <Label>Recipient</Label>
+
+            {/* Destination type toggle — only shown when sub-vaults exist (so internal transfer is meaningful) */}
+            {subVaultAccounts.length > 0 && (
+              <div className="inline-flex w-fit rounded-lg border border-border bg-surface p-1">
+                {(["external", "account"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      if (pending) return;
+                      setDestType(t);
+                      if (t === "external") {
+                        setRecipient("");
+                        setDestVaultIndex(null);
+                      } else {
+                        // pre-select first non-source account
+                        const firstOther = allAccounts.find((a) => a.vaultIndex !== selectedVaultIndex);
+                        if (firstOther) setDestVaultIndex(firstOther.vaultIndex);
+                      }
+                    }}
+                    disabled={pending}
+                    className={`rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                      destType === t ? "bg-accent-soft text-accent" : "text-ink-muted hover:text-ink"
+                    }`}
+                  >
+                    {t === "external" ? "External address" : "Another account"}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {destType === "external" ? (
+              <Input
+                id="sm-recipient"
+                placeholder="Solana address"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                className="font-mono text-sm"
+                autoComplete="off"
+                spellCheck={false}
+                disabled={pending}
+              />
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {allAccounts
+                  .filter((a) => a.vaultIndex !== selectedVaultIndex)
+                  .map((acct) => (
+                    <button
+                      key={acct.vaultIndex}
+                      type="button"
+                      disabled={pending}
+                      onClick={() => setDestVaultIndex(acct.vaultIndex)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                        destVaultIndex === acct.vaultIndex
+                          ? "border-accent/40 bg-accent/10 text-accent"
+                          : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
+                      }`}
+                    >
+                      To {acct.name}
+                    </button>
+                  ))}
+                {allAccounts.filter((a) => a.vaultIndex !== selectedVaultIndex).length === 0 && (
+                  <p className="text-xs text-ink-muted">No other accounts to send to.</p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">

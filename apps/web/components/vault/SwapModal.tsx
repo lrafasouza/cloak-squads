@@ -48,16 +48,25 @@ export function SwapModal({
   multisig,
   open,
   onOpenChange,
+  subVaultAccounts = [],
 }: {
   multisig: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  subVaultAccounts?: Array<{ vaultIndex: number; name: string }>;
 }) {
   const { connection } = useConnection();
   const wallet = useWallet();
   const { startTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
-  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig);
+
+  const [selectedVaultIndex, setSelectedVaultIndex] = useState(0);
+  const allAccounts = useMemo(
+    () => [{ vaultIndex: 0, name: "Primary" }, ...subVaultAccounts],
+    [subVaultAccounts],
+  );
+
+  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig, selectedVaultIndex);
   const { sol: walletSol, insufficientForProposal } = useWalletSolBalance();
 
   const [amount, setAmount] = useState("");
@@ -117,6 +126,7 @@ export function SwapModal({
     setQuoteError(null);
     setError(null);
     setSlippageBps(50);
+    setSelectedVaultIndex(0);
   }, []);
 
   const handleClose = useCallback(
@@ -268,7 +278,7 @@ export function SwapModal({
 
       const [vaultPda] = (await import("@sqds/multisig")).getVaultPda({
         multisigPda: multisigAddress,
-        index: 0,
+        index: selectedVaultIndex,
       });
       const swapInstructions = await getRaydiumSwapInstructions(quote, vaultPda.toBase58());
 
@@ -281,6 +291,7 @@ export function SwapModal({
         multisigPda: multisigAddress,
         instructions: swapInstructions,
         memo: `Swap ${amount} ${selectedInputToken?.symbol} → ${selectedOutputToken?.symbol}`,
+        vaultIndex: selectedVaultIndex,
       });
 
       updateStep("squads", {
@@ -322,6 +333,34 @@ export function SwapModal({
               <span className="underline underline-offset-2">faucet.circle.com</span>
             </p>
           )}
+
+          {/* From account — only shown when sub-vaults exist */}
+          {subVaultAccounts.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-ink-muted">From account</span>
+              <div className="flex flex-wrap gap-1.5">
+                {allAccounts.map((acct) => (
+                  <button
+                    key={acct.vaultIndex}
+                    type="button"
+                    disabled={pending}
+                    onClick={() => {
+                      setSelectedVaultIndex(acct.vaultIndex);
+                      setAmount("");
+                    }}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                      selectedVaultIndex === acct.vaultIndex
+                        ? "border-accent/40 bg-accent/10 text-accent"
+                        : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
+                    }`}
+                  >
+                    {acct.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ── From Card ── */}
           <div className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-1 flex items-center justify-between">

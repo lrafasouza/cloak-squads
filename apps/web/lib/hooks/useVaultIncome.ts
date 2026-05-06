@@ -8,6 +8,7 @@ export type IncomeEntry = {
   amountLamports: number;
   from: string;
   blockTime: number;
+  toLabel?: string | undefined; // undefined = primary vault
 };
 
 export function useVaultIncome(multisig: string, limit = 10) {

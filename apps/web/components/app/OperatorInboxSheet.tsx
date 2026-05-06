@@ -9,7 +9,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { lamportsToSol } from "@/lib/sol";
-import { ArrowRight, Inbox, Key, User, Users } from "lucide-react";
+import { ArrowRight, Inbox, Key, Trash2, User, Users, X } from "lucide-react";
 import Link from "next/link";
 
 interface OperatorInboxSheetProps {
@@ -18,6 +18,8 @@ interface OperatorInboxSheetProps {
   multisig: string;
   items: OperatorInboxItem[];
   loading: boolean;
+  onDismiss?: (id: string) => void;
+  onClearAll?: () => void;
 }
 
 export type OperatorInboxItem = {
@@ -37,6 +39,8 @@ export function OperatorInboxSheet({
   multisig,
   items,
   loading,
+  onDismiss,
+  onClearAll,
 }: OperatorInboxSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -49,11 +53,24 @@ export function OperatorInboxSheet({
               </div>
               <SheetTitle>Operator Inbox</SheetTitle>
             </div>
-            {items.length > 0 && (
-              <span className="flex h-5 items-center justify-center rounded-full bg-accent px-2 text-[11px] font-bold text-accent-ink">
-                {items.length}
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {items.length > 0 && (
+                <span className="flex h-5 items-center justify-center rounded-full bg-accent px-2 text-[11px] font-bold text-accent-ink">
+                  {items.length}
+                </span>
+              )}
+              {items.length > 0 && onClearAll && (
+                <button
+                  type="button"
+                  onClick={onClearAll}
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-ink-subtle transition-colors hover:bg-surface-2 hover:text-signal-error"
+                  title="Clear all items from inbox"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
           <SheetDescription>
             Pending licenses awaiting execution by the registered operator.
@@ -85,6 +102,17 @@ export function OperatorInboxSheet({
                   key={item.id}
                   className="group relative overflow-hidden rounded-xl border border-border bg-surface p-4 shadow-raise-1 transition-all duration-200 hover:border-border-strong hover:shadow-raise-2"
                 >
+                  {onDismiss && (
+                    <button
+                      type="button"
+                      onClick={() => onDismiss(item.id)}
+                      className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md text-ink-subtle opacity-0 transition-all group-hover:opacity-100 hover:bg-surface-2 hover:text-ink"
+                      aria-label="Dismiss"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2.5">
                       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2">

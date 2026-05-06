@@ -1,6 +1,6 @@
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { requireVaultMember } from "@/lib/vault-membership";
-import { PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -19,6 +19,12 @@ const createSchema = z.object({
   destinations: z.array(pubkeyStr),
 });
 
+const RPC_URL =
+  process.env.FALLBACK_RPC_URL ??
+  process.env.NEXT_PUBLIC_RPC_URL ??
+  "https://api.devnet.solana.com";
+const SQUADS_PROGRAM_ID = process.env.NEXT_PUBLIC_SQUADS_PROGRAM_ID ?? "";
+
 export async function GET(_req: Request, context: { params: Promise<{ multisig: string }> }) {
   const { multisig } = await context.params;
 
@@ -33,7 +39,42 @@ export async function GET(_req: Request, context: { params: Promise<{ multisig: 
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(limits);
+  // Reconcile DB with on-chain truth: an "active" row in DB only means a proposal
+  // was created — the actual SpendingLimit PDA only exists once the proposal is
+  // approved + executed. SendModal must NOT offer a limit that doesn't exist
+  // on-chain (would fail with NotEnoughKeys / AccountNotInitialized).
+  let squadsProgram: PublicKey;
+  try {
+    squadsProgram = new PublicKey(SQUADS_PROGRAM_ID);
+  } catch {
+    // If we can't validate, return DB rows untouched — fail open rather than
+    // hiding limits the user expects to see.
+    return NextResponse.json(limits.map((l) => ({ ...l, onChainExists: true })));
+  }
+
+  if (limits.length === 0) return NextResponse.json([]);
+
+  const connection = new Connection(RPC_URL, {
+    commitment: "confirmed",
+    disableRetryOnRateLimit: true,
+  });
+
+  let accountInfos: Array<Awaited<ReturnType<typeof connection.getAccountInfo>>> = [];
+  try {
+    const pdas = limits.map((l) => new PublicKey(l.spendingLimit));
+    accountInfos = await connection.getMultipleAccountsInfo(pdas, "confirmed");
+  } catch (err) {
+    console.warn("[spending-limits] on-chain reconcile failed, falling back to DB:", err);
+    return NextResponse.json(limits.map((l) => ({ ...l, onChainExists: true })));
+  }
+
+  const decorated = limits.map((l, i) => {
+    const acct = accountInfos[i];
+    const onChainExists = !!acct && acct.owner.equals(squadsProgram);
+    return { ...l, onChainExists };
+  });
+
+  return NextResponse.json(decorated);
 }
 
 export async function POST(req: Request, context: { params: Promise<{ multisig: string }> }) {

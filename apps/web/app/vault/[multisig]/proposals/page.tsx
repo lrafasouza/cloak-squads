@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { publicEnv } from "@/lib/env";
 import Link from "next/link";
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 
 type TabId = "queue" | "history" | "drafts" | "income";
 
@@ -81,11 +81,13 @@ function ProposalQueueRow({
   p,
   onCancel,
   cancelling,
+  sourceVaultName,
 }: {
   multisig: string;
   p: ProposalSummary;
   onCancel?: (p: ProposalSummary) => void;
   cancelling?: boolean;
+  sourceVaultName?: string | null;
 }) {
   const description =
     p.type === "payroll"
@@ -117,7 +119,14 @@ function ProposalQueueRow({
         {KIND_LABEL[p.type]}
       </div>
       <div className="relative min-w-0 z-10 pointer-events-none">
-        <p className="truncate text-sm font-medium text-ink">{description}</p>
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-medium text-ink">{description}</p>
+          {sourceVaultName && (
+            <span className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent">
+              From {sourceVaultName}
+            </span>
+          )}
+        </div>
         {recipient && (
           <p className="truncate font-mono text-xs text-ink-subtle">{recipient}</p>
         )}
@@ -164,6 +173,7 @@ function ProposalRow({
   onCancel,
   onHide,
   cancelling,
+  sourceVaultName,
 }: {
   multisig: string;
   p: ProposalSummary;
@@ -171,6 +181,7 @@ function ProposalRow({
   onCancel?: (p: ProposalSummary) => void;
   onHide?: (id: string) => void;
   cancelling?: boolean;
+  sourceVaultName?: string | null;
 }) {
   const description =
     p.type === "payroll"
@@ -197,7 +208,14 @@ function ProposalRow({
         {KIND_LABEL[p.type]}
       </div>
       <div className="relative min-w-0 z-10 pointer-events-none">
-        <p className="truncate text-sm text-ink">{description}</p>
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm text-ink">{description}</p>
+          {sourceVaultName && (
+            <span className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent">
+              From {sourceVaultName}
+            </span>
+          )}
+        </div>
         {p.memo && p.type !== "single" && (
           <p className="truncate text-xs text-ink-subtle">{p.memo}</p>
         )}
@@ -311,11 +329,13 @@ function ProposalQueueMobileCard({
   p,
   onCancel,
   cancelling,
+  sourceVaultName,
 }: {
   multisig: string;
   p: ProposalSummary;
   onCancel?: (p: ProposalSummary) => void;
   cancelling?: boolean;
+  sourceVaultName?: string | null;
 }) {
   const description =
     p.type === "payroll"
@@ -349,6 +369,11 @@ function ProposalQueueMobileCard({
           <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
             <KindIcon type={p.type} />
             {KIND_LABEL[p.type]}
+            {sourceVaultName && (
+              <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent">
+                From {sourceVaultName}
+              </span>
+            )}
           </div>
           <p className="mt-1 text-sm font-medium text-ink">{description}</p>
           {recipient && (
@@ -391,6 +416,7 @@ function ProposalMobileCard({
   onCancel,
   onHide,
   cancelling,
+  sourceVaultName,
 }: {
   multisig: string;
   p: ProposalSummary;
@@ -398,6 +424,7 @@ function ProposalMobileCard({
   onCancel?: (p: ProposalSummary) => void;
   onHide?: (id: string) => void;
   cancelling?: boolean;
+  sourceVaultName?: string | null;
 }) {
   const description =
     p.type === "payroll"
@@ -428,6 +455,11 @@ function ProposalMobileCard({
           <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
             <KindIcon type={p.type} />
             {KIND_LABEL[p.type]}
+            {sourceVaultName && (
+              <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent">
+                From {sourceVaultName}
+              </span>
+            )}
           </div>
           <p className="mt-1 text-sm text-ink">{description}</p>
           {p.memo && p.type !== "single" && (
@@ -519,6 +551,19 @@ export default function TransactionsPage({
   const { multisig } = use(params);
   const { data: proposals = [], isLoading: proposalsLoading } = useProposalSummaries(multisig);
   const { data: incomeEntries = [], isLoading: incomeLoading } = useVaultIncome(multisig, 50);
+
+  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
+  useEffect(() => {
+    fetch(`/api/vaults/${multisig}/sub-vaults`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Array<{ vaultIndex: number; name: string }>) => setSubVaultAccounts(data))
+      .catch(() => {});
+  }, [multisig]);
+  const resolveVaultName = (idx: number | undefined): string | null => {
+    if (idx === undefined) return null;
+    if (idx === 0) return null; // primary is implicit, no badge
+    return subVaultAccounts.find((sv) => sv.vaultIndex === idx)?.name ?? `Vault #${idx}`;
+  };
   const [activeTab, setActiveTab] = useState<TabId>("queue");
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -740,6 +785,7 @@ export default function TransactionsPage({
                           p={p}
                           onCancel={(target: ProposalSummary) => setCancelTarget(target)}
                           cancelling={cancelling && cancelTarget?.id === p.id}
+                          sourceVaultName={resolveVaultName(p.sourceVaultIndex)}
                         />
                       ))}
                     </div>
@@ -767,6 +813,7 @@ export default function TransactionsPage({
                         isHistory={activeTab === "history"}
                         {...(activeTab === "history" ? { onHide: hideProposal } : { onCancel: (target: ProposalSummary) => setCancelTarget(target) })}
                         cancelling={cancelling && cancelTarget?.id === p.id}
+                        sourceVaultName={resolveVaultName(p.sourceVaultIndex)}
                       />
                     ))}
                   </div>
@@ -812,6 +859,7 @@ export default function TransactionsPage({
                   p={p}
                   onCancel={(target: ProposalSummary) => setCancelTarget(target)}
                   cancelling={cancelling && cancelTarget?.id === p.id}
+                  sourceVaultName={resolveVaultName(p.sourceVaultIndex)}
                 />
               ))
             )
@@ -835,6 +883,7 @@ export default function TransactionsPage({
                     isHistory={activeTab === "history"}
                     {...(activeTab === "history" ? { onHide: hideProposal } : { onCancel: (target: ProposalSummary) => setCancelTarget(target) })}
                     cancelling={cancelling && cancelTarget?.id === p.id}
+                    sourceVaultName={resolveVaultName(p.sourceVaultIndex)}
                   />
                 ))
               );

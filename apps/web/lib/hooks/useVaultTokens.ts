@@ -18,11 +18,11 @@ export const SOL_TOKEN = {
 
 export type VaultToken = typeof SOL_TOKEN;
 
-export function useVaultTokens(multisig: string) {
+export function useVaultTokens(multisig: string, vaultIndex = 0) {
   const { connection } = useConnection();
 
   return useQuery({
-    queryKey: ["vault-tokens", multisig],
+    queryKey: ["vault-tokens", multisig, vaultIndex],
     enabled: !!multisig,
     staleTime: 30_000,
     refetchInterval: () =>
@@ -30,7 +30,7 @@ export function useVaultTokens(multisig: string) {
     refetchIntervalInBackground: false,
     queryFn: async (): Promise<VaultToken[]> => {
       const multisigPk = new PublicKey(multisig);
-      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigPk, index: 0 });
+      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigPk, index: vaultIndex });
       const usdcMint = new PublicKey(USDC_MINT);
       const vaultUsdcAta = await getAssociatedTokenAddress(usdcMint, vaultPda, true);
 

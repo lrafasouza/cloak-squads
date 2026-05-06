@@ -747,6 +747,37 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   ) {
     if (!wallet.publicKey || !multisigAddress) return;
 
+    // Hard guard: Cloak relay can only deliver to Ed25519 wallets. Vault PDAs
+    // (and other off-curve addresses) get accepted by the proposal flow but
+    // rejected by the relay AFTER deposit, leaving SOL stuck in the shielded
+    // pool. Reject here BEFORE any deposit happens, so retries don't accumulate
+    // stuck deposits in the pool.
+    if (draft.recipient) {
+      try {
+        const recipientPk = new PublicKey(draft.recipient);
+        if (!PublicKey.isOnCurve(recipientPk.toBuffer())) {
+          const msg =
+            `Cannot execute private send: recipient ${draft.recipient.slice(0, 4)}…${draft.recipient.slice(-4)} ` +
+            `is not an Ed25519 wallet (likely a vault PDA). Cloak's shielded pool can only deliver to standard ` +
+            `wallets. This proposal cannot be executed privately — refund it (Refund button) and recreate as a ` +
+            `Public send for vault-to-vault transfers.`;
+          if (!suppressProgress) {
+            startTransaction({
+              title: "Cannot execute private send",
+              description: msg,
+              steps: [{ id: "block", title: "Validation", description: msg }],
+            });
+            failTransaction(msg);
+          }
+          throw new Error(msg);
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message.includes("Cannot execute private send")) throw err;
+        // PublicKey constructor failure — propagate via a clearer message.
+        throw new Error(`Invalid recipient address in proposal: ${draft.recipient}`);
+      }
+    }
+
     const transferLabel = draft.recipient
       ? ` to ${draft.recipient.slice(0, 4)}...${draft.recipient.slice(-4)}`
       : invoiceId

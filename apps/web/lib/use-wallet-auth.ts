@@ -1,7 +1,7 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 
 /**
  * Wallet auth hook — session-cookie based.
@@ -17,10 +17,17 @@ import { useCallback, useEffect, useRef } from "react";
  *
  * UX guards:
  *   - 60s cooldown after the user rejects the sign prompt (prevents spam).
- *   - Concurrent calls share a single in-flight login promise.
+ *   - Concurrent calls share a single in-flight login promise (module-level,
+ *     so parallel calls from different components never open two popups).
  */
 
 const SIGN_COOLDOWN_MS = 60 * 1000;
+
+// Module-level singletons — shared across every useWalletAuth instance so that
+// concurrent callers (e.g. background proposal refetch + limits page POST) all
+// wait for the same in-flight sign rather than each opening their own popup.
+let _inFlightSession: Promise<SessionInfo | null> | null = null;
+let _lastSignFailure = 0;
 const SESSION_REFRESH_BEFORE_MS = 60 * 1000; // re-login if <1m of session left
 const SESSION_STORAGE_KEY = "aegis:wallet-session";
 
@@ -65,8 +72,6 @@ function clearSession() {
 
 export function useWalletAuth() {
   const wallet = useWallet();
-  const sessionPromiseRef = useRef<Promise<SessionInfo | null> | null>(null);
-  const lastFailureRef = useRef<number>(0);
 
   const ensureSession = useCallback(async (): Promise<SessionInfo | null> => {
     if (!wallet.publicKey || !wallet.signMessage || !wallet.connected) return null;
@@ -76,9 +81,10 @@ export function useWalletAuth() {
     const current = loadSession();
     if (current && current.publicKey === pubkey) return current;
 
-    if (sessionPromiseRef.current) return sessionPromiseRef.current;
+    // Return the in-flight promise so concurrent callers share one popup.
+    if (_inFlightSession) return _inFlightSession;
 
-    if (Date.now() - lastFailureRef.current < SIGN_COOLDOWN_MS) return null;
+    if (Date.now() - _lastSignFailure < SIGN_COOLDOWN_MS) return null;
 
     const promise = (async (): Promise<SessionInfo | null> => {
       const timestamp = Math.floor(Date.now() / 1000);
@@ -91,7 +97,7 @@ export function useWalletAuth() {
       try {
         signature = await signMessage(new TextEncoder().encode(message));
       } catch {
-        lastFailureRef.current = Date.now();
+        _lastSignFailure = Date.now();
         return null;
       }
 
@@ -106,7 +112,7 @@ export function useWalletAuth() {
       });
 
       if (!res.ok) {
-        lastFailureRef.current = Date.now();
+        _lastSignFailure = Date.now();
         return null;
       }
 
@@ -118,9 +124,9 @@ export function useWalletAuth() {
       return info;
     })();
 
-    sessionPromiseRef.current = promise;
+    _inFlightSession = promise;
     promise.finally(() => {
-      sessionPromiseRef.current = null;
+      _inFlightSession = null;
     });
     return promise;
   }, [wallet.publicKey, wallet.signMessage, wallet.connected]);

@@ -38,7 +38,6 @@ const { Permission, Permissions } = multisigSdk.types;
 interface Step3ReviewProps {
   name: string;
   description: string;
-  avatarDataUrl: string;
   members: string[];
   threshold: number;
   operator: string;
@@ -97,7 +96,6 @@ function readProposalStatus(status: unknown): string {
 export function Step3Review({
   name,
   description,
-  avatarDataUrl,
   members,
   threshold,
   operator,
@@ -416,7 +414,6 @@ export function Step3Review({
           cofreAddress: multisigPda.toBase58(),
           name: name.trim(),
           description: description.trim() || undefined,
-          avatarUrl: avatarDataUrl || undefined,
         }),
       });
       if (!metadataResponse.ok) {
@@ -454,7 +451,6 @@ export function Step3Review({
     savedBootstrapIndex,
     name,
     description,
-    avatarDataUrl,
     deployFee,
     prefetchedTreasury,
     onCreatedMultisig,
@@ -558,12 +554,7 @@ export function Step3Review({
       {/* Vault identity header */}
       <div className="rounded-xl border border-border bg-surface p-6 shadow-raise-1 md:p-8">
         <div className="flex items-center gap-3">
-          {avatarDataUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarDataUrl} alt="" className="h-11 w-11 rounded-lg object-cover" />
-          ) : (
-            <VaultIdenticon seed={name} size={44} className="rounded-lg" />
-          )}
+          <VaultIdenticon seed={name} size={44} className="rounded-lg" />
           <div>
             <h2 className="text-base font-semibold text-ink">{name}</h2>
             {description && <p className="mt-0.5 text-xs text-ink-muted">{description}</p>}

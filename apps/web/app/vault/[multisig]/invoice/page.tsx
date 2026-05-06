@@ -171,12 +171,26 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [claimQrDataUrl, setClaimQrDataUrl] = useState<string | null>(null);
   const [selectedMint, setSelectedMint] = useState<string>(SOL_TOKEN.mint);
+  const [selectedVaultIndex, setSelectedVaultIndex] = useState(0);
+  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
   const [result, setResult] = useState<{
     claimUrl: string;
     transactionIndex: string;
   } | null>(null);
 
-  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig);
+  useEffect(() => {
+    fetch(`/api/vaults/${multisig}/sub-vaults`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Array<{ vaultIndex: number; name: string }>) => setSubVaultAccounts(data))
+      .catch(() => {});
+  }, [multisig]);
+
+  const allAccounts = useMemo(
+    () => [{ vaultIndex: 0, name: "Primary" }, ...subVaultAccounts],
+    [subVaultAccounts],
+  );
+
+  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig, selectedVaultIndex);
 
   const selectedToken = useMemo(
     () => tokens.find((t) => t.mint === selectedMint) ?? tokens[0],
@@ -264,7 +278,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       const tokenUnits = isSol ? solAmountToLamports(amount) : tokenAmountToUnits(amount, decimals);
       const recipientPubkey = new PublicKey(recipientWallet.trim());
 
-      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
+      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: selectedVaultIndex });
 
       // Balance check
       if (isSol) {
@@ -346,6 +360,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
           memo: memo.trim() || undefined,
           amount: tokenUnits.toString(),
           recipientWallet: recipientPubkey.toBase58(),
+          vaultIndex: selectedVaultIndex,
         }),
       });
       if (!stealthRes.ok) {
@@ -397,6 +412,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         memo: memo.trim()
           ? `stealth invoice: ${memo.trim()}`
           : `stealth invoice ${stealthData.id.slice(0, 8)}`,
+        vaultIndex: selectedVaultIndex,
       });
       updateStep("proposal", {
         status: "success",
@@ -438,6 +454,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
           },
           commitmentClaim: claim,
           signature: proposalResult.signature,
+          vaultIndex: selectedVaultIndex,
         }),
       });
       if (!draftRes.ok) {
@@ -586,6 +603,30 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
             />
             <PanelBody>
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* From account — only when sub-vaults exist */}
+                {subVaultAccounts.length > 0 && (
+                  <div>
+                    <Label>Pay from</Label>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {allAccounts.map((acct) => (
+                        <button
+                          key={acct.vaultIndex}
+                          type="button"
+                          disabled={pending}
+                          onClick={() => setSelectedVaultIndex(acct.vaultIndex)}
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                            selectedVaultIndex === acct.vaultIndex
+                              ? "border-accent/40 bg-accent/10 text-accent"
+                              : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
+                          }`}
+                        >
+                          {acct.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <Label htmlFor="invoiceRef">Invoice reference</Label>
                   <Input

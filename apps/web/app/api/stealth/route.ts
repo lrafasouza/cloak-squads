@@ -37,6 +37,7 @@ const stealthInvoiceCreateSchema = z.object({
     },
     { message: "Invalid recipient wallet address" },
   ),
+  vaultIndex: z.number().int().min(0).max(255).optional(),
 });
 
 function base64urlEncode(bytes: Uint8Array): string {
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { cofreAddress, invoiceRef, memo, amount, recipientWallet } = parsed.data;
+    const { cofreAddress, invoiceRef, memo, amount, recipientWallet, vaultIndex } = parsed.data;
 
     const stealthKp = nacl.box.keyPair();
     const stealthPubkey = bs58.encode(stealthKp.publicKey);
@@ -94,6 +95,7 @@ export async function POST(request: Request) {
         amountHint: Buffer.from(amount),
         status: "pending",
         expiresAt,
+        vaultIndex: vaultIndex ?? 0,
       },
     });
 

@@ -27,6 +27,7 @@ const swapDraftSchema = z.object({
   inputSymbol: z.string().max(20),
   outputSymbol: z.string().max(20),
   memo: z.string().max(200).optional(),
+  vaultIndex: z.number().int().min(0).max(255).optional(),
 });
 
 export async function POST(request: Request) {
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
         inputSymbol: parsed.data.inputSymbol,
         outputSymbol: parsed.data.outputSymbol,
         memo: parsed.data.memo ?? null,
+        vaultIndex: parsed.data.vaultIndex ?? 0,
       },
     });
 

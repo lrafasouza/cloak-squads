@@ -25,20 +25,40 @@ export function ReceiveModal({
 }) {
   const [copied, setCopied] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [selectedVaultIndex, setSelectedVaultIndex] = useState(0);
+  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
 
   const squadsProgram = useMemo(
     () => new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID),
     [],
   );
 
+  // Fetch sub-vaults whenever modal opens
+  useEffect(() => {
+    if (!open) return;
+    fetch(`/api/vaults/${multisig}/sub-vaults`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Array<{ vaultIndex: number; name: string }>) => setSubVaultAccounts(data))
+      .catch(() => {});
+    setSelectedVaultIndex(0);
+  }, [open, multisig]);
+
+  const allAccounts = useMemo(
+    () => [{ vaultIndex: 0, name: "Primary" }, ...subVaultAccounts],
+    [subVaultAccounts],
+  );
+
   const vaultAddress = useMemo(() => {
     try {
-      const [vault] = squadsVaultPda(new PublicKey(multisig), squadsProgram);
+      const [vault] = squadsVaultPda(new PublicKey(multisig), squadsProgram, selectedVaultIndex);
       return vault.toBase58();
     } catch {
       return multisig;
     }
-  }, [multisig, squadsProgram]);
+  }, [multisig, squadsProgram, selectedVaultIndex]);
+
+  const selectedAccountName =
+    allAccounts.find((a) => a.vaultIndex === selectedVaultIndex)?.name ?? "Primary";
 
   useEffect(() => {
     if (!open) return;
@@ -59,11 +79,36 @@ export function ReceiveModal({
         <DialogHeader>
           <DialogTitle>Receive SOL</DialogTitle>
           <DialogDescription>
-            Send SOL directly to this vault address. All deposits are public on-chain.
+            Send SOL directly to this address. All deposits are public on-chain.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-4 p-6 pt-4">
+          {/* Account selector — only when sub-vaults exist */}
+          {subVaultAccounts.length > 0 && (
+            <div className="w-full">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                Receive into
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {allAccounts.map((acct) => (
+                  <button
+                    key={acct.vaultIndex}
+                    type="button"
+                    onClick={() => setSelectedVaultIndex(acct.vaultIndex)}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      selectedVaultIndex === acct.vaultIndex
+                        ? "border-accent/40 bg-accent/10 text-accent"
+                        : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
+                    }`}
+                  >
+                    {acct.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {qrDataUrl && (
             <div className="rounded-xl border border-border bg-white p-3">
               <img src={qrDataUrl} alt="Vault address QR code" width={160} height={160} />
@@ -72,7 +117,7 @@ export function ReceiveModal({
 
           <div className="w-full rounded-lg border border-border bg-surface-2 p-3">
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
-              Vault address
+              {selectedAccountName} address
             </p>
             <p className="break-all font-mono text-xs leading-relaxed text-ink">{vaultAddress}</p>
           </div>

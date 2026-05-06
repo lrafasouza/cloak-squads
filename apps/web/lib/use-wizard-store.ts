@@ -9,7 +9,6 @@ export interface WizardState {
   step: WizardStep;
   name: string;
   description: string;
-  avatarDataUrl: string;
   members: string[];
   threshold: number;
   operator: string;
@@ -21,7 +20,6 @@ export interface WizardState {
 type Action =
   | { type: "SET_NAME"; value: string }
   | { type: "SET_DESCRIPTION"; value: string }
-  | { type: "SET_AVATAR"; value: string }
   | { type: "ADD_MEMBER" }
   | { type: "REMOVE_MEMBER"; index: number }
   | { type: "UPDATE_MEMBER"; index: number; value: string }
@@ -41,7 +39,6 @@ function createInitialState(initialOperator = ""): WizardState {
     step: 0,
     name: "",
     description: "",
-    avatarDataUrl: "",
     members: [""],
     threshold: 1,
     operator: initialOperator,
@@ -61,8 +58,6 @@ function reducer(state: WizardState, action: Action): WizardState {
       return { ...state, name: action.value };
     case "SET_DESCRIPTION":
       return { ...state, description: action.value };
-    case "SET_AVATAR":
-      return { ...state, avatarDataUrl: action.value };
     case "ADD_MEMBER":
       if (state.members.length >= 10) return state;
       return { ...state, members: [...state.members, ""] };
@@ -117,7 +112,6 @@ function parseDraft(value: string | null): WizardState | null {
         typeof draft.step === "number" ? (Math.min(2, Math.max(0, draft.step)) as WizardStep) : 0,
       name: typeof draft.name === "string" ? draft.name : "",
       description: typeof draft.description === "string" ? draft.description : "",
-      avatarDataUrl: typeof draft.avatarDataUrl === "string" ? draft.avatarDataUrl : "",
       members: draft.members.filter((m): m is string => typeof m === "string").slice(0, 10),
       threshold: typeof draft.threshold === "number" ? draft.threshold : 1,
       operator: typeof draft.operator === "string" ? draft.operator : "",
@@ -158,7 +152,6 @@ export function useWizardStore(initialOperator = "") {
     (v: string) => dispatch({ type: "SET_DESCRIPTION", value: v }),
     [],
   );
-  const setAvatar = useCallback((v: string) => dispatch({ type: "SET_AVATAR", value: v }), []);
   const addMember = useCallback(() => dispatch({ type: "ADD_MEMBER" }), []);
   const removeMember = useCallback(
     (i: number) => dispatch({ type: "REMOVE_MEMBER", index: i }),
@@ -206,7 +199,6 @@ export function useWizardStore(initialOperator = "") {
     draft,
     setName,
     setDescription,
-    setAvatar,
     addMember,
     removeMember,
     updateMember,

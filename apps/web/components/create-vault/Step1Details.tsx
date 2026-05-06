@@ -1,26 +1,22 @@
 "use client";
 
-import { VaultAvatarPicker } from "@/components/create-vault/VaultAvatarPicker";
+import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import { cn } from "@/lib/utils";
 import { useRef } from "react";
 
 interface Step1DetailsProps {
   name: string;
   description: string;
-  avatarDataUrl: string;
   onName: (v: string) => void;
   onDescription: (v: string) => void;
-  onAvatar: (v: string) => void;
   onNext: () => void;
 }
 
 export function Step1Details({
   name,
   description,
-  avatarDataUrl,
   onName,
   onDescription,
-  onAvatar,
   onNext,
 }: Step1DetailsProps) {
   const nameRef = useRef<HTMLInputElement>(null);
@@ -36,7 +32,9 @@ export function Step1Details({
 
         {/* Avatar + Name row */}
         <div className="flex items-center gap-5">
-          <VaultAvatarPicker seed={name} avatarDataUrl={avatarDataUrl} onAvatar={onAvatar} />
+          <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border border-border-strong bg-surface-2">
+            <VaultIdenticon seed={name} size={64} className="h-16 w-16" />
+          </div>
 
           {/* Name input */}
           <div className="flex-1">

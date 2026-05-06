@@ -257,6 +257,20 @@ export default function ProposalApprovalPage({
   const [threshold, setThreshold] = useState<number | null>(null);
   const [memberVote, setMemberVote] = useState<MemberVote>(null);
   const [transactionType, setTransactionType] = useState<"config" | "vault" | null>(null);
+  const [sourceVaultIndex, setSourceVaultIndex] = useState<number | null>(null);
+  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
+
+  useEffect(() => {
+    fetch(`/api/vaults/${multisigParam}/sub-vaults`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Array<{ vaultIndex: number; name: string }>) => setSubVaultAccounts(data))
+      .catch(() => {});
+  }, [multisigParam]);
+
+  const sourceVaultName =
+    sourceVaultIndex === null || sourceVaultIndex === 0
+      ? null
+      : (subVaultAccounts.find((sv) => sv.vaultIndex === sourceVaultIndex)?.name ?? `Vault #${sourceVaultIndex}`);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
@@ -379,6 +393,24 @@ export default function ProposalApprovalPage({
       // Detect transaction type (config vs vault) from on-chain account.
       const detected = await detectTransactionType(connection, multisigPda, BigInt(id));
       if (detected) setTransactionType(detected);
+
+      // Read the source vault index for VaultTransactions so the UI can show
+      // which sub-vault the proposal will spend from.
+      if (detected === "vault") {
+        try {
+          const [transactionPda] = multisig.getTransactionPda({
+            multisigPda,
+            index: BigInt(id),
+          });
+          const vaultTx = await multisig.accounts.VaultTransaction.fromAccountAddress(
+            connection,
+            transactionPda,
+          );
+          setSourceVaultIndex(vaultTx.vaultIndex);
+        } catch {
+          /* vault transaction account unavailable */
+        }
+      }
     } catch (err) {
       console.warn("[proposals] could not load proposal status:", err);
       setStatus("missing");
@@ -485,6 +517,11 @@ export default function ProposalApprovalPage({
                 #{id}
               </h1>
               <StatusBadge status={displayStatus} />
+              {sourceVaultName && (
+                <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                  From {sourceVaultName}
+                </span>
+              )}
             </div>
             {memberVote && (
               <p className="mt-1 text-xs text-ink-muted">

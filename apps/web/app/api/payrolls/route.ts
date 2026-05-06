@@ -122,6 +122,7 @@ const payrollDraftSchema = z
       ),
     mode: z.enum(["direct", "invoice"]).default("direct"),
     recipients: z.array(payrollRecipientSchema).min(1).max(10),
+    vaultIndex: z.number().int().min(0).max(255).optional(),
   })
   .superRefine((draft, ctx) => {
     if (draft.mode !== "invoice") return;
@@ -173,6 +174,7 @@ export async function POST(request: Request) {
           memo: parsed.data.memo ?? null,
           totalAmount: parsed.data.totalAmount,
           recipientCount: parsed.data.recipients.length,
+          vaultIndex: parsed.data.vaultIndex ?? 0,
           recipients: {
             create: parsed.data.recipients.map((r) => ({
               name: r.name,

@@ -11,11 +11,20 @@ import * as multisigSdk from "@sqds/multisig";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
+export interface SubVaultBalance {
+  name: string;
+  vaultIndex: number;
+  balanceSol: string;
+  usdcUi: string;
+}
+
 export interface VaultData {
   balanceLamports: number;
   balanceSol: string;
+  primaryBalanceSol: string;
   usdcRaw: bigint;
   usdcUi: string;
+  subVaultBreakdown: SubVaultBalance[];
   threshold: number;
   memberCount: number;
   members: string[];
@@ -35,36 +44,95 @@ export function useVaultData(multisig: string) {
     queryKey: ["vault-data", multisig],
     enabled: !!multisig,
     staleTime: 30_000,
+    retry: 3,
+    retryDelay: 1500,
     refetchInterval: () =>
       typeof document !== "undefined" && document.visibilityState === "hidden" ? false : 20_000,
     refetchIntervalInBackground: false,
     queryFn: async (): Promise<VaultData> => {
       const multisigPk = new PublicKey(multisig);
-      const [vaultPda] = squadsVaultPda(multisigPk, squadsProgram);
+      const [primaryVaultPda] = squadsVaultPda(multisigPk, squadsProgram, 0);
       const [cofreAddress] = cofrePda(multisigPk, gatekeeperProgramId);
       const usdcMint = new PublicKey(USDC_MINT);
-      const vaultUsdcAta = await getAssociatedTokenAddress(usdcMint, vaultPda, true);
+
+      // Fetch sub-vault indices from DB (no auth needed for GET)
+      let subVaultEntries: Array<{ vaultIndex: number; name: string }> = [];
+      try {
+        const svRes = await fetch(`/api/vaults/${multisig}/sub-vaults`);
+        if (svRes.ok) subVaultEntries = await svRes.json();
+      } catch {}
+
+      // Derive sub-vault PDAs
+      const subVaultMeta = subVaultEntries.map((sv) => ({
+        name: sv.name,
+        vaultIndex: sv.vaultIndex,
+        pda: squadsVaultPda(multisigPk, squadsProgram, sv.vaultIndex)[0],
+      }));
+
+      // Derive all USDC ATAs in one pass
+      const allUsdcAtas = await Promise.all([
+        getAssociatedTokenAddress(usdcMint, primaryVaultPda, true),
+        ...subVaultMeta.map((sv) => getAssociatedTokenAddress(usdcMint, sv.pda, true)),
+      ]);
+      const primaryUsdcAta = allUsdcAtas[0]!;
+      const svUsdcAtas = allUsdcAtas.slice(1);
+
+      // Build one batch: [primaryVault, cofreAddr, primaryUsdcAta, sv0Pda, sv0Usdc, sv1Pda, sv1Usdc, ...]
+      const batchAddresses: PublicKey[] = [
+        primaryVaultPda,
+        cofreAddress,
+        primaryUsdcAta,
+        ...subVaultMeta.flatMap((sv, i) => [sv.pda, svUsdcAtas[i]!]),
+      ];
 
       const [ms, accountInfos] = await Promise.all([
         multisigSdk.accounts.Multisig.fromAccountAddress(connection, multisigPk),
-        connection.getMultipleAccountsInfo([vaultPda, cofreAddress, vaultUsdcAta]),
+        connection.getMultipleAccountsInfo(batchAddresses),
       ]);
-      const [vaultAccount, cofreAccount, usdcAtaAccount] = accountInfos;
 
-      const balanceLamports = vaultAccount?.lamports ?? 0;
+      const [vaultAccount, cofreAccount, primaryUsdcAccount, ...rest] = accountInfos;
 
-      let usdcRaw = 0n;
-      if (usdcAtaAccount?.data) {
-        // Token account layout: amount is at byte offset 64, 8 bytes little-endian
-        const buf = Buffer.from(usdcAtaAccount.data);
-        if (buf.length >= 72) usdcRaw = buf.readBigUInt64LE(64);
+      const primaryLamports = vaultAccount?.lamports ?? 0;
+      let primaryUsdcRaw = 0n;
+      if (primaryUsdcAccount?.data) {
+        const buf = Buffer.from(primaryUsdcAccount.data);
+        if (buf.length >= 72) primaryUsdcRaw = buf.readBigUInt64LE(64);
       }
 
+      // Aggregate sub-vault balances (pairs of [svPda, svUsdcAta] in `rest`)
+      let subLamports = 0;
+      let subUsdcRaw = 0n;
+      const subVaultBreakdown: SubVaultBalance[] = [];
+
+      for (const [i, sv] of subVaultMeta.entries()) {
+        const svAccount = rest[i * 2] ?? null;
+        const svUsdcAccount = rest[i * 2 + 1] ?? null;
+        const svLamports = svAccount?.lamports ?? 0;
+        let svUsdc = 0n;
+        if (svUsdcAccount?.data) {
+          const buf = Buffer.from(svUsdcAccount.data);
+          if (buf.length >= 72) svUsdc = buf.readBigUInt64LE(64);
+        }
+        subLamports += svLamports;
+        subUsdcRaw += svUsdc;
+        subVaultBreakdown.push({
+          name: sv.name,
+          vaultIndex: sv.vaultIndex,
+          balanceSol: lamportsToSol(String(svLamports)),
+          usdcUi: formatTokenAmount(svUsdc, USDC_DECIMALS),
+        });
+      }
+
+      const totalLamports = primaryLamports + subLamports;
+      const totalUsdcRaw = primaryUsdcRaw + subUsdcRaw;
+
       return {
-        balanceLamports,
-        balanceSol: lamportsToSol(String(balanceLamports)),
-        usdcRaw,
-        usdcUi: formatTokenAmount(usdcRaw, USDC_DECIMALS),
+        balanceLamports: totalLamports,
+        balanceSol: lamportsToSol(String(totalLamports)),
+        primaryBalanceSol: lamportsToSol(String(primaryLamports)),
+        usdcRaw: totalUsdcRaw,
+        usdcUi: formatTokenAmount(totalUsdcRaw, USDC_DECIMALS),
+        subVaultBreakdown,
         threshold: ms.threshold,
         memberCount: ms.members.length,
         members: ms.members.map((m) => m.key.toBase58()),

@@ -2,6 +2,7 @@
 
 import type { ProposalSummary } from "@/lib/proposals";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 export function PendingProposalsCard({
   multisig,
@@ -10,6 +11,18 @@ export function PendingProposalsCard({
   multisig: string;
   proposals: ProposalSummary[];
 }) {
+  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
+  useEffect(() => {
+    fetch(`/api/vaults/${multisig}/sub-vaults`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Array<{ vaultIndex: number; name: string }>) => setSubVaultAccounts(data))
+      .catch(() => {});
+  }, [multisig]);
+  const resolveVaultName = (idx: number | undefined): string | null => {
+    if (idx === undefined || idx === 0) return null;
+    return subVaultAccounts.find((sv) => sv.vaultIndex === idx)?.name ?? `Vault #${idx}`;
+  };
+
   const pending = proposals.filter(
     (p) => p.status === "active" || p.status === "approved" || p.status === "draft",
   );
@@ -57,6 +70,14 @@ export function PendingProposalsCard({
                     #{p.transactionIndex}
                   </span>
                   {p.title}
+                  {(() => {
+                    const name = resolveVaultName(p.sourceVaultIndex);
+                    return name ? (
+                      <span className="ml-1.5 rounded-full bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent">
+                        From {name}
+                      </span>
+                    ) : null;
+                  })()}
                 </p>
                 {p.memo && (
                   <p className="mt-0.5 truncate text-xs text-ink-subtle">{p.memo}</p>

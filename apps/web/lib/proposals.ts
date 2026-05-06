@@ -30,6 +30,8 @@ export type ProposalSummary = {
   approvals?: number;
   threshold?: number;
   hasDraft: boolean;
+  /** Source vault index of the underlying VaultTransaction. 0 = primary, > 0 = sub-vault. Undefined for ConfigTransactions and unknown reads. */
+  sourceVaultIndex?: number | undefined;
 };
 
 export function isProposalPendingStatus(status: ProposalStatusKind | undefined): boolean {
@@ -170,6 +172,7 @@ export async function loadOnchainProposalSummaries(params: {
 
         let title = "";
         let txType: ProposalSummaryType = "onchain";
+        let sourceVaultIndex: number | undefined;
 
         const [configTxResult, vaultTxResult] = await Promise.allSettled([
           squadsMultisig.accounts.ConfigTransaction.fromAccountAddress(connection, transactionPda),
@@ -183,6 +186,7 @@ export async function loadOnchainProposalSummaries(params: {
           const ixCount = vaultTxResult.value.message.instructions.length;
           title = ixCount > 0 ? `Vault transaction (${ixCount} instruction${ixCount > 1 ? "s" : ""})` : "Vault transaction";
           txType = "onchain";
+          sourceVaultIndex = vaultTxResult.value.vaultIndex;
         } else {
           title = "On-chain proposal";
         }
@@ -200,6 +204,7 @@ export async function loadOnchainProposalSummaries(params: {
           approvals: proposal.approved.length,
           threshold,
           hasDraft: false,
+          sourceVaultIndex,
         };
       } catch {
         return null;

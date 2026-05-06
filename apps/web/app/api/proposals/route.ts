@@ -110,6 +110,8 @@ const proposalDraftSchema = z.object({
   memoCiphertext: byteArraySchema.optional(),
   memoNonce: byteArraySchema.length(24).optional(),
   memoEphemeralPk: byteArraySchema.length(32).optional(),
+  // Source vault index — 0 = primary, > 0 = sub-vault. Defaults to 0 for back-compat.
+  vaultIndex: z.number().int().min(0).max(255).optional(),
 });
 
 export async function POST(request: Request) {
@@ -163,6 +165,7 @@ export async function POST(request: Request) {
         memoEphemeralPk: parsed.data.memoEphemeralPk
           ? Buffer.from(parsed.data.memoEphemeralPk)
           : null,
+        vaultIndex: parsed.data.vaultIndex ?? 0,
       },
     });
 

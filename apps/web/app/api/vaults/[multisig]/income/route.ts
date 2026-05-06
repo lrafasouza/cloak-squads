@@ -1,3 +1,4 @@
+import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { squadsVaultPda } from "@cloak-squads/core/pda";
 import { Connection, PublicKey } from "@solana/web3.js";
 import type { ParsedInstruction, ParsedTransactionWithMeta } from "@solana/web3.js";
@@ -9,6 +10,7 @@ export type IncomeEntry = {
   amountLamports: number;
   from: string;
   blockTime: number;
+  toLabel?: string | undefined; // undefined = primary vault
 };
 
 const RPC_URL =
@@ -24,6 +26,7 @@ async function fetchParsedTxBatch(
   signatures: string[],
   attempt = 0,
 ): Promise<(ParsedTransactionWithMeta | null)[]> {
+  if (signatures.length === 0) return [];
   try {
     return await connection.getParsedTransactions(signatures, {
       commitment: "confirmed",
@@ -37,6 +40,54 @@ async function fetchParsedTxBatch(
     }
     return signatures.map(() => null);
   }
+}
+
+type VaultTarget = { pda: PublicKey; address: string; toLabel: string | undefined };
+
+function parseIncome(
+  tx: ParsedTransactionWithMeta,
+  sigInfo: { signature: string; blockTime: number | null | undefined },
+  vaultAddress: string,
+  toLabel: string | undefined,
+): IncomeEntry | null {
+  if (!tx.meta || tx.meta.err) return null;
+
+  const accounts = tx.transaction.message.accountKeys;
+  const vaultIdx = accounts.findIndex((a) => a.pubkey.toBase58() === vaultAddress);
+  if (vaultIdx === -1) return null;
+
+  const pre = tx.meta.preBalances[vaultIdx];
+  const post = tx.meta.postBalances[vaultIdx];
+  if (pre === undefined || post === undefined) return null;
+  const diff = post - pre;
+  if (diff < 100_000) return null;
+
+  let from = "Unknown";
+  let amountLamports = diff;
+
+  for (const ix of tx.transaction.message.instructions) {
+    if (!("parsed" in ix)) continue;
+    const pix = ix as ParsedInstruction;
+    if (pix.program !== "system") continue;
+    const parsed = pix.parsed as {
+      type?: string;
+      info?: { destination?: string; source?: string; lamports?: number };
+    } | undefined;
+    if (parsed?.type === "transfer" && parsed.info?.destination === vaultAddress) {
+      from = parsed.info.source ?? "Unknown";
+      amountLamports = parsed.info.lamports ?? diff;
+      break;
+    }
+  }
+
+  return {
+    kind: "income",
+    signature: sigInfo.signature,
+    amountLamports,
+    from,
+    blockTime: sigInfo.blockTime ?? Math.floor(Date.now() / 1000),
+    toLabel,
+  };
 }
 
 export async function GET(
@@ -61,8 +112,28 @@ export async function GET(
     return NextResponse.json({ error: "Server misconfiguration." }, { status: 500 });
   }
 
-  const [vaultPda] = squadsVaultPda(multisigPk, squadsProgram);
-  const vaultAddress = vaultPda.toBase58();
+  const [primaryVaultPda] = squadsVaultPda(multisigPk, squadsProgram, 0);
+
+  // Fetch registered sub-vaults from DB
+  let subVaultEntries: Array<{ vaultIndex: number; name: string }> = [];
+  try {
+    if (isPrismaAvailable()) {
+      subVaultEntries = await prisma.subVault.findMany({
+        where: { cofreAddress: multisig },
+        select: { vaultIndex: true, name: true },
+        orderBy: { vaultIndex: "asc" },
+        take: 10, // cap to avoid too many RPC calls
+      });
+    }
+  } catch {}
+
+  const targets: VaultTarget[] = [
+    { pda: primaryVaultPda, address: primaryVaultPda.toBase58(), toLabel: undefined },
+    ...subVaultEntries.map((sv) => {
+      const [pda] = squadsVaultPda(multisigPk, squadsProgram, sv.vaultIndex);
+      return { pda, address: pda.toBase58(), toLabel: sv.name };
+    }),
+  ];
 
   const connection = new Connection(RPC_URL, {
     commitment: "confirmed",
@@ -70,60 +141,71 @@ export async function GET(
   });
 
   try {
-    const sigs = await connection.getSignaturesForAddress(vaultPda, { limit: 50 });
+    // Fetch signatures for all vaults concurrently
+    const sigsPerTarget = await Promise.all(
+      targets.map((t) =>
+        connection
+          .getSignaturesForAddress(t.pda, { limit: 25 })
+          .catch(() => [] as Awaited<ReturnType<typeof connection.getSignaturesForAddress>>),
+      ),
+    );
 
-    if (sigs.length === 0) {
+    // Build a flat list of { sig, blockTime, vaultAddress, toLabel } deduped by sig+vaultAddress
+    type TaggedSig = {
+      signature: string;
+      blockTime: number;
+      vaultAddress: string;
+      toLabel: string | undefined;
+    };
+    const seen = new Set<string>();
+    const taggedSigs: TaggedSig[] = [];
+
+    for (let i = 0; i < targets.length; i++) {
+      const target = targets[i]!;
+      const sigs = sigsPerTarget[i] ?? [];
+      for (const s of sigs) {
+        const key = `${s.signature}|${target.address}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        taggedSigs.push({
+          signature: s.signature,
+          blockTime: s.blockTime ?? 0,
+          vaultAddress: target.address,
+          toLabel: target.toLabel,
+        });
+      }
+    }
+
+    // Sort by recency, take a batch to parse
+    taggedSigs.sort((a, b) => b.blockTime - a.blockTime);
+    const batchToFetch = taggedSigs.slice(0, 60);
+
+    if (batchToFetch.length === 0) {
       return NextResponse.json(
         { entries: [] },
         { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" } },
       );
     }
 
-    const txs = await fetchParsedTxBatch(connection, sigs.map((s) => s.signature));
+    // Batch-fetch unique signatures
+    const uniqueSigs = [...new Set(batchToFetch.map((t) => t.signature))];
+    const txMap = new Map<string, ParsedTransactionWithMeta | null>();
+    const txResults = await fetchParsedTxBatch(connection, uniqueSigs);
+    uniqueSigs.forEach((sig, i) => txMap.set(sig, txResults[i] ?? null));
 
+    // Parse each tagged sig
     const entries: IncomeEntry[] = [];
-
-    for (let i = 0; i < txs.length && entries.length < limit; i++) {
-      const tx = txs[i];
-      const sig = sigs[i];
-      if (!tx || !tx.meta || tx.meta.err || !sig) continue;
-
-      const accounts = tx.transaction.message.accountKeys;
-      const vaultIdx = accounts.findIndex((a) => a.pubkey.toBase58() === vaultAddress);
-      if (vaultIdx === -1) continue;
-
-      const pre = tx.meta.preBalances[vaultIdx];
-      const post = tx.meta.postBalances[vaultIdx];
-      if (pre === undefined || post === undefined) continue;
-      const diff = post - pre;
-
-      if (diff < 100_000) continue;
-
-      let from = "Unknown";
-      let amountLamports = diff;
-
-      for (const ix of tx.transaction.message.instructions) {
-        if (!("parsed" in ix)) continue;
-        const pix = ix as ParsedInstruction;
-        if (pix.program !== "system") continue;
-        const parsed = pix.parsed as {
-          type?: string;
-          info?: { destination?: string; source?: string; lamports?: number };
-        } | undefined;
-        if (parsed?.type === "transfer" && parsed.info?.destination === vaultAddress) {
-          from = parsed.info.source ?? "Unknown";
-          amountLamports = parsed.info.lamports ?? diff;
-          break;
-        }
-      }
-
-      entries.push({
-        kind: "income",
-        signature: sig.signature,
-        amountLamports,
-        from,
-        blockTime: sig.blockTime ?? Math.floor(Date.now() / 1000),
-      });
+    for (const tagged of batchToFetch) {
+      if (entries.length >= limit) break;
+      const tx = txMap.get(tagged.signature);
+      if (!tx) continue;
+      const entry = parseIncome(
+        tx,
+        { signature: tagged.signature, blockTime: tagged.blockTime },
+        tagged.vaultAddress,
+        tagged.toLabel,
+      );
+      if (entry) entries.push(entry);
     }
 
     return NextResponse.json(

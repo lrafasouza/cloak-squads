@@ -3,6 +3,7 @@
 import { TokenLogo } from "@/components/ui/token-logo";
 import { WarningCallout } from "@/components/ui/warning-callout";
 import { useSolPrice } from "@/lib/hooks/useSolPrice";
+import type { SubVaultBalance } from "@/lib/use-vault-data";
 import NumberFlow from "@number-flow/react";
 import {
   ArrowDownToLine,
@@ -10,25 +11,15 @@ import {
   ArrowUpFromLine,
   ChevronDown,
   RefreshCw,
-  TrendingUp,
 } from "lucide-react";
 import { useState } from "react";
-
-function formatBalance(value: string, maxDecimals: number): string {
-  const num = Number.parseFloat(value);
-  if (Number.isNaN(num)) return "0";
-  if (num === 0) return "0";
-  const formatted = num.toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: maxDecimals,
-  });
-  return formatted;
-}
 
 interface OverviewCardProps {
   multisig: string;
   balanceSol: string;
+  primaryBalanceSol: string;
   usdcUi: string;
+  subVaultBreakdown: SubVaultBalance[];
   cofreInitialized: boolean;
   onRefresh: () => void;
   onReceive: () => void;
@@ -36,9 +27,20 @@ interface OverviewCardProps {
   onSwap: () => void;
 }
 
+function usd(value: number) {
+  return value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+}
+
+function formatSol(value: string, decimals = 4) {
+  const n = Number.parseFloat(value) || 0;
+  return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: decimals });
+}
+
 export function OverviewCard({
   balanceSol,
+  primaryBalanceSol,
   usdcUi,
+  subVaultBreakdown,
   cofreInitialized,
   onRefresh,
   onReceive,
@@ -48,33 +50,30 @@ export function OverviewCard({
   const { data: solPrice } = useSolPrice();
   const [showBreakdown, setShowBreakdown] = useState(false);
 
-  const solNum = Number.parseFloat(balanceSol) || 0;
-  const usdcNum = Number.parseFloat(usdcUi) || 0;
+  const solTotal = Number.parseFloat(balanceSol) || 0;
+  const usdcTotal = Number.parseFloat(usdcUi) || 0;
+  const solUsd = solPrice != null ? solTotal * solPrice : null;
+  const totalUsd = solUsd != null ? solUsd + usdcTotal : null;
 
-  const solUsd = solPrice != null ? solNum * solPrice : null;
-  const totalUsd = solUsd != null ? solUsd + usdcNum : null;
+  // Per-account breakdown (primary + named sub-vaults with any balance)
+  const primarySol = Number.parseFloat(primaryBalanceSol) || 0;
+  const accountRows = [
+    { label: "Primary", sol: primarySol },
+    ...subVaultBreakdown.map((sv) => ({ label: sv.name, sol: Number.parseFloat(sv.balanceSol) || 0 })),
+  ].filter((r) => r.sol > 0 || subVaultBreakdown.length === 0);
 
-  const totalUsdFormatted =
-    totalUsd != null
-      ? totalUsd.toLocaleString("en-US", {
-          style: "currency",
-          currency: "USD",
-          maximumFractionDigits: 2,
-        })
-      : null;
+  const hasSubVaults = subVaultBreakdown.length > 0;
+  const hasUsdc = usdcTotal > 0;
 
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-border/60 bg-surface shadow-raise-1 transition-colors duration-200 hover:border-accent/20">
       <div className="relative p-6 md:p-8">
+
+        {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/10">
-              <TrendingUp className="h-3.5 w-3.5 text-accent" strokeWidth={1.5} />
-            </div>
-            <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">
-              Total Balance
-            </p>
-          </div>
+          <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle/60">
+            Total Balance
+          </p>
           <button
             type="button"
             onClick={onRefresh}
@@ -85,11 +84,11 @@ export function OverviewCard({
           </button>
         </div>
 
-        {/* Primary: total USD */}
-        <div className="mt-4">
-          {totalUsdFormatted != null ? (
+        {/* Big number */}
+        <div className="mt-3">
+          {totalUsd != null ? (
             <NumberFlow
-              value={totalUsd ?? 0}
+              value={totalUsd}
               className="font-display text-4xl font-semibold tabular-nums tracking-tight text-ink md:text-5xl"
               prefix="$"
               locales="en-US"
@@ -98,64 +97,75 @@ export function OverviewCard({
             />
           ) : (
             <span className="font-display text-4xl font-semibold tabular-nums tracking-tight text-ink md:text-5xl">
-              —
+              {formatSol(balanceSol)} SOL
             </span>
           )}
 
-          {/* Toggle breakdown */}
-          <button
-            type="button"
-            onClick={() => setShowBreakdown((v) => !v)}
-            className="mt-2 flex items-center gap-1 text-xs text-ink-subtle/40 transition-colors hover:text-ink-subtle/70"
-          >
-            <ChevronDown
-              className={`h-3 w-3 transition-transform ${showBreakdown ? "rotate-180" : ""}`}
-            />
-            {showBreakdown ? "Hide" : "Details"}
-          </button>
+          {/* SOL pill — always visible below the total */}
+          {totalUsd != null && (
+            <p className="mt-1 font-mono text-sm text-ink-subtle/60 tabular-nums">
+              {formatSol(balanceSol, 6)} SOL
+            </p>
+          )}
 
-          {/* Inline breakdown — animated */}
+          {/* Details toggle */}
+          {(hasSubVaults || hasUsdc) && (
+            <button
+              type="button"
+              onClick={() => setShowBreakdown((v) => !v)}
+              className="mt-3 flex items-center gap-1 text-[11px] text-ink-subtle/50 transition-colors hover:text-ink-subtle"
+            >
+              <ChevronDown
+                className={`h-3 w-3 transition-transform duration-200 ${showBreakdown ? "rotate-180" : ""}`}
+              />
+              {showBreakdown ? "Hide details" : "Show details"}
+            </button>
+          )}
+
+          {/* Breakdown panel */}
           <div
-            className={`grid transition-[grid-template-rows] duration-300 ease-out ${showBreakdown ? "mt-3 grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+            className={`grid transition-[grid-template-rows] duration-300 ease-out ${showBreakdown ? "mt-4 grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
           >
             <div className="overflow-hidden">
-              <div className="space-y-1.5 rounded-xl bg-surface-2/40 p-3">
-                {/* SOL */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TokenLogo symbol="SOL" size={16} />
-                    <span className="text-sm text-ink">SOL</span>
+              <div className="space-y-px rounded-xl border border-border/50 bg-bg/40 overflow-hidden">
+
+                {/* SOL row — always first */}
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <TokenLogo symbol="SOL" size={20} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-ink">SOL</p>
+                    {hasSubVaults && accountRows.length > 1 && (
+                      <p className="text-[10px] text-ink-subtle mt-0.5">
+                        {accountRows.map((r) => `${r.label} ${formatSol(String(r.sol), 3)}`).join(" · ")}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
-                    <span className="block font-mono text-sm font-medium tabular-nums text-ink">
-                      {formatBalance(balanceSol, 6)}
-                    </span>
+                    <p className="font-mono text-sm font-medium tabular-nums text-ink">
+                      {formatSol(balanceSol, 6)}
+                    </p>
                     {solUsd != null && (
-                      <span className="text-[11px] text-ink-subtle/50">
-                        ≈ ${solUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })}
-                      </span>
+                      <p className="text-[11px] tabular-nums text-ink-subtle/50">{usd(solUsd)}</p>
                     )}
                   </div>
                 </div>
-                {/* Divider */}
-                <div className="h-px bg-border/40" />
-                {/* USDC */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TokenLogo symbol="USDC" size={16} />
-                    <span className="text-sm text-ink">USDC</span>
+
+                {/* USDC row — only when balance > 0 */}
+                {hasUsdc && (
+                  <div className="flex items-center gap-3 border-t border-border/40 px-4 py-3">
+                    <TokenLogo symbol="USDC" size={20} />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-ink">USDC</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-mono text-sm font-medium tabular-nums text-ink">
+                        {usdcTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-[11px] tabular-nums text-ink-subtle/50">{usd(usdcTotal)}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="block font-mono text-sm font-medium tabular-nums text-ink">
-                      {formatBalance(usdcUi, 2)}
-                    </span>
-                    {usdcNum > 0 && (
-                      <span className="text-[11px] text-ink-subtle/50">
-                        = ${usdcNum.toLocaleString("en-US", { maximumFractionDigits: 2 })}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                )}
+
               </div>
             </div>
           </div>
@@ -163,7 +173,6 @@ export function OverviewCard({
 
         {/* Quick Actions */}
         <div className="mt-6 grid grid-cols-3 gap-2">
-          {/* Send — primary action */}
           <button
             type="button"
             onClick={onSend}
@@ -172,7 +181,6 @@ export function OverviewCard({
             <ArrowUpFromLine className="h-4 w-4" strokeWidth={1.5} />
             Send
           </button>
-          {/* Deposit — ghost */}
           <button
             type="button"
             onClick={onReceive}
@@ -181,7 +189,6 @@ export function OverviewCard({
             <ArrowDownToLine className="h-4 w-4" strokeWidth={1.5} />
             Deposit
           </button>
-          {/* Swap — ghost */}
           <button
             type="button"
             onClick={onSwap}
