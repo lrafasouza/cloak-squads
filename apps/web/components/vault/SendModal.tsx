@@ -917,8 +917,6 @@ export function SendModal({
             />
           </div>
 
-          {mode === "private" && isSol && <PrivacyMeter />}
-
           {error && (
             <p className="rounded-md bg-signal-danger/10 px-3 py-2 text-xs text-signal-danger">
               {error}
