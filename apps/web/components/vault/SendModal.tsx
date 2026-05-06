@@ -32,6 +32,8 @@ import {
   createUtxo,
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
+import { encryptMemo, serializeEncryptedMemo } from "@cloak-squads/core/memo-crypto";
+import nacl from "tweetnacl";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import {
   createAssociatedTokenAccountInstruction,
@@ -416,6 +418,23 @@ export function SendModal({
       });
       updateStep("persist", { status: "running" });
 
+      // Encrypt memo for private sends. Store the box secret in commitmentClaim
+      // so the operator can decrypt it — the ciphertext is safe to store in DB.
+      let memoEncryptedFields: Record<string, unknown> = {};
+      const trimmedMemo = memo.trim();
+      let memoBoxSkHex: string | undefined;
+      if (trimmedMemo) {
+        const memoBoxKp = nacl.box.keyPair();
+        memoBoxSkHex = Buffer.from(memoBoxKp.secretKey).toString("hex");
+        const encrypted = encryptMemo(trimmedMemo, memoBoxKp.publicKey);
+        const { memoCiphertext, memoNonce, memoEphemeralPk } = serializeEncryptedMemo(encrypted);
+        memoEncryptedFields = {
+          memoCiphertext: Array.from(Buffer.from(memoCiphertext, "hex")),
+          memoNonce: Array.from(Buffer.from(memoNonce, "hex")),
+          memoEphemeralPk: Array.from(Buffer.from(memoEphemeralPk, "hex")),
+        };
+      }
+
       const commitmentClaim = {
         amount: tokenUnits.toString(),
         keypairPrivateKey: keypair.privateKey.toString(16).padStart(64, "0"),
@@ -424,6 +443,7 @@ export function SendModal({
         commitment: commitmentHex,
         recipient_vk: recipientPubkey.toBase58(),
         token_mint: cloakMint.toBase58(),
+        ...(memoBoxSkHex ? { memoBoxSk: memoBoxSkHex } : {}),
       };
 
       try {
@@ -443,7 +463,7 @@ export function SendModal({
           transactionIndex,
           amount: tokenUnits.toString(),
           recipient: recipientPubkey.toBase58(),
-          memo: memo.trim() || undefined,
+          // memo left null for private sends — ciphertext stored below
           payloadHash: Array.from(payloadHash),
           invariants: {
             nullifier: Array.from(invariants.nullifier),
@@ -454,6 +474,7 @@ export function SendModal({
             nonce: Array.from(invariants.nonce),
           },
           commitmentClaim,
+          ...memoEncryptedFields,
         }),
       });
 

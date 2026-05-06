@@ -22,7 +22,7 @@ type SerializeDraftOptions = {
  * `keypairPrivateKey` + `blinding` reconstruct the UTXO and let the holder spend it.
  * Legacy `r` and `sk_spend` were equivalent material under the old scheme.
  */
-const SENSITIVE_CLAIM_FIELDS = ["keypairPrivateKey", "blinding", "r", "sk_spend"] as const;
+const SENSITIVE_CLAIM_FIELDS = ["keypairPrivateKey", "blinding", "r", "sk_spend", "memoBoxSk"] as const;
 
 function publicClaim(raw: string): unknown {
   const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -59,5 +59,12 @@ export function serializeDraft(draft: ProposalDraftRow, options: SerializeDraftO
     signature: draft.signature ?? undefined,
     createdAt: new Date(draft.createdAt).toISOString(),
     archivedAt: draft.archivedAt ? new Date(draft.archivedAt).toISOString() : null,
+    ...(draft.memoCiphertext
+      ? {
+          memoCiphertext: Array.from(Buffer.from(draft.memoCiphertext)),
+          memoNonce: Array.from(Buffer.from(draft.memoNonce ?? Buffer.alloc(0))),
+          memoEphemeralPk: Array.from(Buffer.from(draft.memoEphemeralPk ?? Buffer.alloc(0))),
+        }
+      : {}),
   };
 }

@@ -70,6 +70,9 @@ model StealthInvoice {
   recipientWallet     String
   invoiceRef          String?
   memo                String?
+  memoCiphertext      Bytes?
+  memoNonce           Bytes?
+  memoEphemeralPk     Bytes?
   stealthPubkey       String
   signPubkey          String?
   amountHint          Bytes?
@@ -102,6 +105,9 @@ model ProposalDraft {
   amount           String
   recipient        String
   memo             String?
+  memoCiphertext   Bytes?
+  memoNonce        Bytes?
+  memoEphemeralPk  Bytes?
   payloadHash      Bytes
   invariants       String
   commitmentClaim  String?
@@ -120,6 +126,9 @@ model PayrollDraft {
   cofreAddress     String
   transactionIndex String
   memo             String?
+  memoCiphertext   Bytes?
+  memoNonce        Bytes?
+  memoEphemeralPk  Bytes?
   totalAmount      String
   recipientCount   Int
   mode             String   @default("direct")
@@ -143,6 +152,9 @@ model SwapDraft {
   inputSymbol      String
   outputSymbol     String
   memo             String?
+  memoCiphertext   Bytes?
+  memoNonce        Bytes?
+  memoEphemeralPk  Bytes?
   vaultIndex       Int      @default(0)
   createdAt        DateTime @default(now())
 

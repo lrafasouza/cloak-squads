@@ -39,6 +39,11 @@ const commitmentClaimSchema = z.object({
   commitment: z.string().regex(/^[0-9a-fA-F]{64}$/),
   recipient_vk: z.string().min(32).max(44),
   token_mint: z.string().min(32).max(44),
+  // Encrypted memo decryption key (sensitive — operator only)
+  memoBoxSk: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/)
+    .optional(),
 });
 
 const proposalDraftSchema = z.object({
@@ -101,6 +106,10 @@ const proposalDraftSchema = z.object({
   }),
   commitmentClaim: commitmentClaimSchema.optional(),
   signature: z.string().min(32).max(128).optional(),
+  // Encrypted memo fields (optional — present only for private sends with a memo)
+  memoCiphertext: byteArraySchema.optional(),
+  memoNonce: byteArraySchema.length(24).optional(),
+  memoEphemeralPk: byteArraySchema.length(32).optional(),
 });
 
 export async function POST(request: Request) {
@@ -145,6 +154,15 @@ export async function POST(request: Request) {
             ? null
             : JSON.stringify(parsed.data.commitmentClaim),
         signature: parsed.data.signature ?? null,
+        memoCiphertext: parsed.data.memoCiphertext
+          ? Buffer.from(parsed.data.memoCiphertext)
+          : null,
+        memoNonce: parsed.data.memoNonce
+          ? Buffer.from(parsed.data.memoNonce)
+          : null,
+        memoEphemeralPk: parsed.data.memoEphemeralPk
+          ? Buffer.from(parsed.data.memoEphemeralPk)
+          : null,
       },
     });
 

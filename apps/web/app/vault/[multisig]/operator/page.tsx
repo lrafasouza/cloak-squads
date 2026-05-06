@@ -42,6 +42,7 @@ import { useUnloadGuard } from "@/lib/use-unload-guard";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
+import { decryptMemo } from "@cloak-squads/core/memo-crypto";
 import { cofrePda, licensePda } from "@cloak-squads/core/pda";
 import {
   CLOAK_PROGRAM_ID,
@@ -102,12 +103,16 @@ type CommitmentClaim = {
   commitment: string;
   recipient_vk: string;
   token_mint: string;
+  memoBoxSk?: string;
 };
 
 type SingleDraft = {
   amount: string;
   recipient: string;
   memo: string;
+  memoCiphertext?: number[];
+  memoNonce?: number[];
+  memoEphemeralPk?: number[];
   payloadHash: number[];
   invariants: {
     nullifier: number[];
@@ -394,6 +399,32 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const [draftOnChainStatus, setDraftOnChainStatus] = useState<ProposalStatus>("loading");
   const [licenseStatus, setLicenseStatus] = useState<OperatorLicenseStatus>("idle");
   const { data: proposals = [] } = useProposalSummaries(multisig);
+
+  // Decrypt memo from commitmentClaim if present
+  const decryptedMemo = useMemo(() => {
+    if (!loadedDraft) return null;
+    if (loadedDraft.memo) return loadedDraft.memo;
+    if (
+      !loadedDraft.memoCiphertext ||
+      !loadedDraft.memoNonce ||
+      !loadedDraft.memoEphemeralPk ||
+      !loadedDraft.commitmentClaim?.memoBoxSk
+    ) {
+      return null;
+    }
+    try {
+      return decryptMemo(
+        {
+          ciphertext: Uint8Array.from(loadedDraft.memoCiphertext),
+          nonce: Uint8Array.from(loadedDraft.memoNonce),
+          ephemeralPk: Uint8Array.from(loadedDraft.memoEphemeralPk),
+        },
+        Buffer.from(loadedDraft.commitmentClaim.memoBoxSk, "hex"),
+      );
+    } catch {
+      return "[encrypted memo]";
+    }
+  }, [loadedDraft]);
 
   const queueDrafts = useMemo(() => {
     const executedSet = new Set<string>();
@@ -1913,6 +1944,10 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                       value={formatRawAmount(loadedDraft.amount, loadedDraft.invariants.tokenMint)}
                     />
                     <DetailRow label="Recipient" value={loadedDraft.recipient} mono />
+                    {decryptedMemo && <DetailRow label="Memo" value={decryptedMemo} />}
+                    {loadedDraft.memoCiphertext && !decryptedMemo && (
+                      <DetailRow label="Memo" value="[encrypted memo]" />
+                    )}
                     <DetailRow label="Status" value={proposalStatusMessage ?? "Ready to execute"} />
                   </dl>
                 )}

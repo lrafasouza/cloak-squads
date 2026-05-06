@@ -15,3 +15,4 @@ export * from "./gatekeeper-client";
 export * from "./pda";
 export * from "./cloak-deposit";
 export * from "./cloak-direct-mode";
+export * from "./memo-crypto";
