@@ -99,8 +99,8 @@ function CreateVaultCard({ index }: { index: number }) {
   );
 }
 
-/* ─── "Import by address" card ─── */
-function ImportCard({ index, onClick }: { index: number; onClick: () => void }) {
+/* ─── "Import by address" card — disabled, Coming soon ─── */
+function ImportCard({ index }: { index: number }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 28, scale: 0.96 }}
@@ -111,49 +111,42 @@ function ImportCard({ index, onClick }: { index: number; onClick: () => void }) 
         ease: [0.22, 1, 0.36, 1],
       }}
     >
-      <button
-        type="button"
-        onClick={onClick}
-        className="group relative flex w-full flex-col items-center gap-5 rounded-2xl border border-dashed border-border bg-surface/30 p-6 pb-5 backdrop-blur-sm transition-all duration-300 hover:scale-[1.045] hover:border-accent/30 hover:bg-surface/50 hover:shadow-[0_8px_32px_rgba(201,168,106,0.05)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 sm:p-10 sm:pb-7"
+      <div
+        aria-disabled="true"
+        className="group relative flex w-full flex-col items-center gap-5 rounded-2xl border border-dashed border-border bg-surface/20 p-6 pb-5 opacity-60 backdrop-blur-sm sm:p-10 sm:pb-7"
       >
-        <div className="flex h-[100px] w-[100px] items-center justify-center rounded-2xl border border-dashed border-border bg-surface-2/40 transition-all duration-300 group-hover:border-accent/25 group-hover:bg-accent-soft/20">
-          <Upload className="h-10 w-10 text-ink-subtle transition-colors duration-300 group-hover:text-accent" strokeWidth={1.5} />
+        <span className="absolute right-3 top-3 rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+          Coming soon
+        </span>
+
+        <div className="flex h-[100px] w-[100px] items-center justify-center rounded-2xl border border-dashed border-border bg-surface-2/40">
+          <Upload className="h-10 w-10 text-ink-subtle" strokeWidth={1.5} />
         </div>
 
         <div className="text-center">
-          <p className="text-[17px] font-semibold text-ink-muted transition-colors duration-300 group-hover:text-accent">
-            Import vault
-          </p>
-          <p className="mt-1 text-[11px] text-ink-subtle">
-            By address
-          </p>
+          <p className="text-[17px] font-semibold text-ink-muted">Import vault</p>
+          <p className="mt-1 text-[11px] text-ink-subtle">By address</p>
         </div>
-      </button>
+      </div>
     </motion.div>
   );
 }
 
 /* ─── Main grid component ─── */
-export function VaultSelectionGrid({
-  vaults,
-  onImportClick,
-}: {
-  vaults: AegisVault[];
-  onImportClick: () => void;
-}) {
+export function VaultSelectionGrid({ vaults }: { vaults: AegisVault[] }) {
   return (
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {vaults.map((vault, i) => (
         <VaultCard key={vault.cofreAddress} vault={vault} index={i} />
       ))}
-      <ImportCard index={vaults.length} onClick={onImportClick} />
-      <CreateVaultCard index={vaults.length + 1} />
+      <CreateVaultCard index={vaults.length} />
+      <ImportCard index={vaults.length + 1} />
     </div>
   );
 }
 
 /* ─── Empty state ─── */
-export function VaultEmptyState({ onImportClick }: { onImportClick: () => void }) {
+export function VaultEmptyState() {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -165,21 +158,11 @@ export function VaultEmptyState({ onImportClick }: { onImportClick: () => void }
         <Search className="h-8 w-8 text-accent" strokeWidth={1.5} />
         <div className="pointer-events-none absolute -inset-3 rounded-full bg-accent/[0.04] blur-xl" />
       </div>
-      <h3 className="font-display text-xl font-semibold text-ink">
-        No vaults yet
-      </h3>
+      <h3 className="font-display text-xl font-semibold text-ink">No vaults yet</h3>
       <p className="mt-2 max-w-sm text-sm leading-relaxed text-ink-muted">
-        There are no Aegis vaults in the database yet. Create one or import an existing vault address.
+        Create your first Aegis vault to get started.
       </p>
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-        <button
-          type="button"
-          onClick={onImportClick}
-          className="inline-flex items-center justify-center gap-2 rounded-md border border-border-strong bg-surface-2 px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-surface-3 hover:border-accent/20"
-        >
-          <Upload className="h-4 w-4" />
-          Import by address
-        </button>
+      <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
         <Link
           href="/create"
           className="inline-flex items-center justify-center gap-2 rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-hover shadow-raise-1"
@@ -187,6 +170,16 @@ export function VaultEmptyState({ onImportClick }: { onImportClick: () => void }
           <Plus className="h-4 w-4" />
           Create vault
         </Link>
+        <span
+          aria-disabled="true"
+          className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-md border border-dashed border-border bg-surface-2/50 px-5 py-2.5 text-sm font-semibold text-ink-muted opacity-60"
+        >
+          <Upload className="h-4 w-4" />
+          Import by address
+          <span className="ml-1 rounded-full border border-border bg-surface px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-ink-subtle">
+            Soon
+          </span>
+        </span>
       </div>
     </motion.div>
   );
