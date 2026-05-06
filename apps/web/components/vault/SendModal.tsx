@@ -33,6 +33,7 @@ import {
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
 import { encryptMemo, serializeEncryptedMemo } from "@cloak-squads/core/memo-crypto";
+import { PrivacyMeter } from "@/components/vault/PrivacyMeter";
 import nacl from "tweetnacl";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import {
@@ -601,6 +602,8 @@ export function SendModal({
               disabled={pending}
             />
           </div>
+
+          {mode === "private" && isSol && <PrivacyMeter />}
 
           {error && (
             <p className="rounded-md bg-signal-danger/10 px-3 py-2 text-xs text-signal-danger">
