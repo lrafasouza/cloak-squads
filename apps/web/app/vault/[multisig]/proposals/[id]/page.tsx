@@ -6,6 +6,7 @@ import { ExecuteButton } from "@/components/proposal/ExecuteButton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/workspace";
+import { isProposalExecuted } from "@/lib/operator-execution-history";
 import { type ProposalStatusKind, readProposalStatus } from "@/lib/proposals";
 import { SOL_MINT, formatRawAmount } from "@/lib/tokens";
 import { proposalCancel, proposalReject } from "@/lib/squads-sdk";
@@ -259,6 +260,14 @@ export default function ProposalApprovalPage({
   const [transactionType, setTransactionType] = useState<"config" | "vault" | null>(null);
   const [sourceVaultIndex, setSourceVaultIndex] = useState<number | null>(null);
   const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
+  const [operatorDelivered, setOperatorDelivered] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setOperatorDelivered(isProposalExecuted(multisigParam, id));
+    sync();
+    window.addEventListener("aegis:operator-executed", sync);
+    return () => window.removeEventListener("aegis:operator-executed", sync);
+  }, [multisigParam, id]);
 
   useEffect(() => {
     fetch(`/api/vaults/${multisigParam}/sub-vaults`)
@@ -920,9 +929,23 @@ export default function ProposalApprovalPage({
                   <div className="flex items-start gap-2.5 rounded-lg bg-accent-soft px-3.5 py-3">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
                     <div>
-                      <p className="text-sm font-semibold text-accent">Transaction executed</p>
+                      <p className="text-sm font-semibold text-accent">
+                        {isSwap
+                          ? "Swap executed"
+                          : transactionType === "config"
+                            ? "Configuration applied"
+                            : draft !== null || isPayroll
+                              ? "Transaction executed"
+                              : "Transfer complete"}
+                      </p>
                       <p className="mt-0.5 text-xs text-ink-muted">
-                        The Squads proposal is complete.
+                        {isSwap
+                          ? "Tokens swapped — funds returned to the vault."
+                          : transactionType === "config"
+                            ? "The vault settings have been updated."
+                            : draft !== null || isPayroll
+                              ? "The Squads proposal is complete."
+                              : "Funds were sent from the vault."}
                       </p>
                       {executeSignature && (
                         <p className="mt-2 break-all rounded-md border border-accent/20 bg-bg/40 px-2.5 py-1.5 font-mono text-[10px] text-ink-muted">
@@ -931,25 +954,40 @@ export default function ProposalApprovalPage({
                       )}
                     </div>
                   </div>
-                  {transactionType !== "config" && !isSwap && (
-                    <div className="flex items-start gap-2.5 rounded-lg border border-signal-warn/25 bg-signal-warn/10 px-3.5 py-3">
-                      <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-signal-warn" />
-                      <div>
-                        <p className="text-sm font-semibold text-ink">Waiting for Operator</p>
-                        <p className="mt-0.5 text-xs text-ink-muted">
-                          The Operator must now execute the private delivery so the SOL is sent to
-                          the recipient.
-                        </p>
-                        <Link
-                          href={`/vault/${multisigParam}/operator?proposal=${encodeURIComponent(id)}`}
-                          className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink shadow-raise-1 transition-opacity hover:opacity-90"
-                        >
-                          Go to Operator
-                          <ExternalLink className="h-3 w-3" />
-                        </Link>
+                  {(draft !== null || isPayroll) &&
+                    (operatorDelivered ? (
+                      <div className="flex items-start gap-2.5 rounded-lg border border-signal-positive/25 bg-signal-positive/10 px-3.5 py-3">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-signal-positive" />
+                        <div>
+                          <p className="text-sm font-semibold text-signal-positive">
+                            Private delivery complete
+                          </p>
+                          <p className="mt-0.5 text-xs text-ink-muted">
+                            {isPayroll
+                              ? "The Operator delivered the funds to all recipients."
+                              : "The Operator delivered the funds to the recipient."}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="flex items-start gap-2.5 rounded-lg border border-signal-warn/25 bg-signal-warn/10 px-3.5 py-3">
+                        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-signal-warn" />
+                        <div>
+                          <p className="text-sm font-semibold text-ink">Waiting for Operator</p>
+                          <p className="mt-0.5 text-xs text-ink-muted">
+                            The Operator must now execute the private delivery so the SOL is sent
+                            to the recipient.
+                          </p>
+                          <Link
+                            href={`/vault/${multisigParam}/operator?proposal=${encodeURIComponent(id)}`}
+                            className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink shadow-raise-1 transition-opacity hover:opacity-90"
+                          >
+                            Go to Operator
+                            <ExternalLink className="h-3 w-3" />
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
                 </div>
               ) : (
                 <div className="space-y-3">

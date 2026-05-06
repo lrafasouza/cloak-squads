@@ -94,7 +94,9 @@ export function ExecuteButton({
         description:
           transactionType === "config"
             ? "The configuration change is complete."
-            : "The license is issued and the operator can continue the private delivery.",
+            : requireCofreInitialized
+              ? "The license is issued and the operator can continue the private delivery."
+              : "The vault transaction is complete.",
       });
       onSubmitted?.(signature);
     } catch (caught) {
