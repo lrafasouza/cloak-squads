@@ -148,6 +148,15 @@ export function SendModal({
     if (destType === "account" && mode === "private") setMode("public");
   }, [destType, mode]);
 
+  // Snap source to Primary in private mode. The Aegis gatekeeper hardcodes
+  // vault[0] as the required Squads CPI signer (issue_license.rs:14), and
+  // Squads only accepts the source vault as signer in the inner message — so
+  // a private send sourced from a sub-vault would create a proposal that
+  // fails on-chain at execute with InvalidAccount (0x177e).
+  useEffect(() => {
+    if (mode === "private" && selectedVaultIndex !== 0) setSelectedVaultIndex(0);
+  }, [mode, selectedVaultIndex]);
+
   const amountStep = isSol ? "0.000000001" : "0.000001";
   const amountMin = isSol ? "0.000000001" : "0.000001";
   const amountPlaceholder = isSol ? "0.0" : "0.00";
@@ -228,6 +237,14 @@ export function SendModal({
       setError(
         "Recipient is not an Ed25519 wallet (likely a PDA). Cloak can only deliver to standard wallets — switch to Public mode or use a different recipient.",
       );
+      return;
+    }
+
+    // Private flows must source from Primary — the gatekeeper hardcodes vault[0]
+    // as CPI signer. The UI snaps the picker, but guard at submit in case state
+    // races (e.g. user toggles mode while in flight).
+    if (mode === "private" && selectedVaultIndex !== 0) {
+      setError("Private sends must source from Primary. Switch to Public mode to send from a sub-account.");
       return;
     }
 
@@ -575,25 +592,38 @@ export function SendModal({
             <div className="flex flex-col gap-1.5">
               <Label>From account</Label>
               <div className="inline-flex flex-wrap gap-1.5">
-                {allAccounts.map((acct) => (
-                  <button
-                    key={acct.vaultIndex}
-                    type="button"
-                    disabled={pending}
-                    onClick={() => {
-                      setSelectedVaultIndex(acct.vaultIndex);
-                      setAmount("");
-                    }}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
-                      selectedVaultIndex === acct.vaultIndex
-                        ? "border-accent/40 bg-accent/10 text-accent"
-                        : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
-                    }`}
-                  >
-                    {acct.name}
-                  </button>
-                ))}
+                {allAccounts.map((acct) => {
+                  const lockedToPrimary = mode === "private" && acct.vaultIndex !== 0;
+                  return (
+                    <button
+                      key={acct.vaultIndex}
+                      type="button"
+                      disabled={pending || lockedToPrimary}
+                      title={
+                        lockedToPrimary
+                          ? "Private sends route through Primary. The gatekeeper requires vault[0] as the CPI signer — switch to Public mode to send from this account."
+                          : undefined
+                      }
+                      onClick={() => {
+                        setSelectedVaultIndex(acct.vaultIndex);
+                        setAmount("");
+                      }}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                        selectedVaultIndex === acct.vaultIndex
+                          ? "border-accent/40 bg-accent/10 text-accent"
+                          : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
+                      }`}
+                    >
+                      {acct.name}
+                    </button>
+                  );
+                })}
               </div>
+              {mode === "private" && subVaultAccounts.length > 0 && (
+                <p className="text-[11px] text-ink-subtle">
+                  Private sends always route through Primary. Switch to Public mode to send from a sub-account.
+                </p>
+              )}
             </div>
           )}
 

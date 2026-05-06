@@ -226,31 +226,6 @@ html.lenis body {
 }
 
 /* ───────────────────────────────────────────────────────────
- * Shiki block — landing page customization
- * ─────────────────────────────────────────────────────────── */
-.shiki-block pre.shiki {
-  background: transparent !important;
-  padding: 1.25rem 1.25rem 1.5rem;
-  margin: 0;
-  font-family: var(--font-mono), Geist Mono, ui-monospace, Menlo, monospace;
-  font-size: 13px;
-  line-height: 1.65;
-  overflow-x: auto;
-  tab-size: 2;
-}
-.shiki-block pre.shiki code {
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
-  background: transparent;
-}
-.shiki-block .line {
-  display: block;
-  padding: 0 0.25rem;
-  border-left: 2px solid transparent;
-}
-
-/* ───────────────────────────────────────────────────────────
  * Anatomy scrollytelling — pinned section helpers
  * ─────────────────────────────────────────────────────────── */
 .anatomy-step[data-active="true"] {

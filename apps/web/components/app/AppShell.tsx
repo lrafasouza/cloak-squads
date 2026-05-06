@@ -391,7 +391,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             status: p.status === "executed" ? "executed" : "pending",
           }),
         ),
-    [proposals, multisig, executedMap],
+    [proposals, executedMap],
   );
 
   const visibleInboxItems = useMemo(

@@ -2316,8 +2316,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 Every private proposal (send, invoice, payroll) now includes an automatic{" "}
                 <span className="font-medium text-ink">vault → operator transfer</span> alongside
                 the license instruction. When the team approves and executes the proposal, the
-                operator receives the funds (SOL or SPL) needed for the Cloak deposit. No manual
-                top-up required.
+                operator receives the SOL needed for the Cloak deposit. No manual top-up required.
               </p>
             </div>
 

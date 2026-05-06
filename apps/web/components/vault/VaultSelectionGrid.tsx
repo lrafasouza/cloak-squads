@@ -4,7 +4,7 @@ import type { AegisVault } from "@/lib/use-my-vaults";
 import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import { truncateAddress } from "@/lib/proposals";
 import { motion } from "framer-motion";
-import { Check, Plus, Search, Upload } from "lucide-react";
+import { Check, Plus, Upload } from "lucide-react";
 import Link from "next/link";
 
 /* ─── Vault card with DB metadata ─── */
@@ -142,45 +142,5 @@ export function VaultSelectionGrid({ vaults }: { vaults: AegisVault[] }) {
       <CreateVaultCard index={vaults.length} />
       <ImportCard index={vaults.length + 1} />
     </div>
-  );
-}
-
-/* ─── Empty state ─── */
-export function VaultEmptyState() {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className="flex flex-col items-center text-center"
-    >
-      <div className="relative mb-8 flex h-20 w-20 items-center justify-center rounded-2xl border border-border bg-surface shadow-raise-1">
-        <Search className="h-8 w-8 text-accent" strokeWidth={1.5} />
-        <div className="pointer-events-none absolute -inset-3 rounded-full bg-accent/[0.04] blur-xl" />
-      </div>
-      <h3 className="font-display text-xl font-semibold text-ink">No vaults yet</h3>
-      <p className="mt-2 max-w-sm text-sm leading-relaxed text-ink-muted">
-        Create your first Aegis vault to get started.
-      </p>
-      <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
-        <Link
-          href="/create"
-          className="inline-flex items-center justify-center gap-2 rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-hover shadow-raise-1"
-        >
-          <Plus className="h-4 w-4" />
-          Create vault
-        </Link>
-        <span
-          aria-disabled="true"
-          className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-md border border-dashed border-border bg-surface-2/50 px-5 py-2.5 text-sm font-semibold text-ink-muted opacity-60"
-        >
-          <Upload className="h-4 w-4" />
-          Import by address
-          <span className="ml-1 rounded-full border border-border bg-surface px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-ink-subtle">
-            Soon
-          </span>
-        </span>
-      </div>
-    </motion.div>
   );
 }
