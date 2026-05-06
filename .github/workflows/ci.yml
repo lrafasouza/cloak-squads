@@ -46,6 +46,11 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Set up Rust 1.86
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.86.0'
+
       - name: Cache Rust/Cargo
         uses: Swatinem/rust-cache@v2
         with:
@@ -54,7 +59,6 @@ jobs:
       - name: Install Solana CLI (Anza)
         run: |
           sh -c "$(curl -sSfL https://release.anza.xyz/v2.3.13/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       - name: Verify cargo-build-sbf is available
         run: |
