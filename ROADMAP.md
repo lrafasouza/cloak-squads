@@ -77,6 +77,39 @@ Estes itens bloqueiam qualquer deploy em mainnet ou uso com usuários reais.
 
 ## P2 — UX e features pendentes
 
+### Squads parity + Privacy depth ✅ (concluído 2026-05-05)
+
+Pacote de 4 features implementadas para fechar o gap de migração com Squads.so e aprofundar a track Cloak/Frontier:
+
+#### Sub-vaults (`vault_index` 0/1/2…) ✅
+- [x] `vaultIndex` parametrizado em `lib/squads-sdk.ts`, `packages/core/src/pda.ts`, `gatekeeper-instructions.ts` — sem hardcode `index: 0`
+- [x] Modelo Prisma `SubVault { cofreAddress, vaultIndex, name, color, icon }` + migration
+- [x] `vaultIndex Int @default(0)` em `ProposalDraft`, `PayrollDraft`, `StealthInvoice`, `SwapDraft`
+- [x] Página `/vault/[ms]/sub-vaults` — lista, cria (com PDA derivada), deleta sub-vaults
+- [x] APIs REST GET/POST PATCH/DELETE em `/api/vaults/[multisig]/sub-vaults/[vaultIndex]`
+
+#### Encrypted memos ✅
+- [x] `packages/core/src/memo-crypto.ts` — `encryptMemo` / `decryptMemo` via NaCl box (Curve25519 + XSalsa20-Poly1305)
+- [x] Migration: `ProposalDraft` ganha `memoCiphertext`, `memoNonce`, `memoEphemeralPk` (Bytes nullable)
+- [x] `SendModal`: generates ephemeral box keypair, stores `memoBoxSk` em `commitmentClaim`, sends ciphertext fields
+- [x] Operator page: decrypts memo com `memoBoxSk` do `commitmentClaim`; fallback `[encrypted]`
+- [x] `SENSITIVE_CLAIM_FIELDS` inclui `memoBoxSk` — não exposto para membros não-operadores
+
+#### Privacy meter (anonymity set UI) ✅
+- [x] `lib/cloak-anonymity.ts` — `readMerkleTreeState.nextIndex` = anonymity set; pool depth via `getBalance(vaultAuthority)`
+- [x] `/api/cloak/pool-stats` com cache in-memory 60s, retorna `anonymitySetTotal`, `poolDepthLamports`, `riskScore`
+- [x] Componente `<PrivacyMeter />` — badge low/medium/high, barra de anonymity set, pool depth em SOL
+- [x] Integrado em `SendModal` (modo private + SOL) e página educativa `/vault/[ms]/privacy`
+- [x] Threat model honesto: "vault→operator é público; recipient withdraw quebra o link"
+
+#### Spending limits ✅
+- [x] `lib/spending-limits.ts`: `createAddSpendingLimitProposal`, `createRemoveSpendingLimitProposal` (configTx governance), `buildSpendingLimitUseIx` (direct 1-sign send)
+- [x] Modelo Prisma `SpendingLimit` + migration
+- [x] Página `/vault/[ms]/limits` — lista, cria, remove spending limits via proposal
+- [x] APIs GET/POST/DELETE em `/api/vaults/[multisig]/spending-limits`
+- [x] `SendModal`: detecta limit aplicável → toggle "Use spending limit (skip approval)" → envia direto via `spendingLimitUse`
+- [x] Privacy bridge (`spendingLimitUse → Cloak pool`) marcado como follow-up v2
+
 ### UX / Produto
 - [ ] **Auto-execute para threshold=1** — pular tela de "aguardando aprovação" em vaults 1-of-1
 - [ ] **Ocultar nav do Operador** para wallets que não são operadoras do vault
