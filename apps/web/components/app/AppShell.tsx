@@ -67,7 +67,6 @@ const GOVERNANCE_NAV: NavItem[] = [
 const PRIVACY_VAULT_NAV: NavItem[] = [
   { label: "Accounts", href: "/sub-vaults", icon: Layers },
   { label: "Spending Limits", href: "/limits", icon: Zap },
-  { label: "Privacy", href: "/privacy", icon: ShieldAlert },
   { label: "Address Book", href: "/address-book", icon: BookUser },
 ];
 

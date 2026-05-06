@@ -5,7 +5,6 @@ import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import { CofreInitBanner } from "@/components/vault/CofreInitBanner";
 import { OverviewCard } from "@/components/vault/OverviewCard";
 import { PendingProposalsCard } from "@/components/vault/PendingProposalsCard";
-import { PrivacyFlowModal, PrivacyFlowTrigger } from "@/components/vault/PrivacyFlowModal";
 import { ReceiveModal } from "@/components/vault/ReceiveModal";
 import { RecentActivityCard } from "@/components/vault/RecentActivityCard";
 import { SendModal } from "@/components/vault/SendModal";
@@ -139,7 +138,6 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
   const { data, isLoading, error } = useVaultData(multisig);
   const { data: proposals = [] } = useProposalSummaries(multisig);
   const { activity, isLoading: activityLoading } = useRecentActivity(multisig, 5);
-  const [privacyFlowOpen, setPrivacyFlowOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const [swapOpen, setSwapOpen] = useState(false);
@@ -276,16 +274,11 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
 
       <SpendingLimitsDashCard multisig={multisig} />
 
-      {/* Privacy flow explainer */}
-      <PrivacyFlowTrigger onClick={() => setPrivacyFlowOpen(true)} />
-
       {/* Pending proposals — below the main grid */}
       <PendingProposalsCard multisig={multisig} proposals={proposals} />
 
       {/* Activity — full width */}
       <RecentActivityCard multisig={multisig} activity={activity} isLoading={activityLoading} />
-
-      <PrivacyFlowModal open={privacyFlowOpen} onOpenChange={setPrivacyFlowOpen} />
 
       <ReceiveModal multisig={multisig} open={receiveOpen} onOpenChange={setReceiveOpen} />
       <SendModal
