@@ -50,6 +50,24 @@ model VaultSettings {
   @@index([cofreAddress])
 }
 
+model SpendingLimit {
+  id            String   @id @default(uuid())
+  cofreAddress  String
+  spendingLimit String
+  createKey     String
+  vaultIndex    Int
+  mint          String
+  amountRaw     String
+  period        String
+  members       String[]
+  destinations  String[]
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+
+  @@index([cofreAddress])
+  @@index([cofreAddress, status])
+}
+
 model SubVault {
   id           String   @id @default(uuid())
   cofreAddress String

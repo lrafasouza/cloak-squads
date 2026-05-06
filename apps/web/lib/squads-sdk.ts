@@ -512,6 +512,7 @@ export async function configTransactionExecute(params: {
   wallet: BrowserSquadsWallet;
   multisigPda: PublicKey;
   transactionIndex: bigint;
+  spendingLimits?: PublicKey[];
 }) {
   assertBrowserSquadsWallet(params.wallet);
   log("[squads-sdk] configTransactionExecute start", {
@@ -540,7 +541,7 @@ export async function configTransactionExecute(params: {
     transactionIndex: params.transactionIndex,
     member: params.wallet.publicKey,
     rentPayer: params.wallet.publicKey,
-    spendingLimits: [],
+    spendingLimits: params.spendingLimits ?? [],
   });
   const latestBlockhash = await params.connection.getLatestBlockhash();
 
