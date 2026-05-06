@@ -102,6 +102,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.59.0
         version: 5.100.1(react@18.3.1)
+      '@types/bn.js':
+        specifier: ^5.2.0
+        version: 5.2.0
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.17
@@ -207,10 +210,6 @@ importers:
       zustand:
         specifier: ^4.5.4
         version: 4.5.7(@types/react@19.2.14)(react@18.3.1)
-    devDependencies:
-      '@types/bn.js':
-        specifier: ^5.2.0
-        version: 5.2.0
 
   packages/core:
     dependencies:
