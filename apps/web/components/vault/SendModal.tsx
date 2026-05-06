@@ -33,7 +33,6 @@ import {
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
 import { encryptMemo, serializeEncryptedMemo } from "@cloak-squads/core/memo-crypto";
-import { PrivacyMeter } from "@/components/vault/PrivacyMeter";
 import nacl from "tweetnacl";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import {
