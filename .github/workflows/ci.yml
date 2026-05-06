@@ -46,10 +46,11 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Set up Rust 1.86
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: '1.86.0'
+      - name: Set up stable Rust
+        run: |
+          rustup update stable
+          rustup default stable
+          rustup component add rustfmt clippy
 
       - name: Cache Rust/Cargo
         uses: Swatinem/rust-cache@v2
@@ -58,7 +59,7 @@ jobs:
 
       - name: Install Solana CLI (Anza)
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v2.3.13/install)"
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
 
       - name: Verify cargo-build-sbf is available
         run: |
