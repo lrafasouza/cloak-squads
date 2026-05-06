@@ -32,7 +32,7 @@ const features: FeatureRow[] = [
     label: "Treasury Approvals",
     icon: ShieldCheck,
     squads: "Multisig proposals & threshold voting",
-    aegis: "Same Squads flow — unchanged",
+    aegis: "Squads approval flow, built in",
     highlight: false,
   },
   {
@@ -284,7 +284,7 @@ function BottomLine() {
         <p className="text-sm text-ink-muted leading-relaxed">
           Aegis is built on top of Squads Protocol v4. We wrap your treasury with private execution,
           payroll workflows, invoicing, and scoped audit, all while keeping
-          your existing Squads approval layer intact.
+          the same Squads approval layer that secures your vault.
         </p>
       </div>
     </ScrollReveal>
@@ -304,7 +304,7 @@ export function ComparisonSection() {
               Built on Squads. Extended for privacy.
             </h2>
             <p className="mt-4 text-ink-muted leading-relaxed">
-              Squads is the approval layer you already trust. Aegis adds
+              Squads Protocol is the approval layer Aegis is built on. Aegis adds
               privacy, payroll, invoicing, and scoped audit on top.
             </p>
           </div>
