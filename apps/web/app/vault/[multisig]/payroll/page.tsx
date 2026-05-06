@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TokenLogo } from "@/components/ui/token-logo";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import {
   InlineAlert,
@@ -17,7 +18,7 @@ import { RecipientInput } from "@/components/vault/RecipientInput";
 import { ensureCircuitsProxy } from "@/lib/cloak-circuits-proxy";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
-import { SOL_TOKEN, useVaultTokens } from "@/lib/hooks/useVaultTokens";
+import { useVaultTokens } from "@/lib/hooks/useVaultTokens";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import {
   type PayrollRecipientInput,
@@ -51,11 +52,10 @@ import * as multisigSdk from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
-  Check,
   CheckCircle2,
-  ChevronDown,
   Download,
   FileText,
+  HelpCircle,
   List,
   PlayCircle,
   Trash2,
@@ -72,7 +72,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 
@@ -155,89 +154,6 @@ type RecipientNote = {
   invoiceId?: string;
 };
 
-// ── Token Dropdown ─────────────────────────────────────────────────────────
-
-interface TokenDropdownProps {
-  tokens: ReturnType<typeof useVaultTokens>["data"];
-  selectedMint: string;
-  onSelect: (mint: string) => void;
-  disabled?: boolean;
-  loading?: boolean;
-}
-
-function TokenDropdown({
-  tokens = [],
-  selectedMint,
-  onSelect,
-  disabled,
-  loading,
-}: TokenDropdownProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const selected = tokens.find((t) => t.mint === selectedMint) ?? tokens[0];
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => !disabled && !loading && setOpen((v) => !v)}
-        disabled={disabled || loading}
-        className="flex h-11 min-w-[110px] items-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-ink transition-colors hover:border-border-strong hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        {loading ? (
-          <span className="h-5 w-5 animate-pulse rounded-full bg-surface-2" />
-        ) : selected ? (
-          <TokenLogo symbol={selected.symbol as "SOL" | "USDC"} size={20} />
-        ) : null}
-        <span>{loading ? "—" : (selected?.symbol ?? "SOL")}</span>
-        <ChevronDown
-          className={`ml-auto h-3.5 w-3.5 text-ink-muted transition-transform ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1.5 min-w-[200px] overflow-hidden rounded-xl border border-border bg-surface shadow-lg ring-1 ring-black/5">
-          {loading ? (
-            <div className="px-4 py-3 text-xs text-ink-muted">Loading tokens…</div>
-          ) : tokens.length === 0 ? (
-            <div className="px-4 py-3 text-xs text-ink-muted">No tokens found</div>
-          ) : (
-            tokens.map((t) => {
-              const active = t.mint === selectedMint;
-              return (
-                <button
-                  key={t.mint}
-                  type="button"
-                  onClick={() => {
-                    onSelect(t.mint);
-                    setOpen(false);
-                  }}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-surface-2 ${active ? "text-accent" : "text-ink"}`}
-                >
-                  <TokenLogo symbol={t.symbol as "SOL" | "USDC"} size={18} />
-                  <span className="flex-1 text-left font-medium">{t.symbol}</span>
-                  <span className="font-mono text-xs text-ink-muted">{t.uiBalance}</span>
-                  {active && <Check className="h-3.5 w-3.5 shrink-0 text-accent" />}
-                </button>
-              );
-            })
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function PayrollPage({ params }: { params: Promise<{ multisig: string }> }) {
   const { multisig } = use(params);
   const router = useRouter();
@@ -263,7 +179,10 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     transactionIndex: string;
     claimLinks: PayrollClaimLink[];
   } | null>(null);
-  const [selectedMint, setSelectedMint] = useState<string>(SOL_TOKEN.mint);
+  // Payroll private sends are SOL-only on devnet; the Cloak shielded pool is
+  // not initialized for SPL mints, so we lock the asset at the UI to avoid
+  // creating proposals the operator cannot deliver.
+  const selectedMint = SOL_MINT;
   // Payroll always routes through Primary (vault index 0). The Aegis gatekeeper
   // hardcodes vault[0] as the required Squads CPI signer for license issuance,
   // so a payroll proposal whose source is a sub-vault would fail on-chain
@@ -286,7 +205,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   /* ── CSV paste toggle ── */
   const [showCsvTextarea, setShowCsvTextarea] = useState(false);
 
-  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig, 0);
+  const { data: tokens = [] } = useVaultTokens(multisig, 0);
 
   const selectedToken = useMemo(
     () => tokens.find((t) => t.mint === selectedMint) ?? tokens[0],
@@ -1008,19 +927,10 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                       <Label htmlFor="payroll-amount">Amount ({tokenLabel})</Label>
                     </div>
                     <div className="mt-1.5 flex gap-2">
-                      <TokenDropdown
-                        tokens={tokens}
-                        selectedMint={selectedMint}
-                        onSelect={(mint) => {
-                          setSelectedMint(mint);
-                          setRecipients([]);
-                          setParsedNotes([]);
-                          setCsvText("");
-                          setDryRunStatus("idle");
-                        }}
-                        disabled={pending || recipients.length > 0}
-                        loading={tokensLoading}
-                      />
+                      <div className="flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink">
+                        <TokenLogo symbol="SOL" size={16} />
+                        SOL
+                      </div>
                       <Input
                         id="payroll-amount"
                         type="number"
@@ -1202,9 +1112,9 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         {/* ── REVIEW TAB ── */}
         {activeTab === "review" && (
           <Panel>
-            <PanelHeader icon={FileText} title="Review & build" />
+            <PanelHeader icon={FileText} title="Review & confirm" />
             <PanelBody>
-              <form onSubmit={submitPayroll} className="space-y-5">
+              <form onSubmit={submitPayroll} className="space-y-7">
                 {recipients.length === 0 && (
                   <div className="py-12 text-center">
                     <p className="text-sm text-ink-muted">
@@ -1214,187 +1124,261 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                 )}
 
                 {dryRunStatus === "running" && (
-                  <div className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-ink-muted">
-                    Preparing review…
-                  </div>
+                  <InlineAlert tone="info">Building private commitments…</InlineAlert>
                 )}
-
                 {dryRunStatus === "ready" && parsedNotes.length > 0 && (
-                  <div className="rounded-md border border-signal-positive/20 bg-signal-positive/10 px-3 py-2 text-sm text-signal-positive">
-                    Review ready — all notes built.
-                  </div>
+                  <InlineAlert tone="success">
+                    All {parsedNotes.length} private note{parsedNotes.length === 1 ? "" : "s"}{" "}
+                    ready.
+                  </InlineAlert>
                 )}
 
                 {recipients.length > 0 && (
                   <>
-                    {/* Stats */}
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-md border border-border bg-bg px-3 py-2">
-                        <p className="text-xs text-ink-subtle">Recipients</p>
-                        <p className="mt-1 font-mono text-lg font-semibold text-ink">
-                          {recipients.length}/10
+                    {/* Inline summary — values, no cards */}
+                    <div className="grid grid-cols-3 gap-x-6 gap-y-3 sm:gap-x-10">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                          Total payout
+                        </p>
+                        <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
+                          {displayAmount(totalAmount.toString(), decimals, isSol)}
+                          <span className="ml-1.5 text-sm font-normal text-ink-muted">
+                            {tokenLabel}
+                          </span>
                         </p>
                       </div>
-                      <div className="rounded-md border border-border bg-bg px-3 py-2">
-                        <p className="text-xs text-ink-subtle">Total</p>
-                        <p className="mt-1 font-mono text-lg font-semibold text-ink">
-                          {displayAmount(totalAmount.toString(), decimals, isSol)} {tokenLabel}
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                          Recipients
                         </p>
-                      </div>
-                      <div className="rounded-md border border-border bg-bg px-3 py-2">
-                        <p className="text-xs text-ink-subtle">Commitments</p>
-                        <p className="mt-1 font-mono text-lg font-semibold text-ink">
+                        <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
                           {recipients.length}
+                          <span className="text-sm font-normal text-ink-muted">/10</span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                          Private notes
+                        </p>
+                        <p
+                          className={`mt-1 font-mono text-2xl font-semibold tabular-nums ${
+                            parsedNotes.length === recipients.length && parsedNotes.length > 0
+                              ? "text-signal-positive"
+                              : "text-ink-muted"
+                          }`}
+                        >
+                          {parsedNotes.length}
+                          <span className="text-sm font-normal text-ink-muted">
+                            /{recipients.length}
+                          </span>
                         </p>
                       </div>
                     </div>
 
                     {/* Delivery mode */}
-                    <fieldset className="grid gap-2">
-                      <legend className="text-sm font-medium text-ink">Delivery mode</legend>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <button
-                          type="button"
-                          onClick={() => setMode("direct")}
-                          aria-pressed={mode === "direct"}
-                          className={`min-h-16 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                            mode === "direct"
-                              ? "border-accent/25 bg-accent-soft text-accent"
-                              : "border-border-strong bg-bg text-ink-muted hover:border-border-strong"
-                          }`}
-                        >
-                          <span className="font-semibold">Direct send</span>
-                          <span className="mt-0.5 block text-xs opacity-80">
-                            Funds arrive automatically. No claim needed.
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setMode("invoice")}
-                          aria-pressed={mode === "invoice"}
-                          className={`min-h-16 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                            mode === "invoice"
-                              ? "border-accent/25 bg-accent-soft text-accent"
-                              : "border-border-strong bg-bg text-ink-muted hover:border-border-strong"
-                          }`}
-                        >
-                          <span className="font-semibold">Invoice / Claim</span>
-                          <span className="mt-0.5 block text-xs opacity-80">
-                            Create one claim link per recipient.
-                          </span>
-                        </button>
+                    <fieldset>
+                      <legend className="text-sm font-semibold text-ink">Delivery mode</legend>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        {(["direct", "invoice"] as const).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setMode(m)}
+                            aria-pressed={mode === m}
+                            className={`relative flex flex-col gap-1 rounded-lg border px-4 py-3.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                              mode === m
+                                ? "border-accent/30 bg-accent-soft"
+                                : "border-border bg-bg hover:border-border-strong"
+                            }`}
+                          >
+                            <span
+                              className={`font-semibold ${mode === m ? "text-accent" : "text-ink"}`}
+                            >
+                              {m === "direct" ? "Direct send" : "Invoice / Claim"}
+                            </span>
+                            <span
+                              className={`text-xs leading-relaxed ${
+                                mode === m ? "text-accent/80" : "text-ink-muted"
+                              }`}
+                            >
+                              {m === "direct"
+                                ? "Funds arrive automatically after approval."
+                                : "Each recipient gets a private claim link."}
+                            </span>
+                            {mode === m && (
+                              <span className="absolute right-3 top-3 flex h-4 w-4 items-center justify-center rounded-full bg-accent">
+                                <CheckCircle2 className="h-2.5 w-2.5 text-accent-ink" />
+                              </span>
+                            )}
+                          </button>
+                        ))}
                       </div>
                     </fieldset>
 
                     {/* Recipients table */}
-                    <div className="overflow-x-auto rounded-md border border-border">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-border bg-bg text-left">
-                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                              Row
-                            </th>
-                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                              Recipient
-                            </th>
-                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                              Wallet
-                            </th>
-                            <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                              Amount
-                            </th>
-                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                              Status
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/70">
-                          {dryRunRows.map((row) => (
-                            <tr key={`${row.wallet}-${row.index}`}>
-                              <td className="px-3 py-2 font-mono text-xs text-ink-subtle">
-                                {row.index + 1}
-                              </td>
-                              <td className="px-3 py-2 font-medium text-ink">{row.name}</td>
-                              <td className="px-3 py-2 font-mono text-xs text-ink-muted">
-                                {row.wallet.slice(0, 8)}...{row.wallet.slice(-8)}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono text-ink">
-                                {displayAmount(row.amount, decimals, isSol)} {tokenLabel}
-                              </td>
-                              <td className="px-3 py-2">
-                                <span
-                                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
-                                    row.duplicate
-                                      ? "bg-signal-warn/10 text-signal-warn"
-                                      : "bg-accent-soft text-accent"
-                                  }`}
-                                >
-                                  {row.duplicate ? "Duplicate wallet" : "Ready"}
-                                </span>
-                              </td>
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-ink">Recipients</p>
+                      <div className="overflow-hidden rounded-lg border border-border">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border bg-surface-2/40 text-left">
+                              <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                                #
+                              </th>
+                              <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                                Recipient
+                              </th>
+                              <th className="hidden px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle sm:table-cell">
+                                Wallet
+                              </th>
+                              <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                                Amount
+                              </th>
+                              <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                                Note
+                              </th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-border/60">
+                            {dryRunRows.map((row) => (
+                              <tr
+                                key={`${row.wallet}-${row.index}`}
+                                className="transition-colors hover:bg-surface-2/30"
+                              >
+                                <td className="px-4 py-3 font-mono text-xs text-ink-subtle">
+                                  {row.index + 1}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className="font-medium text-ink">{row.name}</span>
+                                  {row.duplicate && (
+                                    <span className="ml-1.5 rounded-full bg-signal-warn/10 px-1.5 py-0.5 text-[9px] font-bold text-signal-warn">
+                                      Duplicate
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="hidden px-4 py-3 font-mono text-xs text-ink-muted sm:table-cell">
+                                  {row.wallet.slice(0, 6)}…{row.wallet.slice(-6)}
+                                </td>
+                                <td className="px-4 py-3 text-right font-mono text-sm font-medium tabular-nums text-ink">
+                                  {displayAmount(row.amount, decimals, isSol)}
+                                  <span className="ml-1 text-xs font-normal text-ink-muted">
+                                    {tokenLabel}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  {parsedNotes[row.index] ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-signal-positive">
+                                      <span className="h-1 w-1 rounded-full bg-signal-positive" />
+                                      Built
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-semibold text-ink-subtle">
+                                      Pending
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("recipients")}
-                        disabled={pending}
-                        className="inline-flex min-h-9 items-center rounded-md border border-border-strong px-3 py-1.5 text-sm font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-50"
-                      >
-                        <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-                        Back
-                      </button>
+                    {/* Build step — clean row, (?) reveals explanation on hover */}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-ink">
+                          {parsedNotes.length === recipients.length && parsedNotes.length > 0
+                            ? `${parsedNotes.length} private commitment${parsedNotes.length !== 1 ? "s" : ""} ready`
+                            : "Run build notes before submitting"}
+                        </p>
+                        <TooltipProvider delayDuration={150}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                aria-label='Why "Build notes"?'
+                                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                              >
+                                <HelpCircle className="h-3.5 w-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs">
+                              <p className="font-semibold text-ink">
+                                Why "Build notes"?
+                              </p>
+                              <p className="mt-1 leading-relaxed text-ink-muted">
+                                Each recipient needs a unique zero-knowledge commitment generated
+                                locally in your browser. This is what hides amounts and recipient
+                                identities on-chain — nothing leaves your browser until you
+                                submit. Generation takes ~1s per recipient.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                       <button
                         type="button"
                         onClick={() => void buildNotes()}
                         disabled={pending || duplicateWallets.size > 0 || zkWarmup === "warming"}
-                        className="inline-flex min-h-9 items-center gap-2 rounded-md bg-surface-2 px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50"
                         title={
                           zkWarmup === "warming"
                             ? "Initializing ZK engine, please wait…"
                             : undefined
                         }
+                        className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-border-strong bg-bg px-3.5 py-2 text-xs font-semibold text-ink transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <PlayCircle className="h-4 w-4" />
+                        <PlayCircle className="h-3.5 w-3.5 shrink-0" />
                         {zkWarmup === "warming"
-                          ? "Initializing ZK engine…"
+                          ? "Initializing…"
                           : pending
-                            ? "Preparing notes..."
-                            : `Build ${recipients.length} private note${recipients.length !== 1 ? "s" : ""}`}
+                            ? "Building…"
+                            : parsedNotes.length === recipients.length && parsedNotes.length > 0
+                              ? "Rebuild notes"
+                              : `Run build notes (${recipients.length})`}
                       </button>
                     </div>
 
-                    <label className="flex items-start gap-2 text-sm text-ink-muted">
-                      <input
-                        type="checkbox"
-                        checked={confirmChecked}
-                        onChange={(e) => setConfirmChecked(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded border-border accent-accent"
-                      />
-                      I confirm the recipient list and amounts are correct before creating this
-                      payroll.
-                    </label>
-
-                    {!pending && (
-                      <div className="flex gap-3">
-                        <Button
-                          type="submit"
-                          disabled={!confirmChecked || parsedNotes.length === 0}
-                        >
-                          Create payroll proposal
-                        </Button>
-                      </div>
-                    )}
+                    {/* Confirm + submit — bottom action bar */}
+                    <div className="flex flex-col gap-4 border-t border-border pt-5">
+                      <label className="flex cursor-pointer items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={confirmChecked}
+                          onChange={(e) => setConfirmChecked(e.target.checked)}
+                          className="mt-0.5 h-4 w-4 rounded border-border accent-accent"
+                          disabled={parsedNotes.length === 0}
+                        />
+                        <span className="text-sm text-ink-muted">
+                          I confirm the recipient list and amounts are correct before creating this
+                          payroll.
+                        </span>
+                      </label>
+                      {!pending && (
+                        <div className="flex items-center gap-3">
+                          <Button
+                            type="submit"
+                            disabled={!confirmChecked || parsedNotes.length === 0}
+                          >
+                            Create payroll proposal
+                          </Button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("recipients")}
+                            className="inline-flex items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink"
+                          >
+                            <ArrowLeft className="h-3.5 w-3.5" />
+                            Back
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
 
                 {error && (
-                  <pre className="whitespace-pre-wrap rounded-md border border-signal-danger/30 bg-signal-danger/15 p-3 text-xs text-signal-danger">
+                  <pre className="whitespace-pre-wrap rounded-lg border border-signal-danger/30 bg-signal-danger/10 p-4 text-xs text-signal-danger">
                     {error}
                   </pre>
                 )}

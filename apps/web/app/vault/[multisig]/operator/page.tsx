@@ -2295,8 +2295,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 privacy-shielded pool. The Cloak protocol requires a wallet with a private key to
                 sign deposits. Because the vault PDA has no private key, the{" "}
                 <span className="font-medium text-ink">operator's wallet</span> deposits into Cloak
-                on behalf of the vault. This also severs the on-chain link between the vault and the
-                payment.
+                on behalf of the vault. The Cloak shielded pool then breaks the on-chain link
+                between the deposit and the eventual withdrawal.
               </p>
             </div>
 
@@ -2316,7 +2316,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 Every private proposal (send, invoice, payroll) now includes an automatic{" "}
                 <span className="font-medium text-ink">vault → operator transfer</span> alongside
                 the license instruction. When the team approves and executes the proposal, the
-                operator receives the SOL needed for the Cloak deposit. No manual top-up required.
+                operator receives the funds (SOL or SPL) needed for the Cloak deposit. No manual
+                top-up required.
               </p>
             </div>
 

@@ -7,6 +7,76 @@ This log is the single source of truth for what was actually verified vs what is
 
 ---
 
+## 🛑 BUG-6 — Private ops from sub-vault are architecturally impossible (2026-05-06 ~22:00)
+
+**Reported by user:** payroll proposal #23 (Jetsul → recipients) was created and approved, but `VaultTransactionExecute` fails with:
+
+```
+Program SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf invoke [1]
+Program log: Instruction: VaultTransactionExecute
+Program log: AnchorError thrown in programs/squads_multisig_program/src/utils/executable_transaction_message.rs:91.
+              Error Code: InvalidAccount. Error Number: 6014.
+              Error Message: Invalid account provided.
+custom program error: 0x177e
+```
+
+### Root cause — two constraints that compound
+
+1. **Aegis gatekeeper hardcodes vault index 0 as the required CPI signer.**
+   `programs/cloak-gatekeeper/src/instructions/issue_license.rs:14`:
+   ```rust
+   verify_squads_vault_signer(&ctx.accounts.cofre.multisig, 0, &ctx.accounts.squads_vault)?;
+   ```
+   So *any* `issue_license` CPI must be signed by the **Primary** vault PDA, regardless of which vault originated the spend. (Same hardcoded `0` in `init_cofre`, `set_operator`, `revoke_audit`, `add_signer_view`, `remove_signer_view`, `emergency_close_license`, `init_view_distribution`.)
+
+2. **Squads on-chain validates that signers in the inner message must be the source vault or an ephemeral signer.**
+   `executable_transaction_message.rs:91` rejects with `InvalidAccount` (6014 / 0x177e) any account marked `is_signer = true` in the stored inner message that isn't either:
+   - the vault PDA derived from `multisig + transaction.vault_index`, OR
+   - one of the transaction's ephemeral signer PDAs.
+
+   When a proposal is created with `vaultIndex = 1` (Jetsul) but its inner message includes an `issue_license` ix that marks Primary (index 0) as signer — Squads rejects it before the gatekeeper even runs.
+
+### Why it didn't surface in proposal #20
+
+Proposal #20 was a plain `SystemProgram::transfer` Primary → Jetsul. No gatekeeper CPI in the inner message → no foreign vault signer → no constraint conflict. **Public** sub-vault sends work; **private** ones cannot.
+
+### Affected flows
+
+| Flow | Uses gatekeeper? | Status from sub-vault |
+|---|---|---|
+| Send Public (external or vault-to-vault) | No | ✅ Works |
+| Swap (Raydium) | No | ✅ Works |
+| Receive (read-only PDA) | No | ✅ Works |
+| Send Private | Yes (`issue_license`) | 🛑 Fails on execute |
+| Payroll (any mode — direct or invoice) | Yes (every recipient gets a license) | 🛑 Fails on execute |
+| Invoice (stealth) | Yes (`issue_license`) | 🛑 Fails on execute |
+
+### Workaround applied — front-end lock (commit `5aee013`)
+
+- `SendModal`: `mode === "private"` → `useEffect` snaps `selectedVaultIndex` to 0; non-Primary buttons in the source picker render `disabled` with tooltip; hard guard at submit returns a clear error.
+- `Payroll`: source picker removed entirely; `vaultIndex` hardcoded to 0; banner surfaces the constraint when sub-vaults exist.
+- `Invoice`: same pattern as Payroll — picker removed, `vaultIndex = 0`, inline note.
+
+Public/Swap/Receive remain free to use any sub-vault. Sub-vaults are still useful as named accounts for separating funds with public flows.
+
+### Permanent fix — parametrize the gatekeeper (deferred)
+
+To unblock private operations from sub-vaults, change the gatekeeper to accept any vault index of the multisig:
+
+1. Add `vault_index: u8` as an instruction-data argument to the 8 affected handlers (`utils.rs::verify_squads_vault_signer` already accepts it; the handlers just pass `0`).
+2. Update `apps/web/lib/gatekeeper-instructions.ts::buildIssueLicenseIxBrowser` — function already takes `vaultIndex`; just needs to encode it in the instruction data buffer.
+3. Update `packages/core/src/gatekeeper-client.ts::buildIssueLicenseIx` — pass `vaultIndex` via `program.methods.issueLicense(...)`.
+4. Thread `vaultIndex` through callers in `payroll/`, `send/`, `invoice/`, and integration tests + scripts.
+5. Bump program, `anchor build`, `solana program deploy` (preserve program ID `AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq` — same upgrade authority).
+
+Estimated: ~4h dev + 30min deploy. Not started — UI lock is sufficient for now.
+
+### Stuck proposal #23
+
+Left in `Approved` state on multisig `5hrqq...HpG2`. Cannot execute. Will be cancelled/refunded manually — no action item for code.
+
+---
+
 ## ✅ END-TO-END VALIDATED (2026-05-06 ~18:30)
 
 **Vault-to-vault Public transfer worked.** Proposal #20: 0.2 SOL Primary → Jetsul.

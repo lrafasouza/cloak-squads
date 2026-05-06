@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/workspace";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
-import { SOL_TOKEN, useVaultTokens } from "@/lib/hooks/useVaultTokens";
+import { useVaultTokens } from "@/lib/hooks/useVaultTokens";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import { lamportsToSol } from "@/lib/sol";
 import { createVaultProposal } from "@/lib/squads-sdk";
@@ -46,11 +46,11 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Check, CheckCircle2, ChevronDown, Copy, Link2 } from "lucide-react";
+import { BookOpen, CheckCircle2, Copy, Link2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
-import { type FormEvent, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, use, useCallback, useEffect, useMemo, useState } from "react";
 
 function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
@@ -64,89 +64,6 @@ function hexToBytes(hex: string) {
     bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   }
   return bytes;
-}
-
-// ── Token Dropdown ─────────────────────────────────────────────────────────
-
-interface TokenDropdownProps {
-  tokens: ReturnType<typeof useVaultTokens>["data"];
-  selectedMint: string;
-  onSelect: (mint: string) => void;
-  disabled?: boolean;
-  loading?: boolean;
-}
-
-function TokenDropdown({
-  tokens = [],
-  selectedMint,
-  onSelect,
-  disabled,
-  loading,
-}: TokenDropdownProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const selected = tokens.find((t) => t.mint === selectedMint) ?? tokens[0];
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => !disabled && !loading && setOpen((v) => !v)}
-        disabled={disabled || loading}
-        className="flex h-11 min-w-[110px] items-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-ink transition-colors hover:border-border-strong hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        {loading ? (
-          <span className="h-5 w-5 animate-pulse rounded-full bg-surface-2" />
-        ) : selected ? (
-          <TokenLogo symbol={selected.symbol as "SOL" | "USDC"} size={20} />
-        ) : null}
-        <span>{loading ? "—" : (selected?.symbol ?? "SOL")}</span>
-        <ChevronDown
-          className={`ml-auto h-3.5 w-3.5 text-ink-muted transition-transform ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1.5 min-w-[200px] overflow-hidden rounded-xl border border-border bg-surface shadow-lg ring-1 ring-black/5">
-          {loading ? (
-            <div className="px-4 py-3 text-xs text-ink-muted">Loading tokens…</div>
-          ) : tokens.length === 0 ? (
-            <div className="px-4 py-3 text-xs text-ink-muted">No tokens found</div>
-          ) : (
-            tokens.map((t) => {
-              const active = t.mint === selectedMint;
-              return (
-                <button
-                  key={t.mint}
-                  type="button"
-                  onClick={() => {
-                    onSelect(t.mint);
-                    setOpen(false);
-                  }}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-surface-2 ${active ? "text-accent" : "text-ink"}`}
-                >
-                  <TokenLogo symbol={t.symbol as "SOL" | "USDC"} size={18} />
-                  <span className="flex-1 text-left font-medium">{t.symbol}</span>
-                  <span className="font-mono text-xs text-ink-muted">{t.uiBalance}</span>
-                  {active && <Check className="h-3.5 w-3.5 shrink-0 text-accent" />}
-                </button>
-              );
-            })
-          )}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default function InvoicePage({ params }: { params: Promise<{ multisig: string }> }) {
@@ -170,7 +87,10 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [claimQrDataUrl, setClaimQrDataUrl] = useState<string | null>(null);
-  const [selectedMint, setSelectedMint] = useState<string>(SOL_TOKEN.mint);
+  // Stealth invoices are SOL-only on devnet; the Cloak shielded pool is not
+  // initialized for SPL mints, so we lock the asset at the UI to avoid
+  // creating proposals the operator cannot deliver.
+  const selectedMint = SOL_MINT;
   // Stealth invoices always issue a gatekeeper license, which hardcodes vault[0]
   // as the required CPI signer. Source is locked to Primary; we only track
   // whether sub-vaults exist so we can surface the constraint in the UI.
@@ -187,7 +107,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       .catch(() => {});
   }, [multisig]);
 
-  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig, 0);
+  const { data: tokens = [] } = useVaultTokens(multisig, 0);
 
   const selectedToken = useMemo(
     () => tokens.find((t) => t.mint === selectedMint) ?? tokens[0],
@@ -204,11 +124,6 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   const handleMaxAmount = useCallback(() => {
     if (selectedToken) setAmount(selectedToken.uiBalance);
   }, [selectedToken]);
-
-  const handleTokenSelect = useCallback((mint: string) => {
-    setSelectedMint(mint);
-    setAmount("");
-  }, []);
 
   const multisigAddress = useMemo(() => {
     try {
@@ -650,13 +565,10 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                     </button>
                   </div>
                   <div className="mt-1.5 flex gap-2">
-                    <TokenDropdown
-                      tokens={tokens}
-                      selectedMint={selectedMint}
-                      onSelect={handleTokenSelect}
-                      disabled={pending}
-                      loading={tokensLoading}
-                    />
+                    <div className="flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink">
+                      <TokenLogo symbol="SOL" size={16} />
+                      SOL
+                    </div>
                     <Input
                       id="amount"
                       type="number"

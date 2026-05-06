@@ -1,6 +1,5 @@
 "use client";
 
-import { ProofGenerationState } from "@/components/proof/ProofGenerationState";
 import { Button } from "@/components/ui/button";
 import type { ProofStepId } from "@/lib/cloak-progress";
 import { publicEnv } from "@/lib/env";
@@ -325,29 +324,6 @@ function TransactionModal({
             </div>
           ) : null}
 
-          {transaction.proofStep && transaction.status === "running" ? (
-            <div className="mb-4">
-              <ProofGenerationState
-                currentStep={transaction.proofStep ?? null}
-                {...(transaction.proofProgress !== undefined
-                  ? { proofProgress: transaction.proofProgress }
-                  : {})}
-              />
-            </div>
-          ) : typeof transaction.proofProgress === "number" && transaction.status === "running" ? (
-            <div className="mb-4 rounded-lg border border-border bg-bg px-3 py-3">
-              <div className="flex items-center justify-between text-xs text-ink-muted">
-                <span>Zero-knowledge proof</span>
-                <span className="font-mono tabular-nums">{transaction.proofProgress}%</span>
-              </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
-                <div
-                  className="h-full rounded-full bg-accent transition-[width] duration-300"
-                  style={{ width: `${transaction.proofProgress}%` }}
-                />
-              </div>
-            </div>
-          ) : null}
 
           <ol className="grid gap-3">
             {transaction.steps.map((step) => (
