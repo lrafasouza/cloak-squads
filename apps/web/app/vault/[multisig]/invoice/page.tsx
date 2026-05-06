@@ -171,8 +171,10 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [claimQrDataUrl, setClaimQrDataUrl] = useState<string | null>(null);
   const [selectedMint, setSelectedMint] = useState<string>(SOL_TOKEN.mint);
-  const [selectedVaultIndex, setSelectedVaultIndex] = useState(0);
-  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
+  // Stealth invoices always issue a gatekeeper license, which hardcodes vault[0]
+  // as the required CPI signer. Source is locked to Primary; we only track
+  // whether sub-vaults exist so we can surface the constraint in the UI.
+  const [hasSubVaults, setHasSubVaults] = useState(false);
   const [result, setResult] = useState<{
     claimUrl: string;
     transactionIndex: string;
@@ -181,16 +183,11 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   useEffect(() => {
     fetch(`/api/vaults/${multisig}/sub-vaults`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: Array<{ vaultIndex: number; name: string }>) => setSubVaultAccounts(data))
+      .then((data: Array<unknown>) => setHasSubVaults(data.length > 0))
       .catch(() => {});
   }, [multisig]);
 
-  const allAccounts = useMemo(
-    () => [{ vaultIndex: 0, name: "Primary" }, ...subVaultAccounts],
-    [subVaultAccounts],
-  );
-
-  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig, selectedVaultIndex);
+  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig, 0);
 
   const selectedToken = useMemo(
     () => tokens.find((t) => t.mint === selectedMint) ?? tokens[0],
@@ -278,7 +275,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       const tokenUnits = isSol ? solAmountToLamports(amount) : tokenAmountToUnits(amount, decimals);
       const recipientPubkey = new PublicKey(recipientWallet.trim());
 
-      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: selectedVaultIndex });
+      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
 
       // Balance check
       if (isSol) {
@@ -360,7 +357,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
           memo: memo.trim() || undefined,
           amount: tokenUnits.toString(),
           recipientWallet: recipientPubkey.toBase58(),
-          vaultIndex: selectedVaultIndex,
+          vaultIndex: 0,
         }),
       });
       if (!stealthRes.ok) {
@@ -412,7 +409,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         memo: memo.trim()
           ? `stealth invoice: ${memo.trim()}`
           : `stealth invoice ${stealthData.id.slice(0, 8)}`,
-        vaultIndex: selectedVaultIndex,
+        vaultIndex: 0,
       });
       updateStep("proposal", {
         status: "success",
@@ -454,7 +451,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
           },
           commitmentClaim: claim,
           signature: proposalResult.signature,
-          vaultIndex: selectedVaultIndex,
+          vaultIndex: 0,
         }),
       });
       if (!draftRes.ok) {
@@ -603,27 +600,12 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
             />
             <PanelBody>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* From account — only when sub-vaults exist */}
-                {subVaultAccounts.length > 0 && (
-                  <div>
-                    <Label>Pay from</Label>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {allAccounts.map((acct) => (
-                        <button
-                          key={acct.vaultIndex}
-                          type="button"
-                          disabled={pending}
-                          onClick={() => setSelectedVaultIndex(acct.vaultIndex)}
-                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
-                            selectedVaultIndex === acct.vaultIndex
-                              ? "border-accent/40 bg-accent/10 text-accent"
-                              : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
-                          }`}
-                        >
-                          {acct.name}
-                        </button>
-                      ))}
-                    </div>
+                {/* Stealth invoices route through Primary — surface the constraint
+                    when sub-vaults exist so the user knows their picker doesn't apply. */}
+                {hasSubVaults && (
+                  <div className="rounded-lg border border-border bg-surface px-3 py-2 text-[11px] text-ink-muted">
+                    Invoices are paid from <span className="font-medium text-ink">Primary</span>.
+                    Private operations require Primary as the source.
                   </div>
                 )}
 
