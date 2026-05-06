@@ -398,7 +398,23 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const [pendingDrafts, setPendingDrafts] = useState<DraftSummary[]>([]);
   const [draftOnChainStatus, setDraftOnChainStatus] = useState<ProposalStatus>("loading");
   const [licenseStatus, setLicenseStatus] = useState<OperatorLicenseStatus>("idle");
+  const [executedMap, setExecutedMap] = useState<Record<string, boolean>>({});
   const { data: proposals = [] } = useProposalSummaries(multisig);
+
+  useEffect(() => {
+    if (!multisig) return;
+    const readMap = () => {
+      try {
+        const raw = localStorage.getItem(`aegis:operator-executed-map:${multisig}`);
+        setExecutedMap(raw ? (JSON.parse(raw) as Record<string, boolean>) : {});
+      } catch {
+        setExecutedMap({});
+      }
+    };
+    readMap();
+    window.addEventListener("aegis:operator-executed", readMap);
+    return () => window.removeEventListener("aegis:operator-executed", readMap);
+  }, [multisig]);
 
   // Decrypt memo from commitmentClaim if present
   const decryptedMemo = useMemo(() => {
@@ -427,18 +443,6 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   }, [loadedDraft]);
 
   const queueDrafts = useMemo(() => {
-    const executedSet = new Set<string>();
-    try {
-      const key = `aegis:operator-executed-map:${multisig}`;
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        const map = JSON.parse(raw) as Record<string, boolean>;
-        for (const [idx, val] of Object.entries(map)) {
-          if (val) executedSet.add(idx);
-        }
-      }
-    } catch {}
-
     return pendingDrafts
       .map((d) => {
         const proposal = proposals.find((p) => p.transactionIndex === d.transactionIndex);
@@ -448,9 +452,11 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         (d) =>
           d.proposalStatus !== "rejected" &&
           d.proposalStatus !== "cancelled" &&
-          !executedSet.has(d.transactionIndex),
+          d.proposalStatus !== "executed" &&
+          d.proposalStatus !== "executing" &&
+          !executedMap[d.transactionIndex],
       );
-  }, [pendingDrafts, proposals, multisig]);
+  }, [pendingDrafts, proposals, executedMap]);
   const autoLoadFiredRef = useRef(false);
 
   const multisigAddress = useMemo(() => {
@@ -1110,6 +1116,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         });
         markProposalExecuted(multisig, txIndex);
         void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
+        void fetchPendingDrafts();
       } else if (payrollDraft) {
         // Chained execution
         await executePayroll();
@@ -1310,6 +1317,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       if (lastSig) setSignature(lastSig);
       markProposalExecuted(multisig, txIndex);
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
+      void fetchPendingDrafts();
     } else {
       failTransaction(
         lastError ?? `Executed ${completed}/${payrollDraft.recipientCount} recipients.`,
@@ -1400,6 +1408,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       if (lastSig) setSignature(lastSig);
       markProposalExecuted(multisig, txIndex);
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
+      void fetchPendingDrafts();
     }
   }
 
