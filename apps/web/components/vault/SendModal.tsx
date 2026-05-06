@@ -42,9 +42,10 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
-import { Send } from "lucide-react";
+import { buildSpendingLimitUseIx } from "@/lib/spending-limits";
+import { Send, Zap } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 function randomBytes(length: number) {
@@ -63,6 +64,32 @@ function hexToBytes(hex: string) {
 }
 
 type SendMode = "private" | "public";
+
+type SpendingLimitRow = {
+  id: string;
+  spendingLimit: string;
+  vaultIndex: number;
+  mint: string;
+  amountRaw: string;
+  period: string;
+  members: string[];
+  destinations: string[];
+};
+
+function lamportsToSolStr(raw: string) {
+  try { return (Number(BigInt(raw)) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 4 }); }
+  catch { return raw; }
+}
+
+function periodLabel(p: string) {
+  switch (p) {
+    case "Day": return "per day";
+    case "Week": return "per week";
+    case "Month": return "per month";
+    case "OneTime": return "one-time";
+    default: return p;
+  }
+}
 
 export function SendModal({
   multisig,
@@ -92,6 +119,8 @@ export function SendModal({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedMint, setSelectedMint] = useState<string>(SOL_TOKEN.mint);
+  const [spendingLimits, setSpendingLimits] = useState<SpendingLimitRow[]>([]);
+  const [useSpendingLimit, setUseSpendingLimit] = useState(false);
 
   const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig);
 
@@ -120,6 +149,32 @@ export function SendModal({
       if (defaultMode) setMode(defaultMode);
     }
   }, [open, defaultRecipient, defaultAmount, defaultMode]);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch(`/api/vaults/${multisig}/spending-limits`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setSpendingLimits)
+      .catch(() => {});
+  }, [open, multisig]);
+
+  const applicableLimit = useMemo<SpendingLimitRow | null>(() => {
+    if (!wallet.publicKey || mode !== "public" || !isSol) return null;
+    const memberStr = wallet.publicKey.toBase58();
+    return (
+      spendingLimits.find(
+        (l) =>
+          l.mint === SOL_MINT &&
+          l.members.includes(memberStr) &&
+          (l.destinations.length === 0 ||
+            (recipient.trim() !== "" && l.destinations.includes(recipient.trim()))),
+      ) ?? null
+    );
+  }, [spendingLimits, wallet.publicKey, mode, isSol, recipient]);
+
+  useEffect(() => {
+    if (!applicableLimit) setUseSpendingLimit(false);
+  }, [applicableLimit]);
 
   const multisigAddress = useMemo(() => {
     try {
@@ -192,15 +247,30 @@ export function SendModal({
 
     setPending(true);
 
-    const titlePrefix = mode === "public" ? "public" : "private";
+    const isLimitSend = mode === "public" && useSpendingLimit && !!applicableLimit;
     startTransaction({
-      title: `Creating ${titlePrefix} ${tokenLabel} send proposal`,
-      description:
-        mode === "public"
+      title: isLimitSend
+        ? `Sending ${amount} ${tokenLabel} via spending limit`
+        : `Creating ${mode === "public" ? "public" : "private"} ${tokenLabel} send proposal`,
+      description: isLimitSend
+        ? "Direct vault send — no proposal or approval needed."
+        : mode === "public"
           ? "Opening a standard Squads vault transfer proposal."
           : "Preparing your private transfer and opening a vault proposal.",
-      steps:
-        mode === "public"
+      steps: isLimitSend
+        ? [
+            {
+              id: "validate",
+              title: "Validate",
+              description: `Checking balance and spending limit.`,
+            },
+            {
+              id: "send",
+              title: "Send",
+              description: "Signing and sending directly from vault.",
+            },
+          ]
+        : mode === "public"
           ? [
               {
                 id: "validate",
@@ -258,6 +328,50 @@ export function SendModal({
             `Insufficient ${tokenLabel}. Need ${amount}, vault has ${selectedToken.uiBalance}.`,
           );
         }
+      }
+
+      if (mode === "public" && isLimitSend && applicableLimit) {
+        // Direct send via spending limit — no proposal, 1 wallet signature
+        updateStep("validate", { status: "success" });
+        updateStep("send", { status: "running" });
+
+        const [limitVaultPda] = multisigSdk.getVaultPda({
+          multisigPda: multisigAddress,
+          index: applicableLimit.vaultIndex,
+        });
+        const limitIx = buildSpendingLimitUseIx({
+          multisigPda: multisigAddress,
+          member: wallet.publicKey,
+          spendingLimitPda: new PublicKey(applicableLimit.spendingLimit),
+          vaultPda: limitVaultPda,
+          destination: recipientPubkey,
+          amount: tokenUnits,
+          decimals: 9,
+          ...(memo.trim() ? { memo: memo.trim() } : {}),
+        });
+
+        const lbh = await connection.getLatestBlockhash();
+        const limitTx = new Transaction().add(limitIx);
+        limitTx.feePayer = wallet.publicKey;
+        limitTx.recentBlockhash = lbh.blockhash;
+
+        const limitSig = await wallet.sendTransaction(limitTx, connection);
+        await connection.confirmTransaction(
+          { signature: limitSig, blockhash: lbh.blockhash, lastValidBlockHeight: lbh.lastValidBlockHeight },
+          "confirmed",
+        );
+
+        updateStep("send", {
+          status: "success",
+          signature: limitSig,
+          description: `${amount} ${tokenLabel} sent directly.`,
+        });
+        completeTransaction({
+          title: `${tokenLabel} sent`,
+          description: `${amount} ${tokenLabel} sent directly to ${recipientPubkey.toBase58().slice(0, 8)}… (no approval needed).`,
+        });
+        handleClose(false);
+        return;
       }
 
       if (mode === "public") {
@@ -542,6 +656,31 @@ export function SendModal({
             </p>
           )}
 
+          {applicableLimit && (
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3">
+              <Zap className="h-4 w-4 flex-shrink-0 text-accent" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-ink">
+                  Spending limit · {lamportsToSolStr(applicableLimit.amountRaw)} SOL{" "}
+                  {periodLabel(applicableLimit.period)}
+                </p>
+                <p className="text-[10px] text-ink-subtle">
+                  Skip approval — sends directly from vault.
+                </p>
+              </div>
+              <label className="flex cursor-pointer items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={useSpendingLimit}
+                  onChange={(e) => setUseSpendingLimit(e.target.checked)}
+                  disabled={pending}
+                  className="h-3.5 w-3.5 accent-accent"
+                />
+                <span className="text-xs text-ink-muted">Use</span>
+              </label>
+            </div>
+          )}
+
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="sm-recipient">Recipient address</Label>
             <Input
@@ -637,10 +776,12 @@ export function SendModal({
             >
               <Send className="h-4 w-4" />
               {pending
-                ? "Creating proposal…"
-                : mode === "private"
-                  ? `Send ${tokenLabel} privately`
-                  : `Send ${tokenLabel}`}
+                ? (useSpendingLimit && applicableLimit ? "Sending…" : "Creating proposal…")
+                : useSpendingLimit && applicableLimit
+                  ? `Send ${tokenLabel} now`
+                  : mode === "private"
+                    ? `Send ${tokenLabel} privately`
+                    : `Send ${tokenLabel}`}
             </Button>
           </DialogFooter>
         </form>
