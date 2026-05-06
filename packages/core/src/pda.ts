@@ -30,9 +30,13 @@ export function licensePda(cofre: PublicKey, payloadHash: Uint8Array, programId?
   );
 }
 
-export function squadsVaultPda(multisig: PublicKey, programId?: PublicKey): [PublicKey, number] {
+export function squadsVaultPda(
+  multisig: PublicKey,
+  programId?: PublicKey,
+  vaultIndex?: number,
+): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("multisig"), multisig.toBuffer(), Buffer.from("vault"), Buffer.from([0])],
+    [Buffer.from("multisig"), multisig.toBuffer(), Buffer.from("vault"), Buffer.from([vaultIndex ?? 0])],
     squadsProgramId(programId),
   );
 }

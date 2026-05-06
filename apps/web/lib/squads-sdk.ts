@@ -69,10 +69,11 @@ export async function createInitCofreProposal(params: {
   multisigPda: PublicKey;
   initCofreIx: TransactionInstruction;
   memo?: string;
+  vaultIndex?: number;
 }) {
   assertBrowserSquadsWallet(params.wallet);
   const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
-  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: 0 });
+  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: params.vaultIndex ?? 0 });
   const latestBlockhash = await params.connection.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: vaultPda,
@@ -85,7 +86,7 @@ export async function createInitCofreProposal(params: {
     transactionIndex,
     creator: params.wallet.publicKey,
     rentPayer: params.wallet.publicKey,
-    vaultIndex: 0,
+    vaultIndex: params.vaultIndex ?? 0,
     ephemeralSigners: 0,
     transactionMessage: message,
     memo: params.memo ?? "init cofre",
@@ -131,6 +132,7 @@ export async function createIssueLicenseProposal(params: {
   multisigPda: PublicKey;
   issueLicenseIx: TransactionInstruction;
   memo?: string;
+  vaultIndex?: number;
 }) {
   return createVaultProposal({
     ...params,
@@ -145,10 +147,11 @@ export async function createVaultProposal(params: {
   multisigPda: PublicKey;
   instructions: TransactionInstruction[];
   memo?: string;
+  vaultIndex?: number;
 }) {
   assertBrowserSquadsWallet(params.wallet);
   const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
-  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: 0 });
+  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: params.vaultIndex ?? 0 });
   const latestBlockhash = await params.connection.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: vaultPda,
@@ -161,7 +164,7 @@ export async function createVaultProposal(params: {
     transactionIndex,
     creator: params.wallet.publicKey,
     rentPayer: params.wallet.publicKey,
-    vaultIndex: 0,
+    vaultIndex: params.vaultIndex ?? 0,
     ephemeralSigners: 0,
     transactionMessage: message,
     memo: params.memo ?? "vault transaction",
@@ -262,10 +265,11 @@ export async function createBatchIssueLicenseProposal(params: {
   multisigPda: PublicKey;
   issueLicenseIxs: TransactionInstruction[];
   memo?: string;
+  vaultIndex?: number;
 }) {
   assertBrowserSquadsWallet(params.wallet);
   const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
-  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: 0 });
+  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: params.vaultIndex ?? 0 });
   const latestBlockhash = await params.connection.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: vaultPda,
@@ -278,7 +282,7 @@ export async function createBatchIssueLicenseProposal(params: {
     transactionIndex,
     creator: params.wallet.publicKey,
     rentPayer: params.wallet.publicKey,
-    vaultIndex: 0,
+    vaultIndex: params.vaultIndex ?? 0,
     ephemeralSigners: 0,
     transactionMessage: message,
     memo: params.memo ?? `issue license batch (${params.issueLicenseIxs.length} recipients)`,

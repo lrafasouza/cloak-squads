@@ -50,6 +50,20 @@ model VaultSettings {
   @@index([cofreAddress])
 }
 
+model SubVault {
+  id           String   @id @default(uuid())
+  cofreAddress String
+  vaultIndex   Int
+  name         String
+  color        String?
+  icon         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([cofreAddress, vaultIndex])
+  @@index([cofreAddress])
+}
+
 model StealthInvoice {
   id                  String   @id @default(uuid())
   cofreAddress        String
@@ -64,7 +78,8 @@ model StealthInvoice {
   createdAt           DateTime @default(now())
   claimedAt           DateTime?
   claimedBy           String?
-  
+  vaultIndex          Int      @default(0)
+
   // Cloak UTXO data for claim
   utxoAmount          String?
   utxoPrivateKey      String?
@@ -91,6 +106,7 @@ model ProposalDraft {
   invariants       String
   commitmentClaim  String?
   signature        String?
+  vaultIndex       Int      @default(0)
   createdAt        DateTime @default(now())
   archivedAt      DateTime?
 
@@ -107,6 +123,7 @@ model PayrollDraft {
   totalAmount      String
   recipientCount   Int
   mode             String   @default("direct")
+  vaultIndex       Int      @default(0)
   createdAt        DateTime @default(now())
 
   recipients PayrollRecipient[]
@@ -126,6 +143,7 @@ model SwapDraft {
   inputSymbol      String
   outputSymbol     String
   memo             String?
+  vaultIndex       Int      @default(0)
   createdAt        DateTime @default(now())
 
   @@unique([cofreAddress, transactionIndex])

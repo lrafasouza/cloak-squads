@@ -12,6 +12,7 @@ export async function buildIssueLicenseProposal(params: {
   multisigPda: PublicKey;
   creator: Signer;
   issueLicenseIx: TransactionInstruction;
+  vaultIndex?: number;
 }): Promise<{
   transactionIndex: bigint;
   vaultTransactionPda: PublicKey;
@@ -24,7 +25,7 @@ export async function buildIssueLicenseProposal(params: {
   const newTxIndex = BigInt(multisigAccount.transactionIndex.toString()) + 1n;
   const [vaultPda] = multisig.getVaultPda({
     multisigPda: params.multisigPda,
-    index: 0,
+    index: params.vaultIndex ?? 0,
   });
 
   const message = new TransactionMessage({
@@ -39,7 +40,7 @@ export async function buildIssueLicenseProposal(params: {
     multisigPda: params.multisigPda,
     transactionIndex: newTxIndex,
     creator: params.creator.publicKey,
-    vaultIndex: 0,
+    vaultIndex: params.vaultIndex ?? 0,
     ephemeralSigners: 0,
     transactionMessage: message,
     memo: "issue license",
@@ -68,6 +69,7 @@ export async function buildBatchIssueLicenseProposal(params: {
   creator: Signer;
   issueLicenseIxs: TransactionInstruction[];
   memo?: string;
+  vaultIndex?: number;
 }): Promise<{
   transactionIndex: bigint;
   vaultTransactionPda: PublicKey;
@@ -80,7 +82,7 @@ export async function buildBatchIssueLicenseProposal(params: {
   const newTxIndex = BigInt(multisigAccount.transactionIndex.toString()) + 1n;
   const [vaultPda] = multisig.getVaultPda({
     multisigPda: params.multisigPda,
-    index: 0,
+    index: params.vaultIndex ?? 0,
   });
 
   const message = new TransactionMessage({
@@ -95,7 +97,7 @@ export async function buildBatchIssueLicenseProposal(params: {
     multisigPda: params.multisigPda,
     transactionIndex: newTxIndex,
     creator: params.creator.publicKey,
-    vaultIndex: 0,
+    vaultIndex: params.vaultIndex ?? 0,
     ephemeralSigners: 0,
     transactionMessage: message,
     memo: params.memo ?? `issue license batch (${params.issueLicenseIxs.length} recipients)`,
