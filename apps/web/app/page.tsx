@@ -392,12 +392,15 @@ function HeroSection() {
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             className="mx-auto mb-4 md:mb-6 flex items-center justify-center"
           >
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-1.5">
-              <span className="relative flex h-2 w-2">
+            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 sm:px-4">
+              <span className="relative flex h-2 w-2 shrink-0">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal-warn opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-signal-warn" />
               </span>
-              <span className="text-eyebrow text-accent">Built on Squads · Powered by Cloak · Devnet</span>
+              <span className="whitespace-nowrap font-mono text-[9.5px] uppercase tracking-[0.08em] text-accent sm:text-[11px] sm:tracking-eyebrow">
+                <span className="sm:hidden">Squads · Cloak · Devnet</span>
+                <span className="hidden sm:inline">Built on Squads · Powered by Cloak · Devnet</span>
+              </span>
             </div>
           </motion.div>
 
