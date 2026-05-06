@@ -21,6 +21,7 @@ import {
   FileText,
   HelpCircle,
   Key,
+  Layers,
   LayoutDashboard,
   List,
   Menu,
@@ -31,6 +32,7 @@ import {
   Users,
   Wallet,
   X,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
@@ -56,6 +58,9 @@ const PRIMARY_NAV: NavItem[] = [
 
 const PRIVACY_NAV: NavItem[] = [
   { label: "Transactions", href: "/proposals", icon: List },
+  { label: "Sub-vaults", href: "/sub-vaults", icon: Layers },
+  { label: "Spending Limits", href: "/limits", icon: Zap },
+  { label: "Privacy", href: "/privacy", icon: ShieldAlert },
   { label: "Members", href: "/members", icon: Users },
   { label: "Address Book", href: "/address-book", icon: BookUser },
   { label: "Audit", href: "/audit", icon: Shield },
