@@ -4,12 +4,10 @@ import { cn } from "@/lib/utils";
 import NumberFlow from "@number-flow/react";
 import { motion } from "framer-motion";
 import {
-  Activity,
   CheckCircle2,
   Clock,
   Eye,
   FileSpreadsheet,
-  Link2,
   Lock,
   ShieldCheck,
   Users,
