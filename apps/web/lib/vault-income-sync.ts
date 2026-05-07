@@ -53,24 +53,75 @@ type ParsedIncome = {
   toLabel: string | null;
 };
 
+export type ParseRejection = {
+  signature: string;
+  reason:
+    | "tx_meta_missing"
+    | "tx_failed"
+    | "vault_not_in_accounts"
+    | "balance_undefined"
+    | "diff_too_small"
+    | "diff_negative_or_zero";
+  detail?: string;
+};
+
 function parseIncome(
   tx: ParsedTransactionWithMeta,
   sigInfo: { signature: string; blockTime: number | null | undefined },
   vaultAddress: string,
   vaultIndex: number,
   toLabel: string | null,
+  rejections?: ParseRejection[],
 ): ParsedIncome | null {
-  if (!tx.meta || tx.meta.err) return null;
+  if (!tx.meta) {
+    rejections?.push({ signature: sigInfo.signature, reason: "tx_meta_missing" });
+    return null;
+  }
+  if (tx.meta.err) {
+    rejections?.push({
+      signature: sigInfo.signature,
+      reason: "tx_failed",
+      detail: JSON.stringify(tx.meta.err),
+    });
+    return null;
+  }
 
   const accounts = tx.transaction.message.accountKeys;
   const vaultIdx = accounts.findIndex((a) => a.pubkey.toBase58() === vaultAddress);
-  if (vaultIdx === -1) return null;
+  if (vaultIdx === -1) {
+    rejections?.push({
+      signature: sigInfo.signature,
+      reason: "vault_not_in_accounts",
+      detail: `vault=${vaultAddress.slice(0, 8)}... accounts=[${accounts
+        .map((a) => a.pubkey.toBase58().slice(0, 8))
+        .join(",")}]`,
+    });
+    return null;
+  }
 
   const pre = tx.meta.preBalances[vaultIdx];
   const post = tx.meta.postBalances[vaultIdx];
-  if (pre === undefined || post === undefined) return null;
+  if (pre === undefined || post === undefined) {
+    rejections?.push({ signature: sigInfo.signature, reason: "balance_undefined" });
+    return null;
+  }
   const diff = post - pre;
-  if (diff < 100_000) return null;
+  if (diff <= 0) {
+    rejections?.push({
+      signature: sigInfo.signature,
+      reason: "diff_negative_or_zero",
+      detail: `diff=${diff}`,
+    });
+    return null;
+  }
+  if (diff < 100_000) {
+    rejections?.push({
+      signature: sigInfo.signature,
+      reason: "diff_too_small",
+      detail: `diff=${diff}`,
+    });
+    return null;
+  }
 
   let from = "Unknown";
   let amountLamports = BigInt(diff);
@@ -299,6 +350,179 @@ export async function syncVaultIncome(
   );
 
   return { synced: incomes.length, throttled: false };
+}
+
+// ── Read-only diagnostic helper ────────────────────────────────────────────
+//
+// Mirrors the sync flow but skips DB writes and returns a structured trace
+// of what would have happened. Surfaced via the income endpoint's
+// `?debug=true` query so a deposit that doesn't appear in the UI can be
+// pinpointed (vault PDA, sigs found, parse rejections per signature)
+// without server-log access.
+
+export type SyncInspection = {
+  rpcUrl: string;
+  cluster: string;
+  targets: Array<{ vaultIndex: number; address: string; sigsFetched: number }>;
+  totalSigsFetched: number;
+  alreadyInDb: number;
+  unseen: number;
+  txsResolved: number;
+  parsedAsIncome: number;
+  rejections: ParseRejection[];
+  newestSigSampled?: { signature: string; blockTime: number; vaultAddress: string };
+};
+
+export async function inspectVaultIncomeSync(multisig: string): Promise<SyncInspection> {
+  const empty: SyncInspection = {
+    rpcUrl: RPC_URL ? "configured" : "missing",
+    cluster: getCurrentCluster(),
+    targets: [],
+    totalSigsFetched: 0,
+    alreadyInDb: 0,
+    unseen: 0,
+    txsResolved: 0,
+    parsedAsIncome: 0,
+    rejections: [],
+  };
+  if (!RPC_URL || !SQUADS_PROGRAM_ID) return empty;
+
+  let multisigPk: PublicKey;
+  let squadsProgram: PublicKey;
+  try {
+    multisigPk = new PublicKey(multisig);
+    squadsProgram = new PublicKey(SQUADS_PROGRAM_ID);
+  } catch {
+    return empty;
+  }
+
+  const cluster = getCurrentCluster();
+  const [primaryVaultPda] = squadsVaultPda(multisigPk, squadsProgram, 0);
+
+  const subVaults = await prisma.subVault.findMany({
+    where: { cofreAddress: multisig, cluster },
+    select: { vaultIndex: true, name: true },
+    orderBy: { vaultIndex: "asc" },
+    take: 10,
+  });
+
+  type Target = { pda: PublicKey; address: string; vaultIndex: number; toLabel: string | null };
+  const targets: Target[] = [
+    { pda: primaryVaultPda, address: primaryVaultPda.toBase58(), vaultIndex: 0, toLabel: null },
+    ...subVaults.map((sv) => {
+      const [pda] = squadsVaultPda(multisigPk, squadsProgram, sv.vaultIndex);
+      return { pda, address: pda.toBase58(), vaultIndex: sv.vaultIndex, toLabel: sv.name };
+    }),
+  ];
+
+  const connection = new Connection(RPC_URL, {
+    commitment: "confirmed",
+    disableRetryOnRateLimit: true,
+  });
+
+  const sigsPerTarget = await Promise.all(
+    targets.map((t) =>
+      connection
+        .getSignaturesForAddress(t.pda, { limit: 50 })
+        .catch(() => [] as Awaited<ReturnType<typeof connection.getSignaturesForAddress>>),
+    ),
+  );
+
+  const targetSummary: SyncInspection["targets"] = targets.map((t, i) => ({
+    vaultIndex: t.vaultIndex,
+    address: t.address,
+    sigsFetched: sigsPerTarget[i]?.length ?? 0,
+  }));
+
+  type TaggedSig = {
+    signature: string;
+    blockTime: number;
+    vaultAddress: string;
+    vaultIndex: number;
+    toLabel: string | null;
+  };
+  const tagged: TaggedSig[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < targets.length; i++) {
+    const target = targets[i];
+    const sigs = sigsPerTarget[i] ?? [];
+    if (!target) continue;
+    for (const s of sigs) {
+      const key = `${s.signature}|${target.address}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      tagged.push({
+        signature: s.signature,
+        blockTime: s.blockTime ?? 0,
+        vaultAddress: target.address,
+        vaultIndex: target.vaultIndex,
+        toLabel: target.toLabel,
+      });
+    }
+  }
+
+  const totalSigsFetched = tagged.length;
+  if (totalSigsFetched === 0) return { ...empty, targets: targetSummary };
+
+  const existing = await prisma.vaultIncome.findMany({
+    where: {
+      cofreAddress: multisig,
+      signature: { in: tagged.map((t) => t.signature) },
+    },
+    select: { signature: true, vaultIndex: true },
+  });
+  const existingSet = new Set(existing.map((e) => `${e.signature}|${e.vaultIndex}`));
+  const unseenList = tagged.filter((t) => !existingSet.has(`${t.signature}|${t.vaultIndex}`));
+
+  // Newest unseen sig — useful to confirm the recent deposit is in the fetch.
+  const newest = [...tagged].sort((a, b) => b.blockTime - a.blockTime)[0];
+
+  // Parse the unseen ones and collect rejections.
+  const uniqueSigs = [...new Set(unseenList.map((t) => t.signature))];
+  const txResults = await fetchParsedTxBatch(connection, uniqueSigs);
+  const txMap = new Map<string, ParsedTransactionWithMeta | null>();
+  uniqueSigs.forEach((sig, i) => txMap.set(sig, txResults[i] ?? null));
+
+  let txsResolved = 0;
+  let parsedAsIncome = 0;
+  const rejections: ParseRejection[] = [];
+  for (const t of unseenList) {
+    const tx = txMap.get(t.signature);
+    if (!tx) {
+      rejections.push({ signature: t.signature, reason: "tx_meta_missing" });
+      continue;
+    }
+    txsResolved += 1;
+    const parsed = parseIncome(
+      tx,
+      { signature: t.signature, blockTime: t.blockTime },
+      t.vaultAddress,
+      t.vaultIndex,
+      t.toLabel,
+      rejections,
+    );
+    if (parsed) parsedAsIncome += 1;
+  }
+
+  const result: SyncInspection = {
+    rpcUrl: "configured",
+    cluster,
+    targets: targetSummary,
+    totalSigsFetched,
+    alreadyInDb: existing.length,
+    unseen: unseenList.length,
+    txsResolved,
+    parsedAsIncome,
+    rejections: rejections.slice(0, 30),
+  };
+  if (newest) {
+    result.newestSigSampled = {
+      signature: newest.signature,
+      blockTime: newest.blockTime,
+      vaultAddress: newest.vaultAddress,
+    };
+  }
+  return result;
 }
 
 export type StoredIncome = {

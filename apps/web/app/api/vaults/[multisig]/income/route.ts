@@ -1,5 +1,5 @@
 import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
-import { readVaultIncome, syncVaultIncome } from "@/lib/vault-income-sync";
+import { inspectVaultIncomeSync, readVaultIncome, syncVaultIncome } from "@/lib/vault-income-sync";
 import { PublicKey } from "@solana/web3.js";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
@@ -57,6 +57,16 @@ export async function GET(request: Request, context: { params: Promise<{ multisi
     new PublicKey(multisig);
   } catch {
     return NextResponse.json({ error: "Invalid multisig address." }, { status: 400 });
+  }
+
+  // ?debug=true bypasses the normal flow and returns a structured trace of
+  // what the sync would have done, so deposits that don't show up in the UI
+  // can be diagnosed without server-log access. Read-only — never writes.
+  if (searchParams.get("debug") === "true") {
+    const inspection = await inspectVaultIncomeSync(multisig);
+    return NextResponse.json(inspection, {
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 
   const limit = parseLimit(searchParams.get("limit"));
