@@ -2,7 +2,7 @@
 
 import { Logo } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { WalletMenu } from "@/components/wallet/WalletMenu";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -53,7 +53,7 @@ export function SiteHeader({ className, showWallet = true, minimal = false }: { 
             {/* Desktop actions */}
             <div className="hidden items-center gap-3.5 md:flex">
               {/* Status pill — Brand Deliverable §02 */}
-              {showWallet && <ClientWalletButton />}
+              {showWallet && <WalletMenu />}
               {!isVaultPage && (
                 <Link
                   href="/vault"
@@ -67,7 +67,7 @@ export function SiteHeader({ className, showWallet = true, minimal = false }: { 
         )}
         {minimal && (
           <div className="flex items-center gap-3">
-            {showWallet && <ClientWalletButton />}
+            {showWallet && <WalletMenu />}
           </div>
         )}
 
@@ -99,7 +99,7 @@ export function SiteHeader({ className, showWallet = true, minimal = false }: { 
               </Link>
             ))}
             <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
-              {showWallet && <ClientWalletButton />}
+              {showWallet && <WalletMenu />}
               {!isVaultPage && (
                 <Link
                   href="/vault"

@@ -4,7 +4,7 @@ import { VaultSelector } from "@/components/app/VaultSelector";
 import { Logo } from "@/components/brand/Logo";
 import { Spinner } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { WalletMenu } from "@/components/wallet/WalletMenu";
 import { useSolPrice } from "@/lib/hooks/useSolPrice";
 import { useVaultBalance } from "@/lib/hooks/useVaultBalance";
 import { isProposalPendingStatus } from "@/lib/proposals";
@@ -33,6 +33,7 @@ import {
   Shield,
   ShieldAlert,
   Users,
+  Vault,
   Wallet,
   X,
 } from "lucide-react";
@@ -529,7 +530,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Logo href="/" variant="monogram" size="sm" />
           </div>
           <div className="flex items-center gap-2">
-            <ClientWalletButton />
+            <WalletMenu multisig={multisig} />
             {visibleInboxItems.length > 0 && (
               <button
                 type="button"
@@ -551,17 +552,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-3 text-xs font-medium text-ink-muted cursor-default">
-                  <Wallet className="h-3.5 w-3.5" />
+                  <Vault className="h-3.5 w-3.5 text-ink-subtle" />
                   <span className="tabular-nums">{usdValue ?? `${balanceSol} SOL`}</span>
                 </div>
               </TooltipTrigger>
-              {usdValue != null && (
-                <TooltipContent side="bottom">
-                  <span className="tabular-nums">
-                    {balanceSol} SOL · {usdcUi} USDC
-                  </span>
-                </TooltipContent>
-              )}
+              <TooltipContent side="bottom">
+                <span className="tabular-nums">
+                  Vault treasury · {balanceSol} SOL · {usdcUi} USDC
+                </span>
+              </TooltipContent>
             </Tooltip>
           </TooltipProvider>
           {visibleInboxItems.length > 0 && (
@@ -571,7 +570,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               onOpenChange={setInboxOpen}
             />
           )}
-          <ClientWalletButton />
+          <WalletMenu multisig={multisig} />
         </header>
 
         {/* Page content */}

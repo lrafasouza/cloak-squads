@@ -2,7 +2,7 @@
 
 import { Logo } from "@/components/brand/Logo";
 import { Stepper } from "@/components/ui/stepper";
-import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { WalletMenu } from "@/components/wallet/WalletMenu";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
@@ -58,7 +58,7 @@ export function WizardLayout({ step, title, subtitle, children, className }: Wiz
           </Link>
         </div>
         <div className="flex items-center gap-3">
-          <ClientWalletButton />
+          <WalletMenu />
         </div>
       </header>
 

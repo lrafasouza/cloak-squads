@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/skeleton";
 import { VaultSelectionGrid } from "@/components/vault/VaultSelectionGrid";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
+import { WalletMenu } from "@/components/wallet/WalletMenu";
 import { useMyVaults } from "@/lib/use-my-vaults";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
@@ -50,7 +51,7 @@ export default function VaultPage() {
       {/* Minimal header — logo + wallet only */}
       <header className="relative z-10 flex items-center justify-between px-4 py-5 md:px-6">
         <Logo size="sm" />
-        <ClientWalletButton />
+        <WalletMenu />
       </header>
 
       <main className="relative z-10 flex flex-1 flex-col mx-auto w-full max-w-6xl px-4 pt-6 pb-20 md:px-6 md:pt-10 md:pb-28">
