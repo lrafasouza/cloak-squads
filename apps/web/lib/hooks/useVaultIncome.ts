@@ -120,6 +120,9 @@ export function useVaultIncomeSync(multisig: string): void {
     const existing = sharedSubs.get(key);
     if (existing) {
       existing.refCount += 1;
+      console.debug(
+        `[income-sync] piggyback on existing subscription for vault ${vaultPda.toBase58()} (refCount=${existing.refCount})`,
+      );
       return () => {
         existing.refCount -= 1;
         if (existing.refCount <= 0) {
@@ -132,6 +135,9 @@ export function useVaultIncomeSync(multisig: string): void {
     let debounce: ReturnType<typeof setTimeout> | null = null;
     let inFlight = false;
     const onChange = () => {
+      console.debug(
+        `[income-sync] vault PDA ${vaultPda.toBase58()} changed on-chain — debouncing refresh`,
+      );
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(() => {
         void refreshIncomeFromChain(
@@ -146,6 +152,9 @@ export function useVaultIncomeSync(multisig: string): void {
     };
 
     const subId = connection.onAccountChange(vaultPda, onChange, "confirmed");
+    console.info(
+      `[income-sync] watching vault PDA ${vaultPda.toBase58()} for deposits (subId=${subId}, rpc=${connection.rpcEndpoint.replace(/\?api-key=.*/, "?api-key=***")})`,
+    );
 
     const entry: SharedSub = {
       refCount: 1,
@@ -179,17 +188,28 @@ async function refreshIncomeFromChain(
   getInFlight: () => boolean,
   setInFlight: (v: boolean) => void,
 ): Promise<void> {
-  if (getInFlight()) return;
+  if (getInFlight()) {
+    console.debug("[income-sync] refresh skipped — another refresh is already in flight");
+    return;
+  }
   setInFlight(true);
   try {
+    console.debug("[income-sync] force-syncing income endpoint");
     const res = await fetch(`/api/vaults/${multisig}/income?limit=${FETCH_LIMIT}&force=true`, {
       cache: "no-store",
-    }).catch(() => null);
+    }).catch((err) => {
+      console.warn("[income-sync] force-sync fetch failed:", err);
+      return null;
+    });
     if (res?.ok) {
       const data = (await res.json().catch(() => null)) as { entries?: IncomeEntry[] } | null;
+      const count = data?.entries?.length ?? 0;
+      console.info(`[income-sync] force-sync returned ${count} entries`);
       if (data?.entries) {
         queryClient.setQueryData(vaultIncomeQueryKey(multisig), data.entries);
       }
+    } else if (res) {
+      console.warn(`[income-sync] force-sync returned ${res.status} ${res.statusText}`);
     }
   } finally {
     setInFlight(false);
