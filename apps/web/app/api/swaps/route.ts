@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { requireVaultMember } from "@/lib/vault-membership";
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
     const draft = await prisma.swapDraft.create({
       data: {
         cofreAddress: parsed.data.cofreAddress,
+        cluster: getCurrentCluster(),
         transactionIndex: parsed.data.transactionIndex,
         inputMint: parsed.data.inputMint,
         outputMint: parsed.data.outputMint,

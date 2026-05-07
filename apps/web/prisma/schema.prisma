@@ -10,6 +10,7 @@ datasource db {
 model AuditLink {
   id           String   @id @default(uuid())
   cofreAddress String
+  cluster      String?
   diversifier  Bytes
   scope        String
   scopeParams  String?
@@ -21,6 +22,7 @@ model AuditLink {
   accessLogs   AuditAccessLog[]
 
   @@index([cofreAddress])
+  @@index([cofreAddress, cluster])
 }
 
 model AuditAccessLog {
@@ -40,6 +42,7 @@ model AuditAccessLog {
 model RecurringPayment {
   id            String    @id @default(uuid())
   cofreAddress  String
+  cluster       String?
   vaultIndex    Int       @default(0)
   label         String
   recipient     String
@@ -57,12 +60,14 @@ model RecurringPayment {
 
   @@index([cofreAddress])
   @@index([cofreAddress, status])
+  @@index([cofreAddress, cluster])
   @@index([nextDueAt])
 }
 
 model Vault {
   id                String   @id @default(uuid())
   cofreAddress      String   @unique
+  cluster           String?
   name              String
   description       String?
   avatarUrl         String?
@@ -74,6 +79,7 @@ model Vault {
   settings VaultSettings?
 
   @@index([cofreAddress])
+  @@index([cluster])
 }
 
 model VaultSettings {
@@ -92,6 +98,7 @@ model VaultSettings {
 model SpendingLimit {
   id            String   @id @default(uuid())
   cofreAddress  String
+  cluster       String?
   spendingLimit String
   createKey     String
   vaultIndex    Int
@@ -105,11 +112,13 @@ model SpendingLimit {
 
   @@index([cofreAddress])
   @@index([cofreAddress, status])
+  @@index([cofreAddress, cluster])
 }
 
 model SubVault {
   id           String   @id @default(uuid())
   cofreAddress String
+  cluster      String?
   vaultIndex   Int
   name         String
   color        String?
@@ -119,11 +128,13 @@ model SubVault {
 
   @@unique([cofreAddress, vaultIndex])
   @@index([cofreAddress])
+  @@index([cofreAddress, cluster])
 }
 
 model StealthInvoice {
   id                  String   @id @default(uuid())
   cofreAddress        String
+  cluster             String?
   recipientWallet     String?
   mode                String   @default("bound")
   invoiceRef          String?
@@ -154,11 +165,13 @@ model StealthInvoice {
 
   @@index([cofreAddress])
   @@index([stealthPubkey])
+  @@index([cofreAddress, cluster])
 }
 
 model ProposalDraft {
   id               String   @id @default(uuid())
   cofreAddress     String
+  cluster          String?
   transactionIndex String
   amount           String
   recipient        String
@@ -177,11 +190,13 @@ model ProposalDraft {
   @@unique([cofreAddress, transactionIndex])
   @@index([cofreAddress])
   @@index([cofreAddress, archivedAt])
+  @@index([cofreAddress, cluster])
 }
 
 model PayrollDraft {
   id               String   @id @default(uuid())
   cofreAddress     String
+  cluster          String?
   transactionIndex String
   memo             String?
   memoCiphertext   Bytes?
@@ -197,11 +212,13 @@ model PayrollDraft {
 
   @@unique([cofreAddress, transactionIndex])
   @@index([cofreAddress])
+  @@index([cofreAddress, cluster])
 }
 
 model SwapDraft {
   id               String   @id @default(uuid())
   cofreAddress     String
+  cluster          String?
   transactionIndex String
   inputMint        String
   outputMint       String
@@ -218,6 +235,7 @@ model SwapDraft {
 
   @@unique([cofreAddress, transactionIndex])
   @@index([cofreAddress])
+  @@index([cofreAddress, cluster])
 }
 
 model AddressBookEntry {

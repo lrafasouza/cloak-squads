@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { serializeDraft } from "@/lib/serialize-proposal-draft";
@@ -145,6 +146,7 @@ export async function POST(request: Request) {
     const draft = await prisma.proposalDraft.create({
       data: {
         cofreAddress: parsed.data.cofreAddress,
+        cluster: getCurrentCluster(),
         transactionIndex: parsed.data.transactionIndex,
         amount: parsed.data.amount,
         recipient: parsed.data.recipient,

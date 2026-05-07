@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { requireVaultMember, verifyAuditLinkAccess } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
@@ -35,7 +36,7 @@ export async function GET(
 
   try {
     const drafts = await prisma.payrollDraft.findMany({
-      where: { cofreAddress: multisig },
+      where: { cofreAddress: multisig, cluster: getCurrentCluster() },
       orderBy: { createdAt: "desc" },
       take: 100, // Limit to prevent abuse
     });

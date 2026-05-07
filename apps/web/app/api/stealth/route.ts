@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { requireVaultMember } from "@/lib/vault-membership";
@@ -112,6 +113,7 @@ export async function POST(request: Request) {
     const invoice = await prisma.stealthInvoice.create({
       data: {
         cofreAddress,
+        cluster: getCurrentCluster(),
         recipientWallet: mode === "bound" ? (recipientWallet ?? null) : null,
         mode,
         invoiceRef: invoiceRef ?? null,

@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { requireVaultMember } from "@/lib/vault-membership";
@@ -170,6 +171,7 @@ export async function POST(request: Request) {
       const created = await tx.payrollDraft.create({
         data: {
           cofreAddress: parsed.data.cofreAddress,
+          cluster: getCurrentCluster(),
           transactionIndex: parsed.data.transactionIndex,
           memo: parsed.data.memo ?? null,
           totalAmount: parsed.data.totalAmount,

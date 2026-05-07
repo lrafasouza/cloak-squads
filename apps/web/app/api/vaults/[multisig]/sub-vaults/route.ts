@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { requireVaultMember } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
@@ -23,7 +24,7 @@ export async function GET(_req: Request, context: { params: Promise<{ multisig: 
   if (!isPrismaAvailable()) return NextResponse.json([]);
 
   const subVaults = await prisma.subVault.findMany({
-    where: { cofreAddress: multisig },
+    where: { cofreAddress: multisig, cluster: getCurrentCluster() },
     orderBy: { vaultIndex: "asc" },
   });
 
@@ -64,6 +65,7 @@ export async function POST(req: Request, context: { params: Promise<{ multisig: 
   const subVault = await prisma.subVault.create({
     data: {
       cofreAddress: multisig,
+      cluster: getCurrentCluster(),
       vaultIndex,
       name,
       color: color ?? null,

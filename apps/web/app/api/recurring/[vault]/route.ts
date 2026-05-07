@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { isCadence } from "@/lib/recurring-cadence";
@@ -45,7 +46,7 @@ export async function GET(_request: Request, context: { params: Promise<{ vault:
   if (auth instanceof NextResponse) return auth;
 
   const items = await prisma.recurringPayment.findMany({
-    where: { cofreAddress: vault, status: { not: "cancelled" } },
+    where: { cofreAddress: vault, cluster: getCurrentCluster(), status: { not: "cancelled" } },
     orderBy: [{ status: "asc" }, { nextDueAt: "asc" }],
   });
 
@@ -108,6 +109,7 @@ export async function POST(request: Request, context: { params: Promise<{ vault:
   const created = await prisma.recurringPayment.create({
     data: {
       cofreAddress: vault,
+      cluster: getCurrentCluster(),
       vaultIndex: parsed.data.vaultIndex ?? 0,
       label: parsed.data.label,
       recipient: parsed.data.recipient,

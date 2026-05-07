@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { Connection, PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
@@ -86,7 +87,11 @@ export async function GET(_request: Request, context: { params: Promise<{ multis
   if (isPrismaAvailable()) {
     try {
       dbDraftCount = await prisma.proposalDraft.count({
-        where: { cofreAddress: multisigAddress, archivedAt: { equals: null } },
+        where: {
+          cofreAddress: multisigAddress,
+          cluster: getCurrentCluster(),
+          archivedAt: { equals: null },
+        },
       });
     } catch {
       // DB unavailable — ignore

@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { requireVaultMember } from "@/lib/vault-membership";
 import { requireWalletAuth } from "@/lib/wallet-auth";
@@ -34,7 +35,7 @@ async function getVaultsByAddresses(addressesParam: string) {
 
   try {
     const vaults = await prisma.vault.findMany({
-      where: { cofreAddress: { in: addresses } },
+      where: { cofreAddress: { in: addresses }, cluster: getCurrentCluster() },
       orderBy: { createdAt: "desc" },
       take: 100,
     });
@@ -52,7 +53,7 @@ async function getVaultsByCreator(publicKey: string) {
 
   try {
     const vaults = await prisma.vault.findMany({
-      where: { createdBy: publicKey },
+      where: { createdBy: publicKey, cluster: getCurrentCluster() },
       orderBy: { createdAt: "desc" },
       take: 100,
     });
@@ -112,12 +113,14 @@ export async function POST(request: Request) {
       where: { cofreAddress: parsed.data.cofreAddress },
       create: {
         cofreAddress: parsed.data.cofreAddress,
+        cluster: getCurrentCluster(),
         name: parsed.data.name,
         description: parsed.data.description ?? null,
         avatarUrl: parsed.data.avatarUrl ?? null,
         createdBy: auth.publicKey,
       },
       update: {
+        cluster: getCurrentCluster(),
         name: parsed.data.name,
         description: parsed.data.description ?? null,
         avatarUrl: parsed.data.avatarUrl ?? null,

@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { squadsVaultPda } from "@cloak-squads/core/pda";
 import { Connection, PublicKey } from "@solana/web3.js";
@@ -120,7 +121,7 @@ export async function GET(
   try {
     if (isPrismaAvailable()) {
       subVaultEntries = await prisma.subVault.findMany({
-        where: { cofreAddress: multisig },
+        where: { cofreAddress: multisig, cluster: getCurrentCluster() },
         select: { vaultIndex: true, name: true },
         orderBy: { vaultIndex: "asc" },
         take: 10, // cap to avoid too many RPC calls

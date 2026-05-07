@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { prisma } from "@/lib/prisma";
 import { requireVaultMember } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
@@ -19,7 +20,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 
   try {
     const invoices = await prisma.stealthInvoice.findMany({
-      where: { cofreAddress: id },
+      where: { cofreAddress: id, cluster: getCurrentCluster() },
       orderBy: { createdAt: "desc" },
       take: 100,
     });

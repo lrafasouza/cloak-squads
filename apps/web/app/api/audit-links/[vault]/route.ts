@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
@@ -17,7 +18,7 @@ export async function GET(_request: Request, context: { params: Promise<{ vault:
 
   try {
     const links = await prisma.auditLink.findMany({
-      where: { cofreAddress: vault },
+      where: { cofreAddress: vault, cluster: getCurrentCluster() },
       orderBy: { createdAt: "desc" },
       take: 100,
     });

@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { getMultisigMembers, requireVaultMember } from "@/lib/vault-membership";
 import { verifyWalletAuth } from "@/lib/wallet-auth";
@@ -130,6 +131,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ multi
       result = await prisma.vault.create({
         data: {
           cofreAddress: multisig,
+          cluster: getCurrentCluster(),
           name: data.name ?? "Untitled",
           description: data.description ?? null,
           avatarUrl: data.avatarUrl ?? null,

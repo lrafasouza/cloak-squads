@@ -1,3 +1,4 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { serializeDraft } from "@/lib/serialize-proposal-draft";
 import { requireVaultMember, verifyAuditLinkAccess } from "@/lib/vault-membership";
@@ -38,6 +39,7 @@ export async function GET(request: Request, context: { params: Promise<{ multisi
     const drafts = await prisma.proposalDraft.findMany({
       where: {
         cofreAddress: multisig,
+        cluster: getCurrentCluster(),
         ...(includeArchived ? {} : { archivedAt: null }),
       },
       orderBy: { createdAt: "desc" },
