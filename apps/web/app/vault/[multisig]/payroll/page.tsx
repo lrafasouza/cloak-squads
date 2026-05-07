@@ -30,6 +30,7 @@ import { createVaultProposal } from "@/lib/squads-sdk";
 import { SOL_MINT, formatTokenAmount, tokenAmountToUnits } from "@/lib/tokens";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
+import { assertPrivateSolMinimum } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import { cofrePda } from "@cloak-squads/core/pda";
@@ -403,6 +404,12 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         if (!selectedToken) throw new Error("Select a token.");
         const mint = isSol ? NATIVE_SOL_MINT : new PublicKey(selectedToken.mint);
         const amountUnits = BigInt(recipient.amount);
+        if (isSol) {
+          assertPrivateSolMinimum(
+            amountUnits,
+            `Recipient ${recipient.name || recipient.wallet.slice(0, 8)} amount`,
+          );
+        }
         const utxo = await createUtxo(amountUnits, keypair, mint);
         const commitmentBigInt = await computeUtxoCommitment(utxo);
         const commitment = commitmentBigInt.toString(16).padStart(64, "0");
@@ -957,7 +964,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                         id="payroll-amount"
                         type="number"
                         step={isSol ? "0.000000001" : "0.000001"}
-                        min={isSol ? "0.000000001" : "0.000001"}
+                        min={isSol ? "0.01" : "0.000001"}
                         value={manualAmount}
                         onChange={(e) => setManualAmount(e.target.value)}
                         placeholder={isSol ? "0.5" : "0.00"}

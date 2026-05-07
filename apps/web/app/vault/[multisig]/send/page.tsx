@@ -24,7 +24,7 @@ import { createVaultProposal } from "@/lib/squads-sdk";
 import { SOL_MINT, tokenAmountToUnits } from "@/lib/tokens";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
-import { solAmountToLamports } from "@cloak-squads/core/amount";
+import { assertPrivateSolMinimum, solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import { cofrePda } from "@cloak-squads/core/pda";
@@ -207,7 +207,8 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   }, []);
 
   const amountStep = isSol ? "0.000000001" : "0.000001";
-  const amountMin = isSol ? "0.000000001" : "0.000001";
+  const amountMin =
+    sendMode === "private" && isSol ? "0.01" : isSol ? "0.000000001" : "0.000001";
   const amountPlaceholder = isSol ? "0.0" : "0.00";
 
   const usdPreview = useMemo(() => {
@@ -317,6 +318,8 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       // Derive amount in token-native units (lamports for SOL, micro-USDC for USDC)
       const decimals = selectedToken?.decimals ?? 9;
       const tokenUnits = isSol ? solAmountToLamports(amount) : tokenAmountToUnits(amount, decimals);
+
+      if (isSol) assertPrivateSolMinimum(tokenUnits);
 
       // Balance check
       if (isSol) {

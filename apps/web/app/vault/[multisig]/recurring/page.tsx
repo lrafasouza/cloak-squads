@@ -28,7 +28,7 @@ import { SOL_MINT } from "@/lib/tokens";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cn } from "@/lib/utils";
-import { solAmountToLamports } from "@cloak-squads/core/amount";
+import { assertPrivateSolMinimum, solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import { cofrePda } from "@cloak-squads/core/pda";
@@ -1087,6 +1087,7 @@ function AddRecurringModal({
     setSubmitting(true);
     try {
       const lamports = solAmountToLamports(amount);
+      if (privacy === "private") assertPrivateSolMinimum(lamports);
       const res = await fetchWithAuth(`/api/recurring/${encodeURIComponent(vault)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1221,7 +1222,7 @@ function AddRecurringModal({
                 id="rec-amount"
                 type="number"
                 step="0.000000001"
-                min="0"
+                min={privacy === "private" ? "0.01" : "0"}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"

@@ -24,7 +24,7 @@ import { createVaultProposal } from "@/lib/squads-sdk";
 import { SOL_MINT, tokenAmountToUnits } from "@/lib/tokens";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
-import { solAmountToLamports } from "@cloak-squads/core/amount";
+import { assertPrivateSolMinimum, solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import { cofrePda } from "@cloak-squads/core/pda";
@@ -123,7 +123,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   const tokenLabel = selectedToken?.symbol ?? "SOL";
 
   const amountStep = isSol ? "0.000000001" : "0.000001";
-  const amountMin = isSol ? "0.000000001" : "0.000001";
+  const amountMin = isSol ? "0.01" : "0.000001";
   const amountPlaceholder = isSol ? "0.0" : "0.00";
 
   const handleMaxAmount = useCallback(() => {
@@ -195,6 +195,8 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
 
       const decimals = selectedToken.decimals;
       const tokenUnits = isSol ? solAmountToLamports(amount) : tokenAmountToUnits(amount, decimals);
+
+      if (isSol) assertPrivateSolMinimum(tokenUnits);
 
       const [vaultPda] = multisigSdk.getVaultPda({
         multisigPda: multisigAddress,

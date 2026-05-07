@@ -294,13 +294,7 @@ withdrawn to Z" without revealing the full UTXO. Requires Groth16
 witness export + a verifier WASM bundle. Effort ~4-5h, needs
 `@cloak.dev/sdk-devnet` to expose a witness extractor.
 
-### 9. Proposal simulator
-
-Before approving, signer wants to know the effect. We use Solana RPC's
-`simulateTransaction` against a clone of the multisig proposal payload.
-Output: balance deltas, instruction trace, errors. ~2-3h.
-
-### 10. Multi-operator failover
+### 9. Multi-operator failover
 
 Add `backupOperator` to `Cofre` (Anchor change) plus heartbeat in DB:
 
@@ -319,25 +313,25 @@ to backup" with a one-click switch. ~3-4h.
 
 ## Tier 3 — Ecosystem (later)
 
-### 11. Streamflow integration
+### 10. Streamflow integration
 Vesting + salary streams routed through Cloak. Streamflow exposes
 `@streamflow/stream` SDK — wrap their `create` instruction inside the
 Aegis proposal flow and pipe execution through the operator. ~5-6h.
 
-### 12. Sphere fiat off-ramp
+### 11. Sphere fiat off-ramp
 Operator can off-ramp a confirmed deposit to USD via Sphere. Requires
 Sphere API account + KYC. ~8h once API access is provisioned.
 
-### 13. Mobile-first PWA
+### 12. Mobile-first PWA
 Manifest, service worker, offline shell, claim flow optimized for
 mobile (camera QR scan, Solana mobile wallet adapter). ~3-4h.
 
-### 14. MCP server
+### 13. MCP server
 Spec already exists in `docs/specs/2026-05-05-aegis-mcp-server.md`.
 Lets agents drive Aegis (create vaults, propose, execute) from outside.
 ~6-8h.
 
-### 15. Notifications
+### 14. Notifications
 **SKIPPED per direction.** Telegram bot, Slack webhook, email — not in
 scope this sprint.
 

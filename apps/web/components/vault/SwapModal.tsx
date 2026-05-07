@@ -10,8 +10,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { ReceiptRow } from "@/components/ui/receipt-row";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { TokenDropdown } from "@/components/vault/TokenDropdown";
+import { cn } from "@/lib/utils";
 import { useVaultTokens } from "@/lib/hooks/useVaultTokens";
 import { PROPOSAL_RENT_THRESHOLD_SOL, useWalletSolBalance } from "@/lib/hooks/useWalletSolBalance";
 import {
@@ -343,69 +345,80 @@ export function SwapModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent size="lg">
+      <DialogContent size="lg" watermark watermarkSize={260} watermarkOpacity={0.04}>
         <DialogHeader>
-          <DialogTitle>
-            Swap {selectedInputToken?.symbol} → {selectedOutputToken?.symbol}
+          <p className="text-eyebrow">Swap · Multisig proposal</p>
+          <DialogTitle className="mt-0.5">
+            {selectedInputToken?.symbol} → {selectedOutputToken?.symbol}
           </DialogTitle>
           <DialogDescription>
-            Swap {selectedInputToken?.symbol} for {selectedOutputToken?.symbol} via {SWAP_PROVIDER}.
-            Creates a vault proposal for multisig approval.
+            Routed via {SWAP_PROVIDER}. Creates a vault proposal that members must approve before
+            execution.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-6 pt-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 pb-6 pt-5">
           {isDevnet() && (
-            <p className="text-xs text-muted-foreground/60">
+            <p className="text-[11px] uppercase tracking-eyebrow text-ink-subtle/70">
               Devnet · Orca SOL/USDC pool ·{" "}
-              <span className="underline underline-offset-2">faucet.circle.com</span>
+              <a
+                href="https://faucet.circle.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono normal-case tracking-normal text-accent hover:underline"
+              >
+                faucet.circle.com
+              </a>
             </p>
           )}
 
-          {/* From account — only shown when sub-vaults exist */}
+          {/* From account — only shown when sub-vaults exist. Same pill
+              vocabulary as ReceiveModal so the modal family reads as one. */}
           {subVaultAccounts.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-ink-muted">From account</span>
+            <div>
+              <p className="text-eyebrow mb-2">From account</p>
               <div className="flex flex-wrap gap-1.5">
-                {allAccounts.map((acct) => (
-                  <button
-                    key={acct.vaultIndex}
-                    type="button"
-                    disabled={pending}
-                    onClick={() => {
-                      setSelectedVaultIndex(acct.vaultIndex);
-                      setAmount("");
-                    }}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
-                      selectedVaultIndex === acct.vaultIndex
-                        ? "border-accent/40 bg-accent/10 text-accent"
-                        : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
-                    }`}
-                  >
-                    {acct.name}
-                  </button>
-                ))}
+                {allAccounts.map((acct) => {
+                  const active = selectedVaultIndex === acct.vaultIndex;
+                  return (
+                    <button
+                      key={acct.vaultIndex}
+                      type="button"
+                      disabled={pending}
+                      onClick={() => {
+                        setSelectedVaultIndex(acct.vaultIndex);
+                        setAmount("");
+                      }}
+                      className={cn(
+                        "rounded-md border px-3 py-1.5 text-xs font-medium transition-aegis disabled:opacity-50",
+                        active
+                          ? "border-accent/40 bg-accent-soft text-accent"
+                          : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink",
+                      )}
+                    >
+                      {acct.name}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
           {/* ── From Card ── */}
-          <div className="rounded-xl border border-border bg-surface p-4">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="text-sm text-ink-muted">From</span>
-              <span className="text-xs text-ink-muted">
-                Balance:{" "}
-                <button
-                  type="button"
-                  className="ml-1 font-mono text-accent hover:underline disabled:opacity-50"
-                  onClick={handleMaxAmount}
-                  disabled={pending || !selectedInputToken}
-                >
-                  {selectedInputToken
-                    ? `${selectedInputToken.uiBalance} ${selectedInputToken.symbol}`
-                    : "—"}
-                </button>
-              </span>
+          <div className="rounded-list border border-border bg-surface-2 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-eyebrow">You pay</span>
+              <button
+                type="button"
+                className="font-mono text-[11px] tabular-nums text-ink-muted transition-aegis hover:text-accent disabled:opacity-50"
+                onClick={handleMaxAmount}
+                disabled={pending || !selectedInputToken}
+                title="Use full balance"
+              >
+                {selectedInputToken
+                  ? `${selectedInputToken.uiBalance} ${selectedInputToken.symbol} · MAX`
+                  : "—"}
+              </button>
             </div>
             <div className="flex items-center gap-3">
               <Input
@@ -417,7 +430,7 @@ export function SwapModal({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 disabled={pending}
-                className="flex-1 border-0 bg-transparent p-0 text-2xl font-medium placeholder:text-ink-muted/40 focus-visible:ring-0 focus-visible:ring-offset-0"
+                className="flex-1 border-0 bg-transparent p-0 font-display text-3xl font-semibold tabular-nums tracking-tight placeholder:text-ink-subtle/30 focus-visible:ring-0 focus-visible:ring-offset-0"
               />
               <TokenDropdown
                 tokens={tokens}
@@ -429,8 +442,8 @@ export function SwapModal({
             </div>
           </div>
 
-          {/* ── Swap Direction Button ── */}
-          <div className="relative -my-3 flex justify-center">
+          {/* ── Direction button — brass ring, sits between cards ── */}
+          <div className="relative -my-5 flex justify-center">
             <button
               type="button"
               onClick={() => {
@@ -439,21 +452,26 @@ export function SwapModal({
                 setAmount("");
               }}
               disabled={pending}
-              className="z-10 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface-2 shadow-sm transition-colors hover:bg-surface hover:text-ink disabled:opacity-50"
-              title="Swap direction"
+              className={cn(
+                "z-10 flex h-9 w-9 items-center justify-center rounded-full border bg-surface text-ink-muted shadow-raise-1 transition-aegis",
+                "border-border-strong hover:rotate-180 hover:border-accent/50 hover:bg-surface-2 hover:text-accent",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+              )}
+              title="Reverse direction"
+              aria-label="Reverse swap direction"
             >
-              <ArrowLeftRight className="h-4 w-4 text-ink-muted" />
+              <ArrowLeftRight className="h-3.5 w-3.5" />
             </button>
           </div>
 
           {/* ── To Card ── */}
-          <div className="rounded-xl border border-border bg-surface p-4">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="text-sm text-ink-muted">To (estimated)</span>
+          <div className="rounded-list border border-border bg-surface-2 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-eyebrow">You receive · estimated</span>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex-1 text-2xl font-medium text-ink">
-                {preview ? preview.outAmountUi : "0.00"}
+              <div className="flex-1 font-display text-3xl font-semibold tabular-nums tracking-tight text-ink">
+                {preview ? preview.outAmountUi : <span className="text-ink-subtle/40">0.00</span>}
               </div>
               <TokenDropdown
                 tokens={tokens}
@@ -467,95 +485,94 @@ export function SwapModal({
 
           {/* ── Slippage ── */}
           <div className="flex items-center justify-between">
-            <span className="text-xs text-ink-muted">Slippage</span>
-            <div className="inline-flex gap-1">
-              {SLIPPAGE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => !pending && setSlippageBps(opt.value)}
-                  disabled={pending}
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-                    slippageBps === opt.value
-                      ? "bg-accent-soft text-accent"
-                      : "text-ink-muted hover:bg-surface-2 hover:text-ink"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+            <span className="text-eyebrow">Slippage</span>
+            <div
+              role="radiogroup"
+              aria-label="Slippage tolerance"
+              className="inline-flex items-center rounded-md border border-border bg-surface-2 p-0.5"
+            >
+              {SLIPPAGE_OPTIONS.map((opt) => {
+                const active = slippageBps === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => !pending && setSlippageBps(opt.value)}
+                    disabled={pending}
+                    className={cn(
+                      "inline-flex h-6 items-center rounded-[5px] px-2.5 text-[11px] font-semibold tabular-nums transition-aegis disabled:opacity-50",
+                      active
+                        ? "bg-accent text-accent-ink shadow-raise-1"
+                        : "text-ink-subtle hover:text-ink",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* ── Quote Details ── */}
+          {/* ── Quote Details — receipt-style ledger ── */}
           {quoteLoading && (
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-4 py-3">
-              <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
-              <span className="text-sm text-ink-muted">Fetching quote from {SWAP_PROVIDER}...</span>
+            <div className="flex items-center gap-2 rounded-list border border-border bg-surface-2 px-4 py-3">
+              <Loader2 className="h-4 w-4 animate-spin text-ink-subtle" />
+              <span className="text-sm text-ink-muted">
+                Fetching quote from {SWAP_PROVIDER}…
+              </span>
             </div>
           )}
 
           {quoteError && (
-            <p className="rounded-md bg-signal-danger/10 px-3 py-2 text-xs text-signal-danger">
+            <p className="rounded-md border border-signal-danger/30 bg-signal-danger/10 px-3 py-2 text-xs text-signal-danger">
               {quoteError}
             </p>
           )}
 
           {preview && !quoteLoading && (
-            <div className="space-y-1 rounded-lg border border-border bg-surface-2 px-4 py-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-ink-subtle">Rate</span>
-                <span className="text-ink-muted">
-                  1 {selectedInputToken?.symbol} ≈{" "}
-                  {amount && Number(amount) > 0
-                    ? (Number(preview.outAmountUi.replace(/,/g, "")) / Number(amount)).toFixed(6)
-                    : "—"}{" "}
-                  {selectedOutputToken?.symbol}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-ink-subtle">Route</span>
-                <span className="text-ink-muted">{preview.routeLabel}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-ink-subtle">Price Impact</span>
-                <span
-                  className={`${
-                    Number(preview.priceImpact) > 1 ? "text-signal-danger" : "text-ink-muted"
-                  }`}
-                >
-                  {preview.priceImpact}%
-                </span>
-              </div>
+            <div className="rounded-list border border-border/60 bg-bg/40 px-4 py-3">
+              <ReceiptRow label="Rate">
+                1 {selectedInputToken?.symbol} ≈{" "}
+                {amount && Number(amount) > 0
+                  ? (Number(preview.outAmountUi.replace(/,/g, "")) / Number(amount)).toFixed(6)
+                  : "—"}{" "}
+                {selectedOutputToken?.symbol}
+              </ReceiptRow>
+              <ReceiptRow label="Route" mono={false} tone="muted">
+                {preview.routeLabel}
+              </ReceiptRow>
+              <ReceiptRow
+                label="Price impact"
+                tone={Number(preview.priceImpact) > 1 ? "danger" : "muted"}
+              >
+                {preview.priceImpact}%
+              </ReceiptRow>
+              <ReceiptRow label="Provider" mono={false} tone="muted">
+                {SWAP_PROVIDER}
+              </ReceiptRow>
             </div>
           )}
 
           {error && (
-            <p className="rounded-md bg-signal-danger/10 px-3 py-2 text-xs text-signal-danger">
+            <p className="rounded-md border border-signal-danger/30 bg-signal-danger/10 px-3 py-2 text-xs text-signal-danger">
               {error}
             </p>
           )}
 
           {wallet.publicKey && insufficientForProposal && (
-            <div className="flex items-start gap-2 rounded-lg border border-signal-danger/30 bg-signal-danger/10 px-3 py-2.5">
+            <div className="flex items-start gap-2 rounded-list border border-signal-danger/30 bg-signal-danger/10 px-3 py-2.5">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-signal-danger" />
               <p className="text-xs leading-relaxed text-signal-danger">
                 Your connected wallet has only{" "}
                 <span className="font-mono font-medium">{(walletSol ?? 0).toFixed(6)} SOL</span>.
                 Creating a proposal needs at least{" "}
-                <span className="font-mono font-medium">{PROPOSAL_RENT_THRESHOLD_SOL} SOL</span> to
-                cover account rent + fees. Top up your wallet and try again.
+                <span className="font-mono font-medium">{PROPOSAL_RENT_THRESHOLD_SOL} SOL</span>{" "}
+                to cover account rent + fees. Top up your wallet and try again.
               </p>
             </div>
           )}
-
-          <div className="rounded-lg border border-border bg-surface-2 px-3 py-2.5">
-            <p className="text-xs leading-relaxed text-ink-muted">
-              This creates a <span className="font-medium text-ink">multisig swap proposal</span>.
-              Once enough members approve, any member can execute and the swap will be performed by
-              the vault.
-            </p>
-          </div>
 
           <DialogFooter className="p-0 pt-0">
             <Button
@@ -566,7 +583,11 @@ export function SwapModal({
               className="w-full gap-2"
             >
               <ArrowLeftRight className="h-4 w-4" />
-              {pending ? "Creating proposal..." : "Create Swap Proposal"}
+              {pending
+                ? "Creating proposal…"
+                : amount && selectedInputToken && selectedOutputToken
+                  ? `Swap ${amount} ${selectedInputToken.symbol} → ${selectedOutputToken.symbol}`
+                  : "Create swap proposal"}
             </Button>
           </DialogFooter>
         </form>

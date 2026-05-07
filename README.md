@@ -496,7 +496,6 @@ This is the cleanest possible design given the program-owned vault constraint, w
 ### Next — Tier 2 (paridade Squads + privacy depth)
 - [ ] **Time locks** — UI in Settings + `createSetTimeLockProposal`; Squads v4 supports it natively, no on-chain change needed
 - [ ] **Custom roles** — DB-overlay permission model (admin / proposer / executor / viewer)
-- [ ] **Proposal simulator** — `simulateTransaction` preview before approving, surfaces balance deltas + errors
 - [ ] **Sub-vault gatekeeper parametrization** — `vault_index` parameter on the gatekeeper handlers; unlocks private ops in sub-vaults and recurring auto-cron (Anchor change + redeploy)
 - [ ] **Privacy bridge for spending limits** — limit-use deposits into Cloak instead of public transfer (depends on the gatekeeper change above)
 - [ ] **Recurring auto-cron** — background runner to fire schedules without a manual click (depends on gatekeeper change)
@@ -525,4 +524,4 @@ This is the cleanest possible design given the program-owned vault constraint, w
 
 **Devnet, feature-complete on Tier 1.** Private send, payroll, stealth invoices (bound + bearer), recurring payments (public + private), scoped audit links with signed exports and access log are all functional end-to-end on [aegisz.xyz](https://aegisz.xyz). Authentication uses session cookies with one wallet signature per 30 minutes; sensitive UTXO fields are encrypted at rest in PostgreSQL; rate limits are backed by Upstash Redis.
 
-Tier 2 work (time locks, custom roles, sub-vault gatekeeper parametrization, proposal simulator, multi-operator failover) is specced in [`docs/specs/2026-05-06-feature-roadmap-improvements.md`](docs/specs/2026-05-06-feature-roadmap-improvements.md). Mainnet deployment is gated on the gatekeeper security audit and Cloak mainnet API parity, both tracked in the roadmap below.
+Tier 2 work (time locks, custom roles, sub-vault gatekeeper parametrization, multi-operator failover) is specced in [`docs/specs/2026-05-06-feature-roadmap-improvements.md`](docs/specs/2026-05-06-feature-roadmap-improvements.md). Mainnet deployment is gated on the gatekeeper security audit and Cloak mainnet API parity, both tracked in the roadmap below.

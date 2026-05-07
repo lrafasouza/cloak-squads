@@ -2,7 +2,9 @@ import { getCurrentCluster } from "@/lib/cluster";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { isCadence } from "@/lib/recurring-cadence";
+import { SOL_MINT } from "@/lib/tokens";
 import { requireVaultMember } from "@/lib/vault-membership";
+import { MIN_PRIVATE_DEPOSIT_LAMPORTS } from "@cloak-squads/core/amount";
 import { PublicKey } from "@solana/web3.js";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
@@ -102,6 +104,17 @@ export async function POST(request: Request, context: { params: Promise<{ vault:
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid payload", details: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+
+  if (
+    parsed.data.privacy === "private" &&
+    parsed.data.mint === SOL_MINT &&
+    BigInt(parsed.data.amount) < MIN_PRIVATE_DEPOSIT_LAMPORTS
+  ) {
+    return NextResponse.json(
+      { error: "Amount is below the Cloak minimum of 0.01 SOL for private sends." },
       { status: 400 },
     );
   }

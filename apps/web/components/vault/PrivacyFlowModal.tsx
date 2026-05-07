@@ -54,7 +54,7 @@ export function PrivacyFlowModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="xl" className="p-6 sm:p-8">
+      <DialogContent size="xl" watermark watermarkSize={320} className="p-6 sm:p-8">
         <span className="text-eyebrow text-ink-subtle">How it works</span>
         <h2 className="mt-1.5 font-display text-2xl leading-tight text-ink sm:text-[26px]">
           Privacy Flow

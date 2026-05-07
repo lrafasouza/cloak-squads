@@ -1,5 +1,6 @@
 "use client";
 
+import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -76,11 +77,21 @@ export function DialogContent({
   children,
   size = "md",
   autoClose = false,
+  watermark = false,
+  watermarkSize = 240,
+  watermarkOpacity = 0.045,
 }: {
   className?: string;
   children: ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
   autoClose?: boolean;
+  /** Render the heraldic Æ watermark inside the dialog. Reserved for
+   *  surfaces that authorize value movement (Send, Swap, PrivacyFlow). */
+  watermark?: boolean;
+  /** Override watermark size (px). Default 240 — fits the modal frame. */
+  watermarkSize?: number;
+  /** Override watermark opacity. Default 0.045 (subtle whisper). */
+  watermarkOpacity?: number;
 }) {
   const { open, setOpen, dialogId } = useDialog();
   const contentRef = useRef<HTMLDivElement>(null);
@@ -171,13 +182,17 @@ export function DialogContent({
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className={cn(
-              "relative w-full",
-              "rounded-xl border border-border bg-surface shadow-raise-2",
+              "relative w-full overflow-hidden",
+              "rounded-modal border border-border bg-surface shadow-raise-2",
               sizes[size],
               className,
             )}
+            style={{
+              boxShadow:
+                "0 1px 0 0 hsl(var(--inset-highlight)) inset, 0 18px 56px -16px rgb(0 0 0 / 0.5)",
+            }}
             ref={contentRef}
             role="dialog"
             aria-modal="true"
@@ -185,7 +200,18 @@ export function DialogContent({
             aria-describedby={`${dialogId}-desc`}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <div className="absolute right-4 top-4 flex items-center gap-2">
+            {/* Heraldic gold seal — the "we are about to sign value" signal */}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-accent/0 via-accent to-accent/0"
+            />
+
+            {/* Optional Æ watermark — opt-in via `watermark` prop */}
+            {watermark && (
+              <HeraldicWatermark size={watermarkSize} opacity={watermarkOpacity} />
+            )}
+
+            <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
               {autoClose && (
                 <AutoCloseIndicator
                   key={autoCloseKey}
@@ -197,13 +223,13 @@ export function DialogContent({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            {children}
+            <div className="relative">{children}</div>
           </motion.div>
         </motion.div>
       )}
@@ -216,21 +242,50 @@ export function DialogContent({
 
 /* ── Header / Title / Description / Footer / Close ── */
 export function DialogHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-6 pb-0", className)} {...props} />;
+  // Top padding 24 (28 visually with the 3px ribbon above the content edge),
+  // bottom 0 — body owns the spacing below the title block.
+  return <div className={cn("px-6 pt-7 pb-0", className)} {...props} />;
 }
 
 export function DialogTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
   const { dialogId } = useDialog();
-  return <h2 id={`${dialogId}-title`} className={cn("font-display text-lg font-semibold text-ink pr-10", className)} {...props} />;
+  return (
+    <h2
+      id={`${dialogId}-title`}
+      className={cn(
+        "font-display text-xl font-semibold tracking-tight text-ink pr-10",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 export function DialogDescription({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {
   const { dialogId } = useDialog();
-  return <p id={`${dialogId}-desc`} className={cn("mt-1.5 text-sm text-ink-muted leading-relaxed", className)} {...props} />;
+  return (
+    <p
+      id={`${dialogId}-desc`}
+      className={cn("mt-1.5 text-sm leading-relaxed text-ink-muted", className)}
+      {...props}
+    />
+  );
 }
 
 export function DialogFooter({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col-reverse gap-3 p-6 pt-4 sm:flex-row sm:justify-end", className)} {...props} />;
+  // Padding here matches DialogHeader so consumers using the default
+  // shell stay symmetric. Modals with custom footer chrome (SendModal,
+  // SwapModal) override with `p-0 pt-0`.
+  return (
+    <div
+      className={cn(
+        "flex flex-col-reverse gap-3 px-6 pb-6 pt-5",
+        "sm:flex-row sm:justify-end",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 export function DialogClose({ className, children, ...props }: HTMLAttributes<HTMLButtonElement> & { children?: ReactNode }) {

@@ -21,7 +21,7 @@ import { lamportsToSol } from "@/lib/sol";
 import { createVaultProposal } from "@/lib/squads-sdk";
 import { SOL_MINT, tokenAmountToUnits } from "@/lib/tokens";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
-import { solAmountToLamports } from "@cloak-squads/core/amount";
+import { assertPrivateSolMinimum, solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import { encryptMemo, serializeEncryptedMemo } from "@cloak-squads/core/memo-crypto";
@@ -167,7 +167,8 @@ export function SendModal({
   }, [destType, mode]);
 
   const amountStep = isSol ? "0.000000001" : "0.000001";
-  const amountMin = isSol ? "0.000000001" : "0.000001";
+  const amountMin =
+    mode === "private" && isSol ? "0.01" : isSol ? "0.000000001" : "0.000001";
   const amountPlaceholder = isSol ? "0.0" : "0.00";
 
   useEffect(() => {
@@ -261,6 +262,15 @@ export function SendModal({
     if (tokenUnits === 0n) {
       setError("Amount must be greater than 0.");
       return;
+    }
+
+    if (mode === "private" && isSol) {
+      try {
+        assertPrivateSolMinimum(tokenUnits);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Amount below Cloak minimum.");
+        return;
+      }
     }
 
     setPending(true);

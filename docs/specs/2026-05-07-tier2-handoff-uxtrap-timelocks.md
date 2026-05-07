@@ -1,9 +1,9 @@
-# Tier 2 Handoff — UX Trap Fix + Proposal Simulator + Time Locks
+# Tier 2 Handoff — UX Trap Fix + Time Locks
 
 **Date:** 2026-05-07
 **Audience:** an AI agent or developer picking up this work cold
 **Status:** specced, not started
-**Order:** 1) UX trap fix (1h) → 2) Proposal simulator (2-3h) → 3) Time locks (3-4h)
+**Order:** 1) UX trap fix (1h) → 2) Time locks (3-4h)
 
 ---
 
@@ -261,285 +261,7 @@ No on-chain change, no data flow change, purely UI surface addition.
 
 ---
 
-## 2. Proposal Simulator (~2-3h)
-
-### Problem
-
-Today a multisig signer approves proposals "blind". They see amount,
-recipient, memo — but no preview of what the on-chain transaction will
-actually do. This breaks down for:
-
-- Misconstructed proposals (wrong recipient ATA, missing rent, etc.) — fails
-  at execute, gas wasted, user confused
-- Maliciously edited proposals (server compromise) — signer has no way to
-  verify intent
-- Complex multi-instruction proposals (Cloak deposit + license + vault
-  transfer) — signer can't confirm each leg matches expectations
-
-Squads.so has this. Not having it makes signers nervous.
-
-### Fix
-
-Add a "Simulate" button to `apps/web/app/vault/[multisig]/proposals/[id]/page.tsx`
-that runs `connection.simulateTransaction()` against the reconstructed
-proposal and renders a structured panel showing balance deltas per account,
-the instruction trace, and any errors.
-
-### Files to touch
-
-- New: `apps/web/lib/proposal-simulator.ts`
-- New: `apps/web/components/proposal/SimulatePanel.tsx`
-- Modify: `apps/web/app/vault/[multisig]/proposals/[id]/page.tsx` — add button + panel
-- Optionally new: `tests/unit/proposal-simulator.test.ts` (mock connection)
-
-### Implementation
-
-#### `lib/proposal-simulator.ts`
-
-```ts
-import { Connection, PublicKey, type SimulatedTransactionResponse } from "@solana/web3.js";
-import * as multisigSdk from "@sqds/multisig";
-
-export type BalanceDelta = {
-  address: string;
-  preBalance: number;
-  postBalance: number;
-  delta: number;
-};
-
-export type SimulationResult = {
-  ok: boolean;
-  err: string | null;
-  logs: string[];
-  balanceDeltas: BalanceDelta[];
-  computeUnits: number | null;
-  unitsConsumedFraction: number; // 0..1 of compute budget
-};
-
-/**
- * Simulate a Squads proposal's vaultTransactionExecute against an RPC node.
- *
- * Uses `replaceRecentBlockhash: true` so the call works without a fresh
- * blockhash from the proposer. `sigVerify: false` skips signature checks
- * (the proposal hasn't actually been signed yet by the executor — we just
- * want to see the on-chain effect).
- *
- * The accounts list is built from the inner instructions of the vault
- * transaction, so the response includes preBalance/postBalance for every
- * account that the proposal touches. Balance deltas are computed from there.
- */
-export async function simulateProposal({
-  connection,
-  multisig,
-  transactionIndex,
-  proposer,
-}: {
-  connection: Connection;
-  multisig: PublicKey;
-  transactionIndex: bigint;
-  proposer: PublicKey; // wallet that would execute (any member works for simulation)
-}): Promise<SimulationResult> {
-  // Build the on-chain execute transaction. The Squads SDK exposes a helper
-  // that returns the unsigned transaction — we feed that to simulate.
-  const tx = await multisigSdk.transactions.vaultTransactionExecute({
-    connection,
-    multisigPda: multisig,
-    transactionIndex,
-    member: proposer,
-    blockhash: (await connection.getLatestBlockhash()).blockhash,
-    feePayer: proposer,
-  });
-
-  // Collect every account referenced by any instruction so simulate returns
-  // their pre/post balances.
-  const accountsTouched = new Set<string>();
-  for (const ix of tx.message.compiledInstructions ?? []) {
-    for (const idx of ix.accountKeyIndexes) {
-      const key = tx.message.staticAccountKeys[idx];
-      if (key) accountsTouched.add(key.toBase58());
-    }
-  }
-
-  const sim = await connection.simulateTransaction(tx, {
-    sigVerify: false,
-    replaceRecentBlockhash: true,
-    commitment: "confirmed",
-    accounts: {
-      encoding: "base64",
-      addresses: [...accountsTouched],
-    },
-  });
-
-  return shapeSimulation(sim.value, [...accountsTouched]);
-}
-
-function shapeSimulation(
-  raw: SimulatedTransactionResponse,
-  addresses: string[],
-): SimulationResult {
-  const logs = raw.logs ?? [];
-  const err = raw.err ? JSON.stringify(raw.err) : null;
-  const ok = err === null;
-
-  const balanceDeltas: BalanceDelta[] = [];
-  if (raw.accounts) {
-    raw.accounts.forEach((acc, i) => {
-      const address = addresses[i];
-      if (!address || !acc) return;
-      const post = acc.lamports;
-      // Pre-balance must come from a separate getMultipleAccounts call;
-      // simulateTransaction returns POST only. To compute deltas we'd need
-      // pre-state. For now we approximate via logs ("Program N consumed X"),
-      // OR fetch pre-balances upfront (cleanest). Keeping simple: fetch pre
-      // before sim, store, subtract.
-      // (See full impl in `simulateProposalWithDeltas`.)
-      balanceDeltas.push({ address, preBalance: 0, postBalance: post, delta: post });
-    });
-  }
-
-  const computeUnits = raw.unitsConsumed ?? null;
-  const unitsConsumedFraction = computeUnits ? Math.min(1, computeUnits / 1_400_000) : 0;
-
-  return { ok, err, logs, balanceDeltas, computeUnits, unitsConsumedFraction };
-}
-```
-
-> NOTE: The deltas calculation needs a `getMultipleAccountsInfo` call BEFORE
-> simulate to capture pre-balances. The skeleton above leaves a TODO; flesh it
-> out by:
-> 1. Fetch pre-balances: `await connection.getMultipleAccountsInfo(addresses.map(a => new PublicKey(a)))`
-> 2. Run `simulateTransaction`
-> 3. Compute `delta = postBalance - preBalance` for each address
-
-#### `SimulatePanel.tsx`
-
-```tsx
-"use client";
-
-import { Panel, PanelBody, PanelHeader, StatusPill } from "@/components/ui/workspace";
-import { lamportsToSol } from "@/lib/sol";
-import type { SimulationResult } from "@/lib/proposal-simulator";
-import { ArrowDownRight, ArrowUpRight, AlertTriangle, CheckCircle2 } from "lucide-react";
-
-export function SimulatePanel({ result }: { result: SimulationResult }) {
-  return (
-    <Panel>
-      <PanelHeader
-        icon={result.ok ? CheckCircle2 : AlertTriangle}
-        title={result.ok ? "Simulation passed" : "Simulation failed"}
-        action={
-          <StatusPill tone={result.ok ? "success" : "danger"}>
-            {result.ok ? "OK" : "Error"}
-          </StatusPill>
-        }
-      />
-      <PanelBody className="space-y-4">
-        {result.err && (
-          <div className="rounded-md border border-signal-danger/30 bg-signal-danger/5 p-3 font-mono text-xs text-signal-danger">
-            {result.err}
-          </div>
-        )}
-
-        {/* Balance deltas */}
-        {result.balanceDeltas.length > 0 && (
-          <div>
-            <p className="text-eyebrow text-ink-subtle mb-2">Balance changes</p>
-            <ul className="space-y-1.5">
-              {result.balanceDeltas
-                .filter((d) => d.delta !== 0)
-                .map((d) => (
-                  <li key={d.address} className="flex items-center justify-between rounded-md bg-surface-2/50 px-3 py-2 text-sm">
-                    <span className="font-mono text-xs text-ink-muted">
-                      {d.address.slice(0, 8)}…{d.address.slice(-6)}
-                    </span>
-                    <span className={`flex items-center gap-1 font-mono ${d.delta > 0 ? "text-signal-positive" : "text-signal-danger"}`}>
-                      {d.delta > 0 ? <ArrowDownRight className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
-                      {d.delta > 0 ? "+" : ""}
-                      {lamportsToSol(Math.abs(d.delta))} SOL
-                    </span>
-                  </li>
-                ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Compute units */}
-        {result.computeUnits !== null && (
-          <div className="text-xs text-ink-subtle">
-            Compute units consumed: {result.computeUnits.toLocaleString()} / 1,400,000
-            ({(result.unitsConsumedFraction * 100).toFixed(1)}%)
-          </div>
-        )}
-
-        {/* Logs (collapsible, default closed) */}
-        <details className="text-xs">
-          <summary className="cursor-pointer text-ink-muted hover:text-ink">
-            Instruction logs ({result.logs.length})
-          </summary>
-          <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-bg/50 p-3 font-mono text-[10px] text-ink-subtle">
-            {result.logs.join("\n")}
-          </pre>
-        </details>
-      </PanelBody>
-    </Panel>
-  );
-}
-```
-
-#### Integrate in proposal detail page
-
-In `apps/web/app/vault/[multisig]/proposals/[id]/page.tsx`:
-
-1. Add a `<Button variant="outline">Simulate</Button>` next to existing
-   Sign / Execute buttons
-2. State: `const [simResult, setSimResult] = useState<SimulationResult | null>(null);` and `loading`
-3. Handler: `await simulateProposal({ connection, multisig: multisigPk, transactionIndex: BigInt(transactionIndex), proposer: wallet.publicKey })`
-4. Render `<SimulatePanel result={simResult} />` below the proposal details
-
-### Edge cases
-
-- **Proposal already executed** — disable Simulate button (compare
-  `proposal.status === "executed"`), show tooltip "Already executed"
-- **Stale blockhash** — `replaceRecentBlockhash: true` handles this
-- **RPC timeout** — wrap in try/catch, surface "Simulation timed out — try again"
-- **Cloak deposit not visible in sim** — the simulator only sees the Squads
-  vault transaction (vault → operator transfer + license issue). The
-  subsequent Cloak deposit by the operator wallet is a SEPARATE tx and isn't
-  part of this simulation. Document this in the SimulatePanel description:
-  "Shows the on-chain effect of the multisig execution. Operator-side Cloak
-  deposit runs as a separate transaction."
-- **Compute unit limit** — if `unitsConsumed > 1,400,000` simulation throws;
-  unlikely for our flows (we're well under 200k for any single proposal)
-
-### Tests
-
-Mock-based unit test in `tests/unit/proposal-simulator.test.ts`:
-- Stub a `Connection` whose `simulateTransaction` returns a known shape
-- Verify `shapeSimulation` returns expected deltas, ok flag, error mapping
-
-Manual devnet:
-1. Open an unexecuted proposal → click Simulate → see balance deltas
-2. Make a proposal with intentionally wrong recipient → Simulate → "Error" pill + JSON err
-3. Confirm the panel renders both successful and failed simulations
-
-### Risk: Low
-RPC `simulateTransaction` is read-only — no chain mutation, no DB writes.
-Only failure modes are RPC unavailability (catch) or stale blockhash
-(handled by `replaceRecentBlockhash`).
-
-### Effort breakdown
-
-| Step | Time |
-|---|---|
-| `simulateProposal` helper with pre/post deltas | 1h |
-| `SimulatePanel` component | 45min |
-| Integrate into proposal detail page (button + state + render) | 30min |
-| Edge cases + cache result for 60s | 30min |
-| Manual devnet validation across proposal types (transfer, payroll, config) | 30min |
-
----
-
-## 3. Time Locks (~3-4h)
+## 2. Time Locks (~3-4h)
 
 ### Problem
 
@@ -769,16 +491,15 @@ consumption. No new program, no new account, no migration.
 
 ## Cross-cutting
 
-### After all 3 ship
+### After both ship
 
 Update memory:
-- Add a memory entry for "Tier 2 batch 1: UX trap fix + simulator + time
-  locks" pointing at the relevant commits and this spec
+- Add a memory entry for "Tier 2 batch 1: UX trap fix + time locks"
+  pointing at the relevant commits and this spec
 - If anything surprising came up, capture as a feedback memory
 
 Update README:
 - Add Time Locks to the feature table under Governance
-- Add Proposal Simulator to the feature table
 
 ### Useful repo files to read first
 
@@ -788,8 +509,6 @@ Update README:
   is currently shown
 - `apps/web/lib/squads-sdk.ts` — SDK helper patterns to copy
 - `apps/web/lib/use-vault-data.ts` — multisig account read pattern
-- `apps/web/app/vault/[multisig]/proposals/[id]/page.tsx` — proposal detail
-  page where Simulate button goes
 - `apps/web/app/vault/[multisig]/settings/page.tsx` — where Security section
   goes
 - `apps/web/app/vault/[multisig]/recurring/page.tsx` — recent example of a
@@ -836,8 +555,7 @@ Match existing repo conventions:
 ## Recommended order
 
 1. UX trap fix first (1h, defensive, prevents fund loss while other features ship)
-2. Simulator (2-3h, ROI on every proposal flow)
-3. Time locks (3-4h, capstone institutional feature)
+2. Time locks (3-4h, capstone institutional feature)
 
-Total: ~6-9h. Each ships as its own commit. After all three, run a final
+Total: ~4-5h. Each ships as its own commit. After both, run a final
 typecheck + biome pass + vitest, then push.
