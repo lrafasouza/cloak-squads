@@ -1,10 +1,23 @@
 "use client";
 
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
-import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
+import { ConnectionProvider, WalletProvider, useConnection } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { type ConnectionConfig, clusterApiUrl } from "@solana/web3.js";
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
+
+// Pre-warm the RPC so wallets can resolve the cluster (via genesisHash)
+// before the user's first signTransaction. Without this, the first send
+// can race the wallet's network detection — Phantom/Backpack fall back
+// to "Mainnet" when the probe hasn't completed, surfacing a misleading
+// warning that disappears on refresh.
+function ConnectionWarmup() {
+  const { connection } = useConnection();
+  useEffect(() => {
+    connection.getGenesisHash().catch(() => {});
+  }, [connection]);
+  return null;
+}
 
 function adapterNetworkFromEnv() {
   switch (process.env.NEXT_PUBLIC_SOLANA_CLUSTER) {
@@ -40,6 +53,7 @@ export function WalletProviders({ children }: { children: ReactNode }) {
 
   return (
     <ConnectionProvider endpoint={endpoint} config={config}>
+      <ConnectionWarmup />
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>

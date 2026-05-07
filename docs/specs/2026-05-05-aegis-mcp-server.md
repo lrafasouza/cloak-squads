@@ -204,7 +204,7 @@ User configura **3 variáveis de ambiente** no MCP host:
       "command": "npx",
       "args": ["-y", "@aegis/mcp-server"],
       "env": {
-        "AEGIS_API_URL": "https://aegis.app",
+        "AEGIS_API_URL": "https://aegisz.xyz",
         "AEGIS_KEYPAIR_PATH": "/Users/me/.aegis/proposer.json",
         "AEGIS_DEFAULT_VAULT": "Cofre7xR8m..."
       }
@@ -215,7 +215,7 @@ User configura **3 variáveis de ambiente** no MCP host:
 
 | Var | Obrigatório | Descrição |
 |---|---|---|
-| `AEGIS_API_URL` | sim | URL do app web Aegis. Default: `https://aegis.app`. |
+| `AEGIS_API_URL` | sim | URL do app web Aegis. Default: `https://aegisz.xyz`. |
 | `AEGIS_KEYPAIR_PATH` | sim | Caminho de arquivo JSON `[byte, byte, ...]` (formato `solana-keygen`). |
 | `AEGIS_DEFAULT_VAULT` | não | Cofre default. Tools sem `vault` arg usam este. |
 | `AEGIS_NETWORK` | não | `mainnet` \| `devnet`. Default: `devnet`. |
@@ -461,7 +461,7 @@ Claude:
         c. POST /api/stealth (registra invoice no DB)
      → Returns { id, claimUrl: "/claim/abc#v=1&sk=...&vault=..." }
 
-Claude → User: "Done. Send Alex this link: https://aegis.app/claim/abc#v=1&sk=..."
+Claude → User: "Done. Send Alex this link: https://aegisz.xyz/claim/abc#v=1&sk=..."
 ```
 
 Privacy aqui é completa: Alex nunca expõe wallet ao receber. Sem operator, sem ZK. Apenas NaCl.
@@ -482,7 +482,7 @@ Claude:
   → Server cria DB row + on-chain audit-link account
   → Returns { linkId, publicUrl }
 
-Claude: "Send this to the auditor: https://aegis.app/audit/abc123 (expires May 12)."
+Claude: "Send this to the auditor: https://aegisz.xyz/audit/abc123 (expires May 12)."
 ```
 
 ---
@@ -513,7 +513,7 @@ mcp-publisher publish
   "name": "io.github.lrafasouza/aegis-mcp-server",
   "description": "Multisig treasury for AI agents — propose payments, manage invoices, export audits on Solana with Squads + Aegis Gatekeeper",
   "repository": "https://github.com/lrafasouza/Aegis",
-  "homepage": "https://aegis.app",
+  "homepage": "https://aegisz.xyz",
   "license": "MIT",
   "version": "0.1.0",
   "packages": [{ "registry": "npm", "name": "@aegis/mcp-server" }]
@@ -576,7 +576,7 @@ mcp-publisher publish
 
 ### v0.3
 - Streamable HTTP transport com OAuth 2.1
-- Aegis-hosted instance (`aegis.app/mcp`)
+- Aegis-hosted instance (`aegisz.xyz/mcp`)
 - SSE notifications quando proposal aprovado/executado
 
 ### v0.4

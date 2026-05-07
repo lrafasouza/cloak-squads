@@ -61,6 +61,20 @@ function hexToBytes(hex: string) {
   return out;
 }
 
+// Wallets fall back to "mainnet" when their cluster probe hasn't completed
+// before the first signTransaction. Detect that case so we can replace the
+// raw wallet error with an actionable hint instead of leaving the user
+// staring at "WalletSendTransactionError: ... mainnet ...".
+function isWalletNetworkMismatch(message: string) {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("mainnet") ||
+    lower.includes("wrong network") ||
+    lower.includes("network mismatch") ||
+    lower.includes("different network")
+  );
+}
+
 type SendMode = "private" | "public";
 
 export function SendModal({
@@ -565,7 +579,10 @@ export function SendModal({
       });
       handleClose(false);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Transaction failed.";
+      const raw = err instanceof Error ? err.message : "Transaction failed.";
+      const message = isWalletNetworkMismatch(raw)
+        ? "Your wallet hasn't detected the network yet. Refresh the page and try again, or switch your wallet to devnet manually."
+        : raw;
       setError(message);
       failTransaction(message);
     } finally {

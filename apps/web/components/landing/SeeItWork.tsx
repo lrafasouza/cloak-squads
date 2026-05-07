@@ -536,7 +536,7 @@ function AppFrame({
         </div>
         <div className="ml-3 flex items-center gap-1.5 rounded-md bg-bg/60 px-2.5 py-1 font-mono text-[10px] text-ink-subtle shrink min-w-0">
           <Wallet className="h-3 w-3 shrink-0" />
-          <span className="truncate">aegis.com</span>
+          <span className="truncate">aegisz.xyz</span>
         </div>
         <span className="ml-auto hidden sm:inline-flex items-center gap-1 rounded-full border border-border/50 bg-bg/40 px-2 py-0.5 font-mono text-[9px] uppercase tracking-eyebrow text-ink-subtle shrink-0">
           <Building2 className="h-2.5 w-2.5" />

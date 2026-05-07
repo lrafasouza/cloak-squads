@@ -1,6 +1,5 @@
 "use client";
 
-import { ProofGenerationState } from "@/components/proof/ProofGenerationState";
 import { Button } from "@/components/ui/button";
 import type { ProofStepId } from "@/lib/cloak-progress";
 import { publicEnv } from "@/lib/env";
@@ -322,22 +321,6 @@ function TransactionModal({
               )}
             >
               {transaction.detail}
-            </div>
-          ) : null}
-
-          {/* ZK proof phase visual — operator + claim flows emit proofStep /
-              proofProgress while snarkjs runs. ProofGenerationState uses pure
-              CSS animations so it stays alive on the compositor thread even
-              while the JS thread is blocked by the proof. */}
-          {transaction.status === "running" &&
-          (transaction.proofStep || typeof transaction.proofProgress === "number") ? (
-            <div className="mb-4">
-              <ProofGenerationState
-                currentStep={transaction.proofStep ?? null}
-                {...(transaction.proofProgress !== undefined
-                  ? { proofProgress: transaction.proofProgress }
-                  : {})}
-              />
             </div>
           ) : null}
 

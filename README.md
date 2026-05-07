@@ -6,7 +6,7 @@ Every Squads vault transfer is public by default — block explorers show the ex
 
 Aegis is the privacy layer that any Solana multisig can integrate — extending Squads first, with CPI hooks for Realms and custom multisigs next. It turns approval-gated multisig payments into cryptographically unlinkable, auditable, compliance-ready transfers — without changing how teams already vote. A custom on-chain gatekeeper program issues single-use, time-limited licenses. A registered operator uses those licenses to route payments through the **Cloak protocol** — a zero-knowledge shield pool that breaks the on-chain link between sender and recipient.
 
-**Live demo:** [https://aegis-web-iiv0.onrender.com](https://aegis-web-iiv0.onrender.com) (devnet)
+**Live demo:** [https://aegisz.xyz](https://aegisz.xyz) (devnet)
 
 **Built for the [Cloak Track](https://superteam.fun/earn/listing/cloak-track).**
 
@@ -28,7 +28,7 @@ Wallet A = multisig member / proposer
 Wallet B = operator (executes private payments)
 ```
 
-1. Open [https://aegis-web-iiv0.onrender.com](https://aegis-web-iiv0.onrender.com) with **Wallet A**
+1. Open [https://aegisz.xyz](https://aegisz.xyz) with **Wallet A**
 2. Click **Create Vault** → configure a 1-of-1 multisig with Wallet A as the only member and **Wallet B as operator**
 3. Fund the vault with ~0.1 devnet SOL (the vault has a deposit address on the dashboard)
 4. Click **Private Send** → enter Wallet B's address and 0.01 SOL

@@ -15,10 +15,10 @@ export const metadata: Metadata = {
   title: "Aegis — Private execution for shared treasuries",
   description:
     "Private multisig payments on Solana. Single-use execution licenses for Squads vaults, settled privately through Cloak Protocol.",
-  metadataBase: new URL("https://aegis-web-iiv0.onrender.com"),
+  metadataBase: new URL("https://aegisz.xyz"),
   openGraph: {
     type: "website",
-    url: "https://aegis-web-iiv0.onrender.com/",
+    url: "https://aegisz.xyz/",
     title: "Aegis — Private execution for shared treasuries",
     description:
       "Private multisig payments on Solana. Single-use execution licenses for Squads vaults, settled privately through Cloak Protocol.",
@@ -35,7 +35,6 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Aegis — Private execution for shared treasuries",
     description: "Private multisig payments on Solana. Single-use execution licenses for Squads vaults, settled privately through Cloak Protocol.",
-    creator: "@aegis_fi",
     images: ["/og.jpg?v=3"],
   },
   manifest: "/site.webmanifest",

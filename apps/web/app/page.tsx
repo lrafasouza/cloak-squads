@@ -95,7 +95,7 @@ function HeroSection() {
               Open Vault
             </Link>
             <a
-              href="https://docs.aegis.com"
+              href="https://docs.aegisz.xyz"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center rounded-xl border border-border-strong bg-transparent px-5 py-3.5 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"

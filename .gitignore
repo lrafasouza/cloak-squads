@@ -21,5 +21,6 @@ scripts/.demo-cofre-2ofn.json
 claude-session.jsonl
 .superstack/
 .codex
+.claude/
 handoff/
 handoff

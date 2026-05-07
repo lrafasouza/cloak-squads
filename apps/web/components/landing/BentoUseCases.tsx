@@ -238,7 +238,7 @@ function PayrollMockup() {
 
 function InvoicingMockup() {
   const [qrSvg, setQrSvg] = useState<string | null>(null);
-  const claimUrl = "aegis.com/claim/inv_8a4hk2q1z";
+  const claimUrl = "aegisz.xyz/claim/inv_8a4hk2q1z";
 
   useEffect(() => {
     let cancelled = false;
@@ -392,7 +392,7 @@ function AuditMockup() {
           </div>
           <div className="ml-3 inline-flex items-center gap-1.5 rounded-md bg-bg/60 px-2.5 py-0.5 font-mono text-[10px] text-ink-subtle">
             <Lock className="h-2.5 w-2.5 text-signal-positive" />
-            audit.aegis.com/m_xx7qz
+            audit.aegisz.xyz/m_xx7qz
           </div>
         </div>
 
