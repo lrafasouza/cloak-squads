@@ -87,9 +87,9 @@ export function OverviewCard({
       {/* Watermark — Æ embossing in the bottom-right of the card */}
       <HeraldicWatermark size={360} opacity={0.04} />
 
-      <div className="relative flex flex-col gap-6 p-6 md:flex-row md:items-start md:gap-8 md:p-8">
-        {/* ── Left: identity + balance ledger ── */}
-        <div className="flex-1 min-w-0">
+      <div className="relative p-6 md:p-8">
+        {/* ── Identity + balance ledger ── */}
+        <div className="min-w-0">
           {/* Eyebrow + refresh */}
           <div className="flex items-center justify-between">
             <p className="text-eyebrow">Total Treasury · Live</p>
@@ -214,32 +214,26 @@ export function OverviewCard({
           </div>
         </div>
 
-        {/* ── Right: vertical actions stack ──
-            Send Private is the brand-forward primary; Deposit/Swap recede.
-            Star pip on Send Private flags the differentiated capability. */}
-        <div className="flex w-full shrink-0 flex-row gap-2 md:w-56 md:flex-col">
+        {/* ── Quick actions — horizontal grid under the ledger.
+            Send Private keeps the gradient+star treatment so the
+            differentiated capability still leads visually, but the
+            three actions sit at familiar wallet-equivalent positions. */}
+        <div className="mt-6 grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={onSend}
             className={cn(
-              "group/cta relative inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition-aegis md:flex-initial",
+              "inline-flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-xs font-semibold transition-aegis sm:gap-2 sm:px-3 sm:text-sm",
               "bg-gradient-to-r from-accent to-accent-hover text-accent-ink shadow-raise-1 hover:shadow-accent-glow",
             )}
           >
             <Lock className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
             <span>Send Private</span>
-            <span
-              aria-hidden="true"
-              className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-brass text-[8px] font-bold text-accent-ink shadow-raise-1"
-              title="Differentiated action"
-            >
-              ★
-            </span>
           </button>
           <button
             type="button"
             onClick={onReceive}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-border/70 bg-transparent px-3 py-3 text-sm font-medium text-ink-muted transition-aegis hover:border-border-strong hover:bg-surface-2 hover:text-ink md:flex-initial"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border/70 bg-transparent px-2 py-2.5 text-xs font-medium text-ink-muted transition-aegis hover:border-border-strong hover:bg-surface-2 hover:text-ink sm:gap-2 sm:px-3 sm:text-sm"
           >
             <ArrowDownToLine className="h-4 w-4" strokeWidth={1.5} />
             Deposit
@@ -247,7 +241,7 @@ export function OverviewCard({
           <button
             type="button"
             onClick={onSwap}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-border/70 bg-transparent px-3 py-3 text-sm font-medium text-ink-muted transition-aegis hover:border-border-strong hover:bg-surface-2 hover:text-ink md:flex-initial"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border/70 bg-transparent px-2 py-2.5 text-xs font-medium text-ink-muted transition-aegis hover:border-border-strong hover:bg-surface-2 hover:text-ink sm:gap-2 sm:px-3 sm:text-sm"
           >
             <ArrowLeftRight className="h-4 w-4" strokeWidth={1.5} />
             Swap
