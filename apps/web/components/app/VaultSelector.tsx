@@ -134,7 +134,7 @@ function VaultSelectorContent({
         {connected && myVaultsLoading && (
           <div className="flex items-center justify-center gap-2 px-2.5 py-4">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-subtle" />
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+            <p className="text-eyebrow">
               Loading your vaults…
             </p>
           </div>
@@ -142,7 +142,7 @@ function VaultSelectorContent({
 
         {connected && filteredMyVaults.length > 0 && (
           <div className="mb-1">
-            <p className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+            <p className="text-eyebrow px-2.5 py-1.5">
               Your Vaults
             </p>
             <div className="space-y-0.5">

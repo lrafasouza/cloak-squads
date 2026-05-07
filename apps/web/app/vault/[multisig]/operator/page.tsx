@@ -1773,8 +1773,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           <div className="lg:col-span-5 lg:flex">
             {queueDrafts.length === 0 ? (
               /* Calm empty state — flex h-full to match the detail column's
-                  placeholder card height; visual parity left ↔ right */
-              <div className="card-panel flex h-full w-full flex-col items-center justify-center px-6 py-12 text-center">
+                  placeholder card height on lg+; min-h on mobile keeps the
+                  card from collapsing when there's no parent height */
+              <div className="card-panel flex min-h-[16rem] w-full flex-col items-center justify-center px-6 py-12 text-center lg:h-full lg:min-h-0">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface-2 text-ink-subtle">
                   <Inbox className="h-5 w-5" aria-hidden="true" />
                 </div>

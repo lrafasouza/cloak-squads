@@ -207,7 +207,7 @@ function OperatorInboxRow({
           {/* Status — quiet dot + label, no border-pill noise */}
           <div className="flex shrink-0 items-center gap-1.5">
             <span className={cn("h-1.5 w-1.5 rounded-full", tone.dot)} aria-hidden="true" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+            <span className="text-eyebrow">
               {tone.label}
             </span>
           </div>

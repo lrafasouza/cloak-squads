@@ -115,7 +115,7 @@ function ImportCard({ index }: { index: number }) {
         aria-disabled="true"
         className="group relative flex w-full flex-col items-center gap-5 rounded-2xl border border-dashed border-border bg-surface/20 p-6 pb-5 opacity-60 backdrop-blur-sm sm:p-10 sm:pb-7"
       >
-        <span className="absolute right-3 top-3 rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+        <span className="text-eyebrow absolute right-3 top-3 rounded-full border border-border bg-surface-2 px-2 py-0.5">
           Coming soon
         </span>
 

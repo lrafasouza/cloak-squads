@@ -95,7 +95,7 @@ function ProposalRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+          <span className="text-eyebrow">
             {typeLabel}
           </span>
           <span className="font-mono text-[10px] text-ink-subtle">#{p.transactionIndex}</span>
@@ -161,7 +161,7 @@ function IncomeRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+          <span className="text-eyebrow">
             Received
           </span>
           {toLabel && (
@@ -213,7 +213,7 @@ export function RecentActivityCard({
   if (!isLoading && activity.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-surface transition-colors duration-200 hover:border-accent/15">
+    <div className="card-panel">
       <div className="flex items-center justify-between border-b border-border/50 px-6 py-5">
         <h3 className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">
           Recent Activity

@@ -15,7 +15,7 @@ export function StatCard({ label, value, icon: Icon, sub, className }: StatCardP
   return (
     <div
       className={cn(
-        "group rounded-xl border border-border/60 bg-surface p-5 transition-all duration-300 hover:border-accent/15 hover:bg-surface-2/50 hover:shadow-raise-1",
+        "group card-panel p-5 hover:bg-surface-2/50",
         className,
       )}
     >

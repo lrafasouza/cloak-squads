@@ -43,6 +43,12 @@
     /* Inset highlight — subtle dark on top edge of light cards */
     --inset-highlight: 220 25% 12% / 0.04;
 
+    /* Shimmer — separate tokens because surface-2 ↔ surface-3 in light
+     * is too narrow a delta (4% L) to read as motion. Bumping surface-3
+     * darker would affect 22+ unrelated usages, so we keep this isolated. */
+    --shimmer-from: 38 22% 95%;   /* same as surface-2 */
+    --shimmer-to: 38 16% 84%;     /* darker pass through, ~11% L delta */
+
     /* Signals — desaturated, contrast-safe on light */
     --signal-positive: 100 35% 30%; /* deep green */
     --signal-warn: 30 70% 38%;
@@ -88,6 +94,11 @@
 
     /* Inset highlight — light on top edge of dark cards */
     --inset-highlight: 240 5% 96% / 0.04;
+
+    /* Shimmer — surface-2 ↔ surface-3 already reads as motion in dark
+     * mode (~4% L delta against a near-black backdrop, plenty visible). */
+    --shimmer-from: 220 13% 12%;
+    --shimmer-to: 220 13% 16%;
 
     /* Signals */
     --signal-positive: 100 35% 55%;
@@ -197,9 +208,9 @@
   .shimmer-bg {
     background: linear-gradient(
       90deg,
-      hsl(var(--surface-2)) 0%,
-      hsl(var(--surface-3)) 50%,
-      hsl(var(--surface-2)) 100%
+      hsl(var(--shimmer-from)) 0%,
+      hsl(var(--shimmer-to)) 50%,
+      hsl(var(--shimmer-from)) 100%
     );
     background-size: 200% 100%;
     animation: shimmer 2s ease-in-out infinite;
