@@ -14,6 +14,9 @@ import { useMemo } from "react";
 export interface SubVaultBalance {
   name: string;
   vaultIndex: number;
+  /** Base58 PDA derived for this sub-vault, surfaced so callers don't need to
+   *  re-derive when comparing addresses (e.g. internal-vs-external KPI filter). */
+  address: string;
   balanceSol: string;
   usdcUi: string;
 }
@@ -22,6 +25,9 @@ export interface VaultData {
   balanceLamports: number;
   balanceSol: string;
   primaryBalanceSol: string;
+  /** Base58 of the primary vault PDA. Same role as `SubVaultBalance.address` but
+   *  for `vaultIndex = 0`. */
+  primaryVaultAddress: string;
   usdcRaw: bigint;
   usdcUi: string;
   subVaultBreakdown: SubVaultBalance[];
@@ -118,6 +124,7 @@ export function useVaultData(multisig: string) {
         subVaultBreakdown.push({
           name: sv.name,
           vaultIndex: sv.vaultIndex,
+          address: sv.pda.toBase58(),
           balanceSol: lamportsToSol(String(svLamports)),
           usdcUi: formatTokenAmount(svUsdc, USDC_DECIMALS),
         });
@@ -130,6 +137,7 @@ export function useVaultData(multisig: string) {
         balanceLamports: totalLamports,
         balanceSol: lamportsToSol(String(totalLamports)),
         primaryBalanceSol: lamportsToSol(String(primaryLamports)),
+        primaryVaultAddress: primaryVaultPda.toBase58(),
         usdcRaw: totalUsdcRaw,
         usdcUi: formatTokenAmount(totalUsdcRaw, USDC_DECIMALS),
         subVaultBreakdown,

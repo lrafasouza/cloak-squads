@@ -8,7 +8,21 @@ export type ActivityItem =
   | { kind: "proposal"; timestamp: number; data: ProposalSummary }
   | IncomeEntry;
 
-export function useRecentActivity(multisig: string, limit = 10) {
+/**
+ * Recent activity feed = executed/rejected/cancelled proposals merged with
+ * income deposits, sorted newest first.
+ *
+ * `internalAddresses` lets the caller hide income rows that originated from
+ * a sub-vault or the primary vault — those moves are already represented by
+ * their corresponding proposal, so showing both creates a duplicate "Sent
+ * 0.2 SOL → Payroll" + "Received 0.2 SOL from <PDA>" pair. Pass `undefined`
+ * to keep every income row (legacy behavior for callers without vault data).
+ */
+export function useRecentActivity(
+  multisig: string,
+  limit = 10,
+  internalAddresses?: ReadonlySet<string>,
+) {
   const proposalQuery = useProposalSummaries(multisig);
   const incomeQuery = useVaultIncome(multisig, limit);
 
@@ -23,7 +37,10 @@ export function useRecentActivity(multisig: string, limit = 10) {
       data: p,
     }));
 
-  const income: ActivityItem[] = incomeQuery.data ?? [];
+  const incomeRaw: IncomeEntry[] = incomeQuery.data ?? [];
+  const income: ActivityItem[] = internalAddresses
+    ? incomeRaw.filter((i) => !internalAddresses.has(i.from))
+    : incomeRaw;
 
   const activity = [...proposals, ...income]
     .sort((a, b) => {

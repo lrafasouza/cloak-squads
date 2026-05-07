@@ -19,7 +19,7 @@ import { useVaultMetadata } from "@/lib/use-vault-metadata";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, Copy, Shield } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 function DashboardVaultIdentity({ multisig }: { multisig: string }) {
   const { data: vaultMeta } = useVaultMetadata(multisig);
@@ -68,7 +68,22 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useVaultData(multisig);
   const { data: proposals = [] } = useProposalSummaries(multisig);
-  const { activity, isLoading: activityLoading } = useRecentActivity(multisig, 5);
+  // Build the multisig's own address set once and share it with every consumer
+  // that needs to distinguish "value entering the treasury" from "shuffle
+  // between our own vaults". Keeping this in the dashboard avoids each child
+  // re-deriving PDAs and ensures a single referential identity across renders.
+  const internalAddresses = useMemo(() => {
+    if (!data) return undefined;
+    const addrs = new Set<string>();
+    addrs.add(data.primaryVaultAddress);
+    for (const sv of data.subVaultBreakdown) addrs.add(sv.address);
+    return addrs;
+  }, [data]);
+  const { activity, isLoading: activityLoading } = useRecentActivity(
+    multisig,
+    5,
+    internalAddresses,
+  );
   // Single source of truth for the chain-driven income refresh. Mounting at
   // the dashboard root means a fresh deposit only triggers ONE WebSocket
   // subscription regardless of how many consumers (KPI strip, activity,
@@ -178,7 +193,7 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
         onSwap={() => setSwapOpen(true)}
       />
 
-      <TreasuryFlowStrip multisig={multisig} />
+      <TreasuryFlowStrip multisig={multisig} internalAddresses={internalAddresses} />
 
       {/* Governance + Cloak — split block, governance left, privacy right.
           Both sides describe vault attributes that don't change daily, so we

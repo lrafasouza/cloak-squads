@@ -22,8 +22,17 @@ import { MiniSparkline } from "./MiniSparkline";
  * Each card follows the same vertical hierarchy:
  *   eyebrow (label + period) → big mono value → secondary line → trend visual
  */
-export function TreasuryFlowStrip({ multisig }: { multisig: string }) {
-  const flow = useTreasuryFlow(multisig, 30);
+export function TreasuryFlowStrip({
+  multisig,
+  internalAddresses,
+}: {
+  multisig: string;
+  /** Base58 PDAs the multisig owns (primary + every sub-vault). When provided,
+   *  the KPI hook excludes intra-treasury moves from inflow/outflow. The parent
+   *  dashboard owns the source of truth (`useVaultData`) and threads it down. */
+  internalAddresses?: ReadonlySet<string> | undefined;
+}) {
+  const flow = useTreasuryFlow(multisig, 30, internalAddresses);
   const { data: solPrice } = useSolPrice();
 
   if (flow.loading) {

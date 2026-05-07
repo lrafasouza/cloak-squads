@@ -1,12 +1,15 @@
 import { getCurrentCluster } from "@/lib/cluster";
 import { prisma } from "@/lib/prisma";
-import { squadsVaultPda } from "@cloak-squads/core/pda";
 import {
-  Connection,
-  type ParsedInstruction,
-  type ParsedTransactionWithMeta,
-  PublicKey,
-} from "@solana/web3.js";
+  type ParseRejection,
+  type ParsedIncome,
+  parseIncome,
+} from "@/lib/vault-income-parser";
+import { squadsVaultPda } from "@cloak-squads/core/pda";
+import { Connection, type ParsedTransactionWithMeta, PublicKey } from "@solana/web3.js";
+
+export { parseIncome } from "@/lib/vault-income-parser";
+export type { ParsedIncome, ParseRejection } from "@/lib/vault-income-parser";
 
 const RPC_URL = process.env.FALLBACK_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? "";
 const SQUADS_PROGRAM_ID = process.env.NEXT_PUBLIC_SQUADS_PROGRAM_ID ?? "";
@@ -101,113 +104,6 @@ async function fetchParsedTxBatch(
   }
 
   return results;
-}
-
-type ParsedIncome = {
-  signature: string;
-  amountLamports: bigint;
-  fromAddress: string;
-  blockTime: Date;
-  vaultIndex: number;
-  toLabel: string | null;
-};
-
-export type ParseRejection = {
-  signature: string;
-  reason:
-    | "rpc_returned_null"
-    | "tx_meta_missing"
-    | "tx_failed"
-    | "vault_not_in_accounts"
-    | "balance_undefined"
-    | "diff_too_small"
-    | "diff_negative_or_zero";
-  detail?: string;
-};
-
-function parseIncome(
-  tx: ParsedTransactionWithMeta,
-  sigInfo: { signature: string; blockTime: number | null | undefined },
-  vaultAddress: string,
-  vaultIndex: number,
-  toLabel: string | null,
-  rejections?: ParseRejection[],
-): ParsedIncome | null {
-  if (!tx.meta) {
-    rejections?.push({ signature: sigInfo.signature, reason: "tx_meta_missing" });
-    return null;
-  }
-  if (tx.meta.err) {
-    rejections?.push({
-      signature: sigInfo.signature,
-      reason: "tx_failed",
-      detail: JSON.stringify(tx.meta.err),
-    });
-    return null;
-  }
-
-  const accounts = tx.transaction.message.accountKeys;
-  const vaultIdx = accounts.findIndex((a) => a.pubkey.toBase58() === vaultAddress);
-  if (vaultIdx === -1) {
-    rejections?.push({
-      signature: sigInfo.signature,
-      reason: "vault_not_in_accounts",
-      detail: `vault=${vaultAddress.slice(0, 8)}... accounts=[${accounts
-        .map((a) => a.pubkey.toBase58().slice(0, 8))
-        .join(",")}]`,
-    });
-    return null;
-  }
-
-  const pre = tx.meta.preBalances[vaultIdx];
-  const post = tx.meta.postBalances[vaultIdx];
-  if (pre === undefined || post === undefined) {
-    rejections?.push({ signature: sigInfo.signature, reason: "balance_undefined" });
-    return null;
-  }
-  const diff = post - pre;
-  if (diff <= 0) {
-    rejections?.push({
-      signature: sigInfo.signature,
-      reason: "diff_negative_or_zero",
-      detail: `diff=${diff}`,
-    });
-    return null;
-  }
-  if (diff < 100_000) {
-    rejections?.push({
-      signature: sigInfo.signature,
-      reason: "diff_too_small",
-      detail: `diff=${diff}`,
-    });
-    return null;
-  }
-
-  let from = "Unknown";
-  let amountLamports = BigInt(diff);
-
-  for (const ix of tx.transaction.message.instructions) {
-    if (!("parsed" in ix)) continue;
-    const pix = ix as ParsedInstruction;
-    if (pix.program !== "system") continue;
-    const parsed = pix.parsed as
-      | { type?: string; info?: { destination?: string; source?: string; lamports?: number } }
-      | undefined;
-    if (parsed?.type === "transfer" && parsed.info?.destination === vaultAddress) {
-      from = parsed.info.source ?? "Unknown";
-      if (parsed.info.lamports !== undefined) amountLamports = BigInt(parsed.info.lamports);
-      break;
-    }
-  }
-
-  return {
-    signature: sigInfo.signature,
-    amountLamports,
-    fromAddress: from,
-    blockTime: new Date((sigInfo.blockTime ?? Math.floor(Date.now() / 1000)) * 1000),
-    vaultIndex,
-    toLabel,
-  };
 }
 
 type SyncResult = { synced: number; throttled: boolean };

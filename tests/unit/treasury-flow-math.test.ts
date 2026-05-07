@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
 import {
   DAY_MS,
+  type IncomeRecord,
+  type ProposalRecord,
+  aggregateTreasuryFlow,
   bucketize,
   computeWindow,
   ratioBigInt,
@@ -140,5 +143,184 @@ describe("ratioBigInt", () => {
   test("ratio above 100% (growth) preserved", () => {
     // 10x growth, ratio = 10
     expect(ratioBigInt(10_000n, 1_000n)).toBeCloseTo(10, 6);
+  });
+});
+
+// ── aggregateTreasuryFlow ──────────────────────────────────────────────────
+//
+// These tests guard the single most user-visible KPI on the dashboard. The
+// regression they protect against: moving SOL between sub-vaults inflated the
+// 30-day inflow because sub-vault PDAs are also vaults the indexer watches,
+// and any post > pre lamport diff was treated as new income. The fix is the
+// `internalAddresses` filter — every test below sets `now` to a fixed point
+// inside the window so behavior is deterministic.
+
+const NOW = Date.parse("2026-05-07T12:00:00Z");
+const TODAY_S = Math.floor(NOW / 1000);
+const PRIMARY = "PrimaryVaultPdaBase58";
+const SUB_PAYROLL = "SubVaultPayrollPdaBase58";
+const SUB_OPS = "SubVaultOpsPdaBase58";
+const EXTERNAL_WALLET = "ExternalWalletBase58";
+
+function income(partial: Partial<IncomeRecord> & { lamports: bigint; from: string }): IncomeRecord {
+  return {
+    amountLamports: partial.lamports.toString(),
+    from: partial.from,
+    blockTime: partial.blockTime ?? TODAY_S,
+  };
+}
+
+function proposal(partial: Partial<ProposalRecord> = {}): ProposalRecord {
+  return {
+    type: "single",
+    hasDraft: false,
+    status: "executed",
+    createdAt: new Date(NOW).toISOString(),
+    ...partial,
+  };
+}
+
+describe("aggregateTreasuryFlow — internal-address filter", () => {
+  test("excludes inflow when source is one of our own vaults", () => {
+    const internal = new Set([PRIMARY, SUB_PAYROLL, SUB_OPS]);
+    const out = aggregateTreasuryFlow({
+      income: [
+        income({ lamports: 500_000_000n, from: EXTERNAL_WALLET }), // 0.5 SOL external
+        income({ lamports: 200_000_000n, from: PRIMARY }), // 0.2 SOL primary → sub
+        income({ lamports: 100_000_000n, from: SUB_PAYROLL }), // 0.1 SOL sub → sub
+      ],
+      proposals: [],
+      now: NOW,
+      windowDays: 30,
+      internalAddresses: internal,
+    });
+    // Only the external 0.5 SOL counts.
+    expect(out.inflowLamports).toBe(500_000_000n);
+  });
+
+  test("counts inflow normally when no filter is provided (legacy callers)", () => {
+    const out = aggregateTreasuryFlow({
+      income: [
+        income({ lamports: 500_000_000n, from: EXTERNAL_WALLET }),
+        income({ lamports: 200_000_000n, from: PRIMARY }),
+      ],
+      proposals: [],
+      now: NOW,
+      windowDays: 30,
+    });
+    expect(out.inflowLamports).toBe(700_000_000n);
+  });
+
+  test("excludes outflow when single-send recipient is one of our own vaults", () => {
+    const internal = new Set([PRIMARY, SUB_PAYROLL]);
+    const out = aggregateTreasuryFlow({
+      income: [],
+      proposals: [
+        proposal({ type: "single", amount: "300000000", recipient: EXTERNAL_WALLET }),
+        proposal({ type: "single", amount: "200000000", recipient: SUB_PAYROLL }),
+      ],
+      now: NOW,
+      windowDays: 30,
+      internalAddresses: internal,
+    });
+    // Only the external transfer (0.3 SOL) counts.
+    expect(out.outflowLamports).toBe(300_000_000n);
+  });
+
+  test("payroll proposals are not filtered by recipient (label, not an address)", () => {
+    const internal = new Set([PRIMARY, SUB_PAYROLL]);
+    const out = aggregateTreasuryFlow({
+      income: [],
+      proposals: [
+        proposal({
+          type: "payroll",
+          totalAmount: "1000000000",
+          recipient: "5 recipients", // label, never matches a base58 PDA
+          hasDraft: true,
+        }),
+      ],
+      now: NOW,
+      windowDays: 30,
+      internalAddresses: internal,
+    });
+    expect(out.outflowLamports).toBe(1_000_000_000n);
+    expect(out.privateOutflowLamports).toBe(1_000_000_000n);
+  });
+
+  test("symmetric prior-window filter — delta isn't poisoned by old internal moves", () => {
+    const internal = new Set([PRIMARY, SUB_PAYROLL]);
+    const prevWindowDay = Math.floor((NOW - 35 * DAY_MS) / 1000); // ~35d ago
+    const out = aggregateTreasuryFlow({
+      income: [
+        // current window: 1 SOL legitimately external
+        income({ lamports: 1_000_000_000n, from: EXTERNAL_WALLET }),
+        // prior window: 10 SOL but it was an internal shuffle — must not
+        // appear as a "10 SOL drop" in the delta.
+        income({ lamports: 10_000_000_000n, from: PRIMARY, blockTime: prevWindowDay }),
+      ],
+      proposals: [],
+      now: NOW,
+      windowDays: 30,
+      internalAddresses: internal,
+    });
+    expect(out.inflowLamports).toBe(1_000_000_000n);
+    // prevInflow = 0 (filtered) → ratioBigInt(_, 0) === null
+    expect(out.inflowDelta).toBeNull();
+  });
+
+  test("privacy share recomputed after internal proposal filter", () => {
+    const internal = new Set([SUB_OPS]);
+    const out = aggregateTreasuryFlow({
+      income: [],
+      proposals: [
+        // public external send: 1 SOL (counts)
+        proposal({
+          type: "single",
+          kind: "public",
+          hasDraft: true,
+          amount: "1000000000",
+          recipient: EXTERNAL_WALLET,
+        }),
+        // public internal shuffle: 5 SOL (must NOT count)
+        proposal({
+          type: "single",
+          kind: "public",
+          hasDraft: true,
+          amount: "5000000000",
+          recipient: SUB_OPS,
+        }),
+        // private external send: 1 SOL (counts as private)
+        proposal({
+          type: "single",
+          kind: "private",
+          hasDraft: true,
+          amount: "1000000000",
+          recipient: EXTERNAL_WALLET,
+        }),
+      ],
+      now: NOW,
+      windowDays: 30,
+      internalAddresses: internal,
+    });
+    expect(out.outflowLamports).toBe(2_000_000_000n);
+    expect(out.privateOutflowLamports).toBe(1_000_000_000n);
+    expect(out.publicOutflowLamports).toBe(1_000_000_000n);
+    expect(out.privacyShare).toBeCloseTo(0.5, 6);
+    expect(out.privateCount).toBe(1);
+    expect(out.publicCount).toBe(1);
+  });
+
+  test("malformed amountLamports doesn't crash aggregation", () => {
+    const out = aggregateTreasuryFlow({
+      income: [
+        income({ lamports: 500_000_000n, from: EXTERNAL_WALLET }),
+        // craft a bad row by hand — BigInt() throws on this
+        { amountLamports: "not-a-number", from: EXTERNAL_WALLET, blockTime: TODAY_S },
+      ],
+      proposals: [],
+      now: NOW,
+      windowDays: 30,
+    });
+    expect(out.inflowLamports).toBe(500_000_000n);
   });
 });

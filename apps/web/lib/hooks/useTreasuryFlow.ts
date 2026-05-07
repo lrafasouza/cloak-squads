@@ -3,10 +3,7 @@
 import type { ProposalSummary } from "@/lib/proposals";
 import {
   type FlowBucket,
-  type FlowEvent,
-  bucketize,
-  computeWindow,
-  ratioBigInt,
+  aggregateTreasuryFlow,
 } from "@/lib/treasury-flow-math";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useMemo } from "react";
@@ -41,22 +38,6 @@ export type TreasuryFlow = {
   outflowSpark: FlowBucket[];
 };
 
-function isExecuted(p: ProposalSummary): boolean {
-  return p.status === "executed";
-}
-
-function pickAmountLamports(p: ProposalSummary): bigint {
-  // Payroll proposals carry totalAmount; single proposals carry amount.
-  // Both are stringified base-unit numbers (lamports for SOL flows).
-  const raw = p.totalAmount ?? p.amount;
-  try {
-    if (!raw) return 0n;
-    return BigInt(raw);
-  } catch {
-    return 0n;
-  }
-}
-
 /**
  * Aggregate inflow and outflow over the last `windowDays`, surface a
  * privacy-share metric, and bucket daily values for sparklines. Reuses
@@ -67,98 +48,35 @@ function pickAmountLamports(p: ProposalSummary): bigint {
  * persists a ProposalDraft with the commitmentClaim. Public sends and public
  * recurring runs don't, so this split is reliable client-side without an extra
  * API call.
+ *
+ * `internalAddresses`: base58 addresses owned by this multisig (primary vault
+ * PDA + every sub-vault PDA). Treasury KPIs treat external value movement only,
+ * so income whose source is one of these addresses (sub-vault → primary,
+ * primary → sub-vault, sub → sub) and proposals whose recipient is one of them
+ * are excluded from both the current window AND the prior window so deltas
+ * stay symmetric. Pass `undefined` (or omit) to fall back to the un-filtered
+ * legacy behavior — this keeps server-side pre-renders that don't have the
+ * vault data yet from blowing up.
  */
-export function useTreasuryFlow(multisig: string, windowDays = 30): TreasuryFlow {
+export function useTreasuryFlow(
+  multisig: string,
+  windowDays = 30,
+  internalAddresses?: ReadonlySet<string>,
+): TreasuryFlow {
   const proposalQuery = useProposalSummaries(multisig);
   const incomeQuery = useVaultIncome(multisig, 200);
 
   return useMemo(() => {
-    const proposals = proposalQuery.data ?? [];
-    const income: IncomeEntry[] = incomeQuery.data ?? [];
-
-    const now = Date.now();
-    const { windowStart, prevStart } = computeWindow(now, windowDays);
-    const sparkStart = windowStart;
-
-    let inflow = 0n;
-    let prevInflow = 0n;
-    const inflowEvents: FlowEvent[] = [];
-    for (const inc of income) {
-      const ts = inc.blockTime * 1000;
-      let lamports: bigint;
-      try {
-        lamports = BigInt(inc.amountLamports);
-      } catch {
-        continue;
-      }
-      if (ts >= windowStart && ts <= now) {
-        inflow += lamports;
-        inflowEvents.push({ ts, lamports });
-      } else if (ts >= prevStart && ts < windowStart) {
-        prevInflow += lamports;
-      }
-    }
-
-    let outflow = 0n;
-    let prevOutflow = 0n;
-    let privateOutflow = 0n;
-    let publicOutflow = 0n;
-    let privateCount = 0;
-    let publicCount = 0;
-    const outflowEvents: FlowEvent[] = [];
-
-    for (const p of proposals) {
-      const ts = p.createdAt ? new Date(p.createdAt).getTime() : 0;
-      if (!ts) continue;
-
-      if (!isExecuted(p)) continue;
-      const lamports = pickAmountLamports(p);
-      if (lamports <= 0n) continue;
-
-      if (ts >= windowStart && ts <= now) {
-        outflow += lamports;
-        outflowEvents.push({ ts, lamports });
-        // Privacy split: a flow is private when it carries a Cloak draft AND
-        // wasn't tagged as a public-kind transfer. Payroll drafts have no
-        // `kind` field (always private) and config/swap rows are excluded by
-        // the lamports check above, so this covers single-send public drafts.
-        const isPrivate = p.hasDraft && p.kind !== "public";
-        if (isPrivate) {
-          privateOutflow += lamports;
-          privateCount += 1;
-        } else {
-          publicOutflow += lamports;
-          publicCount += 1;
-        }
-      } else if (ts >= prevStart && ts < windowStart) {
-        prevOutflow += lamports;
-      }
-    }
-
-    // Compute ratios in BigInt-space first to preserve precision past
-    // Number.MAX_SAFE_INTEGER, then convert the small scaled result to Number.
-    // 1ppm scale gives 6 significant digits which is more than enough for any
-    // UI display ("73.4%", "−12% vs prior").
-    const inflowDelta = ratioBigInt(inflow - prevInflow, prevInflow);
-    const outflowDelta = ratioBigInt(outflow - prevOutflow, prevOutflow);
-    const privacyShare = ratioBigInt(privateOutflow, outflow);
-
-    const inflowSpark = bucketize(inflowEvents, sparkStart, windowDays);
-    const outflowSpark = bucketize(outflowEvents, sparkStart, windowDays);
-
+    const aggregated = aggregateTreasuryFlow({
+      income: (incomeQuery.data ?? []) as IncomeEntry[],
+      proposals: (proposalQuery.data ?? []) as ProposalSummary[],
+      now: Date.now(),
+      windowDays,
+      internalAddresses,
+    });
     return {
       loading: proposalQuery.isLoading || incomeQuery.isLoading,
-      inflowLamports: inflow,
-      outflowLamports: outflow,
-      privateOutflowLamports: privateOutflow,
-      publicOutflowLamports: publicOutflow,
-      privateCount,
-      publicCount,
-      privacyShare,
-      inflowDelta,
-      outflowDelta,
-      inflowSpark,
-      outflowSpark,
+      ...aggregated,
     };
   }, [
     proposalQuery.data,
@@ -166,6 +84,7 @@ export function useTreasuryFlow(multisig: string, windowDays = 30): TreasuryFlow
     incomeQuery.data,
     incomeQuery.isLoading,
     windowDays,
+    internalAddresses,
   ]);
 }
 
