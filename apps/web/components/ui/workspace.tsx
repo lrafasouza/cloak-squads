@@ -45,8 +45,11 @@ export function WorkspaceHeader({
 }
 
 export function Panel({ children, className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  // Heraldic Workstation — uses the .card-panel archetype defined in
+  // globals.css so every Panel across the workspace inherits the same
+  // radius/border/shadow/hover treatment that the dashboard cards use.
   return (
-    <div className={cn("rounded-lg border border-border bg-surface", className)} {...props}>
+    <div className={cn("card-panel", className)} {...props}>
       {children}
     </div>
   );
@@ -103,13 +106,16 @@ export function DetailRow({
   mono?: boolean;
   className?: string;
 }) {
+  // Stacked label/value pair — eyebrow above, value in a list-style box
+  // below. Aligns with the card-list archetype so detail blocks inside
+  // panels read as a single material.
   return (
     <div className={cn("grid gap-1", className)}>
-      <dt className="text-xs font-medium uppercase tracking-wider text-ink-subtle">{label}</dt>
+      <dt className="text-eyebrow">{label}</dt>
       <dd
         className={cn(
-          "rounded-md border border-border bg-bg/50 px-3 py-2 text-sm text-ink",
-          mono && "break-all font-mono text-xs",
+          "rounded-list border border-border bg-bg/50 px-3 py-2 text-sm text-ink",
+          mono && "break-all font-mono text-xs tabular-nums",
         )}
       >
         {value}
@@ -144,7 +150,7 @@ export function InlineAlert({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 rounded-md border border-border-strong px-3 py-2 text-sm",
+        "flex items-center gap-2 rounded-list border border-border-strong px-3 py-2 text-sm",
         textColor,
         className,
       )}
@@ -220,7 +226,7 @@ export function EmptyPanel({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-border bg-bg/30 px-4 py-8 text-center">
+    <div className="rounded-panel border border-dashed border-border bg-bg/30 px-4 py-8 text-center">
       <p className="text-sm font-semibold text-ink">{title}</p>
       {description ? (
         <p className="mx-auto mt-1 max-w-md text-sm text-ink-muted">{description}</p>
