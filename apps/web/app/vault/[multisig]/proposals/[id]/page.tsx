@@ -797,7 +797,7 @@ export default function ProposalApprovalPage({
                     <button
                       type="button"
                       onClick={() => void loadDraft()}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-surface-3"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-ink transition-aegis hover:bg-surface-3"
                     >
                       <RefreshCw className="h-3.5 w-3.5" />
                       Retry

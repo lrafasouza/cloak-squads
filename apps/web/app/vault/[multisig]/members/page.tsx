@@ -183,7 +183,7 @@ export default function MembersPage({
                 setAddError(null);
                 setAddModalOpen(true);
               }}
-              className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink shadow-raise-1 transition-colors hover:bg-accent-hover"
+              className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-accent to-accent-hover px-4 py-2 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow"
             >
               <UserPlus className="h-4 w-4" />
               Add Member

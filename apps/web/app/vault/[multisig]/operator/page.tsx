@@ -1474,7 +1474,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       <WorkspacePage>
         <div className="flex min-h-[calc(100vh-10rem)] flex-col items-center justify-center px-4">
           {/* Icon */}
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-signal-danger/20 bg-signal-danger/5">
+          <div className="flex h-16 w-16 items-center justify-center rounded-panel border border-signal-danger/20 bg-signal-danger/5">
             <ShieldX className="h-8 w-8 text-signal-danger" strokeWidth={1.5} />
           </div>
 
@@ -1495,7 +1495,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           {/* Wallet comparison */}
           <div className="mt-10 w-full max-w-md space-y-2">
             {/* Connected (wrong) */}
-            <div className="flex items-start gap-3 rounded-xl border border-signal-danger/30 bg-signal-danger/5 px-4 py-3.5">
+            <div className="flex items-start gap-3 rounded-list border border-signal-danger/30 bg-signal-danger/5 px-4 py-3.5">
               <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-signal-danger/40 bg-signal-danger/10">
                 <span className="text-[10px] font-bold leading-none text-signal-danger">✕</span>
               </div>
@@ -1511,12 +1511,12 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
             {/* Operator (required) */}
             {registeredOperator ? (
-              <div className="flex items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3.5">
+              <div className="flex items-start gap-3 rounded-list border border-border bg-surface px-4 py-3.5">
                 <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10">
                   <span className="text-[10px] font-bold leading-none text-accent">✓</span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                  <p className="text-eyebrow">
                     Required operator
                   </p>
                   <p
@@ -1534,7 +1534,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
               href={`/vault/${multisig}`}
-              className="text-sm font-medium text-ink-muted transition-colors hover:text-ink"
+              className="text-sm font-medium text-ink-muted transition-aegis hover:text-ink"
             >
               Back to vault
             </Link>
@@ -1581,7 +1581,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               <button
                 type="button"
                 onClick={() => setHelpOpen(true)}
-                className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-surface-2 text-xs font-bold text-ink-subtle transition-colors hover:border-border-strong hover:text-ink"
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-surface-2 text-xs font-bold text-ink-subtle transition-aegis hover:border-border-strong hover:text-ink"
                 aria-label="How operator budget works"
               >
                 ?
@@ -1675,7 +1675,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         ) : null}
 
         {/* Main execution card */}
-        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-raise-1">
+        <div className="card-panel overflow-hidden">
           {!loadedDraft && !payrollDraft ? (
             <>
               <div className="flex items-center justify-between border-b border-border px-5 py-4">
@@ -1729,19 +1729,19 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                       className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
                       style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 6rem 5rem" }}
                     >
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-eyebrow">
                         #
                       </span>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-eyebrow">
                         Type
                       </span>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-eyebrow">
                         Details
                       </span>
-                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-right text-eyebrow">
                         Amount
                       </span>
-                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-right text-eyebrow">
                         Status
                       </span>
                       <span />
@@ -1853,7 +1853,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                     {queueDrafts.map((d) => (
                       <div
                         key={d.id}
-                        className="rounded-xl border border-border/60 bg-surface p-4 transition-colors active:bg-surface-2"
+                        className="card-panel p-4 transition-aegis active:bg-surface-2"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
@@ -1981,7 +1981,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                     setWithdrawSignature(null);
                     setExecutionSteps([]);
                   }}
-                  className="text-xs font-semibold text-accent transition-colors hover:text-accent-hover"
+                  className="text-xs font-semibold text-accent transition-aegis hover:text-accent-hover"
                 >
                   Back to queue
                 </button>
@@ -2164,7 +2164,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                                 href={transactionExplorerUrl(s.signature!)}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft"
+                                className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-aegis hover:bg-accent-soft"
                               >
                                 Explorer
                               </a>
@@ -2201,7 +2201,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                               href={transactionExplorerUrl(item.value)}
                               target="_blank"
                               rel="noreferrer"
-                              className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft"
+                              className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-aegis hover:bg-accent-soft"
                             >
                               Explorer
                             </a>
@@ -2217,7 +2217,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
         {/* Execution history */}
         {executionHistory.length > 0 && (
-          <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-raise-1">
+          <div className="card-panel overflow-hidden">
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <div>
                 <h2 className="text-sm font-semibold text-ink">Execution history</h2>
@@ -2230,16 +2230,16 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
               style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 5rem" }}
             >
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+              <span className="text-eyebrow">
                 #
               </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+              <span className="text-eyebrow">
                 Status
               </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+              <span className="text-eyebrow">
                 Details
               </span>
-              <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+              <span className="text-right text-eyebrow">
                 Amount
               </span>
               <span />
@@ -2279,7 +2279,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                         href={transactionExplorerUrl(item.signature)}
                         target="_blank"
                         rel="noreferrer"
-                        className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft"
+                        className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-aegis hover:bg-accent-soft"
                       >
                         Explorer
                       </a>

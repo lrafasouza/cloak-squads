@@ -68,7 +68,7 @@ function ApprovalDots({ approvals, threshold }: { approvals: number; threshold: 
       {Array.from({ length: capped }).map((_, i) => (
         <span
           key={i}
-          className={`h-1.5 w-1.5 rounded-full transition-colors ${i < approvals ? "bg-accent" : "bg-border-strong"}`}
+          className={`h-1.5 w-1.5 rounded-full transition-aegis ${i < approvals ? "bg-accent" : "bg-border-strong"}`}
         />
       ))}
       <span className="ml-1.5 text-xs tabular-nums text-ink-muted">

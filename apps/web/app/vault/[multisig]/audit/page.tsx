@@ -947,7 +947,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
 
       {showRevokeConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-md p-4">
-          <div className="relative w-full max-w-md rounded-xl border border-border-strong bg-surface p-6 shadow-raise-2">
+          <div className="relative w-full max-w-md rounded-modal border border-border-strong bg-surface p-6 shadow-raise-2">
             <button
               type="button"
               onClick={() => {
