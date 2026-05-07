@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { StatCard } from "@/components/ui/stat-card";
 import { useToast } from "@/components/ui/toast-provider";
 import { TokenLogo } from "@/components/ui/token-logo";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import {
@@ -48,6 +49,7 @@ import {
   Calendar,
   CalendarClock,
   Eye,
+  HelpCircle,
   Lock,
   Pause,
   Play,
@@ -810,7 +812,26 @@ export default function RecurringPage({
       <ConfirmModal
         open={!!confirmDelete}
         title="Delete recurring payment"
-        description="This stops the schedule. Past on-chain payments are unaffected."
+        description={
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            This stops the schedule. Past on-chain payments are unaffected.
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-ink-subtle transition-colors hover:text-ink"
+                  aria-label="What about pending proposals?"
+                >
+                  <HelpCircle className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[260px] leading-relaxed">
+                Pending proposals from this schedule remain in the Transactions queue. Cancel them
+                there if you want to stop an upcoming run.
+              </TooltipContent>
+            </Tooltip>
+          </span>
+        }
         confirmText="Delete"
         cancelText="Cancel"
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
