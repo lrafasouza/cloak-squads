@@ -28,6 +28,12 @@ import {
   writeExecutionHistory,
 } from "@/lib/operator-execution-history";
 import {
+  type CloakDepositCache,
+  cloakDepositCacheKey,
+  deserializeCacheEntry,
+  serializeCacheEntry,
+} from "@/lib/operator-deposit-cache";
+import {
   type OperatorExecutionBlockReason,
   type OperatorLicenseStatus,
   type ProposalStatus,
@@ -46,7 +52,6 @@ import { decryptMemo } from "@cloak-squads/core/memo-crypto";
 import { cofrePda, licensePda } from "@cloak-squads/core/pda";
 import {
   CLOAK_PROGRAM_ID,
-  type MerkleTree,
   NATIVE_SOL_MINT,
   type Utxo,
   computeUtxoCommitment,
@@ -160,15 +165,6 @@ type ExecutionStep = {
   error?: string | undefined;
 };
 
-type CloakDepositCache = {
-  signature: string;
-  leafIndex: number;
-  spendKeyHex: string;
-  blindingHex: string;
-  outputUtxos?: Utxo[] | undefined;
-  merkleTree?: MerkleTree | undefined;
-};
-
 type DraftInvariants = SingleDraft["invariants"];
 
 type CloakProgressCallbacks = {
@@ -181,17 +177,14 @@ type DecodedLicense = {
   expires_at?: unknown;
 };
 
-function cloakDepositCacheKey(multisig: string, transactionIndex: string) {
-  return `cloak-deposit:${multisig}:${transactionIndex}`;
-}
-
 function readCloakDepositCache(
   multisig: string,
   transactionIndex: string,
 ): CloakDepositCache | null {
   try {
     const raw = sessionStorage.getItem(cloakDepositCacheKey(multisig, transactionIndex));
-    return raw ? (JSON.parse(raw) as CloakDepositCache) : null;
+    if (!raw) return null;
+    return deserializeCacheEntry(JSON.parse(raw));
   } catch {
     return null;
   }
@@ -203,11 +196,19 @@ function writeCloakDepositCache(
   value: CloakDepositCache,
 ) {
   try {
-    sessionStorage.setItem(cloakDepositCacheKey(multisig, transactionIndex), JSON.stringify(value));
+    sessionStorage.setItem(
+      cloakDepositCacheKey(multisig, transactionIndex),
+      JSON.stringify(serializeCacheEntry(value)),
+    );
   } catch {
     // Best effort cache only; execution can continue without it.
   }
 }
+
+// TODO(operator-cache): sessionStorage is per-tab — closing the tab between
+// deposit and Finalize loses the cache and a retry will re-deposit. Persist
+// {leafIndex, depositSig, withdrawn, withdrawSignature} server-side on the
+// proposal record (operator-only) for full robustness across sessions.
 
 async function cloakDepositBrowser(
   connection: Parameters<typeof transact>[1]["connection"],
@@ -917,54 +918,56 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           description: "Shielded deposit confirmed.",
         });
 
+        // Persist the deposit immediately, before any later step can fail.
+        // The whole point of this cache is to prevent a second on-chain deposit
+        // when the user retries — so it has to land the moment the deposit is
+        // confirmed, not after later steps. Carries withdrawn: false so the
+        // recipient branch below knows withdraw still needs to run on retry.
+        if (!cachedDeposit) {
+          writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, {
+            ...cloakResult,
+            withdrawn: false,
+          });
+        }
+
         // F4 invoice mode: use explicit invoiceId param or fall back to legacy commitmentClaim lookup
         const effectiveInvoiceId = invoiceId ?? draft.commitmentClaim?.invoiceId;
 
         if (effectiveInvoiceId) {
           updateStep("deliver", { status: "running" });
           // F4: store UTXO data for recipient claim.
-          try {
-            const storeResponse = await fetchWithAuth(`/api/stealth/${effectiveInvoiceId}/utxo`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                utxoAmount: amount.toString(),
-                utxoPrivateKey: cloakResult.spendKeyHex,
-                utxoPublicKey: draft.commitmentClaim?.keypairPublicKey ?? cloakResult.spendKeyHex,
-                utxoBlinding: cloakResult.blindingHex,
-                utxoMint: tokenMint.toBase58(),
-                utxoLeafIndex: cloakResult.leafIndex,
-                utxoCommitment: draft.invariants.commitment
-                  ? Array.from(draft.invariants.commitment)
-                      .map((b) => b.toString(16).padStart(2, "0"))
-                      .join("")
-                  : undefined,
-                utxoSiblingCommitment: cloakResult.outputUtxos?.[0]?.siblingCommitment
-                  ?.toString(16)
-                  .padStart(64, "0"),
-                utxoLeftSiblingCommitment: (
-                  cloakResult.outputUtxos?.[0] as
-                    | (Utxo & { leftSiblingCommitment?: bigint })
-                    | undefined
-                )?.leftSiblingCommitment
-                  ?.toString(16)
-                  .padStart(64, "0"),
-              }),
-            });
-            if (!storeResponse.ok) {
-              const body = (await storeResponse.json().catch(() => null)) as {
-                error?: string;
-              } | null;
-              throw new Error(body?.error ?? "Could not store UTXO data for claim.");
-            }
-          } catch {
-            if (!cachedDeposit) {
-              writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
-            }
-            throw new Error("Could not store UTXO data for claim.");
-          }
-          if (!cachedDeposit) {
-            writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
+          const storeResponse = await fetchWithAuth(`/api/stealth/${effectiveInvoiceId}/utxo`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              utxoAmount: amount.toString(),
+              utxoPrivateKey: cloakResult.spendKeyHex,
+              utxoPublicKey: draft.commitmentClaim?.keypairPublicKey ?? cloakResult.spendKeyHex,
+              utxoBlinding: cloakResult.blindingHex,
+              utxoMint: tokenMint.toBase58(),
+              utxoLeafIndex: cloakResult.leafIndex,
+              utxoCommitment: draft.invariants.commitment
+                ? Array.from(draft.invariants.commitment)
+                    .map((b) => b.toString(16).padStart(2, "0"))
+                    .join("")
+                : undefined,
+              utxoSiblingCommitment: cloakResult.outputUtxos?.[0]?.siblingCommitment
+                ?.toString(16)
+                .padStart(64, "0"),
+              utxoLeftSiblingCommitment: (
+                cloakResult.outputUtxos?.[0] as
+                  | (Utxo & { leftSiblingCommitment?: bigint })
+                  | undefined
+              )?.leftSiblingCommitment
+                ?.toString(16)
+                .padStart(64, "0"),
+            }),
+          });
+          if (!storeResponse.ok) {
+            const body = (await storeResponse.json().catch(() => null)) as {
+              error?: string;
+            } | null;
+            throw new Error(body?.error ?? "Could not store UTXO data for claim.");
           }
           updateStep("deliver", {
             status: "success",
@@ -973,13 +976,16 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         } else if (draft.recipient) {
           updateStep("deliver", { status: "running" });
           // F1: withdraw directly to recipient, no claim needed.
-          if (cachedDeposit) {
-            // Deposit + withdraw already completed in a prior attempt.
-            // Skip fullWithdraw and proceed to execute_with_license below.
+          if (cachedDeposit?.withdrawn) {
+            // Deposit + withdraw already completed in a prior attempt — skip
+            // fullWithdraw and proceed straight to execute_with_license below.
             updateStep("deliver", {
               status: "success",
               description: "Delivery already completed in a previous attempt.",
             });
+            if (cachedDeposit.withdrawSignature) {
+              setWithdrawSignature(cachedDeposit.withdrawSignature);
+            }
           } else {
             if (!cloakResult.outputUtxos?.length) {
               throw new Error("Cloak deposit did not return spendable UTXO data.");
@@ -1012,12 +1018,15 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               signature: withdrawResult.signature,
               description: "Funds delivered to the recipient.",
             });
-            // Cache after successful withdraw so retries skip deposit+withdraw and only
-            // re-run execute_with_license (prevents double-deposit on operator retry).
-            writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
+            // Mark the cache entry as withdrawn so a later license-step
+            // failure doesn't trigger a duplicate withdraw on retry.
+            writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, {
+              ...cloakResult,
+              withdrawn: true,
+              withdrawSignature: withdrawResult.signature,
+            });
           }
-        } else if (!cachedDeposit) {
-          writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, cloakResult);
+        } else {
           updateStep("deliver", { status: "success", description: "Cloak deposit cached." });
         }
       } catch (caught) {
