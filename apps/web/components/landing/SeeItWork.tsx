@@ -9,8 +9,10 @@ import {
   Clock,
   Eye,
   EyeOff,
+  Link as LinkIcon,
   Lock,
   Mail,
+  ScanLine,
   Sparkles,
   Wallet,
   X,
@@ -507,6 +509,127 @@ function ActAudit() {
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   ACT 5 — Bearer claim (the moat — from the recipient's perspective)
+   ──────────────────────────────────────────────────────────────────────── */
+
+function ActBearer() {
+  const [stage, setStage] = useState<"scan" | "pick" | "done">("scan");
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setStage("pick"), 1100);
+    const t2 = setTimeout(() => setStage("done"), 3200);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []);
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border/60 bg-bg/40">
+        <div>
+          <Eyebrow as="div">Aegis claim · Bearer</Eyebrow>
+          <p className="text-xs text-ink mt-0.5">Invoice 0182 · Acme Studio</p>
+        </div>
+        <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 font-mono text-[9px] uppercase tracking-eyebrow text-accent">
+          <Sparkles className="h-2.5 w-2.5" />
+          Aegis only
+        </span>
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 px-5 py-5 space-y-4 overflow-hidden">
+        {/* Amount card */}
+        <div className="rounded-lg border border-border/60 bg-bg/60 px-4 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-eyebrow text-ink-subtle">
+              you&apos;re claiming
+            </p>
+            <p className="font-display text-2xl font-semibold text-ink num leading-tight mt-0.5">
+              $2,400 <span className="text-xs font-medium text-ink-muted">USDC</span>
+            </p>
+          </div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft border border-accent/30">
+            <ScanLine className="h-5 w-5 text-accent" strokeWidth={1.6} />
+          </div>
+        </div>
+
+        {/* Wallet picker */}
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-eyebrow text-ink-subtle mb-2">
+            send it to
+          </p>
+          <div className="rounded-lg border border-border/60 bg-bg/60 px-3 py-2.5 flex items-center gap-3 min-h-[58px]">
+            <Wallet className="h-4 w-4 text-ink-subtle shrink-0" />
+            {stage === "scan" ? (
+              <span className="text-sm text-ink-subtle italic">
+                Choose a wallet…
+              </span>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3 }}
+                className="min-w-0 flex-1"
+              >
+                <p className="text-sm text-ink leading-tight truncate">
+                  marie-cpa.sol
+                </p>
+                <p className="text-[10px] text-ink-subtle leading-tight mt-0.5">
+                  a fresh wallet, just for this payment
+                </p>
+              </motion.div>
+            )}
+            {stage === "done" && (
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="ml-auto inline-flex h-6 w-6 items-center justify-center rounded-full bg-signal-positive/20"
+              >
+                <Check className="h-3.5 w-3.5 text-signal-positive" strokeWidth={3} />
+              </motion.span>
+            )}
+          </div>
+        </div>
+
+        {/* Pitch line */}
+        <div className="flex items-start gap-2.5 rounded-lg border border-accent/30 bg-accent/[0.04] px-3 py-2.5">
+          <LinkIcon className="h-4 w-4 text-accent shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-ink leading-tight">
+              The treasury never knew this address before now.
+            </p>
+            <p className="mt-1 text-[11px] text-ink-subtle leading-tight">
+              Bearer invoices bind the recipient at claim time, not at issue.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-border/60 bg-bg/40 px-5 py-3 flex items-center justify-between">
+        <span className="inline-flex items-center gap-1 text-[11px] text-ink-subtle">
+          <Clock className="h-3 w-3" />
+          Single-use · 24h
+        </span>
+        <button
+          type="button"
+          className={cn(
+            "rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors",
+            stage === "done"
+              ? "bg-signal-positive/15 text-signal-positive border border-signal-positive/30"
+              : "bg-accent text-accent-ink",
+          )}
+        >
+          {stage === "done" ? "Claimed" : "Claim now"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    App frame
    ──────────────────────────────────────────────────────────────────────── */
 
@@ -515,6 +638,7 @@ const ACTS = [
   { id: "approve", title: "The team approves", caption: "Whatever your threshold is, 2-of-3 or 3-of-5, Aegis respects it.", Component: ActApprove },
   { id: "sent", title: "Sent privately", caption: "The chain proves it happened. The details stay with you.", Component: ActSent },
   { id: "audit", title: "Auditors get just what they need", caption: "Scoped, read-only, revocable. No spreadsheet exports.", Component: ActAudit },
+  { id: "bearer", title: "And the link no one else can issue", caption: "Bearer claim — recipient picks the wallet at scan time.", Component: ActBearer },
 ] as const;
 
 const ACT_DURATION = 6500;
@@ -613,15 +737,15 @@ export function SeeItWork() {
             <div className="md:col-span-7">
               <Eyebrow as="div" className="mb-3">See it work</Eyebrow>
               <h2 className="font-display text-display-sm font-bold text-ink leading-[1.05]">
-                One payment.{" "}
-                <span className="text-accent">Four people. Zero noise.</span>
+                One vote.{" "}
+                <span className="text-accent">Five steps. Zero leaks.</span>
               </h2>
             </div>
             <div className="md:col-span-5">
               <p className="text-ink-muted leading-relaxed">
-                Watch a real treasury payment move through Aegis. Proposed,
-                approved by the team, sent privately, then opened up to an
-                auditor with scoped access. No code, no jargon.
+                A treasury payment, end to end — proposed, approved, sent
+                privately, audited under scope, and the bearer claim that
+                only Aegis can issue. No code, no jargon.
               </p>
             </div>
           </div>

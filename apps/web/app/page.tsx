@@ -1,12 +1,12 @@
 "use client";
 
-import { AnatomyScrollytelling } from "@/components/landing/AnatomyScrollytelling";
 import { BentoUseCases } from "@/components/landing/BentoUseCases";
 import { CobeGlobe } from "@/components/landing/CobeGlobe";
 import { ComparisonSection } from "@/components/landing/ComparisonSection";
 import { FAQ } from "@/components/landing/FAQ";
 import { FinalCTASection } from "@/components/landing/FinalCTASection";
 import { ScrollReveal } from "@/components/landing/ScrollReveal";
+import { SecurityTrust } from "@/components/landing/SecurityTrust";
 import { SeeItWork } from "@/components/landing/SeeItWork";
 import { LenisProvider } from "@/components/providers/LenisProvider";
 import { SiteFooter } from "@/components/site/SiteFooter";
@@ -158,16 +158,16 @@ export default function HomePage() {
 
         <HeroSection />
 
-        {/* 2. See it work — animated CLI + live vault preview + SDK code */}
+        {/* See it work — animated 5-act demo, ending on the bearer moat */}
         <SeeItWork />
 
-        {/* 3. Anatomy — pinned scrollytelling, walks through every node */}
-        <AnatomyScrollytelling />
-
-        {/* 4. Bento — every workflow, with real mini-demos */}
+        {/* Use cases — Bearer first (Aegis exclusive), then payroll, then audit */}
         <BentoUseCases />
 
-        {/* Comparison — kept (it works), now in stronger context */}
+        {/* Security & trust — clean, presence-led */}
+        <SecurityTrust />
+
+        {/* Comparison — kept (it works), now follows security */}
         <ComparisonSection />
 
         {/* FAQ */}

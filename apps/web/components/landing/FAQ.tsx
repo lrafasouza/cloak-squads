@@ -11,28 +11,32 @@ const faqs = [
     a: "Aegis is a treasury app on Solana, powered by Squads Protocol v4 as its multisig layer. When you create an Aegis vault, you get Squads-style approvals, members and thresholds, plus privacy primitives, payroll, invoicing and scoped audit on top.",
   },
   {
-    q: "Is Aegis a Squads alternative?",
-    a: "No. Aegis is built on top of Squads Protocol v4. We don't compete with Squads, we extend it. Today, you create a fresh Aegis vault that uses Squads multisig under the hood. Importing an existing Squads vault is on the roadmap, not yet available.",
+    q: "How is Aegis different from Arcium, Umbra, or Darklake?",
+    a: "Those projects shield wallet-to-wallet payments. Aegis is the only one that wraps the full treasury surface — multisig approvals, payroll, bearer invoices, and scoped audit links — around that privacy layer. We're not the cipher; we're the product the cipher lives inside.",
   },
   {
-    q: "How does the Operator work?",
-    a: "The Operator is a dedicated wallet you choose for your vault. After your team approves a payment through Squads, the Cloak Engine on Solana issues a one-time permission. Only your Operator can use that permission to complete the private payment.",
+    q: "Can I import my existing Squads vault?",
+    a: "Not yet. Today you create a fresh Aegis vault that uses Squads multisig under the hood. Importing an existing Squads vault is on the roadmap — it requires onboarding the existing multisig PDA into Aegis's operator + privacy config without disturbing your members or thresholds.",
+  },
+  {
+    q: "How does the Operator work, and what if it's compromised?",
+    a: "The Operator is a dedicated wallet you choose for your vault. After your team approves a payment through Squads, the Cloak Engine issues a one-time, time-bound permission scoped to that exact payment. The Operator can only execute what your team already approved — it cannot create or approve new payments. If compromised, replace it with a normal Squads vote.",
   },
   {
     q: "Do permissions expire?",
-    a: "Yes. Every permission is one-time and has a time limit. If it is not used within that window, it expires automatically. This means even if someone intercepted a permission, it would be useless after the deadline.",
+    a: "Yes. Every permission is single-use and time-bound — 60 seconds by default. If it is not used within that window, it expires automatically. An intercepted permission is useless after the deadline, and is burned on first execute.",
+  },
+  {
+    q: "What's a bearer invoice and when is it dangerous?",
+    a: "A bearer invoice is a claim link you can publish or DM without knowing the recipient's wallet upfront — they pick it at claim time. The trade-off: anyone with the link can claim, like bearer cash. We default expiry to 24h, mark them with a red badge, and let you revoke before claim. Use bound mode if you need the recipient locked in.",
   },
   {
     q: "Can transactions be audited?",
-    a: "Yes. You can generate time-limited audit links for accountants or regulators. These links show only the transactions you choose to share, and you can revoke them at any time. The public blockchain remains blind.",
-  },
-  {
-    q: "What happens if the Operator wallet is compromised?",
-    a: "The Operator can only run payments your team already approved through Squads. It cannot create or approve new payments on its own. If needed, you can replace the Operator instantly through a normal Squads vote.",
+    a: "Yes. You generate time-limited, read-only links for accountants or regulators, scoped by date, member, or category. Exports are Ed25519-signed so they're verifiable offline and tamper-evident. Every view is logged. The public blockchain remains blind.",
   },
   {
     q: "Is this ready for mainnet?",
-    a: "Aegis is live on Solana devnet for testing. Mainnet requires additional security review and production hardening. Follow the project on GitHub for the public roadmap.",
+    a: "Aegis is live on Solana devnet for testing only. Mainnet ships after an external audit closes. Follow the project on GitHub for the public roadmap.",
   },
 ];
 

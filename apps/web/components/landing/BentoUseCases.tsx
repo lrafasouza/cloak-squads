@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   Lock,
   ShieldCheck,
+  Sparkles,
   Users,
 } from "lucide-react";
 import QRCode from "qrcode";
@@ -27,20 +28,30 @@ function CaseText({
   title,
   body,
   bullets,
+  exclusive = false,
 }: {
   num: string;
   kicker: string;
   title: string;
   body: string;
   bullets: string[];
+  exclusive?: boolean;
 }) {
   return (
     <div>
-      <Eyebrow as="div" className="mb-4">
-        <span className="text-accent">{num}</span>
-        <span className="mx-2 text-ink-subtle/40">/</span>
-        <span>{kicker}</span>
-      </Eyebrow>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <Eyebrow as="div">
+          <span className="text-accent">{num}</span>
+          <span className="mx-2 text-ink-subtle/40">/</span>
+          <span>{kicker}</span>
+        </Eyebrow>
+        {exclusive && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 font-mono text-[9.5px] uppercase tracking-eyebrow text-accent">
+            <Sparkles className="h-2.5 w-2.5" />
+            Aegis exclusive
+          </span>
+        )}
+      </div>
       <h3 className="font-display text-3xl md:text-4xl lg:text-[2.75rem] font-bold text-ink leading-[1.05] tracking-tight">
         {title}
       </h3>
@@ -256,12 +267,18 @@ function InvoicingMockup() {
   }, []);
 
   return (
-    <VisualFrame caption={{ left: "Acme Studio · external claim", right: "Awaiting · 47h" }}>
+    <VisualFrame caption={{ left: "Acme Studio · bearer claim", right: "Awaiting · 47h" }}>
       <div className="grid grid-cols-1 md:grid-cols-2 min-h-[360px]">
         {/* Left: invoice details */}
         <div className="px-6 py-6 md:py-8 border-b md:border-b-0 md:border-r border-border/60 flex flex-col justify-between">
           <div>
-            <Eyebrow as="div">Invoice 0182</Eyebrow>
+            <div className="flex items-center gap-2">
+              <Eyebrow as="div">Invoice 0182</Eyebrow>
+              <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 font-mono text-[9px] uppercase tracking-eyebrow text-accent">
+                <Sparkles className="h-2 w-2" />
+                Bearer
+              </span>
+            </div>
             <h4 className="mt-2 font-display text-2xl font-semibold text-ink leading-tight">
               Acme Studio
             </h4>
@@ -281,7 +298,7 @@ function InvoicingMockup() {
           <div className="mt-6 space-y-2">
             <div className="flex items-center gap-2 text-xs text-ink-muted">
               <Lock className="h-3 w-3 text-accent" />
-              Single-claim. Recipient stays private.
+              No wallet upfront. Recipient picks at claim.
             </div>
             <div className="flex items-center gap-2 text-xs text-ink-muted">
               <Clock className="h-3 w-3 text-signal-warn" />
@@ -529,22 +546,42 @@ export function BentoUseCases() {
           <div className="mb-16 md:mb-24 max-w-2xl mx-auto text-center">
             <Eyebrow as="div" className="mb-3">Use cases</Eyebrow>
             <h2 className="font-display text-display-sm font-bold text-ink leading-[1.05]">
-              Built for the way your team{" "}
-              <span className="text-accent">actually moves money</span>.
+              Things every treasury does.{" "}
+              <span className="text-accent">Done without leaking.</span>
             </h2>
             <p className="mt-5 text-ink-muted leading-relaxed">
-              Three things treasuries do every month. Aegis wraps each one with privacy.
+              One of these only Aegis does. The other two we just do better.
             </p>
           </div>
         </ScrollReveal>
 
         {/* Cases */}
         <div className="space-y-24 md:space-y-36">
-          {/* CASE 01 — Payroll */}
+          {/* CASE 01 — Bearer Invoice (the moat) */}
           <CaseRow
             text={
               <CaseText
                 num="01"
+                kicker="Bearer invoice"
+                exclusive
+                title="The only crypto invoice link that doesn't ask for the wallet upfront."
+                body="Post a claim link to your site or DM it to a contractor. The recipient picks the destination wallet at claim time. Nothing else in the Solana privacy stack does this."
+                bullets={[
+                  "No recipient address required at issue.",
+                  "Single-claim, default 24h expiry, fully revocable.",
+                  "Bind to a wallet instead if you want a stricter mode.",
+                ]}
+              />
+            }
+            visual={<InvoicingMockup />}
+          />
+
+          {/* CASE 02 — Payroll */}
+          <CaseRow
+            reverse
+            text={
+              <CaseText
+                num="02"
                 kicker="Payroll"
                 title="Run payroll without doxxing your team."
                 body="Drop a CSV. Aegis bundles every line into a single shielded payout, signed once and executed atomically."
@@ -558,25 +595,6 @@ export function BentoUseCases() {
             visual={<PayrollMockup />}
           />
 
-          {/* CASE 02 — Invoicing */}
-          <CaseRow
-            reverse
-            text={
-              <CaseText
-                num="02"
-                kicker="Invoicing"
-                title="Send invoices that don't expose your clients."
-                body="Generate a private claim link. Recipient scans, signs, and pulls funds. The chain never learns who they are."
-                bullets={[
-                  "A claim link, not a public address.",
-                  "Single-claim, time-bound, fully revocable.",
-                  "Use one for vendors, contractors, anything.",
-                ]}
-              />
-            }
-            visual={<InvoicingMockup />}
-          />
-
           {/* CASE 03 — Audit */}
           <CaseRow
             text={
@@ -584,11 +602,11 @@ export function BentoUseCases() {
                 num="03"
                 kicker="Audit"
                 title="Hand auditors exactly what they need."
-                body="Generate read-only links scoped by date, member, or category. Auditors see only what you allow. The public ledger stays blind."
+                body="Generate read-only links scoped by date, member, or category. Exports are Ed25519-signed and verifiable offline. The public ledger stays blind."
                 bullets={[
-                  "Read-only views. Scope by date, member, or category.",
-                  "Time-limited access. Revoke whenever.",
-                  "No CSV exports, no shared spreadsheets.",
+                  "Scope by date, member, or category.",
+                  "Signed exports — tamper-evident, revokable.",
+                  "Access log shows every view from every IP.",
                 ]}
               />
             }
