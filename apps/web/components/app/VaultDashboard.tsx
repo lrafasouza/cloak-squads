@@ -1,7 +1,7 @@
 "use client";
 
 import { EmptyState } from "@/components/ui/empty-state";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import { CofreInitBanner } from "@/components/vault/CofreInitBanner";
 import { OverviewCard } from "@/components/vault/OverviewCard";
@@ -51,27 +51,29 @@ function DashboardVaultIdentity({ multisig }: { multisig: string }) {
             {truncateAddress(multisig)}
           </span>
         </p>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={handleCopyAddress}
-              className="flex h-5 w-5 items-center justify-center rounded text-ink-subtle opacity-0 transition-all hover:bg-surface-2 hover:text-ink group-hover/address:opacity-100"
-              aria-label="Copy vault address"
-            >
-              {copiedAddress ? (
-                <Check className="h-3 w-3 text-accent" />
-              ) : (
-                <Copy className="h-3 w-3" />
-              )}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            {copiedAddress
-              ? "Copied"
-              : "Multisig identifier (governance ID). For deposits, use the address shown below the balance."}
-          </TooltipContent>
-        </Tooltip>
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleCopyAddress}
+                className="flex h-5 w-5 items-center justify-center rounded text-ink-subtle opacity-0 transition-all hover:bg-surface-2 hover:text-ink group-hover/address:opacity-100"
+                aria-label="Copy vault address"
+              >
+                {copiedAddress ? (
+                  <Check className="h-3 w-3 text-accent" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {copiedAddress
+                ? "Copied"
+                : "Multisig identifier (governance ID). For deposits, use the address shown below the balance."}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>
   );
