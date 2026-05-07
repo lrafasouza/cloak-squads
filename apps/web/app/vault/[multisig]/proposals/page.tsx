@@ -105,7 +105,7 @@ function ProposalQueueRow({
 
   return (
     <div
-      className="group relative grid items-center gap-4 px-5 py-3.5 transition-colors hover:bg-surface-2"
+      className="group relative grid items-center gap-4 px-5 py-3.5 transition-aegis hover:bg-surface-2"
       style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
     >
       <Link
@@ -202,7 +202,7 @@ function ProposalRow({
 
   return (
     <div
-      className="group relative grid items-center gap-4 px-5 py-3.5 transition-colors hover:bg-surface-2"
+      className="group relative grid items-center gap-4 px-5 py-3.5 transition-aegis hover:bg-surface-2"
       style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
     >
       <Link
@@ -301,7 +301,7 @@ function IncomeRow({ entry }: { entry: IncomeEntry }) {
 
   return (
     <div
-      className="group grid items-center gap-4 px-5 py-3.5 transition-colors hover:bg-surface-2"
+      className="group grid items-center gap-4 px-5 py-3.5 transition-aegis hover:bg-surface-2"
       style={{ gridTemplateColumns: "1fr 1fr 8rem 5rem" }}
     >
       {/* Amount */}
@@ -373,7 +373,7 @@ function ProposalQueueMobileCard({
   const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "-";
 
   return (
-    <div className="relative rounded-xl border border-border/60 bg-surface p-4 transition-colors active:bg-surface-2">
+    <div className="card-panel relative p-4 transition-aegis active:bg-surface-2">
       <Link
         href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
         className="absolute inset-0 rounded-xl"
@@ -464,7 +464,7 @@ function ProposalMobileCard({
   const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "-";
 
   return (
-    <div className="relative rounded-xl border border-border/60 bg-surface p-4 transition-colors active:bg-surface-2">
+    <div className="card-panel relative p-4 transition-aegis active:bg-surface-2">
       <Link
         href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
         className="absolute inset-0 rounded-xl"
@@ -546,7 +546,7 @@ function IncomeMobileCard({ entry }: { entry: IncomeEntry }) {
   const explorerUrl = `https://solscan.io/tx/${entry.signature}${CLUSTER}`;
 
   return (
-    <div className="relative rounded-xl border border-border/60 bg-surface p-4 transition-colors active:bg-surface-2">
+    <div className="card-panel relative p-4 transition-aegis active:bg-surface-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -572,7 +572,7 @@ function IncomeMobileCard({ entry }: { entry: IncomeEntry }) {
           href={explorerUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 rounded-md border border-border-strong px-2.5 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+          className="inline-flex items-center gap-1 rounded-md border border-border-strong px-2.5 py-1.5 text-xs font-medium text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink"
         >
           Solscan
           <ExternalLink className="h-3 w-3" />
@@ -715,7 +715,7 @@ export default function TransactionsPage({
         </Link>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-raise-1">
+      <div className="card-panel overflow-hidden">
         {/* Tabs */}
         <div className="flex items-center gap-0.5 border-b border-border px-3 py-2">
           {TABS.map(({ id, label, count }) => (
@@ -723,7 +723,7 @@ export default function TransactionsPage({
               key={id}
               type="button"
               onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-aegis ${
                 activeTab === id
                   ? id === "income"
                     ? "bg-signal-positive/10 text-signal-positive"
@@ -761,16 +761,16 @@ export default function TransactionsPage({
                     className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
                     style={{ gridTemplateColumns: "1fr 1fr 8rem 5rem" }}
                   >
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                    <span className="text-eyebrow">
                       Amount
                     </span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                    <span className="text-eyebrow">
                       From
                     </span>
-                    <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                    <span className="text-right text-eyebrow">
                       Date
                     </span>
-                    <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                    <span className="text-right text-eyebrow">
                       Tx
                     </span>
                   </div>
@@ -782,22 +782,22 @@ export default function TransactionsPage({
                       className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
                       style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
                     >
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-eyebrow">
                         #
                       </span>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-eyebrow">
                         Type
                       </span>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-eyebrow">
                         Details
                       </span>
-                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-right text-eyebrow">
                         Approvals
                       </span>
-                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-right text-eyebrow">
                         Status
                       </span>
-                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-right text-eyebrow">
                         Action
                       </span>
                     </div>
@@ -841,22 +841,22 @@ export default function TransactionsPage({
                       className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
                       style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
                     >
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-eyebrow">
                         #
                       </span>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-eyebrow">
                         Type
                       </span>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-eyebrow">
                         Details
                       </span>
-                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-right text-eyebrow">
                         Approvals
                       </span>
-                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-right text-eyebrow">
                         Status
                       </span>
-                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      <span className="text-right text-eyebrow">
                         Action
                       </span>
                     </div>

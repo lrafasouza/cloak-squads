@@ -471,7 +471,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Link href="/" className="text-sm text-accent transition-colors hover:text-accent-hover">
+        <Link href="/" className="text-sm text-accent transition-aegis hover:text-accent-hover">
           Back to picker
         </Link>
         <h1 className="mt-6 text-2xl font-semibold text-ink">Invalid multisig address</h1>
@@ -562,7 +562,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                           type="button"
                           disabled={pending}
                           onClick={() => setSelectedVaultIndex(acct.vaultIndex)}
-                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                          className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-aegis disabled:cursor-not-allowed disabled:opacity-40 ${
                             selectedVaultIndex === acct.vaultIndex
                               ? "border-accent/40 bg-accent/10 text-accent"
                               : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
@@ -581,7 +581,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                     <button
                       type="button"
                       onClick={() => setInvoiceMode("bound")}
-                      className={`rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+                      className={`rounded-list border px-3 py-2.5 text-left text-sm transition-aegis ${
                         invoiceMode === "bound"
                           ? "border-accent bg-accent-soft text-ink"
                           : "border-border bg-surface text-ink-muted hover:bg-surface-2"
@@ -595,7 +595,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                     <button
                       type="button"
                       onClick={() => setInvoiceMode("bearer")}
-                      className={`rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+                      className={`rounded-list border px-3 py-2.5 text-left text-sm transition-aegis ${
                         invoiceMode === "bearer"
                           ? "border-accent bg-accent-soft text-ink"
                           : "border-border bg-surface text-ink-muted hover:bg-surface-2"
@@ -661,7 +661,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                     </button>
                   </div>
                   <div className="mt-1.5 flex gap-2">
-                    <div className="flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink">
+                    <div className="flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink">
                       <TokenLogo symbol="SOL" size={16} />
                       SOL
                     </div>

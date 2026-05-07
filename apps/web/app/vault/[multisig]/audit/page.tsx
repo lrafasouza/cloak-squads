@@ -416,7 +416,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Link href="/" className="text-sm text-accent transition-colors hover:text-accent-hover">
+        <Link href="/" className="text-sm text-accent transition-aegis hover:text-accent-hover">
           Back to picker
         </Link>
         <h1 className="mt-6 text-2xl font-semibold text-ink">Invalid multisig address</h1>
@@ -444,7 +444,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                 key={tab}
                 type="button"
                 onClick={() => setActiveTab(tab)}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-aegis ${
                   activeTab === tab
                     ? "bg-accent-soft text-accent"
                     : "text-ink-muted hover:bg-surface-2 hover:text-ink"
@@ -565,7 +565,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                   type="button"
                   onClick={handleCreateLink}
                   disabled={isCreating || !wallet.publicKey}
-                  className="inline-flex min-h-10 items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex min-h-10 items-center justify-center rounded-md bg-gradient-to-r from-accent to-accent-hover px-4 py-2 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isCreating ? "Creating..." : "Create Audit Link"}
                 </button>
@@ -619,7 +619,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                                       void loadAccessLog(link.id);
                                     }
                                   }}
-                                  className="inline-flex items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+                                  className="inline-flex items-center justify-center rounded-md text-ink-subtle transition-aegis hover:bg-surface-2 hover:text-ink"
                                   aria-label={isExpanded ? "Collapse" : "Expand"}
                                 >
                                   {isExpanded ? (
@@ -955,7 +955,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                 setRevokeError(null);
                 setRevokeSuccess(null);
               }}
-              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
+              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink"
               aria-label="Close"
             >
               <X className="h-4 w-4" />

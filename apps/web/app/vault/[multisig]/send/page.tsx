@@ -107,7 +107,7 @@ function TokenDropdown({
         type="button"
         onClick={() => !disabled && !loading && setOpen((v) => !v)}
         disabled={disabled || loading}
-        className="flex h-11 min-w-[110px] items-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-ink transition-colors hover:border-border-strong hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-11 min-w-[110px] items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm font-medium text-ink transition-aegis hover:border-border-strong hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -123,7 +123,7 @@ function TokenDropdown({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1.5 min-w-[200px] overflow-hidden rounded-xl border border-border bg-surface shadow-lg ring-1 ring-black/5">
+        <div className="absolute left-0 top-full z-50 mt-1.5 min-w-[200px] overflow-hidden rounded-list border border-border bg-surface shadow-raise-2">
           {loading ? (
             <div className="px-4 py-3 text-xs text-ink-muted">Loading tokens…</div>
           ) : tokens.length === 0 ? (
@@ -139,7 +139,7 @@ function TokenDropdown({
                     onSelect(t.mint);
                     setOpen(false);
                   }}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-surface-2 ${active ? "text-accent" : "text-ink"}`}
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition-aegis hover:bg-surface-2 ${active ? "text-accent" : "text-ink"}`}
                 >
                   <TokenLogo symbol={t.symbol as "SOL" | "USDC"} size={18} />
                   <span className="flex-1 text-left font-medium">{t.symbol}</span>
@@ -664,7 +664,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Link href="/" className="text-sm text-accent transition-colors hover:text-accent-hover">
+        <Link href="/" className="text-sm text-accent transition-aegis hover:text-accent-hover">
           Back to picker
         </Link>
         <h1 className="mt-6 text-2xl font-semibold text-ink">Invalid multisig address</h1>
@@ -699,7 +699,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                   setSendMode(mode);
                   if (mode === "private") setSelectedMint(SOL_MINT);
                 }}
-                className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-md px-4 py-1.5 text-sm font-medium transition-aegis ${
                   sendMode === mode ? "bg-accent-soft text-accent" : "text-ink-muted hover:text-ink"
                 }`}
               >
@@ -738,9 +738,9 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                               setSelectedVaultIndex(acct.vaultIndex);
                               setAmount("");
                             }}
-                            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                            className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-aegis disabled:cursor-not-allowed disabled:opacity-40 ${
                               selectedVaultIndex === acct.vaultIndex
-                                ? "border-accent/40 bg-accent/10 text-accent"
+                                ? "border-accent/40 bg-accent-soft text-accent"
                                 : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
                             }`}
                           >
@@ -785,7 +785,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
 
                   <div className="mt-1.5 flex gap-2">
                     {isPrivate ? (
-                      <div className="flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink">
+                      <div className="flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink">
                         <TokenLogo symbol="SOL" size={16} />
                         SOL
                       </div>
@@ -882,7 +882,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Link
                     href={`/vault/${multisig}`}
-                    className="inline-flex w-full shrink-0 items-center justify-center rounded-md border border-border-strong bg-transparent px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2 sm:w-auto"
+                    className="inline-flex w-full shrink-0 items-center justify-center rounded-md border border-border-strong bg-transparent px-4 py-2 text-sm font-medium text-ink transition-aegis hover:bg-surface-2 sm:w-auto"
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Back
