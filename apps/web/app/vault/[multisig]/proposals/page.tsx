@@ -1,6 +1,7 @@
 "use client";
 
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { publicEnv } from "@/lib/env";
 import { type IncomeEntry, useVaultIncome } from "@/lib/hooks/useVaultIncome";
 import { type ProposalSummary, truncateAddress } from "@/lib/proposals";
 import { lamportsToSol } from "@/lib/sol";
@@ -12,15 +13,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDownToLine,
   ArrowRightLeft,
-  EyeOff,
   ExternalLink,
+  EyeOff,
   Loader2,
   Plus,
   Send,
   Users,
   X,
 } from "lucide-react";
-import { publicEnv } from "@/lib/env";
 import Link from "next/link";
 import { use, useEffect, useMemo, useState } from "react";
 
@@ -96,16 +96,16 @@ function ProposalQueueRow({
         ? `${lamportsToSol(p.amount)} SOL`
         : p.title || p.memo || "Configuration change";
 
-  const recipient =
-    p.type === "single" && p.recipient
-      ? truncateAddress(p.recipient)
-      : null;
+  const recipient = p.type === "single" && p.recipient ? truncateAddress(p.recipient) : null;
 
   const dot = STATUS_DOT[p.status ?? "draft"] ?? "bg-ink-subtle";
   const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "—";
 
   return (
-    <div className="group relative grid items-center gap-4 px-5 py-3.5 transition-colors hover:bg-surface-2" style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}>
+    <div
+      className="group relative grid items-center gap-4 px-5 py-3.5 transition-colors hover:bg-surface-2"
+      style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
+    >
       <Link
         href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
         className="absolute inset-0"
@@ -127,9 +127,7 @@ function ProposalQueueRow({
             </span>
           )}
         </div>
-        {recipient && (
-          <p className="truncate font-mono text-xs text-ink-subtle">{recipient}</p>
-        )}
+        {recipient && <p className="truncate font-mono text-xs text-ink-subtle">{recipient}</p>}
       </div>
       <div className="relative flex justify-end z-10 pointer-events-none">
         {p.approvals != null && p.threshold != null ? (
@@ -146,12 +144,19 @@ function ProposalQueueRow({
         {(p.status === "active" || p.status === "approved") && onCancel && (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onCancel(p); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancel(p);
+            }}
             disabled={cancelling}
             title={p.status === "approved" ? "Cancel proposal" : "Reject proposal"}
             className="flex h-7 w-7 items-center justify-center rounded-md border border-signal-danger/30 bg-signal-danger/10 text-signal-danger opacity-60 transition-all hover:opacity-100 hover:bg-signal-danger/20 hover:border-signal-danger/50 group-hover:opacity-80 disabled:opacity-30"
           >
-            {cancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+            {cancelling ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <X className="h-3.5 w-3.5" />
+            )}
           </button>
         )}
         <Link
@@ -194,7 +199,10 @@ function ProposalRow({
   const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "—";
 
   return (
-    <div className="group relative grid items-center gap-4 px-5 py-3.5 transition-colors hover:bg-surface-2" style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}>
+    <div
+      className="group relative grid items-center gap-4 px-5 py-3.5 transition-colors hover:bg-surface-2"
+      style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
+    >
       <Link
         href={`/vault/${multisig}/proposals/${p.transactionIndex}`}
         className="absolute inset-0"
@@ -235,18 +243,28 @@ function ProposalRow({
         {!isHistory && (p.status === "active" || p.status === "approved") && onCancel && (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onCancel(p); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancel(p);
+            }}
             disabled={cancelling}
             title={p.status === "approved" ? "Cancel proposal" : "Reject proposal"}
             className="flex h-7 w-7 items-center justify-center rounded-md border border-signal-danger/30 bg-signal-danger/10 text-signal-danger opacity-60 transition-all hover:opacity-100 hover:bg-signal-danger/20 hover:border-signal-danger/50 group-hover:opacity-80 disabled:opacity-30"
           >
-            {cancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+            {cancelling ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <X className="h-3.5 w-3.5" />
+            )}
           </button>
         )}
         {isHistory && onHide && (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onHide(p.id); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onHide(p.id);
+            }}
             title="Hide from history"
             className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle transition-opacity md:opacity-0 md:group-hover:opacity-100 hover:bg-surface-3 hover:text-ink"
           >
@@ -280,7 +298,10 @@ function IncomeRow({ entry }: { entry: IncomeEntry }) {
   const explorerUrl = `https://solscan.io/tx/${entry.signature}${CLUSTER}`;
 
   return (
-    <div className="group grid items-center gap-4 px-5 py-3.5 transition-colors hover:bg-surface-2" style={{ gridTemplateColumns: "1fr 1fr 8rem 5rem" }}>
+    <div
+      className="group grid items-center gap-4 px-5 py-3.5 transition-colors hover:bg-surface-2"
+      style={{ gridTemplateColumns: "1fr 1fr 8rem 5rem" }}
+    >
       {/* Amount */}
       <div className="flex items-center gap-2">
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-signal-positive/15">
@@ -344,8 +365,7 @@ function ProposalQueueMobileCard({
         ? `${lamportsToSol(p.amount)} SOL`
         : p.title || p.memo || "Configuration change";
 
-  const recipient =
-    p.type === "single" && p.recipient ? truncateAddress(p.recipient) : null;
+  const recipient = p.type === "single" && p.recipient ? truncateAddress(p.recipient) : null;
 
   const dot = STATUS_DOT[p.status ?? "draft"] ?? "bg-ink-subtle";
   const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "—";
@@ -376,9 +396,7 @@ function ProposalQueueMobileCard({
             )}
           </div>
           <p className="mt-1 text-sm font-medium text-ink">{description}</p>
-          {recipient && (
-            <p className="mt-0.5 font-mono text-xs text-ink-subtle">{recipient}</p>
-          )}
+          {recipient && <p className="mt-0.5 font-mono text-xs text-ink-subtle">{recipient}</p>}
           {p.approvals != null && p.threshold != null && (
             <div className="mt-2">
               <ApprovalDots approvals={p.approvals} threshold={p.threshold} />
@@ -396,11 +414,18 @@ function ProposalQueueMobileCard({
           {(p.status === "active" || p.status === "approved") && onCancel && (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onCancel(p); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancel(p);
+              }}
               disabled={cancelling}
               className="flex h-7 w-7 items-center justify-center rounded-md border border-signal-danger/30 bg-signal-danger/10 text-signal-danger disabled:opacity-30"
             >
-              {cancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+              {cancelling ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <X className="h-3.5 w-3.5" />
+              )}
             </button>
           )}
         </div>
@@ -475,17 +500,27 @@ function ProposalMobileCard({
           {!isHistory && (p.status === "active" || p.status === "approved") && onCancel && (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onCancel(p); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancel(p);
+              }}
               disabled={cancelling}
               className="flex h-7 w-7 items-center justify-center rounded-md border border-signal-danger/30 bg-signal-danger/10 text-signal-danger disabled:opacity-30"
             >
-              {cancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+              {cancelling ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <X className="h-3.5 w-3.5" />
+              )}
             </button>
           )}
           {isHistory && onHide && (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onHide(p.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onHide(p.id);
+              }}
               className="flex h-7 w-7 items-center justify-center rounded-md text-ink-subtle hover:bg-surface-3 hover:text-ink"
             >
               <EyeOff className="h-3.5 w-3.5" />
@@ -527,7 +562,9 @@ function IncomeMobileCard({ entry }: { entry: IncomeEntry }) {
               truncateAddress(entry.from)
             )}
           </p>
-          <p className="mt-0.5 text-xs text-ink-muted tabular-nums">{formatDate(entry.blockTime)}</p>
+          <p className="mt-0.5 text-xs text-ink-muted tabular-nums">
+            {formatDate(entry.blockTime)}
+          </p>
         </div>
         <a
           href={explorerUrl}
@@ -552,7 +589,9 @@ export default function TransactionsPage({
   const { data: proposals = [], isLoading: proposalsLoading } = useProposalSummaries(multisig);
   const { data: incomeEntries = [], isLoading: incomeLoading } = useVaultIncome(multisig, 50);
 
-  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
+  const [subVaultAccounts, setSubVaultAccounts] = useState<
+    Array<{ vaultIndex: number; name: string }>
+  >([]);
   useEffect(() => {
     fetch(`/api/vaults/${multisig}/sub-vaults`)
       .then((r) => (r.ok ? r.json() : []))
@@ -576,7 +615,9 @@ export default function TransactionsPage({
 
   const [archivedIds, setArchivedIds] = useState<Set<string>>(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem(`aegis:archived:${multisig}`) ?? "[]") as string[];
+      const stored = JSON.parse(
+        localStorage.getItem(`aegis:archived:${multisig}`) ?? "[]",
+      ) as string[];
       return new Set(stored);
     } catch {
       return new Set();
@@ -584,7 +625,11 @@ export default function TransactionsPage({
   });
 
   const multisigAddress = useMemo(() => {
-    try { return new PublicKey(multisig); } catch { return null; }
+    try {
+      return new PublicKey(multisig);
+    } catch {
+      return null;
+    }
   }, [multisig]);
 
   async function confirmCancel() {
@@ -618,7 +663,9 @@ export default function TransactionsPage({
     setArchivedIds(next);
     try {
       localStorage.setItem(`aegis:archived:${multisig}`, JSON.stringify([...next]));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   const isOperatorOnly = (p: ProposalSummary) => p.hasDraft && p.status === "executed";
@@ -705,33 +752,55 @@ export default function TransactionsPage({
         <div className="hidden md:block overflow-x-auto">
           <div className="min-w-[640px]">
             {/* Column headers */}
-            {activeTab === "income" ? (
-              !isLoading && incomeEntries.length > 0 && (
-                <div
-                  className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
-                  style={{ gridTemplateColumns: "1fr 1fr 8rem 5rem" }}
-                >
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Amount</span>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">From</span>
-                  <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Date</span>
-                  <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Tx</span>
-                </div>
-              )
-            ) : activeTab !== "queue" ? (
-              !isLoading && grouped[activeTab as Exclude<TabId, "income" | "queue">]?.length > 0 && (
-                <div
-                  className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
-                  style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
-                >
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">#</span>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Type</span>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Details</span>
-                  <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Approvals</span>
-                  <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Status</span>
-                  <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Action</span>
-                </div>
-              )
-            ) : null}
+            {activeTab === "income"
+              ? !isLoading &&
+                incomeEntries.length > 0 && (
+                  <div
+                    className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
+                    style={{ gridTemplateColumns: "1fr 1fr 8rem 5rem" }}
+                  >
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      Amount
+                    </span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      From
+                    </span>
+                    <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      Date
+                    </span>
+                    <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                      Tx
+                    </span>
+                  </div>
+                )
+              : activeTab !== "queue"
+                ? !isLoading &&
+                  grouped[activeTab as Exclude<TabId, "income" | "queue">]?.length > 0 && (
+                    <div
+                      className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
+                      style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
+                    >
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        #
+                      </span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Type
+                      </span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Details
+                      </span>
+                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Approvals
+                      </span>
+                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Status
+                      </span>
+                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Action
+                      </span>
+                    </div>
+                  )
+                : null}
 
             {/* Rows */}
             {isLoading ? (
@@ -770,12 +839,24 @@ export default function TransactionsPage({
                       className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
                       style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
                     >
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">#</span>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Type</span>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Details</span>
-                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Approvals</span>
-                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Status</span>
-                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Action</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        #
+                      </span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Type
+                      </span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Details
+                      </span>
+                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Approvals
+                      </span>
+                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Status
+                      </span>
+                      <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        Action
+                      </span>
                     </div>
                     <div className="divide-y divide-border/40">
                       {items.map((p) => (
@@ -798,9 +879,7 @@ export default function TransactionsPage({
                 return items.length === 0 ? (
                   <div className="py-16 text-center">
                     <p className="text-sm font-medium text-ink-muted">
-                      {activeTab === "history"
-                        ? "No history yet"
-                        : "No drafts saved"}
+                      {activeTab === "history" ? "No history yet" : "No drafts saved"}
                     </p>
                   </div>
                 ) : (
@@ -811,7 +890,9 @@ export default function TransactionsPage({
                         multisig={multisig}
                         p={p}
                         isHistory={activeTab === "history"}
-                        {...(activeTab === "history" ? { onHide: hideProposal } : { onCancel: (target: ProposalSummary) => setCancelTarget(target) })}
+                        {...(activeTab === "history"
+                          ? { onHide: hideProposal }
+                          : { onCancel: (target: ProposalSummary) => setCancelTarget(target) })}
                         cancelling={cancelling && cancelTarget?.id === p.id}
                         sourceVaultName={resolveVaultName(p.sourceVaultIndex)}
                       />
@@ -839,9 +920,7 @@ export default function TransactionsPage({
                 </p>
               </div>
             ) : (
-              incomeEntries.map((entry) => (
-                <IncomeMobileCard key={entry.signature} entry={entry} />
-              ))
+              incomeEntries.map((entry) => <IncomeMobileCard key={entry.signature} entry={entry} />)
             )
           ) : activeTab === "queue" ? (
             grouped.queue.length === 0 ? (
@@ -869,9 +948,7 @@ export default function TransactionsPage({
               return items.length === 0 ? (
                 <div className="py-16 text-center">
                   <p className="text-sm font-medium text-ink-muted">
-                    {activeTab === "history"
-                      ? "No history yet"
-                      : "No drafts saved"}
+                    {activeTab === "history" ? "No history yet" : "No drafts saved"}
                   </p>
                 </div>
               ) : (
@@ -881,7 +958,9 @@ export default function TransactionsPage({
                     multisig={multisig}
                     p={p}
                     isHistory={activeTab === "history"}
-                    {...(activeTab === "history" ? { onHide: hideProposal } : { onCancel: (target: ProposalSummary) => setCancelTarget(target) })}
+                    {...(activeTab === "history"
+                      ? { onHide: hideProposal }
+                      : { onCancel: (target: ProposalSummary) => setCancelTarget(target) })}
                     cancelling={cancelling && cancelTarget?.id === p.id}
                     sourceVaultName={resolveVaultName(p.sourceVaultIndex)}
                   />
@@ -904,7 +983,12 @@ export default function TransactionsPage({
         confirmVariant="destructive"
         isLoading={cancelling}
         onConfirm={() => void confirmCancel()}
-        onCancel={() => { if (!cancelling) { setCancelTarget(null); setCancelError(null); } }}
+        onCancel={() => {
+          if (!cancelling) {
+            setCancelTarget(null);
+            setCancelError(null);
+          }
+        }}
       />
       {cancelError && (
         <p className="mt-2 rounded-md border border-signal-danger/30 bg-signal-danger/15 px-3 py-2 text-sm text-signal-danger">

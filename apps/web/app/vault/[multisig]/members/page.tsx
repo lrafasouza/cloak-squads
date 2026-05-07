@@ -2,21 +2,24 @@
 
 import { AddressPill } from "@/components/ui/address-pill";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import {
-  InlineAlert,
-  WorkspaceHeader,
-  WorkspacePage,
-} from "@/components/ui/workspace";
-import {
-  createAddMemberProposal,
-  createRemoveMemberProposal,
-} from "@/lib/squads-sdk";
+import { InlineAlert, WorkspaceHeader, WorkspacePage } from "@/components/ui/workspace";
+import { createAddMemberProposal, createRemoveMemberProposal } from "@/lib/squads-sdk";
 import { proposalSummariesQueryKey, useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Clock, Copy, ExternalLink, Loader2, Shield, Trash2, UserPlus, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  Clock,
+  Copy,
+  ExternalLink,
+  Loader2,
+  Shield,
+  Trash2,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { use, useMemo, useRef, useState } from "react";
 
@@ -43,7 +46,11 @@ export default function MembersPage({
   const submittingRef = useRef(false);
 
   const multisigPda = useMemo(() => {
-    try { return new PublicKey(multisig); } catch { return null; }
+    try {
+      return new PublicKey(multisig);
+    } catch {
+      return null;
+    }
   }, [multisig]);
 
   const pendingMemberProposals = useMemo(
@@ -57,7 +64,8 @@ export default function MembersPage({
   );
 
   async function handleAddMember() {
-    if (submittingRef.current || !wallet.publicKey || !multisigPda || !wallet.sendTransaction) return;
+    if (submittingRef.current || !wallet.publicKey || !multisigPda || !wallet.sendTransaction)
+      return;
     setAddError(null);
     let newMemberPk: PublicKey;
     try {
@@ -95,7 +103,15 @@ export default function MembersPage({
   }
 
   async function handleRemoveMember() {
-    if (submittingRef.current || !wallet.publicKey || !multisigPda || !wallet.sendTransaction || !removeTarget || !data) return;
+    if (
+      submittingRef.current ||
+      !wallet.publicKey ||
+      !multisigPda ||
+      !wallet.sendTransaction ||
+      !removeTarget ||
+      !data
+    )
+      return;
     submittingRef.current = true;
     setRemoveLoading(true);
     try {
@@ -162,7 +178,11 @@ export default function MembersPage({
           action={
             <button
               type="button"
-              onClick={() => { setAddAddress(""); setAddError(null); setAddModalOpen(true); }}
+              onClick={() => {
+                setAddAddress("");
+                setAddError(null);
+                setAddModalOpen(true);
+              }}
               className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink shadow-raise-1 transition-colors hover:bg-accent-hover"
             >
               <UserPlus className="h-4 w-4" />
@@ -222,10 +242,18 @@ export default function MembersPage({
             className="grid items-center gap-4 border-b border-border/50 px-6 py-3"
             style={{ gridTemplateColumns: "3rem 1fr 10rem 5rem" }}
           >
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">#</span>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Address</span>
-            <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Role</span>
-            <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Actions</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+              #
+            </span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+              Address
+            </span>
+            <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+              Role
+            </span>
+            <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+              Actions
+            </span>
           </div>
           <div className="divide-y divide-border/40">
             {data.members.map((addr, i) => {
@@ -238,7 +266,11 @@ export default function MembersPage({
                 >
                   <span className="font-mono text-sm font-medium text-ink-subtle">{i + 1}</span>
                   <div className="flex items-center gap-2">
-                    <AddressPill value={addr} chars={8} className="bg-transparent border-transparent px-0" />
+                    <AddressPill
+                      value={addr}
+                      chars={8}
+                      className="bg-transparent border-transparent px-0"
+                    />
                     {isMe && (
                       <span className="rounded-full border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
                         You
@@ -307,9 +339,7 @@ export default function MembersPage({
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 break-all font-mono text-sm text-ink">
-                      {addr}
-                    </div>
+                    <div className="mt-1 break-all font-mono text-sm text-ink">{addr}</div>
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -361,20 +391,24 @@ export default function MembersPage({
             <p className="mb-4 text-xs text-ink-muted">
               Creates a Squads config proposal. Members with signing rights will need to approve it.
             </p>
-            <label htmlFor="new-member-address" className="block text-xs font-medium text-ink-muted mb-1.5">
+            <label
+              htmlFor="new-member-address"
+              className="block text-xs font-medium text-ink-muted mb-1.5"
+            >
               Member wallet address
             </label>
             <input
               id="new-member-address"
               type="text"
               value={addAddress}
-              onChange={(e) => { setAddAddress(e.target.value); setAddError(null); }}
+              onChange={(e) => {
+                setAddAddress(e.target.value);
+                setAddError(null);
+              }}
               placeholder="Solana public key"
               className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 font-mono text-sm text-ink placeholder-ink-subtle focus:border-accent focus:outline-none"
             />
-            {addError && (
-              <p className="mt-2 text-xs text-signal-danger">{addError}</p>
-            )}
+            {addError && <p className="mt-2 text-xs text-signal-danger">{addError}</p>}
             <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
@@ -417,7 +451,9 @@ export default function MembersPage({
         confirmVariant="destructive"
         isLoading={removeLoading}
         onConfirm={() => void handleRemoveMember()}
-        onCancel={() => { if (!removeLoading) setRemoveTarget(null); }}
+        onCancel={() => {
+          if (!removeLoading) setRemoveTarget(null);
+        }}
       />
     </WorkspacePage>
   );

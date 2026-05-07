@@ -172,7 +172,9 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   const [selectedMint, setSelectedMint] = useState<string>(SOL_TOKEN.mint);
   const [recipientNeedsAta, setRecipientNeedsAta] = useState(false);
   const [selectedVaultIndex, setSelectedVaultIndex] = useState(0);
-  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
+  const [subVaultAccounts, setSubVaultAccounts] = useState<
+    Array<{ vaultIndex: number; name: string }>
+  >([]);
 
   useEffect(() => {
     fetch(`/api/vaults/${multisig}/sub-vaults`)
@@ -194,7 +196,10 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
     if (sendMode === "private" && selectedVaultIndex !== 0) setSelectedVaultIndex(0);
   }, [sendMode, selectedVaultIndex]);
 
-  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig, selectedVaultIndex);
+  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(
+    multisig,
+    selectedVaultIndex,
+  );
   const { data: solPrice } = useSolPrice();
 
   const selectedToken = useMemo(
@@ -321,7 +326,10 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         );
       }
 
-      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: selectedVaultIndex });
+      const [vaultPda] = multisigSdk.getVaultPda({
+        multisigPda: multisigAddress,
+        index: selectedVaultIndex,
+      });
 
       // Derive amount in token-native units (lamports for SOL, micro-USDC for USDC)
       const decimals = selectedToken?.decimals ?? 9;
@@ -541,7 +549,10 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       }
 
       const recipientPubkey = new PublicKey(recipient);
-      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: selectedVaultIndex });
+      const [vaultPda] = multisigSdk.getVaultPda({
+        multisigPda: multisigAddress,
+        index: selectedVaultIndex,
+      });
       const instructions = [];
 
       if (isSol) {
@@ -718,7 +729,8 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                     </div>
                     {isPrivate && (
                       <p className="mt-1.5 text-[11px] text-ink-subtle">
-                        Private sends always route through Primary. Switch to Public Send to source from a sub-account.
+                        Private sends always route through Primary. Switch to Public Send to source
+                        from a sub-account.
                       </p>
                     )}
                   </div>
@@ -786,7 +798,8 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
 
                   {isPrivate && (
                     <p className="mt-1.5 text-xs text-ink-muted">
-                      Private sends route through the Cloak shielded pool. USDC private sends are available on mainnet.
+                      Private sends route through the Cloak shielded pool. USDC private sends are
+                      available on mainnet.
                     </p>
                   )}
 

@@ -13,9 +13,9 @@ import {
   WorkspacePage,
 } from "@/components/ui/workspace";
 import { SendModal } from "@/components/vault/SendModal";
-import { cn } from "@/lib/utils";
-import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { useVaultData } from "@/lib/use-vault-data";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
+import { cn } from "@/lib/utils";
 import { PublicKey } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
 import { ArrowUpFromLine, Check, Copy, Layers, Plus, Trash2 } from "lucide-react";
@@ -56,11 +56,7 @@ function CopyButton({ text }: { text: string }) {
       className="inline-flex h-6 w-6 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
       aria-label="Copy address"
     >
-      {copied ? (
-        <Check className="h-3 w-3 text-signal-positive" />
-      ) : (
-        <Copy className="h-3 w-3" />
-      )}
+      {copied ? <Check className="h-3 w-3 text-signal-positive" /> : <Copy className="h-3 w-3" />}
     </button>
   );
 }
@@ -80,10 +76,7 @@ function VaultCard({
   onDelete?: () => void;
   onSend?: () => void;
 }) {
-  const short =
-    address !== "–"
-      ? `${address.slice(0, 14)}…${address.slice(-8)}`
-      : "–";
+  const short = address !== "–" ? `${address.slice(0, 14)}…${address.slice(-8)}` : "–";
 
   const hasFunds = balanceSol !== undefined && Number.parseFloat(balanceSol) > 0;
 
@@ -115,7 +108,11 @@ function VaultCard({
                 hasFunds ? "text-ink" : "text-ink-subtle/50",
               )}
             >
-              {hasFunds ? Number.parseFloat(balanceSol).toLocaleString("en-US", { maximumFractionDigits: 4 }) : "0"}{" "}
+              {hasFunds
+                ? Number.parseFloat(balanceSol).toLocaleString("en-US", {
+                    maximumFractionDigits: 4,
+                  })
+                : "0"}{" "}
               <span className="text-xs font-normal text-ink-subtle">SOL</span>
             </span>
           )}
@@ -179,9 +176,7 @@ export default function SubVaultsPage({
   }, [load]);
 
   const nextIndex =
-    subVaults.length > 0
-      ? Math.max(...subVaults.map((sv) => sv.vaultIndex)) + 1
-      : 1;
+    subVaults.length > 0 ? Math.max(...subVaults.map((sv) => sv.vaultIndex)) + 1 : 1;
 
   const previewAddress = newName.trim() ? deriveVaultPda(multisig, nextIndex) : null;
 
@@ -222,17 +217,12 @@ export default function SubVaultsPage({
       );
       return;
     }
-    if (
-      !confirm(
-        `Remove "${name}"? This only deletes the label — on-chain funds are unaffected.`,
-      )
-    )
+    if (!confirm(`Remove "${name}"? This only deletes the label — on-chain funds are unaffected.`))
       return;
     try {
-      const res = await fetchWithAuth(
-        `/api/vaults/${multisig}/sub-vaults/${vaultIndex}`,
-        { method: "DELETE" },
-      );
+      const res = await fetchWithAuth(`/api/vaults/${multisig}/sub-vaults/${vaultIndex}`, {
+        method: "DELETE",
+      });
       if (!res.ok && res.status !== 204) {
         const data = await res.json().catch(() => ({}));
         throw new Error((data as { error?: string }).error ?? "Failed to remove.");
@@ -382,7 +372,10 @@ export default function SubVaultsPage({
           <div className="rounded-xl border border-border bg-surface px-4 py-3 space-y-2">
             <p className="text-xs font-semibold text-ink">Important</p>
             <ul className={cn("space-y-1.5 text-[11px] text-ink-muted")}>
-              <li>• These are <strong className="text-ink">sub-accounts</strong> of this vault, not separate vaults</li>
+              <li>
+                • These are <strong className="text-ink">sub-accounts</strong> of this vault, not
+                separate vaults
+              </li>
               <li>• You cannot "enter" them; manage everything from this vault</li>
               <li>• Copy the address and send SOL/tokens to fund it</li>
               <li>• Names are off-chain labels; removing one doesn't affect funds</li>
@@ -394,7 +387,9 @@ export default function SubVaultsPage({
       <SendModal
         multisig={multisig}
         open={sendVaultIndex !== null}
-        onOpenChange={(v) => { if (!v) setSendVaultIndex(null); }}
+        onOpenChange={(v) => {
+          if (!v) setSendVaultIndex(null);
+        }}
         defaultVaultIndex={sendVaultIndex ?? 0}
         // When the user clicks Send on a sub-vault (non-zero index), default to
         // public mode — the gatekeeper hardcodes vault[0] for private flows, so

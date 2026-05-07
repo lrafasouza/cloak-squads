@@ -1305,14 +1305,12 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                               </button>
                             </TooltipTrigger>
                             <TooltipContent side="top" align="start" className="max-w-xs">
-                              <p className="font-semibold text-ink">
-                                Why "Build notes"?
-                              </p>
+                              <p className="font-semibold text-ink">Why "Build notes"?</p>
                               <p className="mt-1 leading-relaxed text-ink-muted">
                                 Each recipient needs a unique zero-knowledge commitment generated
                                 locally in your browser. This is what hides amounts and recipient
-                                identities on-chain — nothing leaves your browser until you
-                                submit. Generation takes ~1s per recipient.
+                                identities on-chain — nothing leaves your browser until you submit.
+                                Generation takes ~1s per recipient.
                               </p>
                             </TooltipContent>
                           </Tooltip>

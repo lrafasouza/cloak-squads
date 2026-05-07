@@ -8,9 +8,9 @@ import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/workspace";
 import { isProposalExecuted } from "@/lib/operator-execution-history";
 import { type ProposalStatusKind, readProposalStatus } from "@/lib/proposals";
-import { SOL_MINT, formatRawAmount } from "@/lib/tokens";
 import { proposalCancel, proposalReject } from "@/lib/squads-sdk";
 import { detectTransactionType } from "@/lib/squads-sdk";
+import { SOL_MINT, formatRawAmount } from "@/lib/tokens";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import type { CommitmentClaim } from "@cloak-squads/core/commitment";
@@ -259,7 +259,9 @@ export default function ProposalApprovalPage({
   const [memberVote, setMemberVote] = useState<MemberVote>(null);
   const [transactionType, setTransactionType] = useState<"config" | "vault" | null>(null);
   const [sourceVaultIndex, setSourceVaultIndex] = useState<number | null>(null);
-  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
+  const [subVaultAccounts, setSubVaultAccounts] = useState<
+    Array<{ vaultIndex: number; name: string }>
+  >([]);
   const [operatorDelivered, setOperatorDelivered] = useState(false);
 
   useEffect(() => {
@@ -279,7 +281,8 @@ export default function ProposalApprovalPage({
   const sourceVaultName =
     sourceVaultIndex === null || sourceVaultIndex === 0
       ? null
-      : (subVaultAccounts.find((sv) => sv.vaultIndex === sourceVaultIndex)?.name ?? `Vault #${sourceVaultIndex}`);
+      : (subVaultAccounts.find((sv) => sv.vaultIndex === sourceVaultIndex)?.name ??
+        `Vault #${sourceVaultIndex}`);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
@@ -332,9 +335,7 @@ export default function ProposalApprovalPage({
         fetchWithAuth(
           `/api/payrolls/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
         ),
-        fetchWithAuth(
-          `/api/swaps/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`,
-        ),
+        fetchWithAuth(`/api/swaps/${encodeURIComponent(multisigParam)}/${encodeURIComponent(id)}`),
       ]);
 
       if (!cancelled) {
@@ -732,7 +733,9 @@ export default function ProposalApprovalPage({
                       <AlertTriangle className="h-6 w-6 text-signal-warn" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-sm font-semibold text-ink">Database temporarily unavailable</p>
+                      <p className="text-sm font-semibold text-ink">
+                        Database temporarily unavailable
+                      </p>
                       <p className="max-w-xs text-xs text-ink-muted">
                         The database is currently unreachable. The proposal details are stored
                         on-chain and can still be executed by signers.
@@ -975,8 +978,8 @@ export default function ProposalApprovalPage({
                         <div>
                           <p className="text-sm font-semibold text-ink">Waiting for Operator</p>
                           <p className="mt-0.5 text-xs text-ink-muted">
-                            The Operator must now execute the private delivery so the SOL is sent
-                            to the recipient.
+                            The Operator must now execute the private delivery so the SOL is sent to
+                            the recipient.
                           </p>
                           <Link
                             href={`/vault/${multisigParam}/operator?proposal=${encodeURIComponent(id)}`}

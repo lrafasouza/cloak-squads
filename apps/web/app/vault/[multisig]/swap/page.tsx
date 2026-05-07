@@ -56,11 +56,7 @@ export default function SwapPage({ params }: { params: Promise<{ multisig: strin
           {/* Left: Swap Panel */}
           <div className="lg:sticky lg:top-6 lg:self-start">
             <Panel>
-              <PanelHeader
-                icon={ArrowLeftRight}
-                title="Swap"
-                description="SOL ↔ USDC via Orca"
-              />
+              <PanelHeader icon={ArrowLeftRight} title="Swap" description="SOL ↔ USDC via Orca" />
               <PanelBody>
                 <SwapPanel multisig={multisig} />
               </PanelBody>

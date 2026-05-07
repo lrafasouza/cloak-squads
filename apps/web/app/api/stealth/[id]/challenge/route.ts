@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/prisma";
 import { createChallenge } from "@/lib/claim-challenge";
+import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
@@ -17,7 +17,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   // Rate-limit by invoiceId to prevent challenge flooding on a single invoice
   if (!(await checkRateLimitAsync(`chal:${id}`, "challenge"))) {
-    return NextResponse.json({ error: "Too many challenge requests for this invoice." }, { status: 429 });
+    return NextResponse.json(
+      { error: "Too many challenge requests for this invoice." },
+      { status: 429 },
+    );
   }
 
   try {
@@ -27,7 +30,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     }
 
     if (invoice.status === "claimed") {
-      return NextResponse.json({ error: "This invoice has already been claimed." }, { status: 409 });
+      return NextResponse.json(
+        { error: "This invoice has already been claimed." },
+        { status: 409 },
+      );
     }
 
     if (invoice.status === "voided") {

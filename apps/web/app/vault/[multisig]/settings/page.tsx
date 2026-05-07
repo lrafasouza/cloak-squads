@@ -3,26 +3,16 @@
 import { AddressPill } from "@/components/ui/address-pill";
 import { useToast } from "@/components/ui/toast-provider";
 import { WarningCallout } from "@/components/ui/warning-callout";
-import {
-  StatusPill,
-  WorkspacePage,
-  WorkspaceHeader,
-} from "@/components/ui/workspace";
-import { useWalletAuth } from "@/lib/use-wallet-auth";
-import { useVaultMetadata, type VaultMetadata } from "@/lib/use-vault-metadata";
-import { cn } from "@/lib/utils";
-import { useVaultData } from "@/lib/use-vault-data";
+import { StatusPill, WorkspaceHeader, WorkspacePage } from "@/components/ui/workspace";
 import { truncateAddress } from "@/lib/proposals";
-import {
-  Check,
-  Key,
-  Loader2,
-  Lock,
-  Pencil,
-} from "lucide-react";
+import { useVaultData } from "@/lib/use-vault-data";
+import { type VaultMetadata, useVaultMetadata } from "@/lib/use-vault-metadata";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
+import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
+import { Check, Key, Loader2, Lock, Pencil } from "lucide-react";
 import Link from "next/link";
 import { use, useCallback, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 
 // ── Section ────────────────────────────────────────────────────────────────
 
@@ -237,11 +227,7 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
 
   return (
     <WorkspacePage>
-      <WorkspaceHeader
-        eyebrow="VAULT"
-        title="Settings"
-        description={truncateAddress(multisig)}
-      />
+      <WorkspaceHeader eyebrow="VAULT" title="Settings" description={truncateAddress(multisig)} />
 
       <div className="space-y-4">
         {/* General */}
