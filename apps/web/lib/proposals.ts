@@ -136,6 +136,19 @@ function parseConfigActionTitle(actions: unknown[]): string {
   return parts.join(", ");
 }
 
+// getMultipleAccountsInfo accepts up to 100 keys per call. We chunk to stay safe.
+const RPC_BATCH_LIMIT = 100;
+
+async function batchGetAccounts(connection: Connection, keys: PublicKey[]) {
+  const out: Array<Awaited<ReturnType<Connection["getAccountInfo"]>>> = [];
+  for (let i = 0; i < keys.length; i += RPC_BATCH_LIMIT) {
+    const slice = keys.slice(i, i + RPC_BATCH_LIMIT);
+    const infos = await connection.getMultipleAccountsInfo(slice, "confirmed");
+    out.push(...infos);
+  }
+  return out;
+}
+
 export async function loadOnchainProposalSummaries(params: {
   connection: Connection;
   multisigAddress: PublicKey;
@@ -155,64 +168,76 @@ export async function loadOnchainProposalSummaries(params: {
     indexes.push(index);
   }
 
-  const proposals: Array<ProposalSummary | null> = await Promise.all(
-    indexes.map(async (index) => {
-      const proposalPda = getProposalPdaForIndex(multisigAddress, index);
-      try {
-        const proposal = await squadsMultisig.accounts.Proposal.fromAccountAddress(
-          connection,
-          proposalPda,
-        );
-
-        // Try to read the underlying transaction account for memo/action details
-        const [transactionPda] = squadsMultisig.getTransactionPda({
-          multisigPda: multisigAddress,
-          index,
-        });
-
-        let title = "";
-        let txType: ProposalSummaryType = "onchain";
-        let sourceVaultIndex: number | undefined;
-
-        const [configTxResult, vaultTxResult] = await Promise.allSettled([
-          squadsMultisig.accounts.ConfigTransaction.fromAccountAddress(connection, transactionPda),
-          squadsMultisig.accounts.VaultTransaction.fromAccountAddress(connection, transactionPda),
-        ]);
-
-        if (configTxResult.status === "fulfilled") {
-          title = parseConfigActionTitle(configTxResult.value.actions as unknown[]);
-          txType = "onchain";
-        } else if (vaultTxResult.status === "fulfilled") {
-          const ixCount = vaultTxResult.value.message.instructions.length;
-          title = ixCount > 0 ? `Vault transaction (${ixCount} instruction${ixCount > 1 ? "s" : ""})` : "Vault transaction";
-          txType = "onchain";
-          sourceVaultIndex = vaultTxResult.value.vaultIndex;
-        } else {
-          title = "On-chain proposal";
-        }
-
-        return {
-          id: `onchain-${index.toString()}`,
-          transactionIndex: index.toString(),
-          amount: "0",
-          recipient: "Squads vault transaction",
-          memo: "",
-          title,
-          createdAt: new Date(0).toISOString(),
-          type: txType,
-          status: readProposalStatus(proposal.status),
-          approvals: proposal.approved.length,
-          threshold,
-          hasDraft: false,
-          sourceVaultIndex,
-        };
-      } catch {
-        return null;
-      }
-    }),
+  // Derive all PDAs upfront so we can fetch in a single batched RPC call instead
+  // of fanning out 3 calls per proposal (1 Proposal + 1 ConfigTransaction + 1
+  // VaultTransaction = 76 RPC calls for 25 proposals, which torches free-tier
+  // RPC rate limits).
+  const proposalPdas = indexes.map((index) => getProposalPdaForIndex(multisigAddress, index));
+  const transactionPdas = indexes.map(
+    (index) => squadsMultisig.getTransactionPda({ multisigPda: multisigAddress, index })[0],
   );
 
-  return proposals.filter((proposal): proposal is ProposalSummary => proposal !== null);
+  // Single batched fetch. getMultipleAccountsInfo bundles up to 100 keys per
+  // RPC call, so 25 proposals is 2 batched calls instead of 75 fan-out calls.
+  const allInfos = await batchGetAccounts(connection, [...proposalPdas, ...transactionPdas]);
+  const proposalInfos = allInfos.slice(0, indexes.length);
+  const transactionInfos = allInfos.slice(indexes.length);
+
+  const summaries: Array<ProposalSummary | null> = indexes.map((index, i) => {
+    const proposalInfo = proposalInfos[i];
+    if (!proposalInfo) return null;
+
+    let proposal: ReturnType<typeof squadsMultisig.accounts.Proposal.fromAccountInfo>[0];
+    try {
+      proposal = squadsMultisig.accounts.Proposal.fromAccountInfo(proposalInfo)[0];
+    } catch {
+      return null;
+    }
+
+    let title = "On-chain proposal";
+    const txType: ProposalSummaryType = "onchain";
+    let sourceVaultIndex: number | undefined;
+
+    const txInfo = transactionInfos[i];
+    if (txInfo) {
+      // Try ConfigTransaction first; fall back to VaultTransaction. Both checks
+      // are local Borsh deserialization — no RPC.
+      try {
+        const configTx = squadsMultisig.accounts.ConfigTransaction.fromAccountInfo(txInfo)[0];
+        title = parseConfigActionTitle(configTx.actions as unknown[]);
+      } catch {
+        try {
+          const vaultTx = squadsMultisig.accounts.VaultTransaction.fromAccountInfo(txInfo)[0];
+          const ixCount = vaultTx.message.instructions.length;
+          title =
+            ixCount > 0
+              ? `Vault transaction (${ixCount} instruction${ixCount > 1 ? "s" : ""})`
+              : "Vault transaction";
+          sourceVaultIndex = vaultTx.vaultIndex;
+        } catch {
+          /* discriminator didn't match either; keep default title */
+        }
+      }
+    }
+
+    return {
+      id: `onchain-${index.toString()}`,
+      transactionIndex: index.toString(),
+      amount: "0",
+      recipient: "Squads vault transaction",
+      memo: "",
+      title,
+      createdAt: new Date(0).toISOString(),
+      type: txType,
+      status: readProposalStatus(proposal.status),
+      approvals: proposal.approved.length,
+      threshold,
+      hasDraft: false,
+      sourceVaultIndex,
+    };
+  });
+
+  return summaries.filter((proposal): proposal is ProposalSummary => proposal !== null);
 }
 
 export function getProposalPdaForIndex(multisigAddress: PublicKey, transactionIndex: bigint) {
