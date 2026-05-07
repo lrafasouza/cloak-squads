@@ -13,6 +13,33 @@ interface State {
   error?: Error;
 }
 
+const CHUNK_RELOAD_KEY = "aegis:chunk-reload-at";
+const CHUNK_RELOAD_COOLDOWN_MS = 30_000;
+
+function isChunkLoadError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = (error as { name?: unknown }).name;
+  const message = (error as { message?: unknown }).message;
+  if (name === "ChunkLoadError") return true;
+  if (typeof message === "string") {
+    return /Loading (CSS )?chunk [\w-]+ failed/i.test(message);
+  }
+  return false;
+}
+
+function attemptChunkReload(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const last = Number(window.sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? 0);
+    if (Date.now() - last < CHUNK_RELOAD_COOLDOWN_MS) return false;
+    window.sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+    window.location.reload();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -23,7 +50,28 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
+  componentDidMount() {
+    if (typeof window === "undefined") return;
+    window.addEventListener("error", this.handleWindowError);
+    window.addEventListener("unhandledrejection", this.handleUnhandledRejection);
+  }
+
+  componentWillUnmount() {
+    if (typeof window === "undefined") return;
+    window.removeEventListener("error", this.handleWindowError);
+    window.removeEventListener("unhandledrejection", this.handleUnhandledRejection);
+  }
+
+  private handleWindowError = (event: ErrorEvent) => {
+    if (isChunkLoadError(event.error)) attemptChunkReload();
+  };
+
+  private handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+    if (isChunkLoadError(event.reason)) attemptChunkReload();
+  };
+
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    if (isChunkLoadError(error) && attemptChunkReload()) return;
     console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
