@@ -890,7 +890,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
             {hasSubVaults && (
               <div className="rounded-xl border border-border bg-surface px-4 py-3 text-xs text-ink-muted">
                 Payroll routes through <span className="font-medium text-ink">Primary</span>.
-                Private operations require Primary as the source — sub-vault payroll is not
+                Private operations require Primary as the source, sub-vault payroll is not
                 supported until the gatekeeper program is parametrized.
               </div>
             )}
@@ -1309,7 +1309,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                               <p className="mt-1 leading-relaxed text-ink-muted">
                                 Each recipient needs a unique zero-knowledge commitment generated
                                 locally in your browser. This is what hides amounts and recipient
-                                identities on-chain — nothing leaves your browser until you submit.
+                                identities on-chain, nothing leaves your browser until you submit.
                                 Generation takes ~1s per recipient.
                               </p>
                             </TooltipContent>

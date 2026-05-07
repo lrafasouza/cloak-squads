@@ -12,23 +12,23 @@ const faqs = [
   },
   {
     q: "How is Aegis different from Arcium, Umbra, or Darklake?",
-    a: "Those projects shield wallet-to-wallet payments. Aegis is the only one that wraps the full treasury surface — multisig approvals, payroll, bearer invoices, and scoped audit links — around that privacy layer. We're not the cipher; we're the product the cipher lives inside.",
+    a: "Those projects shield wallet-to-wallet payments. Aegis is the only one that wraps the full treasury surface, multisig approvals, payroll, bearer invoices, and scoped audit links, around that privacy layer. We're not the cipher; we're the product the cipher lives inside.",
   },
   {
     q: "Can I import my existing Squads vault?",
-    a: "Not yet. Today you create a fresh Aegis vault that uses Squads multisig under the hood. Importing an existing Squads vault is on the roadmap — it requires onboarding the existing multisig PDA into Aegis's operator + privacy config without disturbing your members or thresholds.",
+    a: "Not yet. Today you create a fresh Aegis vault that uses Squads multisig under the hood. Importing an existing Squads vault is on the roadmap, since it requires onboarding the existing multisig PDA into Aegis's operator + privacy config without disturbing your members or thresholds.",
   },
   {
     q: "How does the Operator work, and what if it's compromised?",
-    a: "The Operator is a dedicated wallet you choose for your vault. After your team approves a payment through Squads, the Cloak Engine issues a one-time, time-bound permission scoped to that exact payment. The Operator can only execute what your team already approved — it cannot create or approve new payments. If compromised, replace it with a normal Squads vote.",
+    a: "The Operator is a dedicated wallet you choose for your vault. After your team approves a payment through Squads, the Cloak Engine issues a one-time, time-bound permission scoped to that exact payment. The Operator can only execute what your team already approved, and it cannot create or approve new payments. If compromised, replace it with a normal Squads vote.",
   },
   {
     q: "Do permissions expire?",
-    a: "Yes. Every permission is single-use and time-bound — 60 seconds by default. If it is not used within that window, it expires automatically. An intercepted permission is useless after the deadline, and is burned on first execute.",
+    a: "Yes. Every permission is single-use and time-bound, 60 seconds by default. If it is not used within that window, it expires automatically. An intercepted permission is useless after the deadline, and is burned on first execute.",
   },
   {
     q: "What's a bearer invoice and when is it dangerous?",
-    a: "A bearer invoice is a claim link you can publish or DM without knowing the recipient's wallet upfront — they pick it at claim time. The trade-off: anyone with the link can claim, like bearer cash. We default expiry to 24h, mark them with a red badge, and let you revoke before claim. Use bound mode if you need the recipient locked in.",
+    a: "A bearer invoice is a claim link you can publish or DM without knowing the recipient's wallet upfront, since they pick it at claim time. The trade-off: anyone with the link can claim, like bearer cash. We default expiry to 24h, mark them with a red badge, and let you revoke before claim. Use bound mode if you need the recipient locked in.",
   },
   {
     q: "Can transactions be audited?",

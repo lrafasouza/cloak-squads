@@ -605,7 +605,7 @@ export function BentoUseCases() {
                 body="Generate read-only links scoped by date, member, or category. Exports are Ed25519-signed and verifiable offline. The public ledger stays blind."
                 bullets={[
                   "Scope by date, member, or category.",
-                  "Signed exports — tamper-evident, revokable.",
+                  "Signed exports, tamper-evident, revokable.",
                   "Access log shows every view from every IP.",
                 ]}
               />

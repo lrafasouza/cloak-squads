@@ -768,7 +768,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           const msg =
             `Cannot execute private send: recipient ${draft.recipient.slice(0, 4)}…${draft.recipient.slice(-4)} ` +
             `is not an Ed25519 wallet (likely a vault PDA). Cloak's shielded pool can only deliver to standard ` +
-            `wallets. This proposal cannot be executed privately — refund it (Refund button) and recreate as a ` +
+            `wallets. This proposal cannot be executed privately, so refund it (Refund button) and recreate as a ` +
             `Public send for vault-to-vault transfers.`;
           if (!suppressProgress) {
             startTransaction({
@@ -1027,7 +1027,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         const humanMsg = msg.includes("Merkle tree account not found")
           ? "Cloak shield pool not initialized for this token on the current network. " +
             "Only SOL private sends are supported on devnet. " +
-            "The proposal must be refunded — use the Refund button below."
+            "The proposal must be refunded, use the Refund button below."
           : `Cloak deposit failed: ${msg}`;
         failTransaction(humanMsg);
         throw new Error(humanMsg);
@@ -1306,7 +1306,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
     if (payrollStatus === "success") {
       completeTransaction({
-        title: `Payroll complete — ${completed} transfer${completed !== 1 ? "s" : ""} confirmed`,
+        title: `Payroll complete, ${completed} transfer${completed !== 1 ? "s" : ""} confirmed`,
         description: "All private payroll transfers have been executed on-chain.",
       });
       setPayrollComplete(true);
@@ -1397,7 +1397,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
     if (completed === totalRecipients) {
       completeTransaction({
-        title: `Payroll complete — ${completed} transfer${completed !== 1 ? "s" : ""} confirmed`,
+        title: `Payroll complete, ${completed} transfer${completed !== 1 ? "s" : ""} confirmed`,
         description: "All private payroll transfers have been executed on-chain.",
       });
       setPayrollComplete(true);
@@ -1583,7 +1583,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               {operatorBalanceLoading
                 ? "..."
                 : operatorBalanceLamports === null
-                  ? "—"
+                  ? "-"
                   : `${lamportsToSol(operatorBalanceLamports)} SOL`}
             </span>
           </div>
@@ -1591,7 +1591,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           <div className="flex items-center gap-2">
             <span className="text-ink-muted">Needed</span>
             <span className="font-semibold text-ink">
-              {totalNeededLamports > 0n ? `${lamportsToSol(totalNeededLamports)} SOL` : "—"}
+              {totalNeededLamports > 0n ? `${lamportsToSol(totalNeededLamports)} SOL` : "-"}
             </span>
           </div>
           <div className="h-4 w-px bg-border" />
@@ -2125,7 +2125,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 {isPayroll && payrollComplete && executionSteps.some((s) => s.signature) && (
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-signal-positive">
-                      Payroll complete —{" "}
+                      Payroll complete,{" "}
                       {executionSteps.filter((s) => s.status === "success").length}/
                       {executionSteps.length} transfers confirmed
                     </p>
@@ -2345,7 +2345,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               <span className="font-medium text-ink">
                 {loadedDraft
                   ? formatRawAmount(loadedDraft.amount, loadedDraft.invariants.tokenMint)
-                  : "—"}
+                  : "-"}
               </span>{" "}
               from the vault to the operator wallet, but the Cloak shielded delivery cannot complete
               (e.g., no shielded pool initialized for this token). Refunding sends those funds back
@@ -2354,7 +2354,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             </p>
             <p className="text-xs">
               This signs a single transfer with the connected wallet. The recipient will receive
-              nothing — you can resubmit later via Public mode if needed.
+              nothing, you can resubmit later via Public mode if needed.
             </p>
             {refundError ? (
               <p className="rounded-md bg-signal-danger/10 px-3 py-2 text-xs text-signal-danger">

@@ -53,7 +53,7 @@ export function ImportVaultsModal({ open, onOpenChange }: ImportVaultsModalProps
                 />
               ))}
               <p className="pt-1 text-center text-xs text-ink-subtle">
-                Searching on-chain — this takes a few seconds…
+                Searching on-chain, this takes a few seconds…
               </p>
             </div>
           )}

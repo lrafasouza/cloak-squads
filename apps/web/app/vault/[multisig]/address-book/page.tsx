@@ -320,7 +320,7 @@ function ContactRow({
           <span className="truncate text-sm font-medium text-ink">{entry.label}</span>
           {entry.notes ? (
             <span className="hidden truncate text-xs text-ink-subtle sm:inline">
-              — {entry.notes}
+              , {entry.notes}
             </span>
           ) : null}
         </div>

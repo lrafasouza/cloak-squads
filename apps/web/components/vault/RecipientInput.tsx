@@ -144,7 +144,7 @@ export function RecipientInput({
           <BookUser className="h-3.5 w-3.5 text-accent" />
           <span className="font-medium text-ink">{matchedEntry.label}</span>
           {matchedEntry.notes ? (
-            <span className="truncate text-ink-subtle">— {matchedEntry.notes}</span>
+            <span className="truncate text-ink-subtle">, {matchedEntry.notes}</span>
           ) : null}
         </div>
       ) : null}

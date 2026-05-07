@@ -217,7 +217,7 @@ export default function SubVaultsPage({
       );
       return;
     }
-    if (!confirm(`Remove "${name}"? This only deletes the label — on-chain funds are unaffected.`))
+    if (!confirm(`Remove "${name}"? This only deletes the label, on-chain funds are unaffected.`))
       return;
     try {
       const res = await fetchWithAuth(`/api/vaults/${multisig}/sub-vaults/${vaultIndex}`, {

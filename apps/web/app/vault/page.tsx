@@ -134,7 +134,7 @@ export default function VaultPage() {
                 transition={{ delay: 0.3 }}
                 className="mb-8 text-center text-sm text-ink-subtle"
               >
-                No vaults found yet — create your first one below.
+                No vaults found yet, create your first one below.
               </motion.p>
             )}
 

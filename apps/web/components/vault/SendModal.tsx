@@ -249,7 +249,7 @@ export function SendModal({
     // relay at delivery time, leaving funds stuck in the shielded pool.
     if (mode === "private" && !PublicKey.isOnCurve(recipientPubkey.toBuffer())) {
       setError(
-        "Recipient is not an Ed25519 wallet (likely a PDA). Cloak can only deliver to standard wallets — switch to Public mode or use a different recipient.",
+        "Recipient is not an Ed25519 wallet (likely a PDA). Cloak can only deliver to standard wallets, so switch to Public mode or use a different recipient.",
       );
       return;
     }
@@ -618,7 +618,7 @@ export function SendModal({
                       disabled={pending || lockedToPrimary}
                       title={
                         lockedToPrimary
-                          ? "Private sends route through Primary. The gatekeeper requires vault[0] as the CPI signer — switch to Public mode to send from this account."
+                          ? "Private sends route through Primary. The gatekeeper requires vault[0] as the CPI signer, so switch to Public mode to send from this account."
                           : undefined
                       }
                       onClick={() => {
@@ -650,7 +650,7 @@ export function SendModal({
               const privateDisabledForDest = m === "private" && destType === "account";
               const privateDisabled = privateDisabledForToken || privateDisabledForDest;
               const reason = privateDisabledForDest
-                ? "Vault accounts are off-curve PDAs — Cloak can't deliver to them. Use Public mode for vault-to-vault transfers."
+                ? "Vault accounts are off-curve PDAs, so Cloak can't deliver to them. Use Public mode for vault-to-vault transfers."
                 : privateDisabledForToken
                   ? "Private transfers are only available for SOL on devnet."
                   : undefined;
@@ -679,7 +679,7 @@ export function SendModal({
           {isSol && destType === "account" && (
             <p className="text-xs text-ink-muted">
               Vault-to-vault transfers go through Public mode (multisig proposal). Private mode
-              requires an Ed25519 wallet recipient — vault PDAs are off-curve.
+              requires an Ed25519 wallet recipient, vault PDAs are off-curve.
             </p>
           )}
 
@@ -764,7 +764,7 @@ export function SendModal({
                   onClick={handleMaxAmount}
                   disabled={pending || !selectedToken}
                 >
-                  {selectedToken ? `${selectedToken.uiBalance} ${selectedToken.symbol}` : "—"}
+                  {selectedToken ? `${selectedToken.uiBalance} ${selectedToken.symbol}` : "-"}
                 </button>
               </span>
             </div>

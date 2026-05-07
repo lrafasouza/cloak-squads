@@ -95,7 +95,7 @@ export function CommitmentCheck({
       {state === "unavailable" ? (
         <p className="mt-4 text-sm text-amber-200">
           Local commitment recompute failed. The on-chain payload hash is enforced by the gatekeeper
-          program — you can still vote, but commitment verification is a defense-in-depth check.
+          program, you can still vote, but commitment verification is a defense-in-depth check.
           {error ? (
             <span className="mt-1 block text-xs text-amber-300/80">Detail: {error}</span>
           ) : null}

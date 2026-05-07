@@ -99,7 +99,7 @@ function ProposalQueueRow({
   const recipient = p.type === "single" && p.recipient ? truncateAddress(p.recipient) : null;
 
   const dot = STATUS_DOT[p.status ?? "draft"] ?? "bg-ink-subtle";
-  const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "—";
+  const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "-";
 
   return (
     <div
@@ -133,7 +133,7 @@ function ProposalQueueRow({
         {p.approvals != null && p.threshold != null ? (
           <ApprovalDots approvals={p.approvals} threshold={p.threshold} />
         ) : (
-          <span className="text-xs text-ink-subtle">—</span>
+          <span className="text-xs text-ink-subtle">-</span>
         )}
       </div>
       <div className="relative flex items-center justify-end gap-1.5 z-10 pointer-events-none">
@@ -196,7 +196,7 @@ function ProposalRow({
         : p.title || p.memo || "Configuration change";
 
   const dot = STATUS_DOT[p.status ?? "draft"] ?? "bg-ink-subtle";
-  const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "—";
+  const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "-";
 
   return (
     <div
@@ -232,7 +232,7 @@ function ProposalRow({
         {p.approvals != null && p.threshold != null ? (
           <ApprovalDots approvals={p.approvals} threshold={p.threshold} />
         ) : (
-          <span className="text-xs text-ink-subtle">—</span>
+          <span className="text-xs text-ink-subtle">-</span>
         )}
       </div>
       <div className="relative flex items-center justify-end gap-1.5 z-10 pointer-events-none">
@@ -368,7 +368,7 @@ function ProposalQueueMobileCard({
   const recipient = p.type === "single" && p.recipient ? truncateAddress(p.recipient) : null;
 
   const dot = STATUS_DOT[p.status ?? "draft"] ?? "bg-ink-subtle";
-  const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "—";
+  const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "-";
 
   return (
     <div className="relative rounded-xl border border-border/60 bg-surface p-4 transition-colors active:bg-surface-2">
@@ -459,7 +459,7 @@ function ProposalMobileCard({
         : p.title || p.memo || "Configuration change";
 
   const dot = STATUS_DOT[p.status ?? "draft"] ?? "bg-ink-subtle";
-  const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "—";
+  const label = STATUS_TEXT[p.status ?? ""] ?? p.status ?? "-";
 
   return (
     <div className="relative rounded-xl border border-border/60 bg-surface p-4 transition-colors active:bg-surface-2">

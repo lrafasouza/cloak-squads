@@ -181,10 +181,10 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
             </div>
             <div>
               <p className="text-xs font-semibold text-ink">
-                Cloak — Privacy Layer
+                Cloak, Privacy Layer
               </p>
               <p className="text-[10px] text-ink-subtle">
-                {data.cofreInitialized ? "Shielded transactions enabled" : "Not initialized — set up to enable private sends"}
+                {data.cofreInitialized ? "Shielded transactions enabled" : "Not initialized, set up to enable private sends"}
               </p>
             </div>
           </div>

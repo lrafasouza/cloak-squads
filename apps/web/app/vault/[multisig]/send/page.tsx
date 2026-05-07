@@ -111,7 +111,7 @@ function TokenDropdown({
         ) : selected ? (
           <TokenLogo symbol={selected.symbol as "SOL" | "USDC"} size={20} />
         ) : null}
-        <span>{loading ? "—" : (selected?.symbol ?? "SOL")}</span>
+        <span>{loading ? "-" : (selected?.symbol ?? "SOL")}</span>
         <ChevronDown
           className={`ml-auto h-3.5 w-3.5 text-ink-muted transition-transform ${open ? "rotate-180" : ""}`}
         />
@@ -313,7 +313,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
       // but rejected by the relay at delivery time, stranding funds in the pool.
       if (!PublicKey.isOnCurve(recipientPubkey.toBuffer())) {
         throw new Error(
-          "Recipient is not an Ed25519 wallet (likely a PDA). Use Public Send for vault-to-vault transfers — Cloak can only deliver privately to standard wallets.",
+          "Recipient is not an Ed25519 wallet (likely a PDA). Use Public Send for vault-to-vault transfers, since Cloak can only deliver privately to standard wallets.",
         );
       }
 
@@ -686,7 +686,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
               title="Transfer details"
               description={
                 isPrivate
-                  ? "Funds are routed through the shielded pool — the recipient address stays unlinkable on-chain."
+                  ? "Funds are routed through the shielded pool, so the recipient address stays unlinkable on-chain."
                   : "Public send creates a standard Squads vault transfer visible to all signers on-chain."
               }
             />
@@ -709,7 +709,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                             disabled={pending || lockedToPrimary}
                             title={
                               lockedToPrimary
-                                ? "Private sends route through Primary. The gatekeeper requires vault[0] as the CPI signer — switch to Public Send to source from this account."
+                                ? "Private sends route through Primary. The gatekeeper requires vault[0] as the CPI signer, so switch to Public Send to source from this account."
                                 : undefined
                             }
                             onClick={() => {
@@ -762,7 +762,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                         onClick={handleMaxAmount}
                         disabled={pending || !selectedToken}
                       >
-                        {selectedToken ? `${selectedToken.uiBalance} ${selectedToken.symbol}` : "—"}
+                        {selectedToken ? `${selectedToken.uiBalance} ${selectedToken.symbol}` : "-"}
                       </button>
                     </span>
                   </div>

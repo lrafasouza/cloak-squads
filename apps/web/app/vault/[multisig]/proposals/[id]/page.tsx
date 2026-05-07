@@ -589,7 +589,7 @@ export default function ProposalApprovalPage({
                               <td className="py-3 pr-4 text-right font-mono tabular-nums text-ink">
                                 {formatRawAmount(r.amount, r.invariants.tokenMint ?? SOL_MINT)}
                               </td>
-                              <td className="py-3 text-ink-subtle">{r.memo || "—"}</td>
+                              <td className="py-3 text-ink-subtle">{r.memo || "-"}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -943,7 +943,7 @@ export default function ProposalApprovalPage({
                       </p>
                       <p className="mt-0.5 text-xs text-ink-muted">
                         {isSwap
-                          ? "Tokens swapped — funds returned to the vault."
+                          ? "Tokens swapped, funds returned to the vault."
                           : transactionType === "config"
                             ? "The vault settings have been updated."
                             : draft !== null || isPayroll

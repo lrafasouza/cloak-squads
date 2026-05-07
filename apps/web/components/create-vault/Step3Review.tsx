@@ -600,7 +600,7 @@ export function Step3Review({
           <div className="border-t border-border px-5 py-4">
             <ul className="flex flex-col gap-2 text-xs text-ink-muted">
               {[
-                `Squads multisig — ${allMembers.length} members, ${threshold}-of-${allMembers.length} threshold`,
+                `Squads multisig, ${allMembers.length} members, ${threshold}-of-${allMembers.length} threshold`,
                 "Squads vault PDA (index 0)",
                 "Privacy layer account",
                 `Activation proposal${threshold > 1 ? ` (needs ${threshold} approvals)` : " (auto-approved)"}`,

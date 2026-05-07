@@ -12,14 +12,14 @@ import { Toaster } from "sonner";
 import { fontDisplay, fontGaramond, fontMono, fontSans } from "./fonts";
 
 export const metadata: Metadata = {
-  title: "Aegis — Private execution for shared treasuries",
+  title: "Aegis, Private execution for shared treasuries",
   description:
     "Private multisig payments on Solana. Single-use execution licenses for Squads vaults, settled privately through Cloak Protocol.",
   metadataBase: new URL("https://aegisz.xyz"),
   openGraph: {
     type: "website",
     url: "https://aegisz.xyz/",
-    title: "Aegis — Private execution for shared treasuries",
+    title: "Aegis, Private execution for shared treasuries",
     description:
       "Private multisig payments on Solana. Single-use execution licenses for Squads vaults, settled privately through Cloak Protocol.",
     siteName: "Aegis",
@@ -28,12 +28,12 @@ export const metadata: Metadata = {
       url: "/og.jpg?v=3",
       width: 1200,
       height: 630,
-      alt: "Aegis — Private execution for shared treasuries",
+      alt: "Aegis, Private execution for shared treasuries",
     }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Aegis — Private execution for shared treasuries",
+    title: "Aegis, Private execution for shared treasuries",
     description: "Private multisig payments on Solana. Single-use execution licenses for Squads vaults, settled privately through Cloak Protocol.",
     images: ["/og.jpg?v=3"],
   },

@@ -65,7 +65,7 @@ export function Logo({ variant = "full", className, href = "/", size = "md" }: L
   if (!href) return content;
 
   return (
-    <Link href={href} aria-label="Aegis — home" className="inline-flex items-center">
+    <Link href={href} aria-label="Aegis, home" className="inline-flex items-center">
       {content}
     </Link>
   );
