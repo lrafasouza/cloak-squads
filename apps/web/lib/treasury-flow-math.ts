@@ -46,6 +46,25 @@ export function computeWindow(
   return { windowStart, prevStart };
 }
 
+const RATIO_SCALE = 1_000_000n;
+
+/**
+ * Compute `numerator / denominator` as a Number ratio without losing precision
+ * when the inputs exceed Number.MAX_SAFE_INTEGER. Returns null when the
+ * denominator is non-positive (callers ratio non-negative monetary totals,
+ * the guard makes the contract explicit).
+ *
+ * Implementation scales the numerator into ppm space inside BigInt, then
+ * drops to Number for the final divide. The scaled quotient always fits
+ * comfortably in a Number for any realistic treasury ratio (<= 10000% would
+ * be 1e8 ppm, well below 2^53).
+ */
+export function ratioBigInt(numerator: bigint, denominator: bigint): number | null {
+  if (denominator <= 0n) return null;
+  const scaled = (numerator * RATIO_SCALE) / denominator;
+  return Number(scaled) / Number(RATIO_SCALE);
+}
+
 /**
  * Distribute events into per-day buckets. Events whose `ts` falls outside
  * `[startTs, startTs + windowDays * DAY_MS)` are silently dropped, so callers

@@ -49,14 +49,18 @@ function parseLimit(raw: string | null): number {
 export async function GET(request: Request, context: { params: Promise<{ multisig: string }> }) {
   const { multisig } = await context.params;
   const { searchParams } = new URL(request.url);
-  const limit = parseLimit(searchParams.get("limit"));
-  const force = searchParams.get("force") === "true";
 
+  // Validate the multisig address BEFORE consuming the rate-limit slot, so a
+  // garbage `?multisig=...&force=true` query can't waste the caller's force
+  // budget and can't reach the rate-limit storage at all.
   try {
     new PublicKey(multisig);
   } catch {
     return NextResponse.json({ error: "Invalid multisig address." }, { status: 400 });
   }
+
+  const limit = parseLimit(searchParams.get("limit"));
+  const force = searchParams.get("force") === "true";
 
   if (force) {
     const hdrs = await headers();

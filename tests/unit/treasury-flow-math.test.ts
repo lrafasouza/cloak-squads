@@ -3,6 +3,7 @@ import {
   DAY_MS,
   bucketize,
   computeWindow,
+  ratioBigInt,
   startOfDayUtc,
 } from "../../apps/web/lib/treasury-flow-math";
 
@@ -101,5 +102,43 @@ describe("bucketize", () => {
     const huge = 9_999_999_999_999_999_999n; // > Number.MAX_SAFE_INTEGER
     const buckets = bucketize([{ ts: start, lamports: huge }], start, 1);
     expect(buckets[0]?.lamports).toBe(huge);
+  });
+});
+
+describe("ratioBigInt", () => {
+  test("returns null when denominator is zero", () => {
+    expect(ratioBigInt(100n, 0n)).toBeNull();
+  });
+
+  test("returns null when denominator is negative", () => {
+    expect(ratioBigInt(100n, -10n)).toBeNull();
+  });
+
+  test("computes simple ratio for small values", () => {
+    expect(ratioBigInt(50n, 100n)).toBeCloseTo(0.5, 6);
+    expect(ratioBigInt(1n, 4n)).toBeCloseTo(0.25, 6);
+  });
+
+  test("preserves precision for values above Number.MAX_SAFE_INTEGER", () => {
+    // 73.4% of 10^18 lamports, both values exceed Number precision range.
+    const denom = 1_000_000_000_000_000_000n;
+    const numer = 734_000_000_000_000_000n;
+    const ratio = ratioBigInt(numer, denom);
+    expect(ratio).not.toBeNull();
+    expect(ratio).toBeCloseTo(0.734, 5);
+  });
+
+  test("handles negative numerator (decline)", () => {
+    // Outflow shrunk from 200 to 100: delta = -100, ratio = -0.5
+    expect(ratioBigInt(-100n, 200n)).toBeCloseTo(-0.5, 6);
+  });
+
+  test("zero numerator yields zero", () => {
+    expect(ratioBigInt(0n, 100n)).toBe(0);
+  });
+
+  test("ratio above 100% (growth) preserved", () => {
+    // 10x growth, ratio = 10
+    expect(ratioBigInt(10_000n, 1_000n)).toBeCloseTo(10, 6);
   });
 });

@@ -6,6 +6,7 @@ import {
   type FlowEvent,
   bucketize,
   computeWindow,
+  ratioBigInt,
 } from "@/lib/treasury-flow-math";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useMemo } from "react";
@@ -129,11 +130,13 @@ export function useTreasuryFlow(multisig: string, windowDays = 30): TreasuryFlow
       }
     }
 
-    // Deltas are dimensionless ratios; safe to convert to Number for display.
-    const inflowDelta = prevInflow > 0n ? Number(inflow - prevInflow) / Number(prevInflow) : null;
-    const outflowDelta =
-      prevOutflow > 0n ? Number(outflow - prevOutflow) / Number(prevOutflow) : null;
-    const privacyShare = outflow > 0n ? Number(privateOutflow) / Number(outflow) : null;
+    // Compute ratios in BigInt-space first to preserve precision past
+    // Number.MAX_SAFE_INTEGER, then convert the small scaled result to Number.
+    // 1ppm scale gives 6 significant digits which is more than enough for any
+    // UI display ("73.4%", "−12% vs prior").
+    const inflowDelta = ratioBigInt(inflow - prevInflow, prevInflow);
+    const outflowDelta = ratioBigInt(outflow - prevOutflow, prevOutflow);
+    const privacyShare = ratioBigInt(privateOutflow, outflow);
 
     const inflowSpark = bucketize(inflowEvents, sparkStart, windowDays);
     const outflowSpark = bucketize(outflowEvents, sparkStart, windowDays);

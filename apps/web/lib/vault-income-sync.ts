@@ -12,8 +12,14 @@ const RPC_URL = process.env.FALLBACK_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL 
 const SQUADS_PROGRAM_ID = process.env.NEXT_PUBLIC_SQUADS_PROGRAM_ID ?? "";
 
 /** Minimum window between RPC syncs for the same vault. Sync is otherwise
- *  triggered on every dashboard read which would burn RPC credits. */
-const SYNC_THROTTLE_MS = 8_000;
+ *  triggered on every dashboard read which would burn RPC credits.
+ *
+ *  Set to 30s rather than the deposit-latency target (~5s). Real-time freshness
+ *  comes from the WebSocket onAccountChange path that bypasses the throttle
+ *  via `?force=true`; this throttle only governs polling reads. A bigger window
+ *  also leaves margin under slow RPC: a fetch that takes 10s won't have
+ *  another replica fan out in parallel before it completes. */
+const SYNC_THROTTLE_MS = 30_000;
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -309,10 +315,19 @@ export type StoredIncome = {
 /**
  * Read income rows out of the DB for a given vault, newest first.
  * Returns the same shape the existing useVaultIncome client hook expects.
+ *
+ * Filters by current cluster so devnet/mainnet history doesn't bleed across
+ * envs that share a database. Rows whose `cluster` is null (legacy or fresh
+ * inserts pre-multi-env) are still returned, matching the conventions in
+ * Vault/SubVault/RecurringPayment models.
  */
 export async function readVaultIncome(multisig: string, limit: number): Promise<StoredIncome[]> {
+  const cluster = getCurrentCluster();
   const rows = await prisma.vaultIncome.findMany({
-    where: { cofreAddress: multisig },
+    where: {
+      cofreAddress: multisig,
+      OR: [{ cluster }, { cluster: null }],
+    },
     orderBy: { blockTime: "desc" },
     take: limit,
   });
