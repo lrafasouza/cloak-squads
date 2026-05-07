@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import type { ProofStepId } from "@/lib/cloak-progress";
 import { publicEnv } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import { Check, Copy, ExternalLink, Loader2, WalletCards, X, XCircle } from "lucide-react";
@@ -35,8 +34,6 @@ type TransactionState = {
   description?: string;
   status: TransactionStatus;
   detail?: string;
-  proofProgress?: number;
-  proofStep?: ProofStepId | null;
   steps: TransactionStep[];
 };
 

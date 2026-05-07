@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ensureCircuitsProxy, prefetchCircuits } from "@/lib/cloak-circuits-proxy";
-import { getProofStepUpdate, translateCloakProgress } from "@/lib/cloak-progress";
+import { translateCloakProgress } from "@/lib/cloak-progress";
 import { lamportsToSol } from "@/lib/sol";
 import { statusBadge } from "@/lib/status-labels";
 import { useUnloadGuard } from "@/lib/use-unload-guard";
@@ -308,12 +308,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
           console.debug(`[cloak-claim] ${s}`);
           updateTransaction({
             detail: translateCloakProgress(s),
-            ...getProofStepUpdate(s),
           });
-        },
-        onProofProgress: (p: number) => {
-          console.debug(`[cloak-claim] proof ${p}%`);
-          updateTransaction({ proofProgress: p });
         },
       } as Parameters<typeof fullWithdraw>[2]);
 

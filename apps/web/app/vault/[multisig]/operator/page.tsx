@@ -17,7 +17,7 @@ import { ShieldX } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { ensureCircuitsProxy, prefetchCircuits } from "@/lib/cloak-circuits-proxy";
-import { getProofStepUpdate, translateCloakProgress } from "@/lib/cloak-progress";
+import { translateCloakProgress } from "@/lib/cloak-progress";
 import { publicEnv } from "@/lib/env";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
@@ -171,7 +171,6 @@ type DraftInvariants = SingleDraft["invariants"];
 
 type CloakProgressCallbacks = {
   onProgress?: (message: string) => void;
-  onProofProgress?: (progress: number) => void;
 };
 
 type DecodedLicense = {
@@ -264,10 +263,6 @@ async function cloakDepositBrowser(
       onProgress: (s: string) => {
         console.debug(`[cloak] ${s}`);
         callbacks?.onProgress?.(s);
-      },
-      onProofProgress: (p: number) => {
-        console.debug(`[cloak] proof ${p}%`);
-        callbacks?.onProofProgress?.(p);
       },
     } as Parameters<typeof transact>[1],
   );
@@ -893,9 +888,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               onProgress: (message) =>
                 updateTransaction({
                   detail: translateCloakProgress(message),
-                  ...getProofStepUpdate(message),
                 }),
-              onProofProgress: (progress) => updateTransaction({ proofProgress: progress }),
             },
           );
         } else {
@@ -993,12 +986,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 console.debug(`[cloak] withdraw ${s}`);
                 updateTransaction({
                   detail: translateCloakProgress(s),
-                  ...getProofStepUpdate(s),
                 });
-              },
-              onProofProgress: (p: number) => {
-                console.debug(`[cloak] withdraw proof ${p}%`);
-                updateTransaction({ proofProgress: p });
               },
             } as Parameters<typeof fullWithdraw>[2];
             const withdrawResult = await fullWithdraw(cloakResult.outputUtxos, recipientPubkey, {

@@ -1,6 +1,5 @@
 "use client";
 
-import { ProofGenerationState, type ProofStepId } from "@/components/proof/ProofGenerationState";
 import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Input } from "@/components/ui/input";
@@ -83,7 +82,6 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   const [recipientWallet, setRecipientWallet] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [proofStep, setProofStep] = useState<ProofStepId | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [claimQrDataUrl, setClaimQrDataUrl] = useState<string | null>(null);
@@ -144,7 +142,6 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
     setError(null);
     setResult(null);
     setPending(true);
-    setProofStep("load-circuits");
     startTransaction({
       title: "Creating stealth invoice",
       description: "Creating the private invoice record and opening a Squads proposal.",
@@ -259,7 +256,6 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
 
       updateStep("validate", { status: "success" });
 
-      setProofStep("generate-witness");
       updateStep("invoice", { status: "running" });
 
       // Step 1: Create StealthInvoice in DB
@@ -304,7 +300,6 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       };
       updateStep("commitment", { status: "success" });
 
-      setProofStep("prove");
       updateStep("proposal", { status: "running" });
 
       // Step 3: Build gatekeeper instruction + Squads proposal
@@ -398,7 +393,6 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       failTransaction(message);
     } finally {
       setPending(false);
-      setProofStep(null);
     }
   }
 
@@ -595,8 +589,6 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                     className="mt-1.5 font-mono"
                   />
                 </div>
-
-                <ProofGenerationState currentStep={proofStep} complete={false} error={error} />
 
                 <label className="flex items-start gap-2 text-sm text-ink-muted">
                   <input
