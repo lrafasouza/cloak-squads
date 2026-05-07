@@ -22,6 +22,7 @@ import {
   encodeLicense,
   encodePubkey,
   encodeU64,
+  encodeU8,
   expectTxFailure,
   fundedSystemAccount,
   licensePda,
@@ -87,6 +88,7 @@ function invokeIssueLicenseIx(input: {
   payloadHash: Uint8Array;
   nonce: Uint8Array;
   ttlSecs: bigint;
+  vaultIndex?: number;
 }) {
   return harnessIx(
     "invoke_issue_license",
@@ -103,6 +105,7 @@ function invokeIssueLicenseIx(input: {
       encodeArray(input.payloadHash, 32, "payloadHash"),
       encodeArray(input.nonce, 16, "nonce"),
       encodeI64(input.ttlSecs),
+      encodeU8(input.vaultIndex ?? 0),
     ],
   );
 }
@@ -188,6 +191,7 @@ function invokeEmergencyCloseLicenseIx(input: {
   license: PublicKey;
   operator: PublicKey;
   payer: PublicKey;
+  vaultIndex?: number;
 }) {
   return harnessIx(
     "invoke_emergency_close_license",
@@ -199,7 +203,7 @@ function invokeEmergencyCloseLicenseIx(input: {
       { pubkey: input.operator, isSigner: false, isWritable: true },
       { pubkey: input.payer, isSigner: true, isWritable: true },
     ],
-    [encodePubkey(input.multisig)],
+    [encodePubkey(input.multisig), encodeU8(input.vaultIndex ?? 0)],
   );
 }
 
@@ -209,6 +213,7 @@ function invokeRevokeAuditIx(input: {
   squadsVault: PublicKey;
   payer: PublicKey;
   diversifierTrunc: Uint8Array;
+  vaultIndex?: number;
 }) {
   return harnessIx(
     "invoke_revoke_audit",
@@ -219,7 +224,11 @@ function invokeRevokeAuditIx(input: {
       { pubkey: input.payer, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    [encodePubkey(input.multisig), encodeArray(input.diversifierTrunc, 16, "diversifierTrunc")],
+    [
+      encodePubkey(input.multisig),
+      encodeArray(input.diversifierTrunc, 16, "diversifierTrunc"),
+      encodeU8(input.vaultIndex ?? 0),
+    ],
   );
 }
 

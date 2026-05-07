@@ -1,3 +1,16 @@
+/**
+ * Sub-vault parametrization smoke test.
+ *
+ * Issues a license with vault_index = 1 (sub-vault), confirming that the
+ * gatekeeper's verify_squads_vault_signer accepts the sub-vault PDA as the
+ * CPI signer. This is the fix for BUG-6: prior to parametrization the
+ * handler hardcoded vault_index = 0 and any sub-vault license attempt
+ * would fail with InvalidSquadsSigner.
+ *
+ * Setup mirrors f1-send.test.ts but the issue_license invocation uses the
+ * vault[1] PDA both as the seed for the harness invoke_signed and as the
+ * vault_index argument passed to the gatekeeper handler.
+ */
 import assert from "node:assert/strict";
 import path from "node:path";
 import { Keypair, type PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
@@ -45,29 +58,6 @@ function gatekeeperIx(name: string, keys: TransactionInstruction["keys"], fields
   });
 }
 
-function createSquadsMultisig2of3(context: BankrunContext) {
-  const members = [Keypair.generate(), Keypair.generate(), Keypair.generate()];
-  for (const member of members) {
-    context.setAccount(member.publicKey, fundedSystemAccount());
-  }
-
-  return {
-    address: Keypair.generate().publicKey,
-    threshold: 2,
-    members,
-  };
-}
-
-async function executeSquadsProposal(
-  context: BankrunContext,
-  multisig: ReturnType<typeof createSquadsMultisig2of3>,
-  instructions: TransactionInstruction[],
-) {
-  assert.equal(multisig.threshold, 2);
-  assert.equal(multisig.members.length, 3);
-  await processTx(context, instructions);
-}
-
 function invokeInitCofreIx(input: {
   multisig: PublicKey;
   cofre: PublicKey;
@@ -102,7 +92,7 @@ function invokeIssueLicenseIx(input: {
   payloadHash: Uint8Array;
   nonce: Uint8Array;
   ttlSecs: bigint;
-  vaultIndex?: number;
+  vaultIndex: number;
 }) {
   return harnessIx(
     "invoke_issue_license",
@@ -119,7 +109,7 @@ function invokeIssueLicenseIx(input: {
       encodeArray(input.payloadHash, 32, "payloadHash"),
       encodeArray(input.nonce, 16, "nonce"),
       encodeI64(input.ttlSecs),
-      encodeU8(input.vaultIndex ?? 0),
+      encodeU8(input.vaultIndex),
     ],
   );
 }
@@ -151,49 +141,56 @@ function executeWithLicenseIx(input: {
 
 async function main() {
   const context = (await startAnchor(ROOT, [], [])) as BankrunContext;
-  const squadsMultisig = createSquadsMultisig2of3(context);
+  const multisigAddress = Keypair.generate().publicKey;
   const operator = Keypair.generate();
   context.setAccount(operator.publicKey, fundedSystemAccount());
 
-  const viewKeyPublic = repeated(32, 7);
-  const [cofre] = cofrePda(squadsMultisig.address);
-  const [squadsVault] = squadsVaultPda(squadsMultisig.address);
+  const viewKeyPublic = repeated(32, 9);
+  const [cofre] = cofrePda(multisigAddress);
+  const [primaryVault] = squadsVaultPda(multisigAddress, 0);
+  const [subVault] = squadsVaultPda(multisigAddress, 1);
 
-  await executeSquadsProposal(context, squadsMultisig, [
+  // 1. Initialize cofre via Primary (admin op stays vault[0]-bound by design).
+  await processTx(context, [
     invokeInitCofreIx({
-      multisig: squadsMultisig.address,
+      multisig: multisigAddress,
       cofre,
-      squadsVault,
+      squadsVault: primaryVault,
       payer: context.payer.publicKey,
       operator: operator.publicKey,
       viewKeyPublic,
     }),
   ]);
 
-  const params = {
+  // 2. Issue a license signed by sub-vault[1]. This is the path that used to
+  //    fail with InvalidSquadsSigner before the fix.
+  const params: PayloadInvariants = {
     nullifier: Keypair.generate().publicKey.toBytes(),
     commitment: Keypair.generate().publicKey.toBytes(),
-    amount: 1_000_000n,
+    amount: 2_500_000n,
     tokenMint: Keypair.generate().publicKey,
     recipientVkPub: Keypair.generate().publicKey.toBytes(),
-    nonce: repeated(16, 13),
+    nonce: repeated(16, 21),
   };
   const payloadHash = computePayloadHash(params);
   const [license] = licensePda(cofre, payloadHash);
 
-  await executeSquadsProposal(context, squadsMultisig, [
+  await processTx(context, [
     invokeIssueLicenseIx({
-      multisig: squadsMultisig.address,
+      multisig: multisigAddress,
       cofre,
-      squadsVault,
+      squadsVault: subVault,
       license,
       payer: context.payer.publicKey,
       payloadHash,
       nonce: params.nonce,
       ttlSecs: 3_600n,
+      vaultIndex: 1,
     }),
   ]);
 
+  // 3. Operator consumes the license to confirm the License account was
+  //    created correctly when issued from a sub-vault.
   await processTx(
     context,
     [
@@ -208,8 +205,12 @@ async function main() {
   );
 
   const licenseAccount = await context.banksClient.getAccount(license);
-  assert.ok(licenseAccount);
-  assert.equal(decodeLicense(licenseAccount).status, 1);
+  assert.ok(licenseAccount, "license account must exist after issue from sub-vault");
+  assert.equal(
+    decodeLicense(licenseAccount).status,
+    1,
+    "license status must be Consumed after execute",
+  );
 }
 
 main().catch((error) => {

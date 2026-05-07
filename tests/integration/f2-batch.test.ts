@@ -15,6 +15,7 @@ import {
   encodeI64,
   encodePubkey,
   encodeU64,
+  encodeU8,
   fundedSystemAccount,
   licensePda,
   processTx,
@@ -101,6 +102,7 @@ function invokeIssueLicenseIx(input: {
   payloadHash: Uint8Array;
   nonce: Uint8Array;
   ttlSecs: bigint;
+  vaultIndex?: number;
 }) {
   return harnessIx(
     "invoke_issue_license",
@@ -117,6 +119,7 @@ function invokeIssueLicenseIx(input: {
       encodeArray(input.payloadHash, 32, "payloadHash"),
       encodeArray(input.nonce, 16, "nonce"),
       encodeI64(input.ttlSecs),
+      encodeU8(input.vaultIndex ?? 0),
     ],
   );
 }
