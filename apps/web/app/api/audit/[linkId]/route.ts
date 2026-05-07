@@ -1,4 +1,6 @@
+import { recordAuditAccess } from "@/lib/audit-access";
 import { prisma } from "@/lib/prisma";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function GET(_request: Request, context: { params: Promise<{ linkId: string }> }) {
@@ -16,6 +18,12 @@ export async function GET(_request: Request, context: { params: Promise<{ linkId
     if (link.expiresAt < new Date()) {
       return NextResponse.json({ error: "Audit link expired." }, { status: 410 });
     }
+
+    const hdrs = await headers();
+    const rawIp = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? null;
+    const ip = rawIp ? (rawIp.split(",")[0] ?? rawIp).trim() : null;
+    const userAgent = hdrs.get("user-agent");
+    void recordAuditAccess(linkId, "view", { ip, userAgent });
 
     // Return only metadata — never the diversifier or signature
     return NextResponse.json({

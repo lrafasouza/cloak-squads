@@ -15,11 +15,8 @@ import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cn } from "@/lib/utils";
 import {
   type AuditScope,
-  type FilteredAuditTransaction,
   base64urlEncode,
-  exportAuditToCSV,
   generateAuditLinkSecret,
-  generateDeterministicMockData,
 } from "@cloak-squads/core/audit";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
@@ -31,6 +28,7 @@ import {
   Copy,
   Download,
   ExternalLink,
+  Eye,
   Link2,
   Settings,
   Shield,
@@ -62,14 +60,13 @@ function downloadText(filename: string, body: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function parseScopeParams(scopeParams: string | null): { startDate?: number; endDate?: number } {
-  if (!scopeParams) return {};
-  try {
-    return JSON.parse(scopeParams) as { startDate?: number; endDate?: number };
-  } catch {
-    return {};
-  }
-}
+type AuditAccessEntry = {
+  id: string;
+  action: "view" | "export_csv" | "export_json";
+  ip: string | null;
+  userAgent: string | null;
+  accessedAt: string;
+};
 
 export default function AuditAdminPage({ params }: { params: Promise<{ multisig: string }> }) {
   const { multisig } = use(params);
@@ -322,48 +319,84 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
     }
   };
 
-  const exportToCSV = (link: AuditLinkSummary) => {
-    const mockData = generateDeterministicMockData(link.id, 8);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportingId, setExportingId] = useState<string | null>(null);
 
-    let filtered: FilteredAuditTransaction[] = mockData;
-    const scopeParams = parseScopeParams(link.scopeParams);
-    const { startDate: exportStartDate, endDate: exportEndDate } = scopeParams;
-    if (link.scope === "time_ranged" && exportStartDate && exportEndDate) {
-      filtered = mockData.filter(
-        (tx) => tx.timestamp >= exportStartDate && tx.timestamp <= exportEndDate,
-      );
-    }
-    if (link.scope === "amounts_only") {
-      filtered = filtered.map((tx) => ({ ...tx, nullifier: "REDACTED" }));
-    }
+  const downloadSignedExport = async (link: AuditLinkSummary, format: "csv" | "json") => {
+    setExportingId(link.id);
+    setExportError(null);
+    try {
+      const res = await fetch(`/api/audit/${encodeURIComponent(link.id)}/export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Failed to generate export.");
+      }
+      const signed = (await res.json()) as {
+        data: string;
+        signature: string;
+        publicKey: string;
+        signedAt: string;
+        contentType: string;
+      };
 
-    downloadText(`audit-${link.id}.csv`, exportAuditToCSV(filtered), "text/csv");
+      if (format === "csv") {
+        // Wrap CSV with a signature header so the file remains valid CSV but
+        // carries verifiable provenance — auditors can grep the header out
+        // before processing.
+        const header = [
+          `# audit-export linkId=${link.id} vault=${multisig}`,
+          `# signedAt=${signed.signedAt}`,
+          `# publicKey=${signed.publicKey}`,
+          `# signature=${signed.signature}`,
+          "",
+        ].join("\n");
+        downloadText(`audit-${link.id}.csv`, header + signed.data, "text/csv");
+      } else {
+        const wrapped = JSON.stringify(
+          {
+            signature: signed.signature,
+            publicKey: signed.publicKey,
+            signedAt: signed.signedAt,
+            payload: JSON.parse(signed.data),
+          },
+          null,
+          2,
+        );
+        downloadText(`audit-${link.id}.json`, wrapped, "application/json");
+      }
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Export failed.");
+    } finally {
+      setExportingId(null);
+    }
   };
 
-  const exportToJSON = (link: AuditLinkSummary) => {
-    const mockData = generateDeterministicMockData(link.id, 8);
-    let filtered: FilteredAuditTransaction[] = mockData;
-    const scopeParams = parseScopeParams(link.scopeParams);
-    const { startDate: exportStartDate, endDate: exportEndDate } = scopeParams;
-    if (link.scope === "time_ranged" && exportStartDate && exportEndDate) {
-      filtered = mockData.filter(
-        (tx) => tx.timestamp >= exportStartDate && tx.timestamp <= exportEndDate,
-      );
-    }
-    if (link.scope === "amounts_only") {
-      filtered = filtered.map((tx) => ({ ...tx, nullifier: "REDACTED" }));
-    }
+  const [accessLogs, setAccessLogs] = useState<Record<string, AuditAccessEntry[]>>({});
+  const [loadingAccessFor, setLoadingAccessFor] = useState<string | null>(null);
 
-    downloadText(
-      `audit-${link.id}.json`,
-      JSON.stringify(
-        { link, exportedAt: new Date().toISOString(), transactions: filtered },
-        null,
-        2,
-      ),
-      "application/json",
-    );
-  };
+  const loadAccessLog = useCallback(
+    async (linkId: string) => {
+      if (!multisigAddress) return;
+      setLoadingAccessFor(linkId);
+      try {
+        const res = await fetchWithAuth(
+          `/api/audit-links/${encodeURIComponent(multisigAddress.toBase58())}/${encodeURIComponent(
+            linkId,
+          )}/access-log`,
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as AuditAccessEntry[];
+        setAccessLogs((prev) => ({ ...prev, [linkId]: data }));
+      } finally {
+        setLoadingAccessFor(null);
+      }
+    },
+    [fetchWithAuth, multisigAddress],
+  );
 
   const filteredLinks = useMemo(
     () => links.filter((link) => scopeFilter === "all" || link.scope === scopeFilter),
@@ -502,6 +535,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                 </div>
 
                 {createError && <InlineAlert tone="danger">{createError}</InlineAlert>}
+                {exportError && <InlineAlert tone="danger">{exportError}</InlineAlert>}
 
                 {lastCreatedUrl && (
                   <div className="rounded-md border border-accent/25 bg-accent-soft px-4 py-3">
@@ -578,7 +612,13 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                               <div className="flex items-center gap-2">
                                 <button
                                   type="button"
-                                  onClick={() => setExpandedLinkId(isExpanded ? null : link.id)}
+                                  onClick={() => {
+                                    const next = isExpanded ? null : link.id;
+                                    setExpandedLinkId(next);
+                                    if (next && !accessLogs[link.id]) {
+                                      void loadAccessLog(link.id);
+                                    }
+                                  }}
                                   className="inline-flex items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
                                   aria-label={isExpanded ? "Collapse" : "Expand"}
                                 >
@@ -648,16 +688,18 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                             <div className="flex flex-wrap shrink-0 gap-2">
                               <button
                                 type="button"
-                                onClick={() => exportToCSV(link)}
-                                className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+                                onClick={() => downloadSignedExport(link, "csv")}
+                                disabled={exportingId === link.id}
+                                className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-50"
                               >
                                 <Download className="h-3.5 w-3.5" aria-hidden="true" />
                                 CSV
                               </button>
                               <button
                                 type="button"
-                                onClick={() => exportToJSON(link)}
-                                className="inline-flex min-h-9 items-center rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+                                onClick={() => downloadSignedExport(link, "json")}
+                                disabled={exportingId === link.id}
+                                className="inline-flex min-h-9 items-center rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-50"
                               >
                                 JSON
                               </button>
@@ -721,6 +763,41 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                                   </p>
                                 </div>
                               )}
+
+                              <div>
+                                <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-subtle">
+                                  <Eye className="h-3 w-3" />
+                                  Access log
+                                </p>
+                                {loadingAccessFor === link.id && !accessLogs[link.id] ? (
+                                  <p className="mt-1.5 text-xs text-ink-subtle">Loading…</p>
+                                ) : (accessLogs[link.id]?.length ?? 0) === 0 ? (
+                                  <p className="mt-1.5 text-xs text-ink-subtle">
+                                    No accesses recorded yet.
+                                  </p>
+                                ) : (
+                                  <ul className="mt-1.5 space-y-1.5">
+                                    {(accessLogs[link.id] ?? []).slice(0, 8).map((entry) => (
+                                      <li
+                                        key={entry.id}
+                                        className="flex items-center justify-between gap-2 rounded-md bg-bg/40 px-2 py-1 text-[11px]"
+                                      >
+                                        <span className="font-medium text-ink">
+                                          {entry.action === "view"
+                                            ? "View"
+                                            : entry.action === "export_csv"
+                                              ? "CSV export"
+                                              : "JSON export"}
+                                        </span>
+                                        <span className="font-mono text-ink-subtle">
+                                          {entry.ip ?? "(no ip)"} ·{" "}
+                                          {new Date(entry.accessedAt).toLocaleString()}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
 
                               <div>
                                 <p className="text-[11px] font-medium uppercase tracking-wider text-ink-subtle">
