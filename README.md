@@ -6,6 +6,8 @@ Every Squads vault transfer is public by default — block explorers show the ex
 
 Aegis is the privacy layer that any Solana multisig can integrate — extending Squads first, with CPI hooks for Realms and custom multisigs next. It turns approval-gated multisig payments into cryptographically unlinkable, auditable, compliance-ready transfers — without changing how teams already vote. A custom on-chain gatekeeper program issues single-use, time-limited licenses. A registered operator uses those licenses to route payments through the **Cloak protocol** — a zero-knowledge shield pool that breaks the on-chain link between sender and recipient.
 
+On top of that core, Aegis ships **bearer invoices** (claim links with no recipient wallet committed at create time, so the buyer picks the destination at claim time), **recurring payments** (weekly to quarterly cadences, public or private per schedule), and **scoped audit links with Ed25519-signed exports + an access log** so accountants and regulators get verifiable evidence on demand.
+
 **Live demo:** [https://aegisz.xyz](https://aegisz.xyz) (devnet)
 
 **Built for the [Cloak Track](https://superteam.fun/earn/listing/cloak-track).**
@@ -96,9 +98,15 @@ Any wallet with a block explorer can watch your vault in real time. Aegis breaks
 
 **DAO Payroll:** A 12-person DAO pays contributors monthly. Without privacy, every contributor's wallet and salary is visible on-chain — anyone can correlate identities to compensation. With Aegis, the DAO votes on each payroll batch through Squads, but the actual payments route through Cloak. Observers see Cloak pool activity, not DAO → Alice: 4 SOL.
 
+**Recurring contributor retainer:** The DAO sets up monthly Aegis recurring schedules per contributor, each labeled and tagged with a cadence. Every cycle the treasurer clicks Run on the dashboard, the proposal lands in the Squads queue, members approve, and the operator routes the payment through Cloak. The schedule's `lastRunAt` and `nextDueAt` update automatically, so the team has a clean ledger of who got paid when without any of those payments showing on-chain in plaintext.
+
 **Vendor Payment:** A protocol pays an auditing firm 50 SOL for a security review. The payment amount and the auditor's wallet are competitively sensitive. Aegis routes the payment through Cloak after multisig approval — the vendor receives SOL privately, with a stealth invoice as the delivery mechanism.
 
+**Bearer invoice on a vendor portal:** A contractor lists their services on a public website and wants to accept private crypto payments without doxxing a wallet. They post a bearer Aegis claim link. A buyer opens the link, connects whichever wallet they want to pay from, and on the contractor's side a separate wallet (revealed only at claim time) collects the funds. The on-chain trace shows nothing connecting the contractor's website to their actual treasury wallet.
+
 **Investment:** A treasury DAO wants to acquire a large token position OTC. Broadcasting the vault address as the buyer would move the market. The Cloak-routed payment keeps the buyer identity off the public trace until settlement.
+
+**Selective regulator disclosure:** A foundation's accountant needs to file quarterly reports. The treasurer issues a `time_ranged` audit link scoped to Q2 with a 30-day expiry. The accountant downloads a CSV; every download is recorded in the access log with IP and timestamp, and the CSV carries an Ed25519 signature header bound to the link ID, so the auditor's report is tamper-evident even after handoff.
 
 ---
 
@@ -343,6 +351,14 @@ Every private payment in Aegis passes through three Cloak SDK calls: `generateUt
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
+### Variant flows
+
+**Bearer invoice:** identical to the diagram above except (a) the proposal is created with `recipientVkPub` derived from a server-generated stealth keypair instead of a known recipient wallet, and (b) `fullWithdraw()` runs from the **claim page in the recipient's browser**, not the operator's. Whoever opens the claim link with the secret in the URL fragment chooses the destination wallet at claim time.
+
+**Recurring payments:** the recurring schedule is metadata in PostgreSQL only — no on-chain state. Clicking **Run now** at the cycle boundary creates a fresh proposal. For `privacy: "private"` schedules the proposal mirrors the private-send diagram; for `privacy: "public"` it's a plain `SystemProgram.transfer`. The endpoint advances `nextDueAt` by one cadence period, returns the new state, and the UI patches optimistically.
+
+**Audit access log:** every GET on `/audit/[linkId]` and every POST to `/audit/[linkId]/export` writes to `AuditAccessLog` (rate-limited to 1 entry / IP / minute / action / link). Exports are signed with Ed25519 by the backend; the signature covers `signedAt | vault | linkId | data` and is embedded in a CSV header or JSON wrapper.
+
 ---
 
 ## Quick Start
@@ -356,6 +372,10 @@ pnpm install
 # 2. Configure environment
 cp .env.example apps/web/.env.local
 # Edit apps/web/.env.local — the defaults work for devnet
+# Required: DATABASE_URL, JWT_SIGNING_SECRET, NEXT_PUBLIC_RPC_URL
+# Optional but recommended: AUDIT_EXPORT_SIGN_KEY (base64 of 32 bytes;
+# falls back to a JWT-derived seed when missing), REDIS_URL + REDIS_TOKEN
+# for distributed rate limiting
 
 # 3. Start database
 docker compose up -d postgres
@@ -371,7 +391,11 @@ pnpm prebuild:web
 pnpm -F web dev
 ```
 
+> **Tip:** the Prisma CLI reads `apps/web/.env`, not `.env.local`. Either symlink (`ln -s .env.local apps/web/.env`) or run prisma commands with `set -a; . apps/web/.env.local; set +a;` prefixed.
+
 Open [http://localhost:3000](http://localhost:3000), connect a **devnet wallet** (Phantom or Solflare), and create or import a Squads multisig.
+
+**For production deploys** use `pnpm -F web prisma migrate deploy` instead of `migrate dev` so the runner doesn't try to reset the database on missing migrations.
 
 To test the full private send flow you need two devnet wallets: one as a multisig member/proposer and one as the registered operator. The operator wallet only needs devnet SOL for transaction fees (~0.05 SOL is plenty) — the vault auto-funds the payment amount into the operator wallet as part of the proposal execution.
 
@@ -393,14 +417,18 @@ To test the full private send flow you need two devnet wallets: one as a multisi
 | Layer | Technology |
 |---|---|
 | On-chain | Solana, Anchor 0.31.1, Rust |
-| Frontend | Next.js 15 (App Router), React, Tailwind CSS |
+| Frontend | Next.js 15 (App Router), React, Tailwind CSS, Framer Motion |
 | Wallets | Solana Wallet Adapter (Phantom, Solflare) |
 | Multisig | `@sqds/multisig` v2.1.4 (Squads v4) |
-| Privacy | `@cloak.dev/sdk-devnet` — `transact`, `fullWithdraw`, `generateUtxoKeypair`, `computeUtxoCommitment`, `derivePublicKey` |
-| Data | Prisma + PostgreSQL |
+| Privacy | `@cloak.dev/sdk-devnet` — `transact`, `fullWithdraw`, `generateUtxoKeypair`, `computeUtxoCommitment`, `derivePublicKey`, `cloakDepositBrowser` |
+| Crypto primitives | `tweetnacl` (Ed25519 + NaCl box for memo encryption and audit signing), `@noble/hashes` (Blake3), Poseidon (via Cloak SDK) |
+| Auth | Session-cookie wallet auth with JWT-signed httpOnly cookies (one `signMessage` per 30 minutes) |
+| Data | Prisma + PostgreSQL, Upstash Redis for rate limiting |
+| State | TanStack Query (server state), zustand (wizard state), localStorage (link history) |
+| UI primitives | Radix UI (Dialog, Tooltip), shadcn-style component conventions, Number Flow for animated metrics |
 | Monorepo | pnpm workspaces, Turborepo |
 | Testing | Vitest (unit), anchor-bankrun (integration) |
-| Lint | Biome |
+| Lint / format | Biome |
 
 ---
 
@@ -409,9 +437,14 @@ To test the full private send flow you need two devnet wallets: one as a multisi
 | Command | Purpose |
 |---|---|
 | `pnpm install` | Install all dependencies |
+| `pnpm -F web dev` | Start the Next.js dev server |
 | `pnpm prebuild:web` | Typecheck core + web |
 | `pnpm build:web` | Full production build |
+| `pnpm -F web prisma generate` | Regenerate the Prisma client after schema edits |
+| `pnpm -F web prisma migrate dev` | Apply migrations to a local dev database |
+| `pnpm -F web prisma migrate deploy` | Apply migrations in production (no schema drift checks) |
 | `pnpm lint` | Biome lint checks |
+| `pnpm -w biome check --write <paths>` | Auto-format and fix |
 | `pnpm test:unit` | Vitest unit tests |
 | `pnpm test:int` | anchor-bankrun integration tests |
 | `pnpm test:all` | Run all tests |
@@ -452,23 +485,37 @@ This is the cleanest possible design given the program-owned vault constraint, w
 - [x] Vault import from existing Squads multisigs
 - [x] Member management (add/remove, change threshold)
 - [x] Address book, webhook settings, per-vault RPC override
+- [x] Membership checks on every write API endpoint (`requireVaultMember` / `requireVaultOperator` middleware)
+- [x] Operator-only gate for sensitive UTXO data (`commitmentClaim`, `utxoPrivateKey`, `utxoBlinding`)
+- [x] UTXO private keys and blinding factors encrypted at rest in PostgreSQL
+- [x] Challenge-response with one-time challenge HMAC for stealth invoice claims
+- [x] Distributed rate limiting via Upstash Redis (with in-memory fallback)
+- [x] Session-cookie wallet auth (one `signMessage` per 30 minutes via httpOnly cookie)
+- [x] Operator on-curve guard (rejects vault PDA destinations before deposit, except in invoice mode)
 
-### Next — Security + Mainnet
-- [ ] Membership checks on all API endpoints (any authed wallet can currently write to any vault)
-- [ ] Operator-only gate for sensitive data (`commitmentClaim` / UTXO keys)
-- [ ] Encrypt UTXO private keys at rest in PostgreSQL
-- [ ] Challenge-response for stealth invoice claims
-- [ ] Distributed rate limiting via Redis
-- [ ] Dedicated RPC (Helius/QuickNode) + managed PostgreSQL
+### Next — Tier 2 (paridade Squads + privacy depth)
+- [ ] **Time locks** — UI in Settings + `createSetTimeLockProposal`; Squads v4 supports it natively, no on-chain change needed
+- [ ] **Custom roles** — DB-overlay permission model (admin / proposer / executor / viewer)
+- [ ] **Proposal simulator** — `simulateTransaction` preview before approving, surfaces balance deltas + errors
+- [ ] **Sub-vault gatekeeper parametrization** — `vault_index` parameter on the gatekeeper handlers; unlocks private ops in sub-vaults and recurring auto-cron (Anchor change + redeploy)
+- [ ] **Privacy bridge for spending limits** — limit-use deposits into Cloak instead of public transfer (depends on the gatekeeper change above)
+- [ ] **Recurring auto-cron** — background runner to fire schedules without a manual click (depends on gatekeeper change)
+- [ ] **Multi-operator failover** — backup operator + heartbeat so an offline primary doesn't freeze the queue
+- [ ] **Proof-of-payment exports** — Groth16 witness export so an auditor can cryptographically verify a single payment
+
+### Mainnet readiness
+- [ ] Dedicated RPC (Helius / QuickNode) + managed PostgreSQL with backups
 - [ ] Mainnet Cloak API parity validation
-- [ ] Gatekeeper program security audit
-- [ ] 2-of-N hardening — move `commitmentClaim` to encrypted DB for co-signer verification
+- [ ] Gatekeeper program security audit (Neodyme / OtterSec class)
+- [ ] 2-of-N hardening — co-signer verification of `commitmentClaim` payloads
+- [ ] `AUDIT_EXPORT_SIGN_KEY` rotation story + per-vault signing keys
 
-### Later — New features
-- [ ] SPL token privacy — USDC and other tokens through Cloak (dependent on protocol support)
+### Later — Ecosystem
+- [ ] SPL token privacy — USDC and other tokens through Cloak (dependent on Cloak protocol support)
 - [ ] Aegis MCP server — vault operations for AI agents with human-in-the-loop gate
-- [ ] Role-based permissions (viewer, proposer, approver, operator) + invite links
-- [ ] Activity notifications — webhook + email
+- [ ] Streamflow integration — vesting and salary streams routed through Cloak
+- [ ] Sphere fiat off-ramp — operator off-ramps confirmed deposits to USD
+- [ ] Mobile-first PWA — claim flow optimized for mobile wallet adapter + QR scan
 - [ ] Realms / Governance integration via CPI
 - [ ] Cloak CPI — program-signed deposit eliminating the operator hop
 
@@ -476,4 +523,6 @@ This is the cleanest possible design given the program-owned vault constraint, w
 
 ## Project Status
 
-Working devnet prototype. The private send, payroll, stealth invoice, and audit link flows are all functional end-to-end on devnet, including atomic vault → operator auto-funding.
+**Devnet, feature-complete on Tier 1.** Private send, payroll, stealth invoices (bound + bearer), recurring payments (public + private), scoped audit links with signed exports and access log are all functional end-to-end on [aegisz.xyz](https://aegisz.xyz). Authentication uses session cookies with one wallet signature per 30 minutes; sensitive UTXO fields are encrypted at rest in PostgreSQL; rate limits are backed by Upstash Redis.
+
+Tier 2 work (time locks, custom roles, sub-vault gatekeeper parametrization, proposal simulator, multi-operator failover) is specced in [`docs/specs/2026-05-06-feature-roadmap-improvements.md`](docs/specs/2026-05-06-feature-roadmap-improvements.md). Mainnet deployment is gated on the gatekeeper security audit and Cloak mainnet API parity, both tracked in the roadmap below.
