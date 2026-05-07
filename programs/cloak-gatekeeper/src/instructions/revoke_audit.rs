@@ -4,10 +4,14 @@ use crate::errors::CloakSquadsError;
 use crate::state::*;
 use crate::utils::verify_squads_vault_signer;
 
-pub fn handler(ctx: Context<RevokeAudit>, diversifier_trunc: [u8; 16]) -> Result<()> {
+pub fn handler(
+    ctx: Context<RevokeAudit>,
+    diversifier_trunc: [u8; 16],
+    vault_index: u8,
+) -> Result<()> {
     verify_squads_vault_signer(
         &ctx.accounts.cofre.multisig,
-        0,
+        vault_index,
         &ctx.accounts.squads_vault,
     )?;
 

@@ -3,10 +3,10 @@ use anchor_lang::prelude::*;
 use crate::state::*;
 use crate::utils::verify_squads_vault_signer;
 
-pub fn handler(ctx: Context<EmergencyCloseLicense>) -> Result<()> {
+pub fn handler(ctx: Context<EmergencyCloseLicense>, vault_index: u8) -> Result<()> {
     verify_squads_vault_signer(
         &ctx.accounts.cofre.multisig,
-        0,
+        vault_index,
         &ctx.accounts.squads_vault,
     )?;
 

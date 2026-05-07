@@ -43,8 +43,9 @@ pub mod cloak_gatekeeper {
         payload_hash: [u8; 32],
         nonce: [u8; 16],
         ttl_secs: i64,
+        vault_index: u8,
     ) -> Result<()> {
-        instructions::issue_license::handler(ctx, payload_hash, nonce, ttl_secs)
+        instructions::issue_license::handler(ctx, payload_hash, nonce, ttl_secs, vault_index)
     }
 
     pub fn execute_with_license(
@@ -76,12 +77,19 @@ pub mod cloak_gatekeeper {
         instructions::close_expired_license::handler(ctx)
     }
 
-    pub fn emergency_close_license(ctx: Context<EmergencyCloseLicense>) -> Result<()> {
-        instructions::emergency_close_license::handler(ctx)
+    pub fn emergency_close_license(
+        ctx: Context<EmergencyCloseLicense>,
+        vault_index: u8,
+    ) -> Result<()> {
+        instructions::emergency_close_license::handler(ctx, vault_index)
     }
 
-    pub fn revoke_audit(ctx: Context<RevokeAudit>, diversifier_trunc: [u8; 16]) -> Result<()> {
-        instructions::revoke_audit::handler(ctx, diversifier_trunc)
+    pub fn revoke_audit(
+        ctx: Context<RevokeAudit>,
+        diversifier_trunc: [u8; 16],
+        vault_index: u8,
+    ) -> Result<()> {
+        instructions::revoke_audit::handler(ctx, diversifier_trunc, vault_index)
     }
 
     pub fn set_operator(ctx: Context<SetOperator>, new_operator: Pubkey) -> Result<()> {

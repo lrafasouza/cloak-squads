@@ -10,8 +10,13 @@ pub fn handler(
     payload_hash: [u8; 32],
     nonce: [u8; 16],
     ttl_secs: i64,
+    vault_index: u8,
 ) -> Result<()> {
-    verify_squads_vault_signer(&ctx.accounts.cofre.multisig, 0, &ctx.accounts.squads_vault)?;
+    verify_squads_vault_signer(
+        &ctx.accounts.cofre.multisig,
+        vault_index,
+        &ctx.accounts.squads_vault,
+    )?;
     require!(ttl_secs > 0, CloakSquadsError::InvalidTtl);
 
     let now = Clock::get()?.unix_timestamp;

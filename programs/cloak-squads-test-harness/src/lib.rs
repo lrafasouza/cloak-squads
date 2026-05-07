@@ -47,9 +47,10 @@ pub mod cloak_squads_test_harness {
         payload_hash: [u8; 32],
         nonce: [u8; 16],
         ttl_secs: i64,
+        vault_index: u8,
     ) -> Result<()> {
-        let data = ix_data("issue_license", &(payload_hash, nonce, ttl_secs))?;
-        invoke_with_squads_vault(
+        let data = ix_data("issue_license", &(payload_hash, nonce, ttl_secs, vault_index))?;
+        invoke_with_squads_vault_at(
             &ctx.accounts.gatekeeper_program,
             &[
                 AccountMeta::new_readonly(ctx.accounts.cofre.key(), false),
@@ -68,6 +69,7 @@ pub mod cloak_squads_test_harness {
                 ctx.accounts.gatekeeper_program.to_account_info(),
             ],
             &cofre_multisig,
+            vault_index,
             ctx.bumps.squads_vault,
         )
     }
@@ -167,9 +169,10 @@ pub mod cloak_squads_test_harness {
     pub fn invoke_emergency_close_license(
         ctx: Context<InvokeEmergencyCloseLicense>,
         cofre_multisig: Pubkey,
+        vault_index: u8,
     ) -> Result<()> {
-        let data = ix_data("emergency_close_license", &())?;
-        invoke_with_squads_vault(
+        let data = ix_data("emergency_close_license", &(vault_index,))?;
+        invoke_with_squads_vault_at(
             &ctx.accounts.gatekeeper_program,
             &[
                 AccountMeta::new_readonly(ctx.accounts.cofre.key(), false),
@@ -188,6 +191,7 @@ pub mod cloak_squads_test_harness {
                 ctx.accounts.gatekeeper_program.to_account_info(),
             ],
             &cofre_multisig,
+            vault_index,
             ctx.bumps.squads_vault,
         )
     }
@@ -196,9 +200,10 @@ pub mod cloak_squads_test_harness {
         ctx: Context<InvokeRevokeAudit>,
         cofre_multisig: Pubkey,
         diversifier_trunc: [u8; 16],
+        vault_index: u8,
     ) -> Result<()> {
-        let data = ix_data("revoke_audit", &(diversifier_trunc,))?;
-        invoke_with_squads_vault(
+        let data = ix_data("revoke_audit", &(diversifier_trunc, vault_index))?;
+        invoke_with_squads_vault_at(
             &ctx.accounts.gatekeeper_program,
             &[
                 AccountMeta::new(ctx.accounts.cofre.key(), false),
@@ -215,6 +220,7 @@ pub mod cloak_squads_test_harness {
                 ctx.accounts.gatekeeper_program.to_account_info(),
             ],
             &cofre_multisig,
+            vault_index,
             ctx.bumps.squads_vault,
         )
     }
@@ -252,6 +258,11 @@ fn ix_data<T: AnchorSerialize>(name: &str, args: &T) -> Result<Vec<u8>> {
     Ok(data)
 }
 
+// Hardcoded helper for the 5 admin handlers that still require Primary
+// (init_cofre, set_operator, add/remove_signer_view, init_view_distribution).
+// Their #[derive(Accounts)] still constrain the vault PDA to seeds = [..., &[0]],
+// so we sign at vault[0]. emergency_close_license is now parametrized and uses
+// invoke_with_squads_vault_at instead.
 fn invoke_with_squads_vault<'info>(
     gatekeeper_program: &UncheckedAccount<'info>,
     accounts: &[AccountMeta],
@@ -260,15 +271,45 @@ fn invoke_with_squads_vault<'info>(
     multisig: &Pubkey,
     vault_bump: u8,
 ) -> Result<()> {
+    invoke_with_squads_vault_at(
+        gatekeeper_program,
+        accounts,
+        data,
+        account_infos,
+        multisig,
+        0,
+        vault_bump,
+    )
+}
+
+// Parametrized helper for handlers that accept any vault index
+// (issue_license, revoke_audit, emergency_close_license). The caller is
+// responsible for matching the seed constraint of the corresponding
+// #[derive(Accounts)] struct.
+fn invoke_with_squads_vault_at<'info>(
+    gatekeeper_program: &UncheckedAccount<'info>,
+    accounts: &[AccountMeta],
+    data: &[u8],
+    account_infos: &[AccountInfo<'info>],
+    multisig: &Pubkey,
+    vault_index: u8,
+    vault_bump: u8,
+) -> Result<()> {
     require_keys_eq!(
         gatekeeper_program.key(),
         GATEKEEPER_PROGRAM_ID,
         HarnessError::InvalidGatekeeperProgram
     );
 
-    let vault_index = [0u8];
+    let vault_index_arr = [vault_index];
     let bump = [vault_bump];
-    let signer_seeds: &[&[u8]] = &[b"multisig", multisig.as_ref(), b"vault", &vault_index, &bump];
+    let signer_seeds: &[&[u8]] = &[
+        b"multisig",
+        multisig.as_ref(),
+        b"vault",
+        &vault_index_arr,
+        &bump,
+    ];
 
     let ix = Instruction {
         program_id: gatekeeper_program.key(),
@@ -297,14 +338,14 @@ pub struct InvokeInitCofre<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(cofre_multisig: Pubkey)]
+#[instruction(cofre_multisig: Pubkey, payload_hash: [u8; 32], nonce: [u8; 16], ttl_secs: i64, vault_index: u8)]
 pub struct InvokeIssueLicense<'info> {
-    /// CHECK: checked by address in invoke_with_squads_vault.
+    /// CHECK: checked by address in invoke_with_squads_vault_at.
     pub gatekeeper_program: UncheckedAccount<'info>,
     /// CHECK: typed and validated by cloak-gatekeeper.
     pub cofre: UncheckedAccount<'info>,
     /// CHECK: PDA signer for CPI only.
-    #[account(seeds = [b"multisig", cofre_multisig.as_ref(), b"vault", &[0]], bump)]
+    #[account(seeds = [b"multisig", cofre_multisig.as_ref(), b"vault", &[vault_index]], bump)]
     pub squads_vault: UncheckedAccount<'info>,
     /// CHECK: created and validated by cloak-gatekeeper.
     #[account(mut)]
@@ -369,14 +410,14 @@ pub struct InvokeRemoveSignerView<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(cofre_multisig: Pubkey)]
+#[instruction(cofre_multisig: Pubkey, vault_index: u8)]
 pub struct InvokeEmergencyCloseLicense<'info> {
-    /// CHECK: checked by address in invoke_with_squads_vault.
+    /// CHECK: checked by address in invoke_with_squads_vault_at.
     pub gatekeeper_program: UncheckedAccount<'info>,
     /// CHECK: typed and validated by cloak-gatekeeper.
     pub cofre: UncheckedAccount<'info>,
     /// CHECK: PDA signer for CPI only.
-    #[account(seeds = [b"multisig", cofre_multisig.as_ref(), b"vault", &[0]], bump)]
+    #[account(seeds = [b"multisig", cofre_multisig.as_ref(), b"vault", &[vault_index]], bump)]
     pub squads_vault: UncheckedAccount<'info>,
     /// CHECK: typed and closed by cloak-gatekeeper.
     #[account(mut)]
@@ -389,15 +430,15 @@ pub struct InvokeEmergencyCloseLicense<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(cofre_multisig: Pubkey)]
+#[instruction(cofre_multisig: Pubkey, diversifier_trunc: [u8; 16], vault_index: u8)]
 pub struct InvokeRevokeAudit<'info> {
-    /// CHECK: checked by address in invoke_with_squads_vault.
+    /// CHECK: checked by address in invoke_with_squads_vault_at.
     pub gatekeeper_program: UncheckedAccount<'info>,
     /// CHECK: typed and reallocated by cloak-gatekeeper.
     #[account(mut)]
     pub cofre: UncheckedAccount<'info>,
     /// CHECK: PDA signer for CPI only.
-    #[account(seeds = [b"multisig", cofre_multisig.as_ref(), b"vault", &[0]], bump)]
+    #[account(seeds = [b"multisig", cofre_multisig.as_ref(), b"vault", &[vault_index]], bump)]
     pub squads_vault: UncheckedAccount<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
