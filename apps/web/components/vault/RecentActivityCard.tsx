@@ -1,7 +1,7 @@
 "use client";
 
-import type { ActivityItem } from "@/lib/hooks/useRecentActivity";
 import { publicEnv } from "@/lib/env";
+import type { ActivityItem } from "@/lib/hooks/useRecentActivity";
 import { type ProposalSummary, truncateAddress } from "@/lib/proposals";
 import { lamportsToSol } from "@/lib/sol";
 import { cn } from "@/lib/utils";
@@ -123,12 +123,12 @@ function IncomeRow({
   toLabel,
 }: {
   signature: string;
-  amountLamports: number;
+  amountLamports: string;
   from: string;
   blockTime: number;
   toLabel?: string;
 }) {
-  const amountSol = lamportsToSol(String(amountLamports));
+  const amountSol = lamportsToSol(amountLamports);
   const time = relativeTime(blockTime * 1000);
   const explorerUrl = `https://solscan.io/tx/${signature}${CLUSTER_SUFFIX}`;
 
@@ -180,7 +180,9 @@ export function RecentActivityCard({
   activity: ActivityItem[];
   isLoading?: boolean;
 }) {
-  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
+  const [subVaultAccounts, setSubVaultAccounts] = useState<
+    Array<{ vaultIndex: number; name: string }>
+  >([]);
   useEffect(() => {
     fetch(`/api/vaults/${multisig}/sub-vaults`)
       .then((r) => (r.ok ? r.json() : []))

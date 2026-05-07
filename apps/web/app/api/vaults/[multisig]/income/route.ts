@@ -1,221 +1,85 @@
-import { getCurrentCluster } from "@/lib/cluster";
-import { isPrismaAvailable, prisma } from "@/lib/prisma";
-import { squadsVaultPda } from "@cloak-squads/core/pda";
-import { Connection, PublicKey } from "@solana/web3.js";
-import type { ParsedInstruction, ParsedTransactionWithMeta } from "@solana/web3.js";
+import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
+import { readVaultIncome, syncVaultIncome } from "@/lib/vault-income-sync";
+import { PublicKey } from "@solana/web3.js";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+
+/**
+ * Vault income endpoint, DB-backed.
+ *
+ * Flow per request:
+ *   1. Trigger a throttled sync from RPC (skipped if a sync ran in the last
+ *      ~8s; the throttle lives in `VaultSyncState` so it survives across
+ *      replicas).
+ *   2. Read rows from `VaultIncome`, newest first, capped by ?limit=.
+ *
+ * The DB is the source of truth; the sync is best-effort enrichment. If RPC
+ * is unavailable or rate-limited, the user still sees previously indexed
+ * income.
+ *
+ * `force=true` bypasses the server-side sync throttle. Because that costs
+ * RPC credits regardless of who is asking, we rate-limit it per IP. The
+ * default (non-force) path is unauthenticated by design — incoming
+ * transfers are public on-chain and the response is sliced from a public
+ * index.
+ */
 
 export type IncomeEntry = {
   kind: "income";
   signature: string;
-  amountLamports: number;
+  /** Stringified base-units to preserve precision past Number.MAX_SAFE_INTEGER. */
+  amountLamports: string;
   from: string;
   blockTime: number;
-  toLabel?: string | undefined; // undefined = primary vault
+  toLabel?: string | undefined;
 };
 
-const RPC_URL = process.env.FALLBACK_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? "";
-const SQUADS_PROGRAM_ID = process.env.NEXT_PUBLIC_SQUADS_PROGRAM_ID ?? "";
+// NOTE: amountLamports moved from `number` to `string` in this rev. Consumers
+// using the value for display can call BigInt() before formatting; consumers
+// summing it should use BigInt addition. See useTreasuryFlow.
 
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-async function fetchParsedTxBatch(
-  connection: Connection,
-  signatures: string[],
-  attempt = 0,
-): Promise<(ParsedTransactionWithMeta | null)[]> {
-  if (signatures.length === 0) return [];
-  try {
-    return await connection.getParsedTransactions(signatures, {
-      commitment: "confirmed",
-      maxSupportedTransactionVersion: 0,
-    });
-  } catch (err) {
-    const is429 = err instanceof Error && err.message.includes("429");
-    if (is429 && attempt < 3) {
-      await delay(600 * Math.pow(2, attempt));
-      return fetchParsedTxBatch(connection, signatures, attempt + 1);
-    }
-    return signatures.map(() => null);
-  }
+function parseLimit(raw: string | null): number {
+  // Defends against ?limit=foo (NaN), negative values, and overflow. The
+  // hot path is the cached "10" default, so the small validation is free.
+  const parsed = Number.parseInt(raw ?? "10", 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return 10;
+  return Math.min(parsed, 200);
 }
 
-type VaultTarget = { pda: PublicKey; address: string; toLabel: string | undefined };
-
-function parseIncome(
-  tx: ParsedTransactionWithMeta,
-  sigInfo: { signature: string; blockTime: number | null | undefined },
-  vaultAddress: string,
-  toLabel: string | undefined,
-): IncomeEntry | null {
-  if (!tx.meta || tx.meta.err) return null;
-
-  const accounts = tx.transaction.message.accountKeys;
-  const vaultIdx = accounts.findIndex((a) => a.pubkey.toBase58() === vaultAddress);
-  if (vaultIdx === -1) return null;
-
-  const pre = tx.meta.preBalances[vaultIdx];
-  const post = tx.meta.postBalances[vaultIdx];
-  if (pre === undefined || post === undefined) return null;
-  const diff = post - pre;
-  if (diff < 100_000) return null;
-
-  let from = "Unknown";
-  let amountLamports = diff;
-
-  for (const ix of tx.transaction.message.instructions) {
-    if (!("parsed" in ix)) continue;
-    const pix = ix as ParsedInstruction;
-    if (pix.program !== "system") continue;
-    const parsed = pix.parsed as {
-      type?: string;
-      info?: { destination?: string; source?: string; lamports?: number };
-    } | undefined;
-    if (parsed?.type === "transfer" && parsed.info?.destination === vaultAddress) {
-      from = parsed.info.source ?? "Unknown";
-      amountLamports = parsed.info.lamports ?? diff;
-      break;
-    }
-  }
-
-  return {
-    kind: "income",
-    signature: sigInfo.signature,
-    amountLamports,
-    from,
-    blockTime: sigInfo.blockTime ?? Math.floor(Date.now() / 1000),
-    toLabel,
-  };
-}
-
-export async function GET(
-  request: Request,
-  context: { params: Promise<{ multisig: string }> },
-) {
+export async function GET(request: Request, context: { params: Promise<{ multisig: string }> }) {
   const { multisig } = await context.params;
   const { searchParams } = new URL(request.url);
-  const limit = Math.min(parseInt(searchParams.get("limit") ?? "10", 10), 50);
+  const limit = parseLimit(searchParams.get("limit"));
+  const force = searchParams.get("force") === "true";
 
-  let multisigPk: PublicKey;
   try {
-    multisigPk = new PublicKey(multisig);
+    new PublicKey(multisig);
   } catch {
     return NextResponse.json({ error: "Invalid multisig address." }, { status: 400 });
   }
 
-  if (!RPC_URL) {
-    return NextResponse.json({ error: "RPC URL not configured." }, { status: 500 });
-  }
-
-  let squadsProgram: PublicKey;
-  try {
-    squadsProgram = new PublicKey(SQUADS_PROGRAM_ID);
-  } catch {
-    return NextResponse.json({ error: "Server misconfiguration." }, { status: 500 });
-  }
-
-  const [primaryVaultPda] = squadsVaultPda(multisigPk, squadsProgram, 0);
-
-  // Fetch registered sub-vaults from DB
-  let subVaultEntries: Array<{ vaultIndex: number; name: string }> = [];
-  try {
-    if (isPrismaAvailable()) {
-      subVaultEntries = await prisma.subVault.findMany({
-        where: { cofreAddress: multisig, cluster: getCurrentCluster() },
-        select: { vaultIndex: true, name: true },
-        orderBy: { vaultIndex: "asc" },
-        take: 10, // cap to avoid too many RPC calls
-      });
+  if (force) {
+    const hdrs = await headers();
+    const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
+    const ip = (raw.split(",")[0] ?? raw).trim();
+    const ok = await checkRateLimitAsync(rateLimitBucket(ip, "income-force"), "write");
+    if (!ok) {
+      return NextResponse.json({ error: "Too many force-sync requests" }, { status: 429 });
     }
-  } catch {}
+  }
 
-  const targets: VaultTarget[] = [
-    { pda: primaryVaultPda, address: primaryVaultPda.toBase58(), toLabel: undefined },
-    ...subVaultEntries.map((sv) => {
-      const [pda] = squadsVaultPda(multisigPk, squadsProgram, sv.vaultIndex);
-      return { pda, address: pda.toBase58(), toLabel: sv.name };
-    }),
-  ];
-
-  const connection = new Connection(RPC_URL, {
-    commitment: "confirmed",
-    disableRetryOnRateLimit: true,
+  // Trigger sync but don't block the read on it failing. The sync helper
+  // never throws; it returns a result object.
+  await syncVaultIncome(multisig, { force }).catch((err) => {
+    console.error("[income] sync failed (returning DB-only data):", err);
   });
 
-  try {
-    // Fetch signatures for all vaults concurrently
-    const sigsPerTarget = await Promise.all(
-      targets.map((t) =>
-        connection
-          .getSignaturesForAddress(t.pda, { limit: 25 })
-          .catch(() => [] as Awaited<ReturnType<typeof connection.getSignaturesForAddress>>),
-      ),
-    );
+  const entries = await readVaultIncome(multisig, limit);
 
-    // Build a flat list of { sig, blockTime, vaultAddress, toLabel } deduped by sig+vaultAddress
-    type TaggedSig = {
-      signature: string;
-      blockTime: number;
-      vaultAddress: string;
-      toLabel: string | undefined;
-    };
-    const seen = new Set<string>();
-    const taggedSigs: TaggedSig[] = [];
-
-    for (let i = 0; i < targets.length; i++) {
-      const target = targets[i]!;
-      const sigs = sigsPerTarget[i] ?? [];
-      for (const s of sigs) {
-        const key = `${s.signature}|${target.address}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        taggedSigs.push({
-          signature: s.signature,
-          blockTime: s.blockTime ?? 0,
-          vaultAddress: target.address,
-          toLabel: target.toLabel,
-        });
-      }
-    }
-
-    // Sort by recency, take a batch to parse
-    taggedSigs.sort((a, b) => b.blockTime - a.blockTime);
-    const batchToFetch = taggedSigs.slice(0, 60);
-
-    if (batchToFetch.length === 0) {
-      return NextResponse.json(
-        { entries: [] },
-        { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" } },
-      );
-    }
-
-    // Batch-fetch unique signatures
-    const uniqueSigs = [...new Set(batchToFetch.map((t) => t.signature))];
-    const txMap = new Map<string, ParsedTransactionWithMeta | null>();
-    const txResults = await fetchParsedTxBatch(connection, uniqueSigs);
-    uniqueSigs.forEach((sig, i) => txMap.set(sig, txResults[i] ?? null));
-
-    // Parse each tagged sig
-    const entries: IncomeEntry[] = [];
-    for (const tagged of batchToFetch) {
-      if (entries.length >= limit) break;
-      const tx = txMap.get(tagged.signature);
-      if (!tx) continue;
-      const entry = parseIncome(
-        tx,
-        { signature: tagged.signature, blockTime: tagged.blockTime },
-        tagged.vaultAddress,
-        tagged.toLabel,
-      );
-      if (entry) entries.push(entry);
-    }
-
-    return NextResponse.json(
-      { entries },
-      { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" } },
-    );
-  } catch (err) {
-    console.error("[income] RPC error:", err);
-    return NextResponse.json({ error: "RPC error." }, { status: 500 });
-  }
+  return NextResponse.json(
+    { entries },
+    {
+      headers: { "Cache-Control": "private, max-age=5" },
+    },
+  );
 }

@@ -39,6 +39,37 @@ model AuditAccessLog {
   @@index([auditLinkId, accessedAt])
 }
 
+model VaultIncome {
+  id             String   @id @default(uuid())
+  cofreAddress   String
+  cluster        String?
+  vaultIndex     Int      @default(0)
+  signature      String
+  amountLamports String
+  fromAddress    String
+  blockTime      DateTime
+  toLabel        String?
+  createdAt      DateTime @default(now())
+
+  // Compound key includes vaultIndex because a single Solana transaction
+  // can transfer SOL to multiple vault PDAs of the same multisig (primary +
+  // a sub-vault). Without vaultIndex, the second upsert silently overwrites
+  // the first, dropping one of the deposits from the index.
+  @@unique([cofreAddress, signature, vaultIndex])
+  @@index([cofreAddress])
+  @@index([cofreAddress, blockTime])
+  @@index([cofreAddress, cluster])
+}
+
+model VaultSyncState {
+  cofreAddress     String    @id
+  cluster          String?
+  lastIncomeSyncAt DateTime?
+  updatedAt        DateTime  @updatedAt
+
+  @@index([cluster])
+}
+
 model RecurringPayment {
   id            String    @id @default(uuid())
   cofreAddress  String

@@ -9,13 +9,16 @@ import { ReceiveModal } from "@/components/vault/ReceiveModal";
 import { RecentActivityCard } from "@/components/vault/RecentActivityCard";
 import { SendModal } from "@/components/vault/SendModal";
 import { SwapModal } from "@/components/vault/SwapModal";
+import { TreasuryFlowStrip } from "@/components/vault/TreasuryFlowStrip";
 import { useRecentActivity } from "@/lib/hooks/useRecentActivity";
+import { useVaultIncomeSync, vaultIncomeQueryKey } from "@/lib/hooks/useVaultIncome";
 import { truncateAddress } from "@/lib/proposals";
-import { useProposalSummaries } from "@/lib/use-proposal-summaries";
+import { proposalSummariesQueryKey, useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
 import { useVaultMetadata } from "@/lib/use-vault-metadata";
+import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, Copy } from "lucide-react";
+import { AlertTriangle, Check, Copy, Shield } from "lucide-react";
 import { useState } from "react";
 
 function DashboardVaultIdentity({ multisig }: { multisig: string }) {
@@ -66,32 +69,74 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
   const { data, isLoading, error } = useVaultData(multisig);
   const { data: proposals = [] } = useProposalSummaries(multisig);
   const { activity, isLoading: activityLoading } = useRecentActivity(multisig, 5);
+  // Single source of truth for the chain-driven income refresh. Mounting at
+  // the dashboard root means a fresh deposit only triggers ONE WebSocket
+  // subscription regardless of how many consumers (KPI strip, activity,
+  // proposals page) read income data.
+  useVaultIncomeSync(multisig);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const [swapOpen, setSwapOpen] = useState(false);
 
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["vault-data", multisig] });
+  // Refresh ALL vault-scoped queries: balance, income (KPIs and activity),
+  // and proposal summaries. For income we hit the force-sync endpoint and
+  // seed the cache directly with the response so we don't waste a second
+  // round trip on the standard invalidate→refetch path.
+  //
+  // Failure handling: any non-OK response (notably 429 from the rate-limited
+  // force endpoint) or a thrown fetch error falls back to a plain invalidate,
+  // which causes the consumer to re-fetch the non-force endpoint. The user
+  // still sees fresh data, just from the throttle-respecting path.
+  const refresh = async () => {
+    void queryClient.invalidateQueries({ queryKey: ["vault-data", multisig] });
+    void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
+    let seeded = false;
+    try {
+      const res = await fetch(`/api/vaults/${multisig}/income?limit=200&force=true`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.entries) {
+          queryClient.setQueryData(vaultIncomeQueryKey(multisig), data.entries);
+          seeded = true;
+        }
+      }
+    } catch {
+      // fall through to invalidate
+    }
+    if (!seeded) {
+      void queryClient.invalidateQueries({ queryKey: vaultIncomeQueryKey(multisig) });
+    }
   };
 
   if (isLoading) {
+    // Skeleton mirrors the actual rendered layout so the page doesn't shift
+    // sections around once data lands. Heights are approximate but close
+    // enough that the swap is invisible to the eye.
     return (
       <div className="space-y-6 p-4 md:p-6">
-        <div className="h-12 w-48 shimmer-bg rounded-lg" />
-        {/* Balance skeleton */}
-        <div className="h-40 shimmer-bg rounded-2xl" />
-        {/* Quick actions skeleton */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="h-24 shimmer-bg rounded-2xl" />
-          <div className="h-24 shimmer-bg rounded-2xl" />
-          <div className="h-24 shimmer-bg rounded-2xl" />
+        {/* Header identity row */}
+        <div className="flex items-center gap-3">
+          <div className="h-11 w-11 shimmer-bg rounded-xl" />
+          <div className="space-y-1.5">
+            <div className="h-5 w-32 shimmer-bg rounded" />
+            <div className="h-3 w-40 shimmer-bg rounded" />
+          </div>
         </div>
-        {/* Stats skeleton */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="h-24 shimmer-bg rounded-xl" />
-          <div className="h-24 shimmer-bg rounded-xl" />
-          <div className="h-24 shimmer-bg rounded-xl" />
+        {/* OverviewCard */}
+        <div className="h-[280px] shimmer-bg rounded-2xl" />
+        {/* TreasuryFlowStrip — 3 KPI cards */}
+        <div className="grid gap-3 lg:grid-cols-3">
+          <div className="h-[148px] shimmer-bg rounded-2xl" />
+          <div className="h-[148px] shimmer-bg rounded-2xl" />
+          <div className="h-[148px] shimmer-bg rounded-2xl" />
         </div>
+        {/* Governance + Cloak split */}
+        <div className="h-[96px] shimmer-bg rounded-2xl" />
+        {/* PendingProposalsCard + RecentActivityCard */}
+        <div className="h-32 shimmer-bg rounded-2xl" />
+        <div className="h-48 shimmer-bg rounded-2xl" />
       </div>
     );
   }
@@ -133,70 +178,101 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
         onSwap={() => setSwapOpen(true)}
       />
 
-      {/* Governance + Cloak block */}
-      <div className="rounded-2xl border border-border/60 bg-surface transition-colors duration-200 hover:border-accent/15">
-        {/* Threshold row */}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-4 p-5">
-          <div>
-            <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">Governance</p>
-            <p className="mt-2 font-display text-3xl font-semibold tabular-nums tracking-tight text-ink">
-              {data.threshold}/{data.memberCount}
-            </p>
-            <p className="mt-0.5 text-xs text-ink-muted">Required signatures</p>
-          </div>
+      <TreasuryFlowStrip multisig={multisig} />
 
-          <div className="h-10 w-px bg-border/60" />
-
-          {/* Approval dots */}
-          <div className="flex flex-col gap-1.5">
-            <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">Members</p>
-            <div className="flex items-center gap-1.5">
-              {Array.from({ length: Math.min(data.memberCount, 8) }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`h-2 w-2 rounded-full transition-colors ${i < data.threshold ? "bg-accent" : "bg-border-strong"}`}
-                />
-              ))}
-              {data.memberCount > 8 && (
-                <span className="text-[10px] text-ink-subtle">+{data.memberCount - 8}</span>
-              )}
-              <span className="ml-1 text-xs text-ink-muted">{data.memberCount}</span>
+      {/* Governance + Cloak — split block, governance left, privacy right.
+          Both sides describe vault attributes that don't change daily, so we
+          keep the height tight (~96px desktop) and let the dynamic flow strip
+          above carry the eye. */}
+      <div className="overflow-hidden rounded-2xl border border-border/60 bg-surface transition-colors duration-200 hover:border-accent/15">
+        <div className="flex flex-col md:flex-row md:items-stretch">
+          {/* GOVERNANCE side */}
+          <div className="flex-1 px-5 py-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-eyebrow text-ink-subtle">Governance</p>
+              <span className="text-[10px] tabular-nums text-ink-subtle/70">
+                {data.memberCount} {data.memberCount === 1 ? "member" : "members"}
+              </span>
             </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <p className="font-display text-3xl font-semibold tabular-nums tracking-tight text-ink">
+                {data.threshold}
+                <span className="text-ink-subtle/50">/{data.memberCount}</span>
+              </p>
+              <p className="text-xs text-ink-muted">required to approve</p>
+            </div>
+            {/* Threshold dots only earn their space when there are at least
+                two members to compare against. A single dot for a 1-of-1
+                vault adds noise without information. */}
+            {data.memberCount >= 2 && (
+              <div className="mt-2.5 flex items-center gap-1.5">
+                {Array.from({ length: Math.min(data.memberCount, 12) }).map((_, i) => (
+                  <span
+                    // biome-ignore lint/suspicious/noArrayIndexKey: decorative dots have no identity beyond their position
+                    key={i}
+                    className={cn(
+                      "h-1.5 w-1.5 rounded-full transition-colors",
+                      i < data.threshold ? "bg-accent" : "bg-border-strong",
+                    )}
+                  />
+                ))}
+                {data.memberCount > 12 && (
+                  <span className="text-[10px] tabular-nums text-ink-subtle">
+                    +{data.memberCount - 12}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Cloak row — separado, com identidade própria */}
-        <div className="flex items-center justify-between border-t border-border/50 px-5 py-3.5">
-          <div className="flex items-center gap-2.5">
-            <div
-              className={`flex h-6 w-6 items-center justify-center rounded-md ${
-                data.cofreInitialized ? "bg-accent/10" : "bg-surface-2"
-              }`}
-            >
+          {/* Divider — vertical on desktop, horizontal on mobile */}
+          <div className="hidden w-px bg-border/60 md:block" aria-hidden="true" />
+          <div className="h-px bg-border/60 md:hidden" aria-hidden="true" />
+
+          {/* CLOAK PRIVACY side — opposite corner */}
+          <div className="flex-1 px-5 py-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-eyebrow text-ink-subtle">Cloak Privacy</p>
               <span
-                className={`h-2 w-2 rounded-full ${
-                  data.cofreInitialized ? "bg-accent animate-pulse" : "bg-ink-subtle/50"
-                }`}
-              />
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                  data.cofreInitialized
+                    ? "bg-accent/10 text-accent"
+                    : "bg-surface-2 text-ink-subtle",
+                )}
+              >
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    data.cofreInitialized ? "animate-pulse bg-accent" : "bg-ink-subtle/60",
+                  )}
+                />
+                {data.cofreInitialized ? "Active" : "Inactive"}
+              </span>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-ink">
-                Cloak, Privacy Layer
-              </p>
-              <p className="text-[10px] text-ink-subtle">
-                {data.cofreInitialized ? "Shielded transactions enabled" : "Not initialized, set up to enable private sends"}
-              </p>
+            <div className="mt-2 flex items-start gap-3">
+              <div
+                className={cn(
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-colors",
+                  data.cofreInitialized
+                    ? "border-accent/25 bg-accent/[0.06] text-accent"
+                    : "border-border bg-surface-2 text-ink-subtle",
+                )}
+              >
+                <Shield className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-ink">
+                  {data.cofreInitialized ? "Shielded routing enabled" : "Privacy not initialized"}
+                </p>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  {data.cofreInitialized
+                    ? "Private sends route through the Cloak shield pool"
+                    : "Initialize to unlock private payments"}
+                </p>
+              </div>
             </div>
           </div>
-          <span
-            className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-              data.cofreInitialized
-                ? "bg-accent/10 text-accent"
-                : "bg-surface-2 text-ink-subtle"
-            }`}
-          >
-            {data.cofreInitialized ? "Active" : "Inactive"}
-          </span>
         </div>
       </div>
 
@@ -211,13 +287,19 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
         multisig={multisig}
         open={sendOpen}
         onOpenChange={setSendOpen}
-        subVaultAccounts={data.subVaultBreakdown.map((sv) => ({ vaultIndex: sv.vaultIndex, name: sv.name }))}
+        subVaultAccounts={data.subVaultBreakdown.map((sv) => ({
+          vaultIndex: sv.vaultIndex,
+          name: sv.name,
+        }))}
       />
       <SwapModal
         multisig={multisig}
         open={swapOpen}
         onOpenChange={setSwapOpen}
-        subVaultAccounts={data.subVaultBreakdown.map((sv) => ({ vaultIndex: sv.vaultIndex, name: sv.name }))}
+        subVaultAccounts={data.subVaultBreakdown.map((sv) => ({
+          vaultIndex: sv.vaultIndex,
+          name: sv.name,
+        }))}
       />
     </div>
   );
