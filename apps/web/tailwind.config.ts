@@ -81,6 +81,12 @@ const config: Config = {
         xl: "20px",
         "2xl": "24px",
         "3xl": "32px",
+        // Semantic tokens for the card archetype system (Sprint A).
+        // Used by `.card-hero`, `.card-panel`, `.card-list`, and modal shells.
+        hero: "24px",
+        panel: "16px",
+        list: "12px",
+        modal: "28px",
       },
       boxShadow: {
         "raise-1": "0 1px 0 0 hsl(var(--border) / 1), 0 8px 24px -12px rgb(0 0 0 / 0.6)",

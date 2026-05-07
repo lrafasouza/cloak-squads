@@ -212,6 +212,89 @@
   .pb-safe {
     padding-bottom: max(0px, env(safe-area-inset-bottom));
   }
+
+  /* ───────────────────────────────────────────────────────────
+   * Sprint A — Card archetypes & editorial primitives
+   *
+   * Four card archetypes per the redesign rulebook (see
+   * docs/specs/2026-05-07-design-redesign-dashboard-sidebar.md §5):
+   *
+   *   .card-hero  — unique-on-page, anchor card. Embossed inset highlight,
+   *                 deep drop, no hover reaction (it doesn't react to you,
+   *                 you react to it).
+   *   .card-panel — KPI strip, governance ribbon, sub-vault detail. The
+   *                 workhorse. Borders lift on hover, no glow.
+   *   .card-list  — proposal queues, activity, member rows. Container only;
+   *                 rows handle their own padding.
+   *
+   * Plus three editorial primitives:
+   *   .label-editorial — italic Fraunces section labels (the heraldic moment)
+   *   .privacy-halo    — concentric pulsing arcs around the privacy KPI
+   *                      (the ONLY decorative motion in the product)
+   *   .receipt-row     — dotted-leader rows for modal "we are about to sign
+   *                      value" surfaces
+   * ─────────────────────────────────────────────────────────── */
+
+  .card-hero {
+    @apply relative overflow-hidden rounded-hero border border-border/70 bg-surface;
+    box-shadow:
+      0 1px 0 0 hsl(var(--inset-highlight)) inset,
+      0 1px 0 0 hsl(var(--border)),
+      0 18px 48px -20px rgb(0 0 0 / 0.6);
+  }
+
+  .card-panel {
+    @apply rounded-panel border border-border/60 bg-surface shadow-raise-1 transition-aegis;
+  }
+  .card-panel:hover {
+    border-color: hsl(var(--border-strong));
+  }
+
+  .card-list {
+    @apply rounded-list border border-border/50 bg-surface;
+  }
+
+  .label-editorial {
+    @apply font-display italic text-[11px] tracking-eyebrow text-ink-subtle/60;
+  }
+
+  /* Privacy halo — concentric arcs that pulse subtly. Apply to the parent
+   * element of the KPI; the parent should already have `position: relative`
+   * (the rule below ensures it). Honors prefers-reduced-motion. */
+  .privacy-halo {
+    position: relative;
+  }
+  .privacy-halo::before,
+  .privacy-halo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 1px solid hsl(var(--accent) / 0.12);
+    pointer-events: none;
+    animation: halo-pulse 4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+  .privacy-halo::after {
+    animation-delay: 2s;
+    border-color: hsl(var(--accent) / 0.06);
+  }
+
+  /* Receipt row — pair with <ReceiptRow> in components/ui. The `.leader`
+   * span is the dotted spacer between label and value. */
+  .receipt-row {
+    @apply flex items-baseline gap-2 py-1.5;
+  }
+  .receipt-row > .leader {
+    @apply flex-1 border-b border-dotted border-border/60;
+    transform: translateY(-3px);
+  }
+}
+
+/* Privacy halo keyframes — pulled to top level so reduced-motion override
+ * (see :root @media block) cleanly cancels the animation. */
+@keyframes halo-pulse {
+  0%, 100% { transform: scale(1);    opacity: 0.6; }
+  50%      { transform: scale(1.04); opacity: 0;   }
 }
 
 /* Lenis smooth scroll requirement */
