@@ -27,6 +27,7 @@ import {
   List,
   Menu,
   RefreshCw,
+  Repeat,
   Send,
   Settings,
   Shield,
@@ -53,6 +54,7 @@ const WORKSPACE_NAV: NavItem[] = [
   { label: "Send Private", href: "/send", icon: Send },
   { label: "Swap", href: "/swap", icon: ArrowLeftRight },
   { label: "Payroll", href: "/payroll", icon: FileText },
+  { label: "Recurring", href: "/recurring", icon: Repeat },
   { label: "Operator", href: "/operator", icon: Key },
   { label: "Invoices", href: "/invoice", icon: BookOpen },
 ];
