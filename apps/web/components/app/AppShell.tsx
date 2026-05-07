@@ -3,10 +3,7 @@
 import { VaultSelector } from "@/components/app/VaultSelector";
 import { Logo } from "@/components/brand/Logo";
 import { Spinner } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WalletMenu } from "@/components/wallet/WalletMenu";
-import { useSolPrice } from "@/lib/hooks/useSolPrice";
-import { useVaultBalance } from "@/lib/hooks/useVaultBalance";
 import { isProposalPendingStatus } from "@/lib/proposals";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
@@ -306,19 +303,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: vaultMeta } = useVaultMetadata(multisig);
   const vaultName = vaultMeta?.name || undefined;
   const { data: proposals = [], isLoading: proposalsLoading } = useProposalSummaries(multisig);
-  const { balanceSol, usdcUi } = useVaultBalance(multisig);
-  const { data: solPrice } = useSolPrice();
-  const solNum = Number.parseFloat(balanceSol) || 0;
-  const usdcNum = Number.parseFloat(usdcUi) || 0;
-  const totalUsd = solPrice != null ? solNum * solPrice + usdcNum : null;
-  const usdValue =
-    totalUsd != null
-      ? totalUsd.toLocaleString("en-US", {
-          style: "currency",
-          currency: "USD",
-          maximumFractionDigits: 2,
-        })
-      : null;
 
   const [executedMap, setExecutedMap] = useState<Record<string, boolean>>({});
 
@@ -544,22 +528,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Desktop topbar */}
+        {/* Desktop topbar — balance pill removed; the Treasury Hero and the
+            Vault Crest in the sidebar already carry the balance. */}
         <header className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-3 border-b border-border/50 bg-bg/80 px-6 backdrop-blur-xl md:flex">
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="inline-flex h-8 items-center rounded-md border border-border bg-surface px-3 text-xs font-medium text-ink-muted cursor-default">
-                  <span className="tabular-nums">{usdValue ?? `${balanceSol} SOL`}</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <span className="tabular-nums">
-                  Vault treasury · {balanceSol} SOL · {usdcUi} USDC
-                </span>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
           {visibleInboxItems.length > 0 && (
             <OperatorInboxButton
               count={visibleInboxItems.length}
