@@ -1,13 +1,15 @@
 "use client";
 
+import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
 import { VaultIdenticon } from "@/components/ui/vault-identicon";
+import { useSolPrice } from "@/lib/hooks/useSolPrice";
+import { useVaultBalance } from "@/lib/hooks/useVaultBalance";
 import { truncateAddress } from "@/lib/proposals";
 import { useMyVaults } from "@/lib/use-my-vaults";
 import { cn } from "@/lib/utils";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import {
-  Check,
   ChevronsUpDown,
   Download,
   Loader2,
@@ -210,6 +212,8 @@ function VaultSelectorContent({
 export function VaultSelector({ multisig, name, className }: VaultSelectorProps) {
   const { connected } = useWallet();
   const { vaults: myVaults, loading: myVaultsLoading } = useMyVaults();
+  const { balanceSol, usdcUi } = useVaultBalance(multisig);
+  const { data: solPrice } = useSolPrice();
 
   const [open, setOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -269,57 +273,74 @@ export function VaultSelector({ multisig, name, className }: VaultSelectorProps)
     window.location.href = `/vault/${addr}`;
   };
 
-  const handleExitCurrentVault = () => {
-    window.location.href = "/vault";
-  };
+  // Total USD value across SOL + USDC. SOL is the only token we price,
+  // USDC is treated as $1. Falls back to "—" while either price or balance
+  // is still loading so the crest never flashes a wrong number.
+  const solNum = Number.parseFloat(balanceSol) || 0;
+  const usdcNum = Number.parseFloat(usdcUi) || 0;
+  const totalUsd = solPrice != null ? solNum * solPrice + usdcNum : null;
+  const usdLabel =
+    totalUsd != null
+      ? totalUsd.toLocaleString("en-US", {
+          style: "currency",
+          currency: "USD",
+          maximumFractionDigits: 2,
+        })
+      : null;
+  const solLabel = solNum.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: solNum < 1 ? 4 : 2,
+  });
 
   return (
     <div ref={dropdownRef} className={cn("relative", className)}>
-      {/* Active Vault Card */}
-      <div
+      {/* Vault Crest — heraldic identity card with embedded balance ledger */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
         className={cn(
-          "group flex w-full items-center gap-2 rounded-xl border bg-surface p-3 text-left transition-all duration-150",
+          "group relative flex w-full flex-col gap-2 overflow-hidden rounded-xl border bg-surface px-3 pb-2.5 pt-2.5 text-left transition-aegis",
           open
-            ? "border-accent/50 bg-surface shadow-raise-1"
-            : "border-border bg-surface hover:border-border-strong hover:bg-surface-2 hover:shadow-raise-1",
+            ? "border-accent/40 shadow-raise-1"
+            : "border-border hover:border-border-strong hover:bg-surface-2 hover:shadow-raise-1",
         )}
       >
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="flex min-w-0 flex-1 items-center gap-3 text-left"
-          aria-expanded={open}
-        >
-          <div className="relative shrink-0">
-            <VaultIdenticon seed={multisig} size={36} className="rounded-lg" />
-            <div className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-signal-success ring-2 ring-surface">
-              <Check className="h-2 w-2 text-white" strokeWidth={3} />
-            </div>
-          </div>
+        {/* Watermark — subtle Æ behind the content. 80px / 5% opacity reads
+            as a brass embossing rather than decoration on a card this small. */}
+        <HeraldicWatermark
+          size={88}
+          opacity={0.05}
+          className="-bottom-3 -right-2 top-auto"
+        />
 
+        {/* Identity row */}
+        <div className="relative flex items-center gap-2.5">
+          <VaultIdenticon seed={multisig} size={36} className="shrink-0 rounded-lg" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-ink">{displayName}</p>
+            <p className="font-mono text-[10px] text-ink-subtle">{truncateAddress(multisig)}</p>
           </div>
-        </button>
-
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={handleExitCurrentVault}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-ink-subtle opacity-0 transition-all hover:bg-surface-3 hover:text-ink group-hover:opacity-100"
-            aria-label="Exit current vault"
-            title="Exit vault"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-          </button>
           <ChevronsUpDown
             className={cn(
               "h-3.5 w-3.5 shrink-0 transition-colors",
-              open ? "text-accent" : "text-ink-subtle group-hover:text-ink",
+              open ? "text-accent" : "text-ink-subtle group-hover:text-ink-muted",
             )}
+            aria-hidden="true"
           />
         </div>
-      </div>
+
+        {/* Balance ledger — mono tabular, ledger-style. The USD value leads
+            because that's the operator's mental model; SOL is the audit trail. */}
+        <div className="relative flex items-baseline justify-between gap-2 border-t border-border/50 pt-2">
+          <span className="font-mono text-[13px] font-semibold tabular-nums text-ink">
+            {usdLabel ?? "—"}
+          </span>
+          <span className="font-mono text-[10px] tabular-nums text-ink-subtle">
+            {solLabel} SOL
+          </span>
+        </div>
+      </button>
 
       {/* Desktop dropdown */}
       {open && !isMobile && (

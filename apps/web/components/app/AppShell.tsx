@@ -20,7 +20,6 @@ import {
   BookUser,
   ChevronDown,
   FileText,
-  HelpCircle,
   Key,
   Layers,
   LayoutDashboard,
@@ -65,7 +64,7 @@ const GOVERNANCE_NAV: NavItem[] = [
   { label: "Audit", href: "/audit", icon: Shield },
 ];
 
-const PRIVACY_VAULT_NAV: NavItem[] = [
+const ACCOUNTS_NAV: NavItem[] = [
   { label: "Accounts", href: "/sub-vaults", icon: Layers },
   { label: "Address Book", href: "/address-book", icon: BookUser },
 ];
@@ -101,14 +100,17 @@ function NavLink({
       href={href}
       {...(onClick ? { onClick } : {})}
       className={cn(
-        "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+        "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-aegis",
         isActive
           ? "bg-accent-soft text-accent"
           : "text-ink-muted hover:bg-surface-2 hover:text-ink hover:translate-x-0.5",
       )}
     >
       {isActive && (
-        <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-accent" />
+        <span
+          aria-hidden="true"
+          className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-brass shadow-[0_0_6px_hsl(var(--brass)/0.5)]"
+        />
       )}
       <Icon
         className={cn(
@@ -221,7 +223,7 @@ function SidebarContent({
         <Logo href="/" variant="full" size="sm" />
       </div>
 
-      {/* Vault selector */}
+      {/* Vault Crest — anchors the sidebar with identity + balance ledger */}
       <div className="px-3 pb-3">
         <VaultSelector multisig={multisig} name={vaultName} />
       </div>
@@ -248,17 +250,17 @@ function SidebarContent({
           {...(onClose ? { onClose } : {})}
         />
         <CollapsibleSection
-          label="Privacy & Vault"
-          items={PRIVACY_VAULT_NAV}
+          label="Accounts"
+          items={ACCOUNTS_NAV}
           base={base}
           pathname={pathname}
-          storageKey="aegis:nav:privacy"
+          storageKey="aegis:nav:accounts"
           defaultOpen
           {...(onClose ? { onClose } : {})}
         />
       </nav>
 
-      {/* Cloak banner */}
+      {/* Cloak banner — kept above bottom nav as the privacy partnership seal */}
       <div className="shrink-0 px-3 pb-2">
         <CloakBanner />
       </div>
@@ -275,10 +277,6 @@ function SidebarContent({
               {...(onClose ? { onClick: onClose } : {})}
             />
           ))}
-          <div className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-ink-subtle/70">
-            <HelpCircle className="h-4 w-4 shrink-0 text-ink-subtle/70" />
-            Help & Docs
-          </div>
         </div>
       </div>
     </div>
@@ -502,8 +500,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-bg">
-      {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-border/40 bg-surface/[0.5] backdrop-blur-xl md:flex md:flex-col">
+      {/* Desktop sidebar — recedes to the page background so the main content
+          area (bg-surface-content, one shade brighter) reads as elevated. */}
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-border/50 bg-bg md:flex md:flex-col">
         <SidebarContent
           multisig={multisig}
           vaultName={vaultName}
@@ -514,9 +513,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main area */}
-      <div className="flex flex-1 flex-col min-w-0">
+      <div className="flex flex-1 flex-col min-w-0 bg-surface-content">
         {/* Topbar — mobile only trigger + wallet + inbox */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-border/40 bg-surface/[0.6] px-4 backdrop-blur-xl md:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-border/50 bg-bg/80 px-4 backdrop-blur-xl md:hidden">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -546,7 +545,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Desktop topbar */}
-        <header className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-3 border-b border-border/40 bg-surface/[0.6] px-6 backdrop-blur-xl md:flex">
+        <header className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-3 border-b border-border/50 bg-bg/80 px-6 backdrop-blur-xl md:flex">
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
