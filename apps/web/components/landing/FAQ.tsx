@@ -12,7 +12,7 @@ const faqs = [
   },
   {
     q: "How is Aegis different from Arcium, Umbra, or Darklake?",
-    a: "Those projects shield wallet-to-wallet payments. Aegis is the only one that wraps the full treasury surface, multisig approvals, payroll, bearer invoices, and scoped audit links, around that privacy layer. We're not the cipher; we're the product the cipher lives inside.",
+    a: "Those projects shield wallet-to-wallet payments. Aegis is the only one that wraps the full treasury surface (multisig approvals, payroll, bearer invoices, and scoped audit links) around that privacy layer. We're not the cipher; we're the product the cipher lives inside.",
   },
   {
     q: "Can I import my existing Squads vault?",

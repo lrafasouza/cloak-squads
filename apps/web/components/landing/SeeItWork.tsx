@@ -638,7 +638,7 @@ const ACTS = [
   { id: "approve", title: "The team approves", caption: "Whatever your threshold is, 2-of-3 or 3-of-5, Aegis respects it.", Component: ActApprove },
   { id: "sent", title: "Sent privately", caption: "The chain proves it happened. The details stay with you.", Component: ActSent },
   { id: "audit", title: "Auditors get just what they need", caption: "Scoped, read-only, revocable. No spreadsheet exports.", Component: ActAudit },
-  { id: "bearer", title: "And the link no one else can issue", caption: "Bearer claim, recipient picks the wallet at scan time.", Component: ActBearer },
+  { id: "bearer", title: "And the link no one else can issue", caption: "Bearer claim - recipient picks the wallet at scan time.", Component: ActBearer },
 ] as const;
 
 const ACT_DURATION = 6500;
@@ -743,7 +743,7 @@ export function SeeItWork() {
             </div>
             <div className="md:col-span-5">
               <p className="text-ink-muted leading-relaxed">
-                A treasury payment, end to end, proposed, approved, sent
+                A treasury payment, end to end: proposed, approved, sent
                 privately, audited under scope, and the bearer claim that
                 only Aegis can issue. No code, no jargon.
               </p>
