@@ -748,12 +748,20 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   ) {
     if (!wallet.publicKey || !multisigAddress) return;
 
+    // Detect invoice mode early — invoice flows only deposit into Cloak; the
+    // recipient does their own fullWithdraw at claim time. The Ed25519 guard
+    // below is only relevant for direct send paths where the operator
+    // executes fullWithdraw to draft.recipient.
+    const isInvoiceMode = !!(invoiceId ?? draft.commitmentClaim?.invoiceId);
+
     // Hard guard: Cloak relay can only deliver to Ed25519 wallets. Vault PDAs
     // (and other off-curve addresses) get accepted by the proposal flow but
     // rejected by the relay AFTER deposit, leaving SOL stuck in the shielded
     // pool. Reject here BEFORE any deposit happens, so retries don't accumulate
-    // stuck deposits in the pool.
-    if (draft.recipient) {
+    // stuck deposits in the pool. Skipped for invoice mode — `draft.recipient`
+    // there is informational (bound = recipient wallet; bearer = Curve25519
+    // stealth pubkey), not the fullWithdraw destination.
+    if (!isInvoiceMode && draft.recipient) {
       try {
         const recipientPk = new PublicKey(draft.recipient);
         if (!PublicKey.isOnCurve(recipientPk.toBuffer())) {
