@@ -228,7 +228,7 @@ export default function MembersPage({
               </div>
               <Link
                 href={`/vault/${multisig}/proposals`}
-                className="shrink-0 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
+                className="shrink-0 rounded-md bg-accent px-3 py-2 text-xs font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:bg-accent-hover hover:shadow-accent-glow"
               >
                 Open proposals
               </Link>
@@ -237,21 +237,21 @@ export default function MembersPage({
         )}
 
         {/* Desktop table */}
-        <div className="hidden md:block overflow-hidden rounded-xl border border-border bg-surface shadow-raise-1">
+        <div className="card-panel hidden overflow-hidden md:block">
           <div
             className="grid items-center gap-4 border-b border-border/50 px-6 py-3"
             style={{ gridTemplateColumns: "3rem 1fr 10rem 5rem" }}
           >
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+            <span className="text-eyebrow">
               #
             </span>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+            <span className="text-eyebrow">
               Address
             </span>
-            <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+            <span className="text-right text-eyebrow">
               Role
             </span>
-            <span className="text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+            <span className="text-right text-eyebrow">
               Actions
             </span>
           </div>
@@ -261,7 +261,7 @@ export default function MembersPage({
               return (
                 <div
                   key={addr}
-                  className="group grid items-center gap-4 px-6 py-4 transition-colors hover:bg-surface-2"
+                  className="group grid items-center gap-4 px-6 py-4 transition-aegis hover:bg-surface-2"
                   style={{ gridTemplateColumns: "3rem 1fr 10rem 5rem" }}
                 >
                   <span className="font-mono text-sm font-medium text-ink-subtle">{i + 1}</span>
@@ -287,7 +287,7 @@ export default function MembersPage({
                       type="button"
                       onClick={() => navigator.clipboard.writeText(addr)}
                       title="Copy address"
-                      className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+                      className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle transition-aegis hover:bg-surface-2 hover:text-ink"
                     >
                       <Copy className="h-3 w-3" />
                     </button>
@@ -296,7 +296,7 @@ export default function MembersPage({
                       target="_blank"
                       rel="noopener noreferrer"
                       title="View on SolanaFM"
-                      className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+                      className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle transition-aegis hover:bg-surface-2 hover:text-ink"
                     >
                       <ExternalLink className="h-3 w-3" />
                     </a>
@@ -305,7 +305,7 @@ export default function MembersPage({
                         type="button"
                         onClick={() => setRemoveTarget(addr)}
                         title="Propose removal"
-                        className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle transition-colors hover:bg-signal-danger/15 hover:text-signal-danger"
+                        className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle transition-aegis hover:bg-signal-danger/15 hover:text-signal-danger"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>
@@ -324,7 +324,7 @@ export default function MembersPage({
             return (
               <div
                 key={addr}
-                className="rounded-xl border border-border/60 bg-surface p-4 transition-colors active:bg-surface-2"
+                className="card-panel p-4 transition-aegis active:bg-surface-2"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -346,7 +346,7 @@ export default function MembersPage({
                   <button
                     type="button"
                     onClick={() => navigator.clipboard.writeText(addr)}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-medium text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink"
                   >
                     <Copy className="h-3.5 w-3.5" />
                     Copy
@@ -355,7 +355,7 @@ export default function MembersPage({
                     href={`https://solana.fm/address/${addr}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-medium text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                     View
@@ -364,7 +364,7 @@ export default function MembersPage({
                     <button
                       type="button"
                       onClick={() => setRemoveTarget(addr)}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-signal-danger/30 px-3 py-2 text-xs font-medium text-signal-danger transition-colors hover:bg-signal-danger/10"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-signal-danger/30 px-3 py-2 text-xs font-medium text-signal-danger transition-aegis hover:bg-signal-danger/10"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       Remove
@@ -385,15 +385,23 @@ export default function MembersPage({
 
       {/* Add Member modal */}
       {addModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-raise-2">
-            <h3 className="mb-1 text-base font-semibold text-ink">Add Member</h3>
-            <p className="mb-4 text-xs text-ink-muted">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-md p-4">
+          <div className="relative w-full max-w-md overflow-hidden rounded-modal border border-border bg-surface p-6 shadow-raise-2">
+            {/* Heraldic gold seal — matches the Dialog primitive */}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-accent/0 via-accent to-accent/0"
+            />
+            <p className="text-eyebrow">Add member · Config proposal</p>
+            <h3 className="mt-0.5 font-display text-xl font-semibold tracking-tight text-ink">
+              Invite signer
+            </h3>
+            <p className="mt-1.5 text-sm text-ink-muted">
               Creates a Squads config proposal. Members with signing rights will need to approve it.
             </p>
             <label
               htmlFor="new-member-address"
-              className="block text-xs font-medium text-ink-muted mb-1.5"
+              className="text-eyebrow mt-5 block"
             >
               Member wallet address
             </label>
@@ -406,15 +414,15 @@ export default function MembersPage({
                 setAddError(null);
               }}
               placeholder="Solana public key"
-              className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 font-mono text-sm text-ink placeholder-ink-subtle focus:border-accent focus:outline-none"
+              className="mt-1.5 w-full rounded-md border border-border bg-surface-2 px-3 py-2 font-mono text-sm tabular-nums text-ink placeholder-ink-subtle focus:border-accent focus:outline-none"
             />
             {addError && <p className="mt-2 text-xs text-signal-danger">{addError}</p>}
-            <div className="mt-5 flex justify-end gap-3">
+            <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setAddModalOpen(false)}
                 disabled={addLoading}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-2 disabled:opacity-40"
+                className="rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink disabled:opacity-40"
               >
                 Cancel
               </button>
@@ -422,7 +430,7 @@ export default function MembersPage({
                 type="button"
                 onClick={() => void handleAddMember()}
                 disabled={addLoading || !addAddress.trim()}
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-accent to-accent-hover px-4 py-2 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow disabled:opacity-50"
               >
                 {addLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 {addLoading ? "Creating…" : "Create proposal"}

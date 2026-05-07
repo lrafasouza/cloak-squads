@@ -104,22 +104,33 @@ export default function SwapPage({ params }: { params: Promise<{ multisig: strin
               </PanelBody>
             </Panel>
 
-            {/* Time range selector */}
-            <div className="flex items-center justify-center gap-2 px-4">
-              {[1, 7, 30].map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setChartDays(d)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                    chartDays === d
-                      ? "bg-accent-soft text-accent"
-                      : "text-ink-muted hover:bg-surface-2 hover:text-ink"
-                  }`}
-                >
-                  {d === 1 ? "1D" : d === 7 ? "7D" : "30D"}
-                </button>
-              ))}
+            {/* Time range selector — segmented toggle, mirrors slippage UI */}
+            <div className="flex items-center justify-center px-4">
+              <div
+                role="radiogroup"
+                aria-label="Chart time range"
+                className="inline-flex items-center rounded-md border border-border bg-surface-2 p-0.5"
+              >
+                {[1, 7, 30].map((d) => {
+                  const active = chartDays === d;
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setChartDays(d)}
+                      className={`inline-flex h-6 items-center rounded-[5px] px-2.5 text-[11px] font-semibold tabular-nums transition-aegis ${
+                        active
+                          ? "bg-accent text-accent-ink shadow-raise-1"
+                          : "text-ink-subtle hover:text-ink"
+                      }`}
+                    >
+                      {d === 1 ? "1D" : d === 7 ? "7D" : "30D"}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Swap History */}

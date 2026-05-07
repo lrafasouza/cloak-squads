@@ -78,7 +78,7 @@ function NewContactForm({
   }
 
   return (
-    <div className="rounded-lg border border-accent/30 bg-accent-soft/30 p-4 transition-colors">
+    <div className="rounded-list border border-accent/30 bg-accent-soft/30 p-4 transition-aegis">
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-accent">
           <BookUser className="h-4 w-4" />
@@ -87,7 +87,7 @@ function NewContactForm({
           <div>
             <label
               htmlFor="ab-new-label"
-              className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-ink-subtle"
+              className="mb-1 block text-eyebrow"
             >
               Label
             </label>
@@ -111,7 +111,7 @@ function NewContactForm({
           <div>
             <label
               htmlFor="ab-new-address"
-              className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-ink-subtle"
+              className="mb-1 block text-eyebrow"
             >
               Address
             </label>
@@ -135,7 +135,7 @@ function NewContactForm({
           <div>
             <label
               htmlFor="ab-new-notes"
-              className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-ink-subtle"
+              className="mb-1 block text-eyebrow"
             >
               Notes
             </label>
@@ -235,7 +235,7 @@ function ContactRow({
 
   if (isEditing) {
     return (
-      <div className="rounded-lg border border-accent/30 bg-accent-soft/30 p-4 transition-colors">
+      <div className="rounded-list border border-accent/30 bg-accent-soft/30 p-4 transition-aegis">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-accent">
             <BookUser className="h-4 w-4" />
@@ -244,7 +244,7 @@ function ContactRow({
             <div>
               <label
                 htmlFor={`ab-label-${entry.id}`}
-                className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-ink-subtle"
+                className="mb-1 block text-eyebrow"
               >
                 Label
               </label>
@@ -265,7 +265,7 @@ function ContactRow({
             <div>
               <label
                 htmlFor={`ab-notes-${entry.id}`}
-                className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-ink-subtle"
+                className="mb-1 block text-eyebrow"
               >
                 Notes
               </label>
@@ -307,12 +307,12 @@ function ContactRow({
   return (
     <div
       className={cn(
-        "group flex items-start gap-3 rounded-lg border border-transparent p-4 transition-colors",
+        "group flex items-start gap-3 rounded-list border border-transparent p-4 transition-aegis",
         "hover:border-border hover:bg-surface-2/50",
         removing && "opacity-50",
       )}
     >
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-ink-subtle group-hover:text-accent transition-colors">
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-ink-subtle transition-aegis group-hover:text-accent">
         <BookUser className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
@@ -330,7 +330,7 @@ function ContactRow({
         <button
           type="button"
           onClick={() => setIsEditing(true)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:bg-surface-2 hover:text-ink transition-colors"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink"
           aria-label="Edit contact"
           title="Edit contact"
         >
@@ -339,7 +339,7 @@ function ContactRow({
         <button
           type="button"
           onClick={() => onDelete(entry.id)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:bg-signal-danger/15 hover:text-signal-danger transition-colors"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted transition-aegis hover:bg-signal-danger/15 hover:text-signal-danger"
           aria-label="Delete contact"
           title="Delete contact"
         >
@@ -456,7 +456,7 @@ export default function AddressBookPage() {
                 <Skeleton className="h-[72px] w-full" />
               </div>
             ) : filtered.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border bg-bg/30 px-4 py-10 text-center">
+              <div className="rounded-panel border border-dashed border-border bg-bg/30 px-4 py-10 text-center">
                 <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-ink-subtle">
                   <BookUser className="h-5 w-5" />
                 </div>
