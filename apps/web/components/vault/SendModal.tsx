@@ -24,6 +24,7 @@ import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { solAmountToLamports } from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
+import { encryptMemo, serializeEncryptedMemo } from "@cloak-squads/core/memo-crypto";
 import { cofrePda } from "@cloak-squads/core/pda";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
 import {
@@ -32,8 +33,6 @@ import {
   createUtxo,
   generateUtxoKeypair,
 } from "@cloak.dev/sdk-devnet";
-import { encryptMemo, serializeEncryptedMemo } from "@cloak-squads/core/memo-crypto";
-import nacl from "tweetnacl";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import {
   createAssociatedTokenAccountInstruction,
@@ -45,6 +44,7 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
 import { Send } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import nacl from "tweetnacl";
 
 function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
@@ -114,15 +114,16 @@ export function SendModal({
   const [destVaultIndex, setDestVaultIndex] = useState<number | null>(null);
 
   const allAccounts = useMemo(
-    () => [
-      { vaultIndex: 0, name: "Primary" },
-      ...subVaultAccounts,
-    ],
+    () => [{ vaultIndex: 0, name: "Primary" }, ...subVaultAccounts],
     [subVaultAccounts],
   );
 
   const multisigPk = useMemo(() => {
-    try { return new PublicKey(multisig); } catch { return null; }
+    try {
+      return new PublicKey(multisig);
+    } catch {
+      return null;
+    }
   }, [multisig]);
 
   // Derive destination address when sending to another internal account
@@ -140,7 +141,10 @@ export function SendModal({
     }
   }, [selectedVaultIndex, destType, destVaultIndex]);
 
-  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig, selectedVaultIndex);
+  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(
+    multisig,
+    selectedVaultIndex,
+  );
 
   const selectedToken = useMemo(
     () => tokens.find((t) => t.mint === selectedMint) ?? tokens[0],
@@ -306,7 +310,10 @@ export function SendModal({
     });
 
     try {
-      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: selectedVaultIndex });
+      const [vaultPda] = multisigSdk.getVaultPda({
+        multisigPda: multisigAddress,
+        index: selectedVaultIndex,
+      });
 
       // Balance check
       if (isSol) {
@@ -609,7 +616,6 @@ export function SendModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6 pt-4">
-
           {/* From account — only shown when sub-vaults exist */}
           {subVaultAccounts.length > 0 && (
             <div className="flex flex-col gap-1.5">
@@ -696,13 +702,17 @@ export function SendModal({
                         setDestVaultIndex(null);
                       } else {
                         // pre-select first non-source account
-                        const firstOther = allAccounts.find((a) => a.vaultIndex !== selectedVaultIndex);
+                        const firstOther = allAccounts.find(
+                          (a) => a.vaultIndex !== selectedVaultIndex,
+                        );
                         if (firstOther) setDestVaultIndex(firstOther.vaultIndex);
                       }
                     }}
                     disabled={pending}
                     className={`rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-                      destType === t ? "bg-accent-soft text-accent" : "text-ink-muted hover:text-ink"
+                      destType === t
+                        ? "bg-accent-soft text-accent"
+                        : "text-ink-muted hover:text-ink"
                     }`}
                   >
                     {t === "external" ? "External address" : "Another account"}

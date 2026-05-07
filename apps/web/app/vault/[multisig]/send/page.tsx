@@ -188,7 +188,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
     [subVaultAccounts],
   );
 
-
   const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(
     multisig,
     selectedVaultIndex,
