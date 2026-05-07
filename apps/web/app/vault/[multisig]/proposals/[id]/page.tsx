@@ -3,10 +3,12 @@
 import { ApprovalButtons } from "@/components/proposal/ApprovalButtons";
 import type { CommitmentCheckState } from "@/components/proposal/CommitmentCheck";
 import { ExecuteButton } from "@/components/proposal/ExecuteButton";
+import { SimulatePanel } from "@/components/proposal/SimulatePanel";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/workspace";
 import { isProposalExecuted } from "@/lib/operator-execution-history";
+import { type SimulationResult, simulateProposal } from "@/lib/proposal-simulator";
 import { type ProposalStatusKind, readProposalStatus } from "@/lib/proposals";
 import { proposalCancel, proposalReject } from "@/lib/squads-sdk";
 import { detectTransactionType } from "@/lib/squads-sdk";
@@ -28,6 +30,7 @@ import {
   Copy,
   ExternalLink,
   Loader2,
+  PlayCircle,
   RefreshCw,
   Settings,
   ShieldCheck,
@@ -288,6 +291,9 @@ export default function ProposalApprovalPage({
         `Vault #${sourceVaultIndex}`);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [simResult, setSimResult] = useState<SimulationResult | null>(null);
+  const [simulating, setSimulating] = useState(false);
+  const [simError, setSimError] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -489,6 +495,28 @@ export default function ProposalApprovalPage({
       setCancelling(false);
     }
   }, [connection, wallet, multisigParam, id, status, refreshStatus, addToast, queryClient]);
+
+  const handleSimulate = useCallback(async () => {
+    if (!wallet.publicKey) {
+      setSimError("Connect a member wallet to simulate.");
+      return;
+    }
+    setSimulating(true);
+    setSimError(null);
+    try {
+      const result = await simulateProposal({
+        connection,
+        multisig: new PublicKey(multisigParam),
+        transactionIndex: BigInt(id),
+        proposer: wallet.publicKey,
+      });
+      setSimResult(result);
+    } catch (err) {
+      setSimError(err instanceof Error ? err.message : "Simulation failed.");
+    } finally {
+      setSimulating(false);
+    }
+  }, [connection, multisigParam, id, wallet.publicKey]);
 
   const approveBlocked =
     (commitmentClaim !== null && commitmentState === "mismatch") || status !== "active";
@@ -837,6 +865,14 @@ export default function ProposalApprovalPage({
               </ol>
             </div>
 
+            {/* Simulation result */}
+            {simResult && <SimulatePanel result={simResult} />}
+            {simError && !simResult && (
+              <div className="rounded-xl border border-signal-danger/30 bg-signal-danger/5 px-4 py-3 text-xs text-signal-danger">
+                {simError}
+              </div>
+            )}
+
             {/* Technical details */}
             <details className="group overflow-hidden rounded-xl border border-border bg-surface">
               <summary className="flex cursor-pointer items-center justify-between px-5 py-3.5 text-sm text-ink-muted transition-colors hover:text-ink">
@@ -892,6 +928,31 @@ export default function ProposalApprovalPage({
                 rejectedVoters={rejectedVoters}
               />
             </div>
+
+            {/* Simulate — vault txs only, hidden once executed */}
+            {transactionType === "vault" && status !== "executed" && status !== "cancelled" && (
+              <div className="rounded-xl border border-border bg-surface p-5 shadow-raise-1">
+                <h2 className="mb-2 text-sm font-semibold text-ink">Preview</h2>
+                <p className="mb-3 text-xs text-ink-muted">
+                  Run the proposal against an RPC node to see balance changes and surface errors
+                  before approving.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={simulating || !wallet.publicKey}
+                  onClick={() => void handleSimulate()}
+                >
+                  {simulating ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <PlayCircle className="mr-2 h-4 w-4" />
+                  )}
+                  {simulating ? "Simulating…" : simResult ? "Re-simulate" : "Simulate"}
+                </Button>
+              </div>
+            )}
 
             {/* Vote */}
             <div className="rounded-xl border border-border bg-surface p-5 shadow-raise-1">
