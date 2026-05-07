@@ -1,20 +1,38 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import {
-  DetailRow,
   InlineAlert,
   ProgressBar,
   StatusPill,
-  WorkspaceHeader,
   WorkspacePage,
 } from "@/components/ui/workspace";
-import { ShieldX } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  History,
+  Inbox,
+  Key,
+  Send,
+  ShieldCheck,
+  ShieldX,
+  Users,
+  X as XIcon,
+} from "lucide-react";
 
+import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ReceiptRow } from "@/components/ui/receipt-row";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { truncateAddress } from "@/lib/proposals";
+import { cn } from "@/lib/utils";
 
 import { ensureCircuitsProxy, prefetchCircuits } from "@/lib/cloak-circuits-proxy";
 import { translateCloakProgress } from "@/lib/cloak-progress";
@@ -378,6 +396,10 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const [error, setError] = useState<string | null>(null);
   const [loadedDraft, setLoadedDraft] = useState<SingleDraft | null>(null);
   const [payrollDraft, setPayrollDraft] = useState<PayrollDraft | null>(null);
+  // True while fetching a draft (click on inbox row OR URL deeplink).
+  // Detail panel renders a skeleton while this is true so the operator
+  // sees a deliberate "loading" state instead of stale data or a blank.
+  const [draftLoading, setDraftLoading] = useState(false);
   const [registeredOperator, setRegisteredOperator] = useState<string | null>(null);
   const [cofreMissing, setCofreMissing] = useState(false);
   const [operatorBalanceLamports, setOperatorBalanceLamports] = useState<number | null>(null);
@@ -441,6 +463,14 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   }, [loadedDraft]);
 
   const queueDrafts = useMemo(() => {
+    // Operator's queue must INCLUDE proposals whose status is "executed" —
+    // that's the exact moment when the operator becomes the next signer:
+    // multisig has run vaultTransactionExecute, but the Cloak shielded
+    // delivery hasn't fired yet. We only hide an executed item once the
+    // operator has run their step (tracked locally in executedMap).
+    //
+    // We still hide rejected/cancelled (dead proposals) and "executing"
+    // (transient state during the multisig submit).
     return pendingDrafts
       .map((d) => {
         const proposal = proposals.find((p) => p.transactionIndex === d.transactionIndex);
@@ -450,7 +480,6 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         (d) =>
           d.proposalStatus !== "rejected" &&
           d.proposalStatus !== "cancelled" &&
-          d.proposalStatus !== "executed" &&
           d.proposalStatus !== "executing" &&
           !executedMap[d.transactionIndex],
       );
@@ -645,6 +674,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     setExecutionSteps([]);
     setPayrollComplete(false);
     setLicenseStatus("idle");
+    setDraftLoading(true);
 
     try {
       // Try single draft first (fall back to non-sensitive view if wallet is not the operator)
@@ -654,6 +684,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       if (singleResponse.ok) {
         const draft = (await singleResponse.json()) as SingleDraft;
         setLoadedDraft(draft);
+        setDraftLoading(false);
         void checkOnChainStatus(txIndex, draft);
         return;
       }
@@ -665,6 +696,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       if (payrollResponse.ok) {
         const draft = (await payrollResponse.json()) as PayrollDraft;
         setPayrollDraft(draft);
+        setDraftLoading(false);
         setExecutionSteps(draft.recipients.map((_, i) => ({ index: i, status: "pending" })));
         void checkOnChainStatus(txIndex, draft);
         return;
@@ -675,6 +707,8 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load proposal draft.");
+    } finally {
+      setDraftLoading(false);
     }
   }
 
@@ -1443,6 +1477,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
   const hasDeficit = deficitLamports > 0n;
 
   const [helpOpen, setHelpOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const executionState = getOperatorExecutionState({
     hasDraft: !!(loadedDraft || payrollDraft),
@@ -1570,80 +1605,144 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
   return (
     <WorkspacePage>
-      <div className="space-y-8">
-        <WorkspaceHeader
-          eyebrow="Operator"
-          title="Execution queue"
-          description="Run private transfers after the vault has approved them. Load an approved proposal, review the intent, then execute."
-          action={
-            <div className="flex items-center gap-2">
-              <StatusPill tone="accent">{queueDrafts.length} ready</StatusPill>
-              <button
-                type="button"
-                onClick={() => setHelpOpen(true)}
-                className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-surface-2 text-xs font-bold text-ink-subtle transition-aegis hover:border-border-strong hover:text-ink"
-                aria-label="How operator budget works"
-              >
-                ?
-              </button>
+      <div className="space-y-6">
+        {/* ── Hero · Identity-locked operator card ──
+            Single-keyholder surfaces lead with "who you are right now"
+            (Fireblocks / Coinbase Custody pattern). Æ watermark + Fraunces
+            title position the page as a private-bank signing console. */}
+        <section className="card-hero relative">
+          <HeraldicWatermark size={300} opacity={0.04} />
+          <div className="relative flex flex-col gap-4 p-6 md:flex-row md:items-center md:gap-6 md:p-7">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-accent/40 bg-accent-soft text-accent shadow-raise-1">
+              <Key className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
             </div>
-          }
-        />
-
-        {/* Minimal stats bar */}
-        <div className="flex flex-wrap items-center gap-6 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-ink-muted">Balance</span>
-            <span className={`font-semibold ${hasDeficit ? "text-signal-danger" : "text-ink"}`}>
-              {operatorBalanceLoading
-                ? "..."
-                : operatorBalanceLamports === null
-                  ? "-"
-                  : `${lamportsToSol(operatorBalanceLamports)} SOL`}
-            </span>
-          </div>
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-2">
-            <span className="text-ink-muted">Needed</span>
-            <span className="font-semibold text-ink">
-              {totalNeededLamports > 0n ? `${lamportsToSol(totalNeededLamports)} SOL` : "-"}
-            </span>
-          </div>
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-2">
-            <span className="text-ink-muted">Vault</span>
-            <span className={`font-semibold ${cofreMissing ? "text-signal-warn" : "text-accent"}`}>
-              {cofreMissing ? "Needs setup" : "Ready"}
-            </span>
-          </div>
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-2">
-            <span className="text-ink-muted">Queue</span>
-            <span className="font-semibold text-ink">{queueDrafts.length}</span>
-          </div>
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-2">
-            <span className="text-ink-muted">Wallet</span>
-            <span
-              className={`font-semibold ${operatorMismatch ? "text-signal-danger" : "text-accent"}`}
+            <div className="min-w-0 flex-1">
+              <p className="text-eyebrow">
+                Operator · Designated Signer
+              </p>
+              <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink md:text-3xl">
+                {operatorMismatch
+                  ? "View-only · not the registered operator"
+                  : "You hold the vault key"}
+              </h1>
+              <p className="mt-1.5 font-mono text-xs tabular-nums text-ink-muted">
+                {registeredOperator ? truncateAddress(registeredOperator) : "No operator registered"}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 self-start md:self-auto">
+              {executionHistory.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setHistoryOpen(true)}
+                  className="text-eyebrow inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-aegis hover:bg-surface-2 hover:text-ink"
+                  aria-label="Open recent"
+                >
+                  <History className="h-3 w-3" aria-hidden="true" />
+                  Recent · {executionHistory.length}
+                </button>
+              )}
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              className="text-eyebrow inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-aegis hover:bg-surface-2 hover:text-ink"
+              aria-label="How operator budget works"
             >
-              {operatorMismatch ? "Mismatch" : "Matched"}
-            </span>
+              <ChevronRight className="h-3 w-3" aria-hidden="true" />
+              How this works
+            </button>
+            </div>
+          </div>
+        </section>
+
+        {/* ── KPI strip · 3 numbers ──
+            Awaiting · Value parked · Operator balance. Wormhole/Fireblocks
+            relayer dashboards lead with queue-depth + value-at-risk. */}
+        <div className="grid gap-3 lg:grid-cols-3">
+          <div className="card-panel relative p-5">
+            <div className="flex items-center gap-1.5 text-eyebrow">
+              <Inbox className="h-3 w-3" aria-hidden="true" />
+              Awaiting my key
+            </div>
+            <p className="mt-2.5 font-display text-3xl font-semibold tabular-nums tracking-tight text-ink">
+              {queueDrafts.length}
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">
+              {queueDrafts.length === 0
+                ? "Queue is calm."
+                : queueDrafts.length === 1
+                  ? "1 license to release."
+                  : `${queueDrafts.length} licenses to release.`}
+            </p>
+          </div>
+
+          <div
+            className={cn(
+              "card-panel relative p-5",
+              hasDeficit && "border-signal-danger/30",
+            )}
+          >
+            <div className="flex items-center gap-1.5 text-eyebrow">
+              <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+              Value to release
+            </div>
+            <p className="mt-2.5 font-display text-3xl font-semibold tabular-nums tracking-tight text-ink">
+              {totalNeededLamports > 0n ? lamportsToSol(totalNeededLamports) : "0"}
+              <span className="ml-1.5 text-sm font-medium text-ink-subtle">SOL</span>
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">
+              {hasDeficit
+                ? `Operator short ${lamportsToSol(deficitLamports)} SOL`
+                : "Funded by vault on proposal creation."}
+            </p>
+          </div>
+
+          <div className="card-panel relative p-5">
+            <div className="flex items-center gap-1.5 text-eyebrow">
+              <Key className="h-3 w-3" aria-hidden="true" />
+              Operator balance
+            </div>
+            <p
+              className={cn(
+                "mt-2.5 font-display text-3xl font-semibold tabular-nums tracking-tight",
+                hasDeficit ? "text-signal-danger" : "text-ink",
+              )}
+            >
+              {operatorBalanceLoading
+                ? "…"
+                : operatorBalanceLamports === null
+                  ? "—"
+                  : lamportsToSol(operatorBalanceLamports)}
+              {operatorBalanceLamports !== null && !operatorBalanceLoading && (
+                <span className="ml-1.5 text-sm font-medium text-ink-subtle">SOL</span>
+              )}
+            </p>
+            <p
+              className={cn(
+                "mt-1 text-xs",
+                cofreMissing
+                  ? "text-signal-warn"
+                  : lowOperatorSol
+                    ? "text-signal-warn"
+                    : "text-ink-muted",
+              )}
+            >
+              {cofreMissing
+                ? "Vault privacy not initialized."
+                : lowOperatorSol
+                  ? "Add SOL for network fees."
+                  : "Funded for network fees."}
+            </p>
           </div>
         </div>
 
-        {hasDeficit && !operatorBalanceLoading && (
-          <InlineAlert tone="warning">
-            Insufficient operator balance. Need{" "}
-            <span className="font-semibold">{lamportsToSol(deficitLamports)} SOL</span> more to
-            execute all pending transfers. The vault funds the operator automatically when proposals
-            are created.
-          </InlineAlert>
-        )}
+        {/* Consolidated alert callout — only when the connected wallet is
+            the wrong one, since the wrong-wallet guard above usually
+            covers this; this surfaces the tail-case where membership
+            check passed but operator role didn't. */}
         {operatorMismatch && wallet.publicKey ? (
           <InlineAlert tone="warning">
             <div className="space-y-1">
-              <div>
+              <div className="font-medium">
                 The connected wallet is not the registered operator. Switch wallets before
                 executing.
               </div>
@@ -1662,346 +1761,340 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             </div>
           </InlineAlert>
         ) : null}
-        {lowOperatorSol && !hasDeficit ? (
-          <InlineAlert tone="warning">
-            Add a little SOL to the operator wallet for network fees.
-          </InlineAlert>
-        ) : null}
-        {cofreMissing ? (
-          <InlineAlert tone="warning">
-            Private vault is not ready yet. Finish the vault setup proposal before running private
-            transfers.
-          </InlineAlert>
-        ) : null}
 
-        {/* Main execution card */}
-        <div className="card-panel overflow-hidden">
-          {!loadedDraft && !payrollDraft ? (
-            <>
-              <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                <div>
-                  <h2 className="text-sm font-semibold text-ink">Execution queue</h2>
-                  <p className="text-xs text-ink-muted">
-                    Load an approved proposal to execute the private transfer.
-                  </p>
+        {/* ── Master / detail · Inbox left, detail right (lg+) ──
+            Single-keyholder triage pattern: list reads like a high-stakes
+            inbox, not a database table. Detail panel sticks on scroll so
+            the operator can review long memos without losing context.
+            On mobile the inbox hides while a draft is loaded so the
+            review surface owns the screen. */}
+        <div className="grid gap-4 lg:grid-cols-12">
+          {/* INBOX column */}
+          <div className="lg:col-span-5 lg:flex">
+            {queueDrafts.length === 0 ? (
+              /* Calm empty state — flex h-full to match the detail column's
+                  placeholder card height; visual parity left ↔ right */
+              <div className="card-panel flex h-full w-full flex-col items-center justify-center px-6 py-12 text-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface-2 text-ink-subtle">
+                  <Inbox className="h-5 w-5" aria-hidden="true" />
                 </div>
-                <div className="flex items-end gap-2">
-                  <div>
-                    <Label htmlFor="txIndex" className="text-xs">
-                      Proposal #
-                    </Label>
-                    <Input
-                      id="txIndex"
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      autoComplete="off"
-                      value={txIndex}
-                      onChange={(e) => setTxIndex(e.target.value)}
-                      placeholder="4"
-                      className="mt-1 w-24 font-mono"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => void loadDraft()}
-                    disabled={!txIndex}
-                    className="mt-1"
-                  >
-                    Load
-                  </Button>
-                </div>
+                <p className="mt-4 text-eyebrow">All clear</p>
+                <h3 className="mt-1 font-display text-xl font-semibold tracking-tight text-ink">
+                  Vault is calm
+                </h3>
+                <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-ink-muted">
+                  {executionHistory.length > 0
+                    ? `${executionHistory.length} licenses sealed in recent history.`
+                    : "When the vault approves a private proposal, it shows up here for your key."}
+                </p>
               </div>
-
-              {queueDrafts.length === 0 ? (
-                <div className="py-16 text-center">
-                  <p className="text-sm text-ink-muted">No pending drafts</p>
-                  <p className="mt-1 text-xs text-ink-subtle">
-                    Approved proposals will appear here.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {/* Desktop table */}
-                  <div className="hidden md:block">
-                    <div
-                      className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
-                      style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 6rem 5rem" }}
-                    >
-                      <span className="text-eyebrow">
-                        #
-                      </span>
-                      <span className="text-eyebrow">
-                        Type
-                      </span>
-                      <span className="text-eyebrow">
-                        Details
-                      </span>
-                      <span className="text-right text-eyebrow">
-                        Amount
-                      </span>
-                      <span className="text-right text-eyebrow">
-                        Status
-                      </span>
-                      <span />
-                    </div>
-                    <div className="divide-y divide-border/40">
-                      {queueDrafts.map((d) => (
-                        <div
-                          key={d.id}
-                          className="grid items-center gap-4 px-5 py-3"
-                          style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 6rem 5rem" }}
-                        >
-                          <span className="font-mono text-sm text-ink-subtle">
-                            #{d.transactionIndex}
-                          </span>
-                          <span
-                            className={`inline-flex w-fit items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
-                              d.type === "payroll"
-                                ? "bg-accent-soft text-accent"
-                                : "bg-surface-2 text-ink-muted"
-                            }`}
-                          >
-                            {d.type.toUpperCase()}
-                          </span>
-                          <p className="truncate text-sm text-ink">
-                            {d.type === "payroll"
-                              ? `${d.recipientCount ?? 0} recipients`
-                              : d.recipient
-                                ? `${d.recipient.slice(0, 8)}...${d.recipient.slice(-8)}`
-                                : "Transfer"}
-                          </p>
-                          <p className="text-right font-mono text-sm text-ink">
-                            {formatRawAmount(
-                              d.type === "payroll" ? (d.totalAmount ?? d.amount) : d.amount,
-                              d.invariants?.tokenMint ?? SOL_MINT,
-                            )}
-                          </p>
-                          <div className="flex items-center justify-end gap-1.5">
-                            <span
-                              className={`h-1.5 w-1.5 rounded-full ${statusDot((d as unknown as { proposalStatus?: string }).proposalStatus ?? "unknown")}`}
-                            />
-                            <span className="text-xs text-ink-muted">
-                              {statusLabel(
-                                (d as unknown as { proposalStatus?: string }).proposalStatus ??
-                                  "unknown",
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex justify-end">
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              className="text-xs px-2 py-1 h-auto"
-                              onClick={() => {
-                                setTxIndex(d.transactionIndex);
-                                void (async () => {
-                                  setLoadedDraft(null);
-                                  setPayrollDraft(null);
-                                  setError(null);
-                                  setSignature(null);
-                                  setExecutionSteps([]);
-                                  try {
-                                    const singleResponse = await fetchDraftWithFallback(
-                                      `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
-                                    );
-                                    if (singleResponse.ok) {
-                                      const draft = (await singleResponse.json()) as SingleDraft;
-                                      setLoadedDraft(draft);
-                                      void checkOnChainStatus(d.transactionIndex, draft);
-                                      return;
-                                    }
-                                    const payrollResponse = await fetchDraftWithFallback(
-                                      `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
-                                    );
-                                    if (payrollResponse.ok) {
-                                      const draft = (await payrollResponse.json()) as PayrollDraft;
-                                      setPayrollDraft(draft);
-                                      setExecutionSteps(
-                                        draft.recipients.map((_, i) => ({
-                                          index: i,
-                                          status: "pending",
-                                        })),
-                                      );
-                                      void checkOnChainStatus(d.transactionIndex, draft);
-                                      return;
-                                    }
-                                    setError(
-                                      `No persisted draft found for proposal #${d.transactionIndex}.`,
-                                    );
-                                  } catch (caught) {
-                                    setError(
-                                      caught instanceof Error
-                                        ? caught.message
-                                        : "Could not load proposal draft.",
-                                    );
-                                  }
-                                })();
-                              }}
-                            >
-                              Load
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+            ) : (
+              <div className="card-panel overflow-hidden">
+                {/* Header — visually parallels the active-draft header on
+                    the right column */}
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 px-5 py-4">
+                  <div>
+                    <p className="text-eyebrow">Inbox · awaiting key</p>
+                    <h2 className="mt-0.5 font-display text-lg font-semibold tracking-tight text-ink">
+                      {queueDrafts.length}{" "}
+                      {queueDrafts.length === 1 ? "license" : "licenses"} to release
+                    </h2>
                   </div>
-
-                  {/* Mobile cards */}
-                  <div className="md:hidden p-3 space-y-3">
-                    {queueDrafts.map((d) => (
-                      <div
-                        key={d.id}
-                        className="card-panel p-4 transition-aegis active:bg-surface-2"
+                </div>
+                <ul className="divide-y divide-border/50">
+                  {queueDrafts.map((d) => {
+                  const isLoaded = Boolean(loadedDraft || payrollDraft);
+                  const isSelected = isLoaded && txIndex === d.transactionIndex;
+                  const isPayrollDraft = d.type === "payroll";
+                  const proposalStatus =
+                    (d as unknown as { proposalStatus?: string }).proposalStatus ?? "unknown";
+                  return (
+                    <li key={d.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Skip the round-trip if we're already on this draft.
+                          if (txIndex === d.transactionIndex && (loadedDraft || payrollDraft)) {
+                            return;
+                          }
+                          setTxIndex(d.transactionIndex);
+                          setError(null);
+                          setSignature(null);
+                          setExecutionSteps([]);
+                          // Surface the skeleton immediately so the operator
+                          // sees a deliberate "loading" state rather than the
+                          // previous draft's stale data while we fetch.
+                          setLoadedDraft(null);
+                          setPayrollDraft(null);
+                          setDraftLoading(true);
+                          void (async () => {
+                            try {
+                              const singleResponse = await fetchDraftWithFallback(
+                                `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
+                              );
+                              if (singleResponse.ok) {
+                                const draft = (await singleResponse.json()) as SingleDraft;
+                                setPayrollDraft(null);
+                                setLoadedDraft(draft);
+                                void checkOnChainStatus(d.transactionIndex, draft);
+                                return;
+                              }
+                              const payrollResponse = await fetchDraftWithFallback(
+                                `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
+                              );
+                              if (payrollResponse.ok) {
+                                const draft = (await payrollResponse.json()) as PayrollDraft;
+                                setLoadedDraft(null);
+                                setPayrollDraft(draft);
+                                setExecutionSteps(
+                                  draft.recipients.map((_, i) => ({
+                                    index: i,
+                                    status: "pending",
+                                  })),
+                                );
+                                void checkOnChainStatus(d.transactionIndex, draft);
+                                return;
+                              }
+                              setError(
+                                `No persisted draft found for proposal #${d.transactionIndex}.`,
+                              );
+                            } catch (caught) {
+                              setError(
+                                caught instanceof Error
+                                  ? caught.message
+                                  : "Could not load proposal draft.",
+                              );
+                            } finally {
+                              setDraftLoading(false);
+                            }
+                          })();
+                        }}
+                        className={cn(
+                          "group flex w-full items-center gap-3 px-4 py-3.5 text-left transition-aegis",
+                          isSelected
+                            ? "bg-accent-soft/40 ring-1 ring-inset ring-accent/30"
+                            : "hover:bg-surface-2",
+                        )}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-mono text-xs text-ink-subtle">
-                                #{d.transactionIndex}
-                              </span>
-                              <span
-                                className={`inline-flex w-fit items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
-                                  d.type === "payroll"
-                                    ? "bg-accent-soft text-accent"
-                                    : "bg-surface-2 text-ink-muted"
-                                }`}
-                              >
-                                {d.type.toUpperCase()}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-sm text-ink">
-                              {d.type === "payroll"
-                                ? `${d.recipientCount ?? 0} recipients`
-                                : d.recipient
-                                  ? `${d.recipient.slice(0, 8)}...${d.recipient.slice(-8)}`
-                                  : "Transfer"}
-                            </p>
-                            <p className="mt-0.5 font-mono text-xs text-ink-muted">
+                        <div
+                          className={cn(
+                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-aegis",
+                            isSelected
+                              ? "bg-accent text-accent-ink shadow-raise-1"
+                              : "bg-surface-2 text-ink-subtle group-hover:text-ink",
+                          )}
+                        >
+                          {isPayrollDraft ? (
+                            <Users className="h-4 w-4" aria-hidden="true" />
+                          ) : (
+                            <Send className="h-4 w-4" aria-hidden="true" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <p className="truncate font-display text-base font-semibold tabular-nums tracking-tight text-ink">
                               {formatRawAmount(
-                                d.type === "payroll" ? (d.totalAmount ?? d.amount) : d.amount,
+                                isPayrollDraft ? (d.totalAmount ?? d.amount) : d.amount,
                                 d.invariants?.tokenMint ?? SOL_MINT,
                               )}
                             </p>
-                            <div className="mt-1 flex items-center gap-1.5">
-                              <span
-                                className={`h-1.5 w-1.5 rounded-full ${statusDot((d as unknown as { proposalStatus?: string }).proposalStatus ?? "unknown")}`}
-                              />
-                              <span className="text-xs text-ink-muted">
-                                {statusLabel(
-                                  (d as unknown as { proposalStatus?: string }).proposalStatus ??
-                                    "unknown",
-                                )}
-                              </span>
-                            </div>
+                            <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-subtle">
+                              #{d.transactionIndex}
+                            </span>
                           </div>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            className="shrink-0 text-xs px-2 py-1 h-auto"
-                            onClick={() => {
-                              setTxIndex(d.transactionIndex);
-                              void (async () => {
-                                setLoadedDraft(null);
-                                setPayrollDraft(null);
-                                setError(null);
-                                setSignature(null);
-                                setExecutionSteps([]);
-                                try {
-                                  const singleResponse = await fetchDraftWithFallback(
-                                    `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
-                                  );
-                                  if (singleResponse.ok) {
-                                    const draft = (await singleResponse.json()) as SingleDraft;
-                                    setLoadedDraft(draft);
-                                    void checkOnChainStatus(d.transactionIndex, draft);
-                                    return;
-                                  }
-                                  const payrollResponse = await fetchDraftWithFallback(
-                                    `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
-                                  );
-                                  if (payrollResponse.ok) {
-                                    const draft = (await payrollResponse.json()) as PayrollDraft;
-                                    setPayrollDraft(draft);
-                                    setExecutionSteps(
-                                      draft.recipients.map((_, i) => ({
-                                        index: i,
-                                        status: "pending",
-                                      })),
-                                    );
-                                    void checkOnChainStatus(d.transactionIndex, draft);
-                                    return;
-                                  }
-                                  setError(
-                                    `No persisted draft found for proposal #${d.transactionIndex}.`,
-                                  );
-                                } catch (caught) {
-                                  setError(
-                                    caught instanceof Error
-                                      ? caught.message
-                                      : "Could not load proposal draft.",
-                                  );
-                                }
-                              })();
-                            }}
-                          >
-                            Load
-                          </Button>
+                          <p className="mt-0.5 truncate font-mono text-xs text-ink-muted">
+                            {isPayrollDraft
+                              ? `${d.recipientCount ?? 0} recipients`
+                              : d.recipient
+                                ? truncateAddress(d.recipient)
+                                : "Transfer"}
+                          </p>
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <span
+                              className={cn(
+                                "h-1.5 w-1.5 rounded-full",
+                                statusDot(proposalStatus),
+                              )}
+                            />
+                            <span className="text-[10px] uppercase tracking-eyebrow text-ink-subtle">
+                              {statusLabel(proposalStatus)}
+                            </span>
+                            {isPayrollDraft && (
+                              <span className="rounded-[3px] bg-accent-soft px-1 py-0.5 text-[9px] font-semibold uppercase tracking-eyebrow text-accent">
+                                Payroll
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                        <ChevronRight
+                          className={cn(
+                            "h-4 w-4 shrink-0 transition-aegis",
+                            isSelected
+                              ? "text-accent"
+                              : "text-ink-subtle group-hover:translate-x-0.5 group-hover:text-ink",
+                          )}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    </li>
+                  );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* DETAIL column */}
+          <div className="lg:col-span-7 lg:flex">
+            {/* Sticky on lg+ so the operator can scroll long memos / payroll
+                tables while the inbox stays in place. */}
+            <div className="w-full lg:sticky lg:top-6">
+              {draftLoading ? (
+                /* Skeleton — mirrors the active-draft layout so swapping
+                    in real data feels seamless. shimmer-bg from globals.css
+                    drives the subtle animated wash. */
+                <div className="card-panel overflow-hidden">
+                  <div className="border-b border-border/60 px-6 py-4">
+                    <div className="h-3 w-40 shimmer-bg rounded" />
+                    <div className="mt-2 h-5 w-56 shimmer-bg rounded" />
                   </div>
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                <div>
-                  <h2 className="text-sm font-semibold text-ink">Proposal #{txIndex}</h2>
-                  <p className="text-xs text-ink-muted">
-                    {isPayroll
-                      ? `${payrollDraft?.recipientCount} recipients`
-                      : formatRawAmount(
-                          loadedDraft?.amount ?? "0",
-                          loadedDraft?.invariants.tokenMint ?? SOL_MINT,
-                        )}
+                  <div className="space-y-5 p-6">
+                    <div>
+                      <div className="h-3 w-32 shimmer-bg rounded" />
+                      <div className="mt-2 h-10 w-48 shimmer-bg rounded" />
+                    </div>
+                    <div className="rounded-list border border-border/60 bg-bg/40 p-4 space-y-2">
+                      <div className="h-3.5 w-full shimmer-bg rounded" />
+                      <div className="h-3.5 w-3/4 shimmer-bg rounded" />
+                      <div className="h-3.5 w-2/3 shimmer-bg rounded" />
+                    </div>
+                    <div className="rounded-list border border-border/60 bg-bg/40 p-4">
+                      <div className="h-3 w-36 shimmer-bg rounded" />
+                      <div className="mt-3 space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows
+                          <div key={i} className="flex items-center gap-2.5">
+                            <div className="h-4 w-4 shrink-0 rounded-full shimmer-bg" />
+                            <div className="h-3.5 flex-1 shimmer-bg rounded" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="h-11 w-full shimmer-bg rounded-md" />
+                  </div>
+                </div>
+              ) : !loadedDraft && !payrollDraft ? (
+                <div className="card-panel hidden h-full flex-col items-center justify-center px-6 py-12 text-center lg:flex">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-surface-2 text-ink-subtle">
+                    <Inbox className="h-6 w-6" aria-hidden="true" />
+                  </div>
+                  <p className="mt-4 text-eyebrow">No license selected</p>
+                  <h3 className="mt-1 font-display text-lg font-semibold tracking-tight text-ink">
+                    Pick a license to review
+                  </h3>
+                  <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-ink-muted">
+                    Select an item from the inbox to see the full intent and pre-sign verification
+                    before you release.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoadedDraft(null);
-                    setPayrollDraft(null);
-                    setTxIndex("");
-                    setError(null);
-                    setSignature(null);
-                    setCloakSignature(null);
-                    setWithdrawSignature(null);
-                    setExecutionSteps([]);
-                  }}
-                  className="text-xs font-semibold text-accent transition-aegis hover:text-accent-hover"
-                >
-                  Back to queue
-                </button>
-              </div>
-              <div className="p-5 space-y-5">
-                {/* Transfer details / Payroll table */}
-                {loadedDraft && !isPayroll && (
-                  <dl className="grid gap-2 text-sm">
-                    <DetailRow
-                      label="Amount"
-                      value={formatRawAmount(loadedDraft.amount, loadedDraft.invariants.tokenMint)}
-                    />
-                    <DetailRow label="Recipient" value={loadedDraft.recipient} mono />
-                    {decryptedMemo && <DetailRow label="Memo" value={decryptedMemo} />}
-                    {loadedDraft.memoCiphertext && !decryptedMemo && (
-                      <DetailRow label="Memo" value="[encrypted memo]" />
+              ) : (
+                <div className="card-panel relative overflow-hidden">
+                  {/* Active-draft header — visually mirrors the inbox
+                      header on the left column for alignment */}
+                  <div className="border-b border-border/60 px-6 py-4">
+                    <p className="text-eyebrow">
+                      Proposal #{txIndex} · {isPayroll ? "Payroll" : "Single transfer"}
+                    </p>
+                    <h2 className="mt-0.5 truncate font-display text-lg font-semibold tracking-tight text-ink">
+                      {isPayroll
+                        ? `${payrollDraft?.recipientCount} recipients`
+                        : "Review · sign · release"}
+                    </h2>
+                  </div>
+
+                  <div className="space-y-5 p-6">
+                    {/* HERO AMOUNT — single transfer */}
+                    {loadedDraft && !isPayroll && (
+                      <div>
+                        <p className="text-eyebrow">Amount to release</p>
+                        <p className="mt-1 font-display text-4xl font-semibold tabular-nums tracking-tight text-ink md:text-5xl">
+                          {formatRawAmount(
+                            loadedDraft.amount,
+                            loadedDraft.invariants.tokenMint,
+                          )}
+                        </p>
+                      </div>
                     )}
-                    <DetailRow label="Status" value={proposalStatusMessage ?? "Ready to execute"} />
-                  </dl>
-                )}
+
+                    {/* RECEIPT — single transfer */}
+                    {loadedDraft && !isPayroll && (
+                      <div className="rounded-list border border-border/60 bg-bg/40 px-4 py-3">
+                        <ReceiptRow label="To">
+                          {truncateAddress(loadedDraft.recipient)}
+                        </ReceiptRow>
+                        {decryptedMemo && (
+                          <ReceiptRow label="Memo" mono={false}>
+                            {decryptedMemo}
+                          </ReceiptRow>
+                        )}
+                        {loadedDraft.memoCiphertext && !decryptedMemo && (
+                          <ReceiptRow label="Memo" mono={false} tone="muted">
+                            [encrypted memo]
+                          </ReceiptRow>
+                        )}
+                        <ReceiptRow label="Status" mono={false} tone="muted">
+                          {proposalStatusMessage ?? "Ready to execute"}
+                        </ReceiptRow>
+                      </div>
+                    )}
+
+                    {/* PRE-SIGN SAFETY STRIP — verifies the operator can
+                        actually release before the wallet prompt fires.
+                        Squads / ChainSecurity recommend a pre-execute
+                        verification surface — this is ours. */}
+                    {loadedDraft && !isPayroll && (
+                      <div className="rounded-list border border-border/60 bg-bg/40 px-4 py-3">
+                        <p className="text-eyebrow mb-2.5">Pre-sign verification</p>
+                        <ul className="space-y-1.5">
+                          {[
+                            { label: "Vault privacy initialized", passed: !cofreMissing },
+                            { label: "Operator funded for fees", passed: !lowOperatorSol },
+                            {
+                              label: "Connected wallet matches operator",
+                              passed: !operatorMismatch,
+                            },
+                            { label: "License ready to execute", passed: canExecute },
+                          ].map((check) => (
+                            <li
+                              key={check.label}
+                              className="flex items-center gap-2.5 text-sm"
+                            >
+                              <span
+                                className={cn(
+                                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
+                                  check.passed
+                                    ? "bg-accent text-accent-ink"
+                                    : "bg-surface-2 text-ink-subtle",
+                                )}
+                              >
+                                {check.passed ? (
+                                  <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                                ) : (
+                                  <XIcon className="h-2.5 w-2.5" strokeWidth={3} />
+                                )}
+                              </span>
+                              <span
+                                className={cn(
+                                  check.passed ? "text-ink" : "text-ink-muted",
+                                )}
+                              >
+                                {check.label}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                 {isPayroll && payrollDraft && (
                   <div>
@@ -2077,25 +2170,37 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   </div>
                 )}
 
-                {/* Execute form — hidden after successful single or payroll execution */}
+                {/* Execute form — hidden after successful single or payroll execution.
+                    Sign & Release is the brand-forward primary CTA: gold
+                    gradient + accent-glow on hover, Lock icon to reinforce
+                    that this is the shielded delivery step. */}
                 {!signature && !payrollComplete && (
-                  <form onSubmit={execute} className="space-y-2">
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="submit" disabled={!canExecute}>
+                  <form onSubmit={execute} className="space-y-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <button
+                        type="submit"
+                        disabled={!canExecute}
+                        className={cn(
+                          "inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold transition-aegis",
+                          "bg-gradient-to-r from-accent to-accent-hover text-accent-ink shadow-raise-1 hover:shadow-accent-glow",
+                          "disabled:cursor-not-allowed disabled:opacity-50",
+                        )}
+                      >
+                        <ShieldCheck className="h-4 w-4" strokeWidth={2.25} aria-hidden="true" />
                         {pending
                           ? isPayroll
                             ? "Executing batch…"
-                            : "Executing…"
+                            : "Sealing license…"
                           : isPayroll
-                            ? "Execute batch"
-                            : "Execute transfer"}
-                      </Button>
+                            ? `Sign & release batch · ${payrollDraft?.recipientCount ?? 0}`
+                            : "Sign & release"}
+                      </button>
                       {loadedDraft &&
                         !isPayroll &&
                         (licenseStatus === "active" || licenseStatus === "expired") && (
                           <Button
                             type="button"
-                            variant="secondary"
+                            variant="outline"
                             onClick={() => {
                               setRefundError(null);
                               setRefundConfirmOpen(true);
@@ -2175,10 +2280,18 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   </div>
                 )}
 
-                {/* Latest confirmed transactions (single transfer) */}
+                {/* Latest confirmed transactions (single transfer) — calm
+                    success ribbon. Each signature gets a receipt-style row
+                    with eyebrow label, mono signature, and Explorer link. */}
                 {!isPayroll && (cloakSignature || signature || withdrawSignature) && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-ink">Latest confirmed transactions</p>
+                  <div className="rounded-list border border-accent/25 bg-accent-soft/30 px-4 py-3.5">
+                    <div className="mb-2.5 flex items-center gap-2">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-ink">
+                        <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
+                      </div>
+                      <p className="text-eyebrow text-accent">Released · Confirmed on chain</p>
+                    </div>
+                    <div className="space-y-1.5">
                     {[
                       cloakSignature ? { label: "Cloak deposit", value: cloakSignature } : null,
                       withdrawSignature
@@ -2190,107 +2303,116 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                       .map((item) => (
                         <div
                           key={item.label}
-                          className="flex flex-col gap-2 rounded-md border border-border bg-bg px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                          className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between"
                         >
-                          <dt className="text-sm text-ink-muted">{item.label}</dt>
+                          <dt className="text-[11px] uppercase tracking-eyebrow text-ink-subtle">
+                            {item.label}
+                          </dt>
                           <dd className="flex items-center gap-2">
-                            <code className="font-mono text-xs text-ink">
+                            <code className="font-mono text-xs tabular-nums text-ink">
                               {truncateSignature(item.value)}
                             </code>
                             <a
                               href={transactionExplorerUrl(item.value)}
                               target="_blank"
                               rel="noreferrer"
-                              className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-aegis hover:bg-accent-soft"
+                              className="rounded-md px-2 py-1 text-[11px] font-semibold text-accent transition-aegis hover:bg-surface-2"
                             >
                               Explorer
                             </a>
                           </dd>
                         </div>
                       ))}
+                    </div>
                   </div>
                 )}
               </div>
-            </>
-          )}
+            </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Execution history */}
-        {executionHistory.length > 0 && (
-          <div className="card-panel overflow-hidden">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+      </div>
+
+      {/* Execution history — side sheet so the audit trail is one click
+          away from anywhere on the page without growing the active flow. */}
+      <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+        <SheetContent side="right" className="flex flex-col">
+          <SheetHeader className="px-0 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface-2 text-accent">
+                <History className="h-4 w-4" aria-hidden="true" />
+              </div>
               <div>
-                <h2 className="text-sm font-semibold text-ink">Execution history</h2>
-                <p className="text-xs text-ink-muted">
-                  Browser-local record of recent operator runs.
-                </p>
+                <p className="text-eyebrow">Operator</p>
+                <SheetTitle className="mt-0.5">Recent</SheetTitle>
               </div>
             </div>
-            <div
-              className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
-              style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 5rem" }}
-            >
-              <span className="text-eyebrow">
-                #
-              </span>
-              <span className="text-eyebrow">
-                Status
-              </span>
-              <span className="text-eyebrow">
-                Details
-              </span>
-              <span className="text-right text-eyebrow">
-                Amount
-              </span>
-              <span />
-            </div>
-            <div className="divide-y divide-border/40">
-              {executionHistory.map((item) => (
-                <div
-                  key={item.id}
-                  className="grid items-center gap-4 px-5 py-3"
-                  style={{ gridTemplateColumns: "3rem 6rem 1fr 8rem 5rem" }}
-                >
-                  <span className="font-mono text-sm text-ink-subtle">
-                    #{item.transactionIndex}
-                  </span>
-                  <StatusPill tone={item.status === "success" ? "success" : "danger"}>
-                    {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                  </StatusPill>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm text-ink">
+            <SheetDescription className="mt-2">
+              {executionHistory.length}{" "}
+              {executionHistory.length === 1 ? "run" : "runs"} ·{" "}
+              {executionHistory.filter((e) => e.status === "success").length} sealed ·
+              browser-local audit trail.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto pt-2">
+            {executionHistory.length === 0 ? (
+              <div className="card-panel p-8 text-center">
+                <p className="text-eyebrow">Empty</p>
+                <p className="mt-2 text-sm text-ink-muted">
+                  Once you run a license here, it shows up in this drawer.
+                </p>
+              </div>
+            ) : (
+              <ul className="card-list overflow-hidden divide-y divide-border/50">
+                {executionHistory.map((item) => (
+                  <li
+                    key={item.id}
+                    className="px-4 py-3.5 transition-aegis hover:bg-surface-2/50"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-xs tabular-nums text-ink-subtle">
+                        #{item.transactionIndex}
+                      </span>
+                      <StatusPill tone={item.status === "success" ? "success" : "danger"}>
+                        {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                      </StatusPill>
+                    </div>
+                    <p className="mt-1.5 truncate text-sm font-medium text-ink">
                       {item.type === "payroll"
                         ? `${item.recipientCount ?? 0} recipients`
                         : item.recipient
-                          ? `${item.recipient.slice(0, 8)}...${item.recipient.slice(-8)}`
-                          : "single transfer"}
+                          ? truncateAddress(item.recipient)
+                          : "Single transfer"}
                     </p>
-                    <p className="text-xs text-ink-muted">
+                    <div className="mt-1 flex items-baseline justify-between gap-2">
+                      <p className="font-mono text-sm tabular-nums text-ink">
+                        {formatRawAmount(item.amount, item.tokenMint ?? SOL_MINT)}
+                      </p>
+                      {item.signature ? (
+                        <a
+                          href={transactionExplorerUrl(item.signature)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-md px-2 py-1 text-[11px] font-semibold text-accent transition-aegis hover:bg-accent-soft"
+                        >
+                          Explorer
+                        </a>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 truncate text-xs text-ink-muted">
                       {new Date(item.createdAt).toLocaleString()}
                       {item.error ? ` · ${item.error}` : ""}
                     </p>
-                  </div>
-                  <p className="text-right font-mono text-sm text-ink">
-                    {formatRawAmount(item.amount, item.tokenMint ?? SOL_MINT)}
-                  </p>
-                  <div className="flex justify-end">
-                    {item.signature ? (
-                      <a
-                        href={transactionExplorerUrl(item.signature)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-aegis hover:bg-accent-soft"
-                      >
-                        Explorer
-                      </a>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        )}
-      </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Help modal */}
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
