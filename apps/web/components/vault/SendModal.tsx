@@ -11,16 +11,19 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ReceiptRow } from "@/components/ui/receipt-row";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { TokenDropdown } from "@/components/vault/TokenDropdown";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { SOL_TOKEN, useVaultTokens } from "@/lib/hooks/useVaultTokens";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
+import { truncateAddress } from "@/lib/proposals";
 import { lamportsToSol } from "@/lib/sol";
 import { createVaultProposal } from "@/lib/squads-sdk";
 import { SOL_MINT, tokenAmountToUnits } from "@/lib/tokens";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
+import { cn } from "@/lib/utils";
 import {
   MIN_PRIVATE_DEPOSIT_LAMPORTS,
   MIN_PRIVATE_DEPOSIT_SOL,
@@ -47,7 +50,7 @@ import {
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
-import { Send } from "lucide-react";
+import { Eye, Lock, Send } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import nacl from "tweetnacl";
 
@@ -627,25 +630,113 @@ export function SendModal({
     }
   };
 
+  // Resolve a friendly destination label for the receipt block. Internal
+  // accounts show by name; external addresses show as truncated mono.
+  const resolvedDestLabel =
+    destType === "account" && destVaultIndex !== null
+      ? (allAccounts.find((a) => a.vaultIndex === destVaultIndex)?.name ?? "—")
+      : recipient.trim()
+        ? truncateAddress(recipient.trim())
+        : null;
+
+  const isReadyForReceipt = Boolean(amount) && Boolean(recipient.trim()) && !belowPrivateMin;
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent size="lg">
+      <DialogContent size="lg" watermark watermarkSize={260} watermarkOpacity={0.04}>
         <DialogHeader>
-          <DialogTitle>Send {tokenLabel}</DialogTitle>
+          <p className="text-eyebrow">
+            {mode === "private" ? "Send · Shielded" : "Send · Public"}
+          </p>
+          <DialogTitle className="mt-0.5">
+            {mode === "private" ? `${tokenLabel} via Cloak` : `${tokenLabel} transfer`}
+          </DialogTitle>
           <DialogDescription>
             {mode === "private"
-              ? "Funds are routed through the shielded pool. The recipient address stays unlinkable on-chain."
-              : "Creates a standard vault transfer visible on-chain. Requires member approval."}
+              ? "Funds route through the Cloak shielded pool. The recipient address stays unlinkable on-chain."
+              : "Creates a standard vault transfer that lands on-chain in the open. Requires member approval."}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6 pt-4">
-          {/* From account — only shown when sub-vaults exist */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 pb-6 pt-5">
+          {/* ── Mode toggle — public ↔ shielded — the moat surface ── */}
+          <div>
+            <p className="text-eyebrow mb-2">Privacy</p>
+            <div
+              role="radiogroup"
+              aria-label="Privacy mode"
+              className="grid grid-cols-2 gap-1.5"
+            >
+              {(["private", "public"] as const).map((m) => {
+                const privateDisabledForToken = m === "private" && !isSol;
+                const privateDisabledForDest = m === "private" && destType === "account";
+                const privateDisabled = privateDisabledForToken || privateDisabledForDest;
+                const reason = privateDisabledForDest
+                  ? "Vault accounts are off-curve PDAs, so Cloak can't deliver to them. Use Public mode for vault-to-vault transfers."
+                  : privateDisabledForToken
+                    ? "Private transfers are only available for SOL on devnet."
+                    : undefined;
+                const active = mode === m;
+                const isPrivate = m === "private";
+                const Icon = isPrivate ? Lock : Eye;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => !pending && !privateDisabled && setMode(m)}
+                    disabled={pending || privateDisabled}
+                    title={reason}
+                    className={cn(
+                      "group/mode relative flex flex-col items-start gap-1 rounded-list border px-3 py-2.5 text-left transition-aegis",
+                      "disabled:cursor-not-allowed disabled:opacity-40",
+                      active && isPrivate
+                        ? "border-accent/50 bg-accent-soft text-accent shadow-raise-1"
+                        : active
+                          ? "border-border-strong bg-surface-2 text-ink shadow-raise-1"
+                          : "border-border bg-surface text-ink-muted hover:border-border-strong hover:bg-surface-2 hover:text-ink",
+                    )}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      <span className="text-sm font-semibold">
+                        {isPrivate ? "Shielded" : "Public"}
+                      </span>
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[11px] leading-tight",
+                        active && isPrivate ? "text-accent/80" : "text-ink-subtle",
+                      )}
+                    >
+                      {isPrivate ? "Unlinkable via Cloak" : "Visible on-chain"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {!isSol && (
+              <p className="mt-2 text-[11px] leading-relaxed text-ink-subtle">
+                Private transfers are only available for SOL on devnet (the SPL shielded pool isn't
+                initialized yet). {tokenLabel} sends fall back to public mode.
+              </p>
+            )}
+            {isSol && destType === "account" && (
+              <p className="mt-2 text-[11px] leading-relaxed text-ink-subtle">
+                Vault-to-vault transfers go through public mode. Private mode requires an Ed25519
+                wallet recipient — vault PDAs are off-curve.
+              </p>
+            )}
+          </div>
+
+          {/* ── From account — only shown when sub-vaults exist ── */}
           {subVaultAccounts.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <Label>From account</Label>
-              <div className="inline-flex flex-wrap gap-1.5">
+            <div>
+              <p className="text-eyebrow mb-2">From account</p>
+              <div className="flex flex-wrap gap-1.5">
                 {allAccounts.map((acct) => {
+                  const active = selectedVaultIndex === acct.vaultIndex;
                   return (
                     <button
                       key={acct.vaultIndex}
@@ -655,11 +746,13 @@ export function SendModal({
                         setSelectedVaultIndex(acct.vaultIndex);
                         setAmount("");
                       }}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                        selectedVaultIndex === acct.vaultIndex
-                          ? "border-accent/40 bg-accent/10 text-accent"
-                          : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
-                      }`}
+                      className={cn(
+                        "rounded-md border px-3 py-1.5 text-xs font-medium transition-aegis",
+                        "disabled:cursor-not-allowed disabled:opacity-40",
+                        active
+                          ? "border-accent/40 bg-accent-soft text-accent"
+                          : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink",
+                      )}
                     >
                       {acct.name}
                     </button>
@@ -669,79 +762,49 @@ export function SendModal({
             </div>
           )}
 
-          <div className="inline-flex rounded-lg border border-border bg-surface p-1">
-            {(["private", "public"] as const).map((m) => {
-              const privateDisabledForToken = m === "private" && !isSol;
-              const privateDisabledForDest = m === "private" && destType === "account";
-              const privateDisabled = privateDisabledForToken || privateDisabledForDest;
-              const reason = privateDisabledForDest
-                ? "Vault accounts are off-curve PDAs, so Cloak can't deliver to them. Use Public mode for vault-to-vault transfers."
-                : privateDisabledForToken
-                  ? "Private transfers are only available for SOL on devnet."
-                  : undefined;
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => !pending && !privateDisabled && setMode(m)}
-                  disabled={pending || privateDisabled}
-                  title={reason}
-                  className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                    mode === m ? "bg-accent-soft text-accent" : "text-ink-muted hover:text-ink"
-                  }`}
-                >
-                  {m === "private" ? "Private" : "Public"}
-                </button>
-              );
-            })}
-          </div>
-          {!isSol && (
-            <p className="text-xs text-ink-muted">
-              Private transfers are only available for SOL on devnet (the SPL shielded pool isn't
-              initialized yet). {tokenLabel} sends fall back to public mode.
-            </p>
-          )}
-          {isSol && destType === "account" && (
-            <p className="text-xs text-ink-muted">
-              Vault-to-vault transfers go through Public mode (multisig proposal). Private mode
-              requires an Ed25519 wallet recipient, vault PDAs are off-curve.
-            </p>
-          )}
+          {/* ── Recipient ── */}
+          <div className="flex flex-col gap-2">
+            <p className="text-eyebrow">Recipient</p>
 
-          <div className="flex flex-col gap-1.5">
-            <Label>Recipient</Label>
-
-            {/* Destination type toggle — only shown when sub-vaults exist (so internal transfer is meaningful) */}
             {subVaultAccounts.length > 0 && (
-              <div className="inline-flex w-fit rounded-lg border border-border bg-surface p-1">
-                {(["external", "account"] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => {
-                      if (pending) return;
-                      setDestType(t);
-                      if (t === "external") {
-                        setRecipient("");
-                        setDestVaultIndex(null);
-                      } else {
-                        // pre-select first non-source account
-                        const firstOther = allAccounts.find(
-                          (a) => a.vaultIndex !== selectedVaultIndex,
-                        );
-                        if (firstOther) setDestVaultIndex(firstOther.vaultIndex);
-                      }
-                    }}
-                    disabled={pending}
-                    className={`rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-                      destType === t
-                        ? "bg-accent-soft text-accent"
-                        : "text-ink-muted hover:text-ink"
-                    }`}
-                  >
-                    {t === "external" ? "External address" : "Another account"}
-                  </button>
-                ))}
+              <div
+                role="radiogroup"
+                aria-label="Destination type"
+                className="inline-flex w-fit items-center rounded-md border border-border bg-surface-2 p-0.5"
+              >
+                {(["external", "account"] as const).map((t) => {
+                  const active = destType === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => {
+                        if (pending) return;
+                        setDestType(t);
+                        if (t === "external") {
+                          setRecipient("");
+                          setDestVaultIndex(null);
+                        } else {
+                          const firstOther = allAccounts.find(
+                            (a) => a.vaultIndex !== selectedVaultIndex,
+                          );
+                          if (firstOther) setDestVaultIndex(firstOther.vaultIndex);
+                        }
+                      }}
+                      disabled={pending}
+                      className={cn(
+                        "inline-flex h-6 items-center rounded-[5px] px-2.5 text-[11px] font-semibold transition-aegis disabled:opacity-50",
+                        active
+                          ? "bg-accent text-accent-ink shadow-raise-1"
+                          : "text-ink-subtle hover:text-ink",
+                      )}
+                    >
+                      {t === "external" ? "External address" : "Another account"}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
@@ -751,7 +814,7 @@ export function SendModal({
                 placeholder="Solana address"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
-                className="font-mono text-sm"
+                className="font-mono text-sm tabular-nums"
                 autoComplete="off"
                 spellCheck={false}
                 disabled={pending}
@@ -760,51 +823,49 @@ export function SendModal({
               <div className="flex flex-wrap gap-1.5">
                 {allAccounts
                   .filter((a) => a.vaultIndex !== selectedVaultIndex)
-                  .map((acct) => (
-                    <button
-                      key={acct.vaultIndex}
-                      type="button"
-                      disabled={pending}
-                      onClick={() => setDestVaultIndex(acct.vaultIndex)}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
-                        destVaultIndex === acct.vaultIndex
-                          ? "border-accent/40 bg-accent/10 text-accent"
-                          : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
-                      }`}
-                    >
-                      To {acct.name}
-                    </button>
-                  ))}
+                  .map((acct) => {
+                    const active = destVaultIndex === acct.vaultIndex;
+                    return (
+                      <button
+                        key={acct.vaultIndex}
+                        type="button"
+                        disabled={pending}
+                        onClick={() => setDestVaultIndex(acct.vaultIndex)}
+                        className={cn(
+                          "rounded-md border px-3 py-1.5 text-xs font-medium transition-aegis disabled:opacity-50",
+                          active
+                            ? "border-accent/40 bg-accent-soft text-accent"
+                            : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink",
+                        )}
+                      >
+                        To {acct.name}
+                      </button>
+                    );
+                  })}
                 {allAccounts.filter((a) => a.vaultIndex !== selectedVaultIndex).length === 0 && (
-                  <p className="text-xs text-ink-muted">No other accounts to send to.</p>
+                  <p className="text-xs text-ink-subtle">No other accounts to send to.</p>
                 )}
               </div>
             )}
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-baseline justify-between">
-              <Label htmlFor="sm-amount">Amount ({tokenLabel})</Label>
-              <span className="text-xs text-ink-muted">
-                Available:{" "}
-                <button
-                  type="button"
-                  className="font-mono text-accent hover:underline disabled:opacity-50"
-                  onClick={handleMaxAmount}
-                  disabled={pending || !selectedToken}
-                >
-                  {selectedToken ? `${selectedToken.uiBalance} ${selectedToken.symbol}` : "-"}
-                </button>
-              </span>
+          {/* ── Amount card — Fraunces big-input ledger ── */}
+          <div className="rounded-list border border-border bg-surface-2 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-eyebrow">You send</span>
+              <button
+                type="button"
+                className="font-mono text-[11px] tabular-nums text-ink-muted transition-aegis hover:text-accent disabled:opacity-50"
+                onClick={handleMaxAmount}
+                disabled={pending || !selectedToken}
+                title="Use full balance"
+              >
+                {selectedToken
+                  ? `${selectedToken.uiBalance} ${selectedToken.symbol} · MAX`
+                  : "—"}
+              </button>
             </div>
-            <div className="flex gap-2">
-              <TokenDropdown
-                tokens={tokens}
-                selectedMint={selectedMint}
-                onSelect={handleTokenSelect}
-                disabled={pending}
-                loading={tokensLoading}
-              />
+            <div className="flex items-center gap-3">
               <Input
                 id="sm-amount"
                 type="number"
@@ -815,18 +876,29 @@ export function SendModal({
                 onChange={(e) => setAmount(e.target.value)}
                 disabled={pending}
                 aria-invalid={belowPrivateMin || undefined}
+                className="flex-1 border-0 bg-transparent p-0 font-display text-3xl font-semibold tabular-nums tracking-tight placeholder:text-ink-subtle/30 focus-visible:ring-0 focus-visible:ring-offset-0"
+              />
+              <TokenDropdown
+                tokens={tokens}
+                selectedMint={selectedMint}
+                onSelect={handleTokenSelect}
+                disabled={pending}
+                loading={tokensLoading}
               />
             </div>
             {belowPrivateMin && (
-              <p className="text-xs text-signal-danger">
+              <p className="mt-2 text-[11px] leading-relaxed text-signal-danger">
                 Increase to at least {MIN_PRIVATE_DEPOSIT_SOL} SOL — Cloak rejects smaller private
                 deposits.
               </p>
             )}
           </div>
 
+          {/* ── Memo ── */}
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="sm-memo">Memo (optional)</Label>
+            <Label htmlFor="sm-memo" className="text-eyebrow">
+              Memo · optional
+            </Label>
             <Input
               id="sm-memo"
               placeholder="Internal reference"
@@ -836,29 +908,42 @@ export function SendModal({
             />
           </div>
 
+          {/* ── Receipt summary — only when ready, draws final attention
+              to what the operator is about to authorize ── */}
+          {isReadyForReceipt && (
+            <div className="rounded-list border border-border/60 bg-bg/40 px-4 py-3">
+              <ReceiptRow label="Amount">
+                {amount} {tokenLabel}
+              </ReceiptRow>
+              <ReceiptRow label="To" mono={mode === "public" || destType === "external"}>
+                {resolvedDestLabel ?? "—"}
+              </ReceiptRow>
+              {memo.trim() && (
+                <ReceiptRow label="Memo" mono={false} tone="muted">
+                  {memo.trim()}
+                </ReceiptRow>
+              )}
+              <ReceiptRow label="Privacy" tone={mode === "private" ? "accent" : "muted"} mono={false}>
+                {mode === "private" ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Lock className="h-2.5 w-2.5" strokeWidth={2.25} />
+                    Shielded via Cloak
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    <Eye className="h-2.5 w-2.5" strokeWidth={2.25} />
+                    Public on-chain
+                  </span>
+                )}
+              </ReceiptRow>
+            </div>
+          )}
+
           {error && (
-            <p className="rounded-md bg-signal-danger/10 px-3 py-2 text-xs text-signal-danger">
+            <p className="rounded-md border border-signal-danger/30 bg-signal-danger/10 px-3 py-2 text-xs text-signal-danger">
               {error}
             </p>
           )}
-
-          <div className="rounded-lg border border-border bg-surface-2 px-3 py-2.5">
-            <p className="text-xs leading-relaxed text-ink-muted">
-              {mode === "private" ? (
-                <>
-                  This creates a{" "}
-                  <span className="font-medium text-ink">private {tokenLabel} send proposal</span>.
-                  The vault funds the operator, who executes the shielded transfer after approval.
-                </>
-              ) : (
-                <>
-                  This creates a <span className="font-medium text-ink">multisig proposal</span>.
-                  Once enough members approve, any member can execute and the {tokenLabel} leaves
-                  the vault.
-                </>
-              )}
-            </p>
-          </div>
 
           <DialogFooter className="p-0 pt-0">
             <Button
@@ -868,12 +953,18 @@ export function SendModal({
               }
               className="w-full gap-2"
             >
-              <Send className="h-4 w-4" />
+              {mode === "private" ? (
+                <Lock className="h-4 w-4" strokeWidth={2.25} />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
               {pending
                 ? "Creating proposal…"
-                : mode === "private"
-                  ? `Send ${tokenLabel} privately`
-                  : `Send ${tokenLabel}`}
+                : amount
+                  ? `Send ${amount} ${tokenLabel} · ${mode === "private" ? "Shielded" : "Public"}`
+                  : mode === "private"
+                    ? `Send ${tokenLabel} privately`
+                    : `Send ${tokenLabel}`}
             </Button>
           </DialogFooter>
         </form>
