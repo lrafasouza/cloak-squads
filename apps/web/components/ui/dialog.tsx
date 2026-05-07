@@ -21,6 +21,14 @@ function useDialog() {
   return ctx;
 }
 
+// Body scroll-lock is ref-counted at the module level so nested or
+// overlapping dialogs unlock only once the last one closes. We also
+// compensate the scrollbar width to keep the page from shifting when
+// overflow flips from `auto` to `hidden`.
+let openDialogCount = 0;
+let savedOverflow: string | null = null;
+let savedPaddingRight: string | null = null;
+
 /* ── Root ── */
 export function Dialog({
   open,
@@ -105,6 +113,32 @@ export function DialogContent({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open, setOpen]);
+
+  /* Body scroll-lock while open */
+  useEffect(() => {
+    if (!open) return;
+    if (openDialogCount === 0) {
+      const body = document.body;
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      savedOverflow = body.style.overflow;
+      savedPaddingRight = body.style.paddingRight;
+      body.style.overflow = "hidden";
+      if (scrollbarWidth > 0) {
+        body.style.paddingRight = `${scrollbarWidth}px`;
+      }
+    }
+    openDialogCount += 1;
+    return () => {
+      openDialogCount -= 1;
+      if (openDialogCount === 0) {
+        const body = document.body;
+        body.style.overflow = savedOverflow ?? "";
+        body.style.paddingRight = savedPaddingRight ?? "";
+        savedOverflow = null;
+        savedPaddingRight = null;
+      }
+    };
+  }, [open]);
 
   /* Click outside */
   const onPointerDown = useCallback(

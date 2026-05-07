@@ -6,6 +6,7 @@ import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import { CofreInitBanner } from "@/components/vault/CofreInitBanner";
 import { OverviewCard } from "@/components/vault/OverviewCard";
 import { PendingProposalsCard } from "@/components/vault/PendingProposalsCard";
+import { PrivacyFlowModal } from "@/components/vault/PrivacyFlowModal";
 import { ReceiveModal } from "@/components/vault/ReceiveModal";
 import { RecentActivityCard } from "@/components/vault/RecentActivityCard";
 import { SendModal } from "@/components/vault/SendModal";
@@ -19,7 +20,7 @@ import { useVaultData } from "@/lib/use-vault-data";
 import { useVaultMetadata } from "@/lib/use-vault-metadata";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, Copy, Shield } from "lucide-react";
+import { AlertTriangle, Check, Copy, HelpCircle, Shield } from "lucide-react";
 import { useMemo, useState } from "react";
 
 function DashboardVaultIdentity({ multisig }: { multisig: string }) {
@@ -107,6 +108,7 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const [swapOpen, setSwapOpen] = useState(false);
+  const [privacyFlowOpen, setPrivacyFlowOpen] = useState(false);
 
   // Refresh ALL vault-scoped queries: balance, income (KPIs and activity),
   // and proposal summaries. For income we hit the force-sync endpoint and
@@ -262,7 +264,24 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
           {/* CLOAK PRIVACY side — opposite corner */}
           <div className="flex-1 px-5 py-4">
             <div className="flex items-baseline justify-between gap-3">
-              <p className="text-eyebrow text-ink-subtle">Cloak Privacy</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-eyebrow text-ink-subtle">Cloak Privacy</p>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => setPrivacyFlowOpen(true)}
+                        className="flex h-4 w-4 items-center justify-center rounded-full text-ink-subtle/70 transition-colors hover:bg-surface-2 hover:text-accent"
+                        aria-label="How privacy works"
+                      >
+                        <HelpCircle className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">How privacy works</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <span
                 className={cn(
                   "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
@@ -311,6 +330,8 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
 
       {/* Activity — full width */}
       <RecentActivityCard multisig={multisig} activity={activity} isLoading={activityLoading} />
+
+      <PrivacyFlowModal open={privacyFlowOpen} onOpenChange={setPrivacyFlowOpen} />
 
       <ReceiveModal multisig={multisig} open={receiveOpen} onOpenChange={setReceiveOpen} />
       <SendModal
