@@ -98,22 +98,18 @@ export function SiteFooter({ className }: { className?: string }) {
             &copy; {new Date().getFullYear()} Aegis. Private execution for shared treasuries.
           </p>
           <div className="flex gap-6 text-xs text-ink-subtle">
-            <a
-              href="https://github.com/cloak-dev/aegis"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/terms"
               className="hover:text-ink transition-colors"
             >
               Terms
-            </a>
-            <a
-              href="https://github.com/cloak-dev/aegis"
-              target="_blank"
-              rel="noopener noreferrer"
+            </Link>
+            <Link
+              href="/privacy"
               className="hover:text-ink transition-colors"
             >
               Privacy
-            </a>
+            </Link>
           </div>
         </div>
       </div>

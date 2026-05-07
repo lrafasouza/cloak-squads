@@ -9,10 +9,10 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const nav = [
-  { label: "Demo", href: "#see-it-work" },
-  { label: "How it works", href: "#anatomy" },
-  { label: "Use cases", href: "#usecases" },
-  { label: "FAQ", href: "#faq" },
+  { label: "Demo", href: "/#see-it-work" },
+  { label: "How it works", href: "/#anatomy" },
+  { label: "Use cases", href: "/#usecases" },
+  { label: "FAQ", href: "/#faq" },
 ];
 
 export function SiteHeader({ className, showWallet = true, minimal = false }: { className?: string; showWallet?: boolean; minimal?: boolean }) {
