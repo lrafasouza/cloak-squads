@@ -62,6 +62,14 @@ export function translateOnchainError(error: unknown): string {
     return "Cofre account is not initialized for this multisig. Initialize the cofre before creating or executing private send proposals.";
   }
 
+  // Anchor "InstructionDidNotDeserialize" (3003 / 0xbbb) means the program
+  // received args it doesn't recognize. The most common cause in production is
+  // a stale browser bundle that ships an older instruction layout than the
+  // currently-deployed program. Tell the user to refresh.
+  if (message.includes("InstructionDidNotDeserialize") || matchesCode(message, 3003)) {
+    return "Your app is out of date and was unable to talk to the on-chain program. Hard-refresh this page (Cmd/Ctrl+Shift+R) and try again.";
+  }
+
   if (message.includes("insufficient lamports")) {
     return "The paying account does not have enough SOL to complete this transaction. Add devnet SOL, then try again.";
   }

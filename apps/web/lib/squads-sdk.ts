@@ -150,8 +150,35 @@ export async function createVaultProposal(params: {
   vaultIndex?: number;
 }) {
   assertBrowserSquadsWallet(params.wallet);
+  const sourceVaultIndex = params.vaultIndex ?? 0;
+
+  // Defense in depth: catch vaultIndex drift between the inner ix builder and
+  // this call. Squads' executable_transaction_message rejects any signer in the
+  // inner message that isn't the source vault PDA. If a builder used vault[1]
+  // for the issue_license CPI but this call passes vaultIndex=0, the proposal
+  // is created but fails at execute with InvalidAccount (0x177e). Throwing
+  // here turns a confusing on-chain failure into a clear client-side error.
+  const VAULT_INDEX_PROBE_LIMIT = 32;
+  const probedVaults = Array.from({ length: VAULT_INDEX_PROBE_LIMIT }, (_, i) =>
+    multisig.getVaultPda({ multisigPda: params.multisigPda, index: i })[0],
+  );
+  for (const ix of params.instructions) {
+    for (const key of ix.keys) {
+      if (!key.isSigner) continue;
+      const matchedIndex = probedVaults.findIndex((v) => v.equals(key.pubkey));
+      if (matchedIndex >= 0 && matchedIndex !== sourceVaultIndex) {
+        throw new Error(
+          `vaultIndex mismatch: createVaultProposal received vaultIndex=${sourceVaultIndex} ` +
+            `but an inner instruction marks vault[${matchedIndex}] as signer. ` +
+            `Pass the same vaultIndex to both the ix builder (e.g. buildIssueLicenseIxBrowser) ` +
+            `and createVaultProposal.`,
+        );
+      }
+    }
+  }
+
   const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
-  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: params.vaultIndex ?? 0 });
+  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: sourceVaultIndex });
   const latestBlockhash = await params.connection.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: vaultPda,
@@ -164,7 +191,7 @@ export async function createVaultProposal(params: {
     transactionIndex,
     creator: params.wallet.publicKey,
     rentPayer: params.wallet.publicKey,
-    vaultIndex: params.vaultIndex ?? 0,
+    vaultIndex: sourceVaultIndex,
     ephemeralSigners: 0,
     transactionMessage: message,
     memo: params.memo ?? "vault transaction",
@@ -268,8 +295,30 @@ export async function createBatchIssueLicenseProposal(params: {
   vaultIndex?: number;
 }) {
   assertBrowserSquadsWallet(params.wallet);
+  const sourceVaultIndex = params.vaultIndex ?? 0;
+
+  // Same defense as in createVaultProposal: catch vaultIndex drift between
+  // the issue_license ix builders and this call.
+  const VAULT_INDEX_PROBE_LIMIT = 32;
+  const probedVaults = Array.from({ length: VAULT_INDEX_PROBE_LIMIT }, (_, i) =>
+    multisig.getVaultPda({ multisigPda: params.multisigPda, index: i })[0],
+  );
+  for (const ix of params.issueLicenseIxs) {
+    for (const key of ix.keys) {
+      if (!key.isSigner) continue;
+      const matchedIndex = probedVaults.findIndex((v) => v.equals(key.pubkey));
+      if (matchedIndex >= 0 && matchedIndex !== sourceVaultIndex) {
+        throw new Error(
+          `vaultIndex mismatch in batch: createBatchIssueLicenseProposal received ` +
+            `vaultIndex=${sourceVaultIndex} but an issue_license ix marks vault[${matchedIndex}] as signer. ` +
+            `Pass the same vaultIndex to buildIssueLicenseIxBrowser and this function.`,
+        );
+      }
+    }
+  }
+
   const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
-  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: params.vaultIndex ?? 0 });
+  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: sourceVaultIndex });
   const latestBlockhash = await params.connection.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: vaultPda,
@@ -282,7 +331,7 @@ export async function createBatchIssueLicenseProposal(params: {
     transactionIndex,
     creator: params.wallet.publicKey,
     rentPayer: params.wallet.publicKey,
-    vaultIndex: params.vaultIndex ?? 0,
+    vaultIndex: sourceVaultIndex,
     ephemeralSigners: 0,
     transactionMessage: message,
     memo: params.memo ?? `issue license batch (${params.issueLicenseIxs.length} recipients)`,
@@ -467,11 +516,10 @@ export async function vaultTransactionExecute(params: {
   // Squads SDK bug workaround: accountsForTransactionExecute only demotes the
   // transaction's own source vault PDA from signer→non-signer. Inner messages
   // can legitimately reference OTHER vault PDAs of the same multisig as signers
-  // (e.g. the gatekeeper license requires vault index 0 to sign even when the
-  // transfer comes from a different sub-vault — see issue_license.rs:14, where
-  // the program hardcodes index 0). Those are CPI-signed by Squads too, but
-  // the SDK leaves them marked as signers, so web3.js demands a real signature
-  // nobody can produce. Demote any vault PDA of this multisig in the keys.
+  // when an instruction CPI-signs as a different vault (cross-vault flows are
+  // valid by design). Those are CPI-signed by Squads too, but the SDK leaves
+  // them marked as signers, so web3.js demands a real signature nobody can
+  // produce. Demote any vault PDA of this multisig in the keys.
   const memberPubkey = params.wallet.publicKey;
   const VAULT_INDEX_PROBE_LIMIT = 32;
   const knownVaultPdas: PublicKey[] = [];

@@ -54,6 +54,7 @@ export async function buildIssueLicenseIxBrowser(params: {
     params.payloadHash,
     params.nonce,
     writeI64Le(BigInt(params.ttlSecs ?? 900)),
+    new Uint8Array([params.vaultIndex ?? 0]),
   );
 
   return {
@@ -158,17 +159,18 @@ export async function buildExecuteWithLicenseIxBrowser(params: {
 export async function buildRevokeAuditIxBrowser(params: {
   multisig: PublicKey;
   diversifier: Uint8Array;
+  vaultIndex?: number;
 }) {
   const gatekeeperProgram = new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID);
   const cofre = cofrePda(params.multisig, gatekeeperProgram)[0];
   const squadsProgram = new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID);
-  const vault = squadsVaultPda(params.multisig, squadsProgram)[0];
+  const vault = squadsVaultPda(params.multisig, squadsProgram, params.vaultIndex)[0];
 
   // Take first 16 bytes of diversifier as diversifier_trunc
   const diversifierTrunc = params.diversifier.slice(0, 16);
 
   const discriminator = await anchorDiscriminator("revoke_audit");
-  const data = concatBytes(discriminator, diversifierTrunc);
+  const data = concatBytes(discriminator, diversifierTrunc, new Uint8Array([params.vaultIndex ?? 0]));
 
   return {
     cofre,

@@ -10,6 +10,7 @@ export function buildIssueLicenseIx(
   nonce: Uint8Array,
   ttlSecs: number,
   payer: PublicKey,
+  vaultIndex = 0,
 ): Promise<TransactionInstruction> {
   const payloadHash = computePayloadHash(invariants);
   const issueLicense = program.methods.issueLicense;
@@ -17,7 +18,7 @@ export function buildIssueLicenseIx(
     throw new Error("IDL is missing issueLicense");
   }
 
-  return issueLicense(Array.from(payloadHash), Array.from(nonce), ttlSecs)
+  return issueLicense(Array.from(payloadHash), Array.from(nonce), ttlSecs, vaultIndex)
     .accountsPartial({
       cofre,
       payer,
