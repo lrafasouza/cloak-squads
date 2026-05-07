@@ -188,13 +188,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
     [subVaultAccounts],
   );
 
-  // Snap source to Primary in private mode. The Aegis gatekeeper hardcodes
-  // vault[0] as the required Squads CPI signer (issue_license.rs:14), so a
-  // private send sourced from a sub-vault would create a proposal that fails
-  // on-chain at execute with InvalidAccount (0x177e).
-  useEffect(() => {
-    if (sendMode === "private" && selectedVaultIndex !== 0) setSelectedVaultIndex(0);
-  }, [sendMode, selectedVaultIndex]);
 
   const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(
     multisig,
@@ -317,15 +310,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         );
       }
 
-      // Private flows must source from Primary — gatekeeper hardcodes vault[0]
-      // as CPI signer. The picker is locked, but guard at submit in case state
-      // races (e.g. user toggles mode while in flight).
-      if (selectedVaultIndex !== 0) {
-        throw new Error(
-          "Private sends must source from Primary. Switch to Public Send to source from a sub-account.",
-        );
-      }
-
       const [vaultPda] = multisigSdk.getVaultPda({
         multisigPda: multisigAddress,
         index: selectedVaultIndex,
@@ -437,6 +421,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         multisig: multisigAddress,
         payloadHash,
         nonce: invariants.nonce,
+        vaultIndex: selectedVaultIndex,
       });
       proposalInstructions.push(licenseIx);
 
@@ -554,6 +539,8 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         index: selectedVaultIndex,
       });
       const instructions = [];
+      let amountUnits: bigint;
+      let tokenMintForDraft: string;
 
       if (isSol) {
         const lamports = solAmountToLamports(amount);
@@ -567,6 +554,8 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         instructions.push(
           SystemProgram.transfer({ fromPubkey: vaultPda, toPubkey: recipientPubkey, lamports }),
         );
+        amountUnits = lamports;
+        tokenMintForDraft = SOL_MINT;
       } else {
         if (!selectedToken) throw new Error("Select a token.");
         const mintPk = new PublicKey(selectedToken.mint);
@@ -600,6 +589,8 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
             selectedToken.decimals,
           ),
         );
+        amountUnits = units;
+        tokenMintForDraft = selectedToken.mint;
       }
 
       updateStep("validate", { status: "success" });
@@ -619,6 +610,27 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         signature: result.signature,
         description: `Proposal #${result.transactionIndex.toString()} created.`,
       });
+
+      // Persist a public-kind draft so the proposal page can render the
+      // amount, recipient, and memo. Non-fatal: the on-chain proposal stands
+      // on its own.
+      void fetchWithAuth("/api/proposals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cofreAddress: multisigAddress.toBase58(),
+          transactionIndex: result.transactionIndex.toString(),
+          kind: "public",
+          amount: amountUnits.toString(),
+          recipient: recipientPubkey.toBase58(),
+          memo: memo.trim() || undefined,
+          tokenMint: tokenMintForDraft,
+          vaultIndex: selectedVaultIndex,
+        }),
+      }).catch(() => {
+        /* non-fatal */
+      });
+
       completeTransaction({
         title: `${tokenLabel} proposal ready`,
         description: `Proposal #${result.transactionIndex.toString()} is ready for signer approval.`,
@@ -701,17 +713,11 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                     <Label>From account</Label>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {allAccounts.map((acct) => {
-                        const lockedToPrimary = isPrivate && acct.vaultIndex !== 0;
                         return (
                           <button
                             key={acct.vaultIndex}
                             type="button"
-                            disabled={pending || lockedToPrimary}
-                            title={
-                              lockedToPrimary
-                                ? "Private sends route through Primary. The gatekeeper requires vault[0] as the CPI signer, so switch to Public Send to source from this account."
-                                : undefined
-                            }
+                            disabled={pending}
                             onClick={() => {
                               setSelectedVaultIndex(acct.vaultIndex);
                               setAmount("");
@@ -727,12 +733,6 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                         );
                       })}
                     </div>
-                    {isPrivate && (
-                      <p className="mt-1.5 text-[11px] text-ink-subtle">
-                        Private sends always route through Primary. Switch to Public Send to source
-                        from a sub-account.
-                      </p>
-                    )}
                   </div>
                 )}
 

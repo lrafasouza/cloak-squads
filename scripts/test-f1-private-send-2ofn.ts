@@ -98,6 +98,7 @@ function buildIssueLicenseIx(opts: {
   payloadHash: Uint8Array;
   nonce: Uint8Array;
   ttlSecs: bigint;
+  vaultIndex?: number;
 }): TransactionInstruction {
   const ttlBuf = Buffer.alloc(8);
   ttlBuf.writeBigInt64LE(opts.ttlSecs);
@@ -106,6 +107,7 @@ function buildIssueLicenseIx(opts: {
     Buffer.from(opts.payloadHash),
     Buffer.from(opts.nonce),
     ttlBuf,
+    Buffer.from([opts.vaultIndex ?? 0]),
   ]);
   return new TransactionInstruction({
     programId: GATEKEEPER_PROGRAM_ID,

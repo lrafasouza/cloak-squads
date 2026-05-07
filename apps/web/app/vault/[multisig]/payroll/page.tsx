@@ -183,18 +183,22 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   // not initialized for SPL mints, so we lock the asset at the UI to avoid
   // creating proposals the operator cannot deliver.
   const selectedMint = SOL_MINT;
-  // Payroll always routes through Primary (vault index 0). The Aegis gatekeeper
-  // hardcodes vault[0] as the required Squads CPI signer for license issuance,
-  // so a payroll proposal whose source is a sub-vault would fail on-chain
-  // (Squads only allows the source vault as signer in the inner message).
-  const [hasSubVaults, setHasSubVaults] = useState(false);
+  const [selectedVaultIndex, setSelectedVaultIndex] = useState(0);
+  const [subVaultAccounts, setSubVaultAccounts] = useState<
+    Array<{ vaultIndex: number; name: string }>
+  >([]);
 
   useEffect(() => {
     fetch(`/api/vaults/${multisig}/sub-vaults`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: Array<unknown>) => setHasSubVaults(data.length > 0))
+      .then((data: Array<{ vaultIndex: number; name: string }>) => setSubVaultAccounts(data))
       .catch(() => {});
   }, [multisig]);
+
+  const allVaultAccounts = useMemo(
+    () => [{ vaultIndex: 0, name: "Primary" }, ...subVaultAccounts],
+    [subVaultAccounts],
+  );
 
   /* ── Manual form ── */
   const [manualName, setManualName] = useState("");
@@ -205,7 +209,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   /* ── CSV paste toggle ── */
   const [showCsvTextarea, setShowCsvTextarea] = useState(false);
 
-  const { data: tokens = [] } = useVaultTokens(multisig, 0);
+  const { data: tokens = [] } = useVaultTokens(multisig, selectedVaultIndex);
 
   const selectedToken = useMemo(
     () => tokens.find((t) => t.mint === selectedMint) ?? tokens[0],
@@ -424,6 +428,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
           multisig: multisigAddress,
           payloadHash: hash,
           nonce: invariants.nonce,
+          vaultIndex: selectedVaultIndex,
         });
 
         notes.push({
@@ -504,7 +509,10 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       }
       if (!selectedToken) throw new Error("Select a token.");
 
-      const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
+      const [vaultPda] = multisigSdk.getVaultPda({
+        multisigPda: multisigAddress,
+        index: selectedVaultIndex,
+      });
 
       // Balance check
       if (isSol) {
@@ -581,7 +589,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         multisigPda: multisigAddress,
         instructions: [...proposalInstructions, ...instructions],
         memo: `payroll batch (${parsedNotes.length} recipients)`,
-        vaultIndex: 0,
+        vaultIndex: selectedVaultIndex,
       });
       updateStep("squads", {
         status: "success",
@@ -647,7 +655,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         memo: `payroll batch (${parsedNotes.length} recipients)`,
         totalAmount: totalAmountStr,
         mode,
-        vaultIndex: 0,
+        vaultIndex: selectedVaultIndex,
         recipients: notesWithInvoices.map((n) => ({
           name: n.name,
           wallet: n.wallet,
@@ -885,13 +893,27 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
         {/* ── RECIPIENTS TAB ── */}
         {activeTab === "recipients" && (
           <div className="space-y-6">
-            {/* Payroll always routes through Primary — surface it when sub-vaults exist
-                so the user understands their picker choice elsewhere doesn't apply here. */}
-            {hasSubVaults && (
-              <div className="rounded-xl border border-border bg-surface px-4 py-3 text-xs text-ink-muted">
-                Payroll routes through <span className="font-medium text-ink">Primary</span>.
-                Private operations require Primary as the source, sub-vault payroll is not
-                supported until the gatekeeper program is parametrized.
+            {/* Vault source selector — shown when sub-vaults exist */}
+            {subVaultAccounts.length > 0 && (
+              <div>
+                <Label>From account</Label>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {allVaultAccounts.map((acct) => (
+                    <button
+                      key={acct.vaultIndex}
+                      type="button"
+                      disabled={pending}
+                      onClick={() => setSelectedVaultIndex(acct.vaultIndex)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                        selectedVaultIndex === acct.vaultIndex
+                          ? "border-accent/40 bg-accent/10 text-accent"
+                          : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
+                      }`}
+                    >
+                      {acct.name}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

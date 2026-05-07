@@ -391,11 +391,6 @@ export default function SubVaultsPage({
           if (!v) setSendVaultIndex(null);
         }}
         defaultVaultIndex={sendVaultIndex ?? 0}
-        // When the user clicks Send on a sub-vault (non-zero index), default to
-        // public mode — the gatekeeper hardcodes vault[0] for private flows, so
-        // a private send from a sub-vault would snap back to Primary and lose
-        // the source they just clicked.
-        {...(sendVaultIndex && sendVaultIndex !== 0 ? { defaultMode: "public" as const } : {})}
         subVaultAccounts={subVaults.map((sv) => ({ vaultIndex: sv.vaultIndex, name: sv.name }))}
       />
     </WorkspacePage>

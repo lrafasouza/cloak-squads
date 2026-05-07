@@ -162,15 +162,6 @@ export function SendModal({
     if (destType === "account" && mode === "private") setMode("public");
   }, [destType, mode]);
 
-  // Snap source to Primary in private mode. The Aegis gatekeeper hardcodes
-  // vault[0] as the required Squads CPI signer (issue_license.rs:14), and
-  // Squads only accepts the source vault as signer in the inner message — so
-  // a private send sourced from a sub-vault would create a proposal that
-  // fails on-chain at execute with InvalidAccount (0x177e).
-  useEffect(() => {
-    if (mode === "private" && selectedVaultIndex !== 0) setSelectedVaultIndex(0);
-  }, [mode, selectedVaultIndex]);
-
   const amountStep = isSol ? "0.000000001" : "0.000001";
   const amountMin = isSol ? "0.000000001" : "0.000001";
   const amountPlaceholder = isSol ? "0.0" : "0.00";
@@ -251,14 +242,6 @@ export function SendModal({
       setError(
         "Recipient is not an Ed25519 wallet (likely a PDA). Cloak can only deliver to standard wallets, so switch to Public mode or use a different recipient.",
       );
-      return;
-    }
-
-    // Private flows must source from Primary — the gatekeeper hardcodes vault[0]
-    // as CPI signer. The UI snaps the picker, but guard at submit in case state
-    // races (e.g. user toggles mode while in flight).
-    if (mode === "private" && selectedVaultIndex !== 0) {
-      setError("Private sends must source from Primary. Switch to Public mode to send from a sub-account.");
       return;
     }
 
@@ -400,6 +383,28 @@ export function SendModal({
           signature: result.signature,
           description: `Proposal #${result.transactionIndex.toString()} created on-chain.`,
         });
+
+        // Persist a public-kind draft so the proposal page can render the
+        // amount, recipient, and memo instead of the generic fallback.
+        // Non-fatal: the Squads proposal is the source of truth.
+        const tokenMintForDraft = isSol ? SOL_MINT : selectedToken?.mint;
+        void fetchWithAuth("/api/proposals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cofreAddress: multisigAddress.toBase58(),
+            transactionIndex: result.transactionIndex.toString(),
+            kind: "public",
+            amount: tokenUnits.toString(),
+            recipient: recipientPubkey.toBase58(),
+            memo: memo.trim() || undefined,
+            tokenMint: tokenMintForDraft,
+            vaultIndex: selectedVaultIndex,
+          }),
+        }).catch(() => {
+          /* non-fatal */
+        });
+
         completeTransaction({
           title: `${tokenLabel} proposal ready`,
           description: `Proposal #${result.transactionIndex.toString()} is ready for signer approval.`,
@@ -485,6 +490,7 @@ export function SendModal({
         multisig: multisigAddress,
         payloadHash,
         nonce: invariants.nonce,
+        vaultIndex: selectedVaultIndex,
       });
       proposalInstructions.push(licenseIx);
 
@@ -610,17 +616,11 @@ export function SendModal({
               <Label>From account</Label>
               <div className="inline-flex flex-wrap gap-1.5">
                 {allAccounts.map((acct) => {
-                  const lockedToPrimary = mode === "private" && acct.vaultIndex !== 0;
                   return (
                     <button
                       key={acct.vaultIndex}
                       type="button"
-                      disabled={pending || lockedToPrimary}
-                      title={
-                        lockedToPrimary
-                          ? "Private sends route through Primary. The gatekeeper requires vault[0] as the CPI signer, so switch to Public mode to send from this account."
-                          : undefined
-                      }
+                      disabled={pending}
                       onClick={() => {
                         setSelectedVaultIndex(acct.vaultIndex);
                         setAmount("");
@@ -636,11 +636,6 @@ export function SendModal({
                   );
                 })}
               </div>
-              {mode === "private" && subVaultAccounts.length > 0 && (
-                <p className="text-[11px] text-ink-subtle">
-                  Private sends always route through Primary. Switch to Public mode to send from a sub-account.
-                </p>
-              )}
             </div>
           )}
 

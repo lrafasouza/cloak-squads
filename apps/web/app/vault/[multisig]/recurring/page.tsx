@@ -277,17 +277,7 @@ export default function RecurringPage({
     setError(null);
 
     if (isPrivate) {
-      // Private path mirrors SendModal's flow: deposit into Cloak via the
-      // operator. The gatekeeper hardcodes vault[0], so private recurring
-      // schedules can only run from Primary; we surface the error here in
-      // case a stale schedule was created before this guard existed.
-      if (item.vaultIndex !== 0) {
-        setError(
-          "Private recurring payments must source from Primary. Recreate this schedule on Primary or switch it to Public.",
-        );
-        setRunning(null);
-        return;
-      }
+      // Private path mirrors SendModal's flow: deposit into Cloak via the operator.
       let recipientPk: PublicKey;
       try {
         recipientPk = new PublicKey(item.recipient);
@@ -343,7 +333,7 @@ export default function RecurringPage({
       try {
         const [vaultPda] = multisigSdk.getVaultPda({
           multisigPda: multisigAddress,
-          index: 0,
+          index: item.vaultIndex ?? 0,
         });
         const tokenUnits = BigInt(item.amount);
         const vaultBalance = await connection.getBalance(vaultPda, "confirmed");
@@ -395,6 +385,7 @@ export default function RecurringPage({
           multisig: multisigAddress,
           payloadHash,
           nonce: invariants.nonce,
+          vaultIndex: item.vaultIndex ?? 0,
         });
 
         const proposalInstructions = [
@@ -412,7 +403,7 @@ export default function RecurringPage({
           multisigPda: multisigAddress,
           instructions: proposalInstructions,
           memo: `recurring private: ${item.label}`,
-          vaultIndex: 0,
+          vaultIndex: item.vaultIndex ?? 0,
         });
 
         const transactionIndex = result.transactionIndex.toString();
@@ -451,7 +442,7 @@ export default function RecurringPage({
               nonce: Array.from(invariants.nonce),
             },
             commitmentClaim,
-            vaultIndex: 0,
+            vaultIndex: item.vaultIndex ?? 0,
           }),
         });
         if (!draftRes.ok) {
