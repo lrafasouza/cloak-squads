@@ -35,6 +35,8 @@ export interface VaultData {
   memberCount: number;
   members: string[];
   cofreInitialized: boolean;
+  /** Required wait between proposal approval and execution, in seconds. 0 = disabled. */
+  timeLock: number;
 }
 
 export function useVaultData(multisig: string) {
@@ -145,6 +147,7 @@ export function useVaultData(multisig: string) {
         memberCount: ms.members.length,
         members: ms.members.map((m) => m.key.toBase58()),
         cofreInitialized: !!cofreAccount && cofreAccount.owner.equals(gatekeeperProgramId),
+        timeLock: ms.timeLock,
       };
     },
   });

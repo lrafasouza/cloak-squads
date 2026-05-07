@@ -5,14 +5,30 @@ import { useToast } from "@/components/ui/toast-provider";
 import { WarningCallout } from "@/components/ui/warning-callout";
 import { StatusPill, WorkspaceHeader, WorkspacePage } from "@/components/ui/workspace";
 import { truncateAddress } from "@/lib/proposals";
+import { createSetTimeLockProposal } from "@/lib/squads-sdk";
+import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
 import { type VaultMetadata, useVaultMetadata } from "@/lib/use-vault-metadata";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cn } from "@/lib/utils";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, Key, Loader2, Lock, Pencil } from "lucide-react";
 import Link from "next/link";
 import { use, useCallback, useState } from "react";
+
+function formatTimeLock(seconds: number): string {
+  if (seconds === 0) return "Disabled";
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  const hours = seconds / 3600;
+  if (hours < 24) {
+    return Number.isInteger(hours) ? `${hours}h` : `${hours.toFixed(1)}h`;
+  }
+  const days = hours / 24;
+  return Number.isInteger(days) ? `${days}d` : `${days.toFixed(1)}d`;
+}
 
 // ── Section ────────────────────────────────────────────────────────────────
 
@@ -184,6 +200,10 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
   const { fetchWithAuth } = useWalletAuth();
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+  const { connection } = useConnection();
+  const wallet = useWallet();
+  const [timeLockHoursDraft, setTimeLockHoursDraft] = useState<number | null>(null);
+  const [applyingTimeLock, setApplyingTimeLock] = useState(false);
 
   const patchVault = useCallback(
     async (patch: Record<string, unknown>) => {
@@ -203,6 +223,37 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
       return updated;
     },
     [fetchWithAuth, multisig, queryClient],
+  );
+
+  const handleApplyTimeLock = useCallback(
+    async (newSeconds: number) => {
+      if (!wallet.publicKey || !wallet.sendTransaction) {
+        addToast("Connect a member wallet to apply.", "error");
+        return;
+      }
+      setApplyingTimeLock(true);
+      try {
+        await createSetTimeLockProposal({
+          connection,
+          wallet: { publicKey: wallet.publicKey, sendTransaction: wallet.sendTransaction },
+          multisigPda: new PublicKey(multisig),
+          timeLockSeconds: newSeconds,
+        });
+        addToast(
+          newSeconds === 0
+            ? "Proposal created to disable time lock."
+            : `Proposal created to set time lock to ${newSeconds}s.`,
+          "success",
+        );
+        await queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
+        setTimeLockHoursDraft(null);
+      } catch (e) {
+        addToast(e instanceof Error ? e.message : "Failed to create proposal", "error");
+      } finally {
+        setApplyingTimeLock(false);
+      }
+    },
+    [addToast, connection, multisig, queryClient, wallet.publicKey, wallet.sendTransaction],
   );
 
   if (isLoading || metaLoading) {
@@ -298,6 +349,75 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
               </span>
             }
           />
+        </Section>
+
+        {/* Security */}
+        <Section title="Security" description="Cooling period between approval and execution">
+          <SettingRow
+            label="Time lock"
+            value={
+              data.timeLock === 0
+                ? "Disabled — proposals execute immediately on threshold."
+                : `${formatTimeLock(data.timeLock)} between approval and execution.`
+            }
+            action={
+              <StatusPill tone={data.timeLock > 0 ? "accent" : "neutral"}>
+                {data.timeLock === 0 ? "Off" : "On"}
+              </StatusPill>
+            }
+          />
+          <div className="px-5 py-3.5">
+            <p className="text-sm font-medium text-ink">Adjust time lock</p>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              Members get a window to spot and cancel a compromised approval. Range: 0 to 168 hours
+              (7 days). Changes require multisig approval.
+            </p>
+            <input
+              id="timelock-slider"
+              type="range"
+              min={0}
+              max={168}
+              step={1}
+              value={timeLockHoursDraft ?? Math.round(data.timeLock / 3600)}
+              onChange={(e) => setTimeLockHoursDraft(Number(e.target.value))}
+              className="mt-3 w-full accent-accent"
+              aria-label="Time lock hours"
+            />
+            <div className="mt-1 flex items-center justify-between text-xs">
+              <span className="font-mono text-ink">
+                {timeLockHoursDraft === null
+                  ? data.timeLock === 0
+                    ? "Disabled"
+                    : `${Math.round(data.timeLock / 3600)}h`
+                  : timeLockHoursDraft === 0
+                    ? "Disabled"
+                    : `${timeLockHoursDraft}h`}
+              </span>
+              <span className="text-ink-subtle">
+                Current: {data.timeLock === 0 ? "Disabled" : formatTimeLock(data.timeLock)}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (timeLockHoursDraft === null) return;
+                void handleApplyTimeLock(timeLockHoursDraft * 3600);
+              }}
+              disabled={
+                applyingTimeLock ||
+                timeLockHoursDraft === null ||
+                timeLockHoursDraft * 3600 === data.timeLock
+              }
+              className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-50"
+            >
+              {applyingTimeLock ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Check className="h-3 w-3" />
+              )}
+              {applyingTimeLock ? "Creating proposal…" : "Apply (creates a proposal)"}
+            </button>
+          </div>
         </Section>
 
         {/* Privacy */}

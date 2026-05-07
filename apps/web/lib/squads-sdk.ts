@@ -1,5 +1,6 @@
 "use client";
 
+import { simulateAndOptimize } from "@/lib/tx-optimization";
 import { translateOnchainError } from "@cloak-squads/core/onchain-error";
 import { buildIssueLicenseProposal } from "@cloak-squads/core/squads-adapter";
 import type {
@@ -9,9 +10,13 @@ import type {
   Signer,
   TransactionInstruction,
 } from "@solana/web3.js";
-import { SendTransactionError, Transaction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
+import {
+  SendTransactionError,
+  Transaction,
+  TransactionMessage,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
-import { simulateAndOptimize } from "@/lib/tx-optimization";
 
 const IS_DEV = process.env.NODE_ENV === "development";
 
@@ -73,7 +78,10 @@ export async function createInitCofreProposal(params: {
 }) {
   assertBrowserSquadsWallet(params.wallet);
   const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
-  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: params.vaultIndex ?? 0 });
+  const [vaultPda] = multisig.getVaultPda({
+    multisigPda: params.multisigPda,
+    index: params.vaultIndex ?? 0,
+  });
   const latestBlockhash = await params.connection.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: vaultPda,
@@ -159,8 +167,9 @@ export async function createVaultProposal(params: {
   // is created but fails at execute with InvalidAccount (0x177e). Throwing
   // here turns a confusing on-chain failure into a clear client-side error.
   const VAULT_INDEX_PROBE_LIMIT = 32;
-  const probedVaults = Array.from({ length: VAULT_INDEX_PROBE_LIMIT }, (_, i) =>
-    multisig.getVaultPda({ multisigPda: params.multisigPda, index: i })[0],
+  const probedVaults = Array.from(
+    { length: VAULT_INDEX_PROBE_LIMIT },
+    (_, i) => multisig.getVaultPda({ multisigPda: params.multisigPda, index: i })[0],
   );
   for (const ix of params.instructions) {
     for (const key of ix.keys) {
@@ -178,7 +187,10 @@ export async function createVaultProposal(params: {
   }
 
   const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
-  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: sourceVaultIndex });
+  const [vaultPda] = multisig.getVaultPda({
+    multisigPda: params.multisigPda,
+    index: sourceVaultIndex,
+  });
   const latestBlockhash = await params.connection.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: vaultPda,
@@ -204,7 +216,11 @@ export async function createVaultProposal(params: {
   });
 
   const coreIxs = [createVaultIx, createProposalIx];
-  const { budgetIxs, simulationErr, logs: simLogs } = await simulateAndOptimize({
+  const {
+    budgetIxs,
+    simulationErr,
+    logs: simLogs,
+  } = await simulateAndOptimize({
     connection: params.connection,
     instructions: coreIxs,
     payer: params.wallet.publicKey,
@@ -300,8 +316,9 @@ export async function createBatchIssueLicenseProposal(params: {
   // Same defense as in createVaultProposal: catch vaultIndex drift between
   // the issue_license ix builders and this call.
   const VAULT_INDEX_PROBE_LIMIT = 32;
-  const probedVaults = Array.from({ length: VAULT_INDEX_PROBE_LIMIT }, (_, i) =>
-    multisig.getVaultPda({ multisigPda: params.multisigPda, index: i })[0],
+  const probedVaults = Array.from(
+    { length: VAULT_INDEX_PROBE_LIMIT },
+    (_, i) => multisig.getVaultPda({ multisigPda: params.multisigPda, index: i })[0],
   );
   for (const ix of params.issueLicenseIxs) {
     for (const key of ix.keys) {
@@ -318,7 +335,10 @@ export async function createBatchIssueLicenseProposal(params: {
   }
 
   const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
-  const [vaultPda] = multisig.getVaultPda({ multisigPda: params.multisigPda, index: sourceVaultIndex });
+  const [vaultPda] = multisig.getVaultPda({
+    multisigPda: params.multisigPda,
+    index: sourceVaultIndex,
+  });
   const latestBlockhash = await params.connection.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: vaultPda,
@@ -539,7 +559,11 @@ export async function vaultTransactionExecute(params: {
 
   // Single simulation: builds budget ixs AND surfaces on-chain errors. Wallet adapters
   // often swallow these errors, so we must throw on real failures here.
-  const { budgetIxs, simulationErr, logs: simLogs } = await simulateAndOptimize({
+  const {
+    budgetIxs,
+    simulationErr,
+    logs: simLogs,
+  } = await simulateAndOptimize({
     connection: params.connection,
     instructions: [instruction],
     payer: params.wallet.publicKey,
@@ -598,7 +622,11 @@ export async function vaultTransactionExecute(params: {
           : null;
     if (maybeSendTxErr) {
       let sendLogs: string[] | null = null;
-      try { sendLogs = await maybeSendTxErr.getLogs(params.connection); } catch { /* ignore */ }
+      try {
+        sendLogs = await maybeSendTxErr.getLogs(params.connection);
+      } catch {
+        /* ignore */
+      }
       if (sendLogs && sendLogs.length > 0) {
         logError("[squads-sdk]   on-chain logs:", sendLogs);
         throw new Error(translateOnchainError(sendLogs.join("\n")));
@@ -696,7 +724,10 @@ export async function configTransactionExecute(params: {
       log("[squads-sdk] could not auto-derive spending limits from ConfigTransaction:", err);
     }
   }
-  log("[squads-sdk] configTransactionExecute spendingLimits:", spendingLimits.map((p) => p.toBase58()));
+  log(
+    "[squads-sdk] configTransactionExecute spendingLimits:",
+    spendingLimits.map((p) => p.toBase58()),
+  );
 
   const instruction = multisig.instructions.configTransactionExecute({
     multisigPda: params.multisigPda,
@@ -708,7 +739,11 @@ export async function configTransactionExecute(params: {
   const latestBlockhash = await params.connection.getLatestBlockhash();
 
   // Single simulation: builds budget ixs AND surfaces on-chain errors.
-  const { budgetIxs, simulationErr, logs: simLogs } = await simulateAndOptimize({
+  const {
+    budgetIxs,
+    simulationErr,
+    logs: simLogs,
+  } = await simulateAndOptimize({
     connection: params.connection,
     instructions: [instruction],
     payer: params.wallet.publicKey,
@@ -835,6 +870,47 @@ export async function createRemoveMemberProposal(params: {
     creator: params.wallet.publicKey,
     actions,
     memo: params.memo ?? "Remove member",
+  });
+
+  const proposalIx = multisig.instructions.proposalCreate({
+    multisigPda: params.multisigPda,
+    creator: params.wallet.publicKey,
+    rentPayer: params.wallet.publicKey,
+    transactionIndex,
+  });
+
+  return sendConfigTransaction(
+    params.connection,
+    params.wallet,
+    [configIx, proposalIx],
+    transactionIndex,
+  );
+}
+
+export async function createSetTimeLockProposal(params: {
+  connection: Connection;
+  wallet: BrowserSquadsWallet;
+  multisigPda: PublicKey;
+  /** Seconds; 0 disables the time lock. Capped at 7 days to keep treasury operations responsive. */
+  timeLockSeconds: number;
+  memo?: string;
+}): Promise<{ signature: string; transactionIndex: bigint }> {
+  assertBrowserSquadsWallet(params.wallet);
+  if (
+    !Number.isInteger(params.timeLockSeconds) ||
+    params.timeLockSeconds < 0 ||
+    params.timeLockSeconds > 604_800
+  ) {
+    throw new Error("timeLock must be an integer between 0 and 604800 seconds (7 days).");
+  }
+  const transactionIndex = await nextTransactionIndex(params.connection, params.multisigPda);
+
+  const configIx = multisig.instructions.configTransactionCreate({
+    multisigPda: params.multisigPda,
+    transactionIndex,
+    creator: params.wallet.publicKey,
+    actions: [{ __kind: "SetTimeLock", newTimeLock: params.timeLockSeconds }],
+    memo: params.memo ?? `Set time lock to ${params.timeLockSeconds}s`,
   });
 
   const proposalIx = multisig.instructions.proposalCreate({

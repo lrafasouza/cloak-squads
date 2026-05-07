@@ -5,6 +5,7 @@ import type { CommitmentCheckState } from "@/components/proposal/CommitmentCheck
 import { ExecuteButton } from "@/components/proposal/ExecuteButton";
 import { SimulatePanel } from "@/components/proposal/SimulatePanel";
 import { Button } from "@/components/ui/button";
+import { Countdown } from "@/components/ui/countdown";
 import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/workspace";
 import { isProposalExecuted } from "@/lib/operator-execution-history";
@@ -14,6 +15,7 @@ import { proposalCancel, proposalReject } from "@/lib/squads-sdk";
 import { detectTransactionType } from "@/lib/squads-sdk";
 import { SOL_MINT, formatRawAmount } from "@/lib/tokens";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
+import { useVaultData } from "@/lib/use-vault-data";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import type { CommitmentClaim } from "@cloak-squads/core/commitment";
 import { type MemberVote, getMemberVote } from "@cloak-squads/core/proposal-vote";
@@ -83,7 +85,7 @@ type PayrollDraft = {
 };
 
 const STATUS_CONFIG: Record<
-  ProposalStatusKind | "unknown",
+  ProposalStatusKind | "unknown" | "locked",
   { dot: string; bg: string; text: string; label: string }
 > = {
   draft: { dot: "bg-ink-subtle", bg: "bg-surface-2", text: "text-ink-muted", label: "Draft" },
@@ -94,6 +96,12 @@ const STATUS_CONFIG: Record<
     label: "Awaiting",
   },
   approved: { dot: "bg-accent", bg: "bg-accent-soft", text: "text-accent", label: "Ready" },
+  locked: {
+    dot: "bg-signal-warn",
+    bg: "bg-signal-warn/10",
+    text: "text-signal-warn",
+    label: "Locked",
+  },
   executing: {
     dot: "bg-signal-warn animate-pulse",
     bg: "bg-signal-warn/10",
@@ -121,7 +129,7 @@ const STATUS_CONFIG: Record<
   unknown: { dot: "bg-ink-subtle", bg: "bg-surface-2", text: "text-ink-muted", label: "Unknown" },
 };
 
-function StatusBadge({ status }: { status: ProposalStatusKind | "unknown" }) {
+function StatusBadge({ status }: { status: ProposalStatusKind | "unknown" | "locked" }) {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.unknown;
   return (
     <span
@@ -294,6 +302,9 @@ export default function ProposalApprovalPage({
   const [simResult, setSimResult] = useState<SimulationResult | null>(null);
   const [simulating, setSimulating] = useState(false);
   const [simError, setSimError] = useState<string | null>(null);
+  const [approvedAtSec, setApprovedAtSec] = useState<number | null>(null);
+  const { data: vaultData } = useVaultData(multisigParam);
+  const timeLockSeconds = vaultData?.timeLock ?? 0;
 
   useEffect(() => {
     try {
@@ -392,11 +403,25 @@ export default function ProposalApprovalPage({
       const multisigPda = new PublicKey(multisigParam);
       const [proposalPda] = multisig.getProposalPda({ multisigPda, transactionIndex: BigInt(id) });
       const proposal = await multisig.accounts.Proposal.fromAccountAddress(connection, proposalPda);
-      setStatus(readProposalStatus(proposal.status));
+      const statusKind = readProposalStatus(proposal.status);
+      setStatus(statusKind);
       setApprovals(proposal.approved.length);
       setApprovedVoters(proposal.approved.map((k: PublicKey) => k.toBase58()));
       setRejectedVoters((proposal.rejected ?? []).map((k: PublicKey) => k.toBase58()));
       setMemberVote(getMemberVote(proposal, wallet.publicKey?.toBase58()));
+
+      // Capture the Approved-state timestamp so we can compute when the time
+      // lock expires. The Squads program stamps unix seconds (bignum) on every
+      // status transition; we only care about Approved here.
+      if (statusKind === "approved") {
+        const ts = (proposal.status as { timestamp?: { toString: () => string } }).timestamp;
+        if (ts) {
+          const seconds = Number(ts.toString());
+          if (Number.isFinite(seconds)) setApprovedAtSec(seconds);
+        }
+      } else {
+        setApprovedAtSec(null);
+      }
       if (threshold === null) {
         try {
           const msAccount = await multisig.accounts.Multisig.fromAccountAddress(
@@ -518,14 +543,32 @@ export default function ProposalApprovalPage({
     }
   }, [connection, multisigParam, id, wallet.publicKey]);
 
+  const unlocksAtMs =
+    approvedAtSec !== null && timeLockSeconds > 0 ? (approvedAtSec + timeLockSeconds) * 1000 : null;
+  const [, forceTimeLockTick] = useState(0);
+  // Re-evaluate isLocked once the lock should expire so the Execute button
+  // enables without waiting for the next 3s status poll.
+  useEffect(() => {
+    if (unlocksAtMs === null) return;
+    const remaining = unlocksAtMs - Date.now();
+    if (remaining <= 0) return;
+    const id = setTimeout(() => forceTimeLockTick((n) => n + 1), remaining + 100);
+    return () => clearTimeout(id);
+  }, [unlocksAtMs]);
+  const isLocked = unlocksAtMs !== null && unlocksAtMs > Date.now();
   const approveBlocked =
     (commitmentClaim !== null && commitmentState === "mismatch") || status !== "active";
-  const executeBlocked = status !== "approved";
+  const executeBlocked = status !== "approved" || isLocked;
   const executeComplete = status === "executed" || executeSignature !== null;
   const isPayroll = payrollDraft !== null;
   const isSwap = swapDraft !== null;
 
-  const displayStatus = status === "loading" || status === "missing" ? "unknown" : status;
+  const displayStatus: ProposalStatusKind | "unknown" | "locked" =
+    status === "loading" || status === "missing"
+      ? "unknown"
+      : isLocked && status === "approved"
+        ? "locked"
+        : status;
 
   return (
     <div className="min-h-screen bg-bg">
@@ -560,6 +603,11 @@ export default function ProposalApprovalPage({
                 #{id}
               </h1>
               <StatusBadge status={displayStatus} />
+              {isLocked && unlocksAtMs !== null && (
+                <span className="font-mono text-xs text-signal-warn">
+                  Unlocks in <Countdown to={unlocksAtMs} />
+                </span>
+              )}
               {sourceVaultName && (
                 <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
                   From {sourceVaultName}
@@ -1103,9 +1151,15 @@ export default function ProposalApprovalPage({
                   )}
                   {!executeComplete && executeBlocked && status !== "loading" && (
                     <p className="text-xs text-ink-subtle">
-                      {status === "active" && threshold !== null
-                        ? `Needs ${Math.max(0, threshold - approvals)} more approval${Math.max(0, threshold - approvals) !== 1 ? "s" : ""}.`
-                        : `Execute requires approved status. Current: ${status}.`}
+                      {isLocked && unlocksAtMs !== null ? (
+                        <>
+                          Time lock active. Unlocks in <Countdown to={unlocksAtMs} />.
+                        </>
+                      ) : status === "active" && threshold !== null ? (
+                        `Needs ${Math.max(0, threshold - approvals)} more approval${Math.max(0, threshold - approvals) !== 1 ? "s" : ""}.`
+                      ) : (
+                        `Execute requires approved status. Current: ${status}.`
+                      )}
                     </p>
                   )}
                   {cancelError && (
