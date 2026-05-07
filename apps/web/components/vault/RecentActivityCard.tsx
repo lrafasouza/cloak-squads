@@ -53,20 +53,36 @@ function ProposalRow({
         ? lamportsToSol(p.amount)
         : null;
 
-  const typeLabel = p.type === "payroll" ? "Payroll" : p.type === "single" ? "Transfer" : "Config";
+  const typeLabel =
+    p.type === "payroll"
+      ? "Payroll"
+      : p.type === "single"
+        ? "Transfer"
+        : p.type === "swap"
+          ? "Swap"
+          : "Config";
   const detail =
     p.type === "payroll"
       ? `${p.recipientCount ?? "?"} recipients`
-      : p.recipient && p.recipient !== "Squads vault transaction"
-        ? truncateAddress(p.recipient)
-        : p.title || p.memo || "—";
+      : p.type === "swap"
+        ? p.title || "Swap"
+        : p.recipient && p.recipient !== "Squads vault transaction"
+          ? truncateAddress(p.recipient)
+          : p.title || p.memo || "—";
 
   const time =
     p.createdAt && new Date(p.createdAt).getFullYear() > 1970
       ? relativeTime(new Date(p.createdAt).getTime())
       : null;
 
-  const TypeIcon = p.type === "payroll" ? Users : p.type === "single" ? Send : ArrowRightLeft;
+  const TypeIcon =
+    p.type === "payroll"
+      ? Users
+      : p.type === "single"
+        ? Send
+        : p.type === "swap"
+          ? ArrowRightLeft
+          : ArrowRightLeft;
 
   return (
     <Link

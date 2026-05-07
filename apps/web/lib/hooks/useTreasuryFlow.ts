@@ -118,7 +118,12 @@ export function useTreasuryFlow(multisig: string, windowDays = 30): TreasuryFlow
       if (ts >= windowStart && ts <= now) {
         outflow += lamports;
         outflowEvents.push({ ts, lamports });
-        if (p.hasDraft) {
+        // Privacy split: a flow is private when it carries a Cloak draft AND
+        // wasn't tagged as a public-kind transfer. Payroll drafts have no
+        // `kind` field (always private) and config/swap rows are excluded by
+        // the lamports check above, so this covers single-send public drafts.
+        const isPrivate = p.hasDraft && p.kind !== "public";
+        if (isPrivate) {
           privateOutflow += lamports;
           privateCount += 1;
         } else {

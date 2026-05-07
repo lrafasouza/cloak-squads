@@ -49,6 +49,7 @@ const STATUS_TEXT: Record<string, string> = {
 const KIND_LABEL: Record<ProposalSummary["type"], string> = {
   payroll: "Payroll",
   single: "Transfer",
+  swap: "Swap",
   onchain: "Settings",
 };
 
@@ -56,6 +57,7 @@ function KindIcon({ type }: { type: ProposalSummary["type"] }) {
   const cls = "h-3.5 w-3.5";
   if (type === "payroll") return <Users className={cls} />;
   if (type === "single") return <Send className={cls} />;
+  if (type === "swap") return <ArrowRightLeft className={cls} />;
   return <ArrowRightLeft className={cls} />;
 }
 

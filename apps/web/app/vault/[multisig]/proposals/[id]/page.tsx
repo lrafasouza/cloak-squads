@@ -38,11 +38,14 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 
 type ProposalDraft = {
+  // "private" — Cloak shielded send (default for back-compat)
+  // "public"  — plain Squads transfer; payloadHash + invariants.{commitment,...} are absent
+  kind?: "private" | "public";
   amount: string;
   recipient: string;
   memo: string;
-  payloadHash: number[];
-  invariants: { commitment: number[]; tokenMint?: string };
+  payloadHash: number[] | null;
+  invariants: { commitment?: number[]; tokenMint?: string } | null;
   // Member-tier (default GET) returns this with public fields only;
   // operator-tier GET (?includeSensitive=true) adds keypairPrivateKey/blinding.
   commitmentClaim?: CommitmentClaim;
@@ -523,7 +526,9 @@ export default function ProposalApprovalPage({
                     ? "Swap"
                     : transactionType === "config"
                       ? "Config"
-                      : "Transfer"}{" "}
+                      : draft?.kind === "private"
+                        ? "Private send"
+                        : "Transfer"}{" "}
                 #{id}
               </h1>
               <StatusBadge status={displayStatus} />
@@ -677,7 +682,7 @@ export default function ProposalApprovalPage({
                         Amount
                       </dt>
                       <dd className="font-mono text-lg font-bold tabular-nums text-ink">
-                        {formatRawAmount(draft.amount, draft.invariants.tokenMint ?? SOL_MINT)}
+                        {formatRawAmount(draft.amount, draft.invariants?.tokenMint ?? SOL_MINT)}
                       </dd>
                     </div>
                     <div className="border-t border-border/50 pt-4">
@@ -859,7 +864,15 @@ export default function ProposalApprovalPage({
                       Type
                     </dt>
                     <dd className="text-ink-muted">
-                      {isPayroll ? "Payroll batch" : isSwap ? "Token swap" : "Private send"}
+                      {isPayroll
+                        ? "Payroll batch"
+                        : isSwap
+                          ? "Token swap"
+                          : draft?.kind === "public"
+                            ? "Public transfer"
+                            : draft?.kind === "private"
+                              ? "Private send"
+                              : "Vault transaction"}
                     </dd>
                   </div>
                 </dl>
@@ -957,7 +970,7 @@ export default function ProposalApprovalPage({
                       )}
                     </div>
                   </div>
-                  {(draft !== null || isPayroll) &&
+                  {((draft !== null && draft.kind !== "public") || isPayroll) &&
                     (operatorDelivered ? (
                       <div className="flex items-start gap-2.5 rounded-lg border border-signal-positive/25 bg-signal-positive/10 px-3.5 py-3">
                         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-signal-positive" />
@@ -1000,7 +1013,9 @@ export default function ProposalApprovalPage({
                     transactionIndex={id}
                     onSubmitted={onExecuteSubmitted}
                     disabled={executeBlocked}
-                    requireCofreInitialized={draft !== null || payrollDraft !== null}
+                    requireCofreInitialized={
+                      (draft !== null && draft.kind !== "public") || payrollDraft !== null
+                    }
                     transactionType={transactionType ?? "vault"}
                   />
                   {(status === "active" || status === "approved") && (

@@ -89,6 +89,8 @@ type DraftSummary = {
   memo: string;
   createdAt: string;
   type: "single" | "payroll";
+  // "private" — needs operator delivery; "public" — plain transfer, no operator step.
+  kind?: "private" | "public";
   recipientCount?: number;
   totalAmount?: string;
   invariants?: { tokenMint?: string };
@@ -543,10 +545,14 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         fetchWithAuth(`/api/payrolls/${encodeURIComponent(multisig)}`),
       ]);
       const singleDrafts: DraftSummary[] = singleRes.ok
-        ? ((await singleRes.json()) as DraftSummary[]).map((d) => ({
-            ...d,
-            type: "single" as const,
-          }))
+        ? ((await singleRes.json()) as DraftSummary[])
+            // Operator only handles private (Cloak-shielded) sends. Public
+            // drafts are plain Squads transfers — no operator delivery step.
+            .filter((d) => d.kind !== "public")
+            .map((d) => ({
+              ...d,
+              type: "single" as const,
+            }))
         : [];
       const payrollDrafts: DraftSummary[] = payrollRes.ok
         ? ((await payrollRes.json()) as DraftSummary[]).map((d) => ({

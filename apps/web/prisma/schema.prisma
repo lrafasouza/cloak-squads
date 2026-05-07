@@ -204,14 +204,17 @@ model ProposalDraft {
   cofreAddress     String
   cluster          String?
   transactionIndex String
+  // "private" (default) — Cloak shielded send; carries payloadHash + invariants.
+  // "public"            — plain Squads transfer; payloadHash/invariants are null.
+  kind             String   @default("private")
   amount           String
   recipient        String
   memo             String?
   memoCiphertext   Bytes?
   memoNonce        Bytes?
   memoEphemeralPk  Bytes?
-  payloadHash      Bytes
-  invariants       String
+  payloadHash      Bytes?
+  invariants       String?
   commitmentClaim  String?
   signature        String?
   vaultIndex       Int      @default(0)

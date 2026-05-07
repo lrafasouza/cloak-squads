@@ -13,7 +13,7 @@ export type ProposalStatusKind =
   | "cancelled"
   | "unknown";
 
-export type ProposalSummaryType = "single" | "payroll" | "onchain";
+export type ProposalSummaryType = "single" | "payroll" | "swap" | "onchain";
 
 export type ProposalSummary = {
   id: string;
@@ -30,6 +30,13 @@ export type ProposalSummary = {
   approvals?: number;
   threshold?: number;
   hasDraft: boolean;
+  /**
+   * Persisted draft sub-kind. Only meaningful for `type === "single"`:
+   *   - "private" → Cloak shielded send (operator-delivered, hasCommitmentClaim)
+   *   - "public"  → plain Squads transfer (no operator step, no privacy)
+   * Undefined for payroll/swap/onchain — those have their own type discriminator.
+   */
+  kind?: "private" | "public";
   /** Source vault index of the underlying VaultTransaction. 0 = primary, > 0 = sub-vault. Undefined for ConfigTransactions and unknown reads. */
   sourceVaultIndex?: number | undefined;
 };
@@ -51,8 +58,22 @@ type ApiDraftSummary = {
   recipient: string;
   memo: string;
   createdAt: string;
+  kind?: "private" | "public";
   recipientCount?: number;
   totalAmount?: string;
+};
+
+type ApiSwapDraftSummary = {
+  id: string;
+  transactionIndex: string;
+  inputMint: string;
+  outputMint: string;
+  inputAmount: string;
+  outputAmount: string;
+  inputSymbol: string;
+  outputSymbol: string;
+  memo: string | null;
+  createdAt: string;
 };
 
 export function readProposalStatus(status: unknown): ProposalStatusKind {
@@ -81,9 +102,10 @@ export async function loadPersistedProposalSummaries(
   fetchFn: FetchFn = fetch,
 ): Promise<ProposalSummary[]> {
   const base = multisigAddress.toBase58();
-  const [singleRes, payrollRes] = await Promise.all([
+  const [singleRes, payrollRes, swapRes] = await Promise.all([
     fetchFn(`/api/proposals/${encodeURIComponent(base)}`),
     fetchFn(`/api/payrolls/${encodeURIComponent(base)}`),
+    fetchFn(`/api/swaps/${encodeURIComponent(base)}`),
   ]);
 
   const singleDrafts: ProposalSummary[] = singleRes.ok
@@ -108,7 +130,24 @@ export async function loadPersistedProposalSummaries(
       }))
     : [];
 
-  return [...singleDrafts, ...payrollDrafts];
+  const swapDrafts: ProposalSummary[] = swapRes.ok
+    ? ((await swapRes.json()) as ApiSwapDraftSummary[]).map((draft) => ({
+        id: draft.id,
+        transactionIndex: draft.transactionIndex,
+        // Swap inputAmount is denominated in `inputMint` units (not lamports), so
+        // setting amount="0" suppresses the listing's generic `${amount} SOL`
+        // fallback and lets the swap-specific title carry the meaning.
+        amount: "0",
+        recipient: draft.outputMint,
+        memo: draft.memo ?? "",
+        type: "swap" as const,
+        title: draft.memo || `Swap ${draft.inputSymbol} → ${draft.outputSymbol}`,
+        createdAt: draft.createdAt,
+        hasDraft: true,
+      }))
+    : [];
+
+  return [...singleDrafts, ...payrollDrafts, ...swapDrafts];
 }
 
 function parseConfigActionTitle(actions: unknown[]): string {
@@ -117,7 +156,8 @@ function parseConfigActionTitle(actions: unknown[]): string {
     if (action && typeof action === "object") {
       const kind = (action as { __kind?: unknown }).__kind;
       if (kind === "AddMember") {
-        const newMember = (action as { newMember?: { key?: { toBase58?: () => string } } }).newMember;
+        const newMember = (action as { newMember?: { key?: { toBase58?: () => string } } })
+          .newMember;
         const addr = newMember?.key?.toBase58?.() ?? "unknown";
         return `Add member ${truncateAddress(addr)}`;
       }

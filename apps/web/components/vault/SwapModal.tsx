@@ -15,8 +15,8 @@ import { TokenDropdown } from "@/components/vault/TokenDropdown";
 import { useVaultTokens } from "@/lib/hooks/useVaultTokens";
 import { PROPOSAL_RENT_THRESHOLD_SOL, useWalletSolBalance } from "@/lib/hooks/useWalletSolBalance";
 import {
-  SWAP_PROVIDER,
   type RaydiumQuote,
+  SWAP_PROVIDER,
   formatSwapPreview,
   getRaydiumQuote,
   getRaydiumSwapInstructions,
@@ -24,6 +24,7 @@ import {
 } from "@/lib/raydium-swap";
 import { createVaultProposal } from "@/lib/squads-sdk";
 import { SOL_MINT, USDC_DECIMALS, USDC_MINT, tokenAmountToUnits } from "@/lib/tokens";
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { ArrowLeftRight, Info, Loader2 } from "lucide-react";
@@ -57,6 +58,7 @@ export function SwapModal({
 }) {
   const { connection } = useConnection();
   const wallet = useWallet();
+  const { fetchWithAuth } = useWalletAuth();
   const { startTransaction, updateStep, completeTransaction, failTransaction } =
     useTransactionProgress();
 
@@ -66,7 +68,10 @@ export function SwapModal({
     [subVaultAccounts],
   );
 
-  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig, selectedVaultIndex);
+  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(
+    multisig,
+    selectedVaultIndex,
+  );
   const { sol: walletSol, insufficientForProposal } = useWalletSolBalance();
 
   const [amount, setAmount] = useState("");
@@ -299,6 +304,29 @@ export function SwapModal({
         signature: result.signature,
         description: `Proposal #${result.transactionIndex.toString()} created on-chain.`,
       });
+
+      // Persist swap draft so the proposal page can identify this as a swap.
+      // Non-fatal: the on-chain proposal is the source of truth; if persistence
+      // fails the proposal still works, it just renders with the generic title.
+      void fetchWithAuth("/api/swaps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cofreAddress: multisigAddress.toBase58(),
+          transactionIndex: result.transactionIndex.toString(),
+          inputMint,
+          outputMint,
+          inputAmount: units.toString(),
+          outputAmount: quote.outputAmount,
+          inputSymbol: selectedInputToken?.symbol ?? inputMint.slice(0, 6),
+          outputSymbol: selectedOutputToken?.symbol ?? outputMint.slice(0, 6),
+          memo: `Swap ${amount} ${selectedInputToken?.symbol} → ${selectedOutputToken?.symbol}`,
+          vaultIndex: selectedVaultIndex,
+        }),
+      }).catch(() => {
+        /* non-fatal */
+      });
+
       completeTransaction({
         title: "Swap proposal ready",
         description: `Proposal #${result.transactionIndex.toString()} is ready for signer approval.`,
