@@ -1,6 +1,7 @@
 "use client";
 
 import { AddressPill } from "@/components/ui/address-pill";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useToast } from "@/components/ui/toast-provider";
 import { WarningCallout } from "@/components/ui/warning-callout";
 import { StatusPill, WorkspaceHeader, WorkspacePage } from "@/components/ui/workspace";
@@ -447,6 +448,15 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
                 Open
               </Link>
             }
+          />
+        </Section>
+
+        {/* Appearance */}
+        <Section title="Appearance" description="Theme and visual preferences">
+          <SettingRow
+            label="Theme"
+            value="Follow your system preference, or pin to Heraldic Light or Dark"
+            action={<ThemeToggle size="md" />}
           />
         </Section>
 

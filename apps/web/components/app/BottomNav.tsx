@@ -26,7 +26,7 @@ export function BottomNav() {
   const base = `/vault/${multisig}`;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/[0.04] bg-surface/[0.75] backdrop-blur-xl md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-surface/[0.75] backdrop-blur-xl md:hidden">
       <div className="flex h-16 items-center justify-around pb-safe">
         {NAV.map((item) => {
           const href = `${base}${item.href}`;

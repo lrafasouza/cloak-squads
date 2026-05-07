@@ -503,7 +503,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-bg">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-white/[0.04] bg-surface/[0.5] backdrop-blur-xl md:flex md:flex-col">
+      <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-border/40 bg-surface/[0.5] backdrop-blur-xl md:flex md:flex-col">
         <SidebarContent
           multisig={multisig}
           vaultName={vaultName}
@@ -516,7 +516,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main area */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Topbar — mobile only trigger + wallet + inbox */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-white/[0.04] bg-surface/[0.6] px-4 backdrop-blur-xl md:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-border/40 bg-surface/[0.6] px-4 backdrop-blur-xl md:hidden">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -546,7 +546,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Desktop topbar */}
-        <header className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-3 border-b border-white/[0.04] bg-surface/[0.6] px-6 backdrop-blur-xl md:flex">
+        <header className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-3 border-b border-border/40 bg-surface/[0.6] px-6 backdrop-blur-xl md:flex">
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -584,7 +584,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="absolute inset-0 bg-bg/80 backdrop-blur-sm"
             onClick={() => setMobileNavOpen(false)}
           />
-          <aside className="absolute left-0 top-0 h-full w-[85vw] max-w-80 border-r border-white/[0.04] bg-surface/[0.85] shadow-raise-2 backdrop-blur-xl overflow-y-auto">
+          <aside className="absolute left-0 top-0 h-full w-[85vw] max-w-80 border-r border-border/40 bg-surface/[0.85] shadow-raise-2 backdrop-blur-xl overflow-y-auto">
             <div className="absolute right-3 top-3">
               <button
                 type="button"

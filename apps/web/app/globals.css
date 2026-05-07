@@ -3,16 +3,70 @@
 @tailwind utilities;
 
 /*
- * Aegis — design tokens (Heraldic Dark)
- * Definidos como HSL para suportar `<alpha-value>` no Tailwind.
+ * Aegis — design tokens (Heraldic).
+ *
+ * Two themes share the same heraldic identity:
+ *   :root  → Heraldic Light (warm cream paper, deep gold leaf accent, ink-dark)
+ *   .dark  → Heraldic Dark  (near-black vault, burnished gold accent, ink-light)
+ *
+ * Tokens are HSL triplets so Tailwind's `<alpha-value>` opacity syntax works.
+ * Theme switching swaps ONLY this layer — every component reads tokens.
  */
 @layer base {
+  /* ─── Heraldic Light (default for first paint when no preference) ─── */
   :root {
+    /* Surfaces — warm cream paper, never pure white */
+    --bg: 38 30% 97%;             /* #FBF7F0 — warm off-white */
+    --surface: 38 35% 99%;        /* #FEFCF7 — paper bright */
+    --surface-2: 38 22% 95%;      /* #F2EEE5 — subtle wash */
+    --surface-3: 38 18% 91%;      /* #E9E3D6 — deeper wash */
+    --surface-content: 38 35% 99%;/* same as surface in light */
+
+    /* Borders */
+    --border: 38 14% 85%;         /* #DCD5C5 */
+    --border-strong: 38 12% 70%;  /* #B5AC97 */
+
+    /* Ink — deep navy-charcoal, the colour of vault-stamp ink */
+    --ink: 220 25% 12%;           /* #181D29 */
+    --ink-muted: 220 14% 32%;     /* #45495A */
+    --ink-subtle: 220 8% 50%;     /* #757A85 */
+
+    /* Accent — Old Gold Leaf (darker than dark mode for AAA contrast) */
+    --accent: 30 55% 35%;         /* #8E6D26 */
+    --accent-hover: 30 55% 28%;   /* #74591E */
+    --accent-soft: 36 60% 91%;    /* #F5E9D2 */
+    --accent-ink: 38 35% 99%;     /* cream — text on accent fills */
+
+    /* Brass — lighter gold for active rails */
+    --brass: 30 65% 50%;          /* #C9914A */
+
+    /* Inset highlight — subtle dark on top edge of light cards */
+    --inset-highlight: 220 25% 12% / 0.04;
+
+    /* Signals — desaturated, contrast-safe on light */
+    --signal-positive: 100 35% 30%; /* deep green */
+    --signal-warn: 30 70% 38%;
+    --signal-danger: 0 60% 42%;
+
+    /* Misc */
+    --ring: var(--accent);
+    --radius: 10px;
+
+    /* Glass */
+    --glass-bg: hsl(var(--surface) / 0.78);
+    --glass-border: hsl(var(--border) / 0.6);
+
+    color-scheme: light;
+  }
+
+  /* ─── Heraldic Dark ─── */
+  .dark {
     /* Surfaces */
-    --bg: 220 13% 5%;            /* #0A0B0D */
+    --bg: 220 13% 5%;             /* #0A0B0D */
     --surface: 220 12% 9%;        /* #131519 */
     --surface-2: 220 13% 12%;     /* #1B1E24 */
     --surface-3: 220 13% 16%;
+    --surface-content: 220 12% 11%;/* between surface and surface-2 — main page content area */
 
     /* Borders */
     --border: 222 11% 17%;        /* #262932 */
@@ -29,16 +83,18 @@
     --accent-soft: 36 35% 16%;    /* #3A2F1A */
     --accent-ink: 220 13% 5%;     /* dark text on accent fills */
 
+    /* Brass — lighter gold for active rails */
+    --brass: 39 56% 67%;          /* same as accent-hover; reads as brass on dark */
+
+    /* Inset highlight — light on top edge of dark cards */
+    --inset-highlight: 240 5% 96% / 0.04;
+
     /* Signals */
-    --signal-positive: 100 35% 55%;  /* #7FB069 */
-    --signal-warn: 39 60% 56%;       /* #D4A24C */
-    --signal-danger: 0 47% 56%;      /* #C45A5A */
+    --signal-positive: 100 35% 55%;
+    --signal-warn: 39 60% 56%;
+    --signal-danger: 0 47% 56%;
 
-    /* Misc */
-    --ring: var(--accent);
-    --radius: 10px;
-
-    /* Glassmorphism */
+    /* Glass */
     --glass-bg: hsl(var(--surface) / 0.72);
     --glass-border: hsl(var(--border) / 0.5);
 
@@ -66,7 +122,7 @@
     color: hsl(var(--ink));
   }
 
-  /* Scrollbar — dark, narrow */
+  /* Scrollbar — narrow, theme-aware */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -173,7 +229,7 @@ html.lenis body {
   overflow: hidden;
 }
 
-/* ── Solana Wallet Adapter override ── */
+/* ── Solana Wallet Adapter override — theme-aware via tokens ── */
 .wallet-adapter-button {
   background: hsl(var(--surface-2)) !important;
   color: hsl(var(--ink)) !important;
