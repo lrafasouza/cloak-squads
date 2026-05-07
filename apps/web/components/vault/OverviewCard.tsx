@@ -2,7 +2,6 @@
 
 import { TokenLogo } from "@/components/ui/token-logo";
 import { WarningCallout } from "@/components/ui/warning-callout";
-import { DepositAddressChip } from "@/components/vault/DepositAddressChip";
 import { useSolPrice } from "@/lib/hooks/useSolPrice";
 import type { SubVaultBalance } from "@/lib/use-vault-data";
 import NumberFlow from "@number-flow/react";
@@ -42,7 +41,6 @@ function formatSol(value: string, decimals = 4) {
 }
 
 export function OverviewCard({
-  multisig,
   balanceSol,
   primaryBalanceSol,
   usdcUi,
@@ -210,10 +208,6 @@ export function OverviewCard({
             <ArrowLeftRight className="h-4 w-4" strokeWidth={1.5} />
             Swap
           </button>
-        </div>
-
-        <div className="mt-5">
-          <DepositAddressChip multisig={multisig} vaultIndex={0} vaultName="Primary" />
         </div>
       </div>
 
