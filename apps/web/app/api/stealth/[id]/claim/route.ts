@@ -49,7 +49,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
     }
 
-    if (existing.recipientWallet !== auth.publicKey) {
+    // Bound invoices: the connected wallet must be the recipient encoded at create time.
+    // Bearer invoices: anyone with the link secret can claim — challenge-response over
+    // the stealth signing key (verified in /claim-data) already proves possession.
+    if (existing.mode !== "bearer" && existing.recipientWallet !== auth.publicKey) {
       return NextResponse.json(
         { error: "Connected wallet is not the invoice recipient." },
         { status: 403 },

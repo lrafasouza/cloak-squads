@@ -9,36 +9,47 @@ import { NextResponse } from "next/server";
 import nacl from "tweetnacl";
 import { z } from "zod";
 
-const stealthInvoiceCreateSchema = z.object({
-  cofreAddress: z.string().refine(
-    (val) => {
-      try {
-        new PublicKey(val);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    { message: "Invalid cofre address" },
-  ),
-  invoiceRef: z.string().min(1).max(64).optional(),
-  memo: z.string().max(256).optional(),
-  amount: z.string().refine((val) => /^[0-9]+$/.test(val) && BigInt(val) > 0n, {
-    message: "Amount must be a positive integer in lamports (backend unit)",
-  }),
-  recipientWallet: z.string().refine(
-    (val) => {
-      try {
-        new PublicKey(val);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    { message: "Invalid recipient wallet address" },
-  ),
-  vaultIndex: z.number().int().min(0).max(255).optional(),
-});
+const stealthInvoiceCreateSchema = z
+  .object({
+    cofreAddress: z.string().refine(
+      (val) => {
+        try {
+          new PublicKey(val);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: "Invalid cofre address" },
+    ),
+    invoiceRef: z.string().min(1).max(64).optional(),
+    memo: z.string().max(256).optional(),
+    amount: z.string().refine((val) => /^[0-9]+$/.test(val) && BigInt(val) > 0n, {
+      message: "Amount must be a positive integer in lamports (backend unit)",
+    }),
+    recipientWallet: z
+      .string()
+      .refine(
+        (val) => {
+          try {
+            new PublicKey(val);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { message: "Invalid recipient wallet address" },
+      )
+      .optional(),
+    mode: z.enum(["bound", "bearer"]).default("bound"),
+    expiresInHours: z.number().int().min(1).max(720).optional(),
+    vaultIndex: z.number().int().min(0).max(255).optional(),
+  })
+  .refine((data) => (data.mode === "bound" ? !!data.recipientWallet : !data.recipientWallet), {
+    message:
+      "recipientWallet is required for bound invoices and must be omitted for bearer invoices",
+    path: ["recipientWallet"],
+  });
 
 function base64urlEncode(bytes: Uint8Array): string {
   const binary = Array.from(bytes)
@@ -75,19 +86,34 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { cofreAddress, invoiceRef, memo, amount, recipientWallet, vaultIndex } = parsed.data;
+    const {
+      cofreAddress,
+      invoiceRef,
+      memo,
+      amount,
+      recipientWallet,
+      mode,
+      expiresInHours,
+      vaultIndex,
+    } = parsed.data;
 
     const stealthKp = nacl.box.keyPair();
     const stealthPubkey = bs58.encode(stealthKp.publicKey);
     // Derive Ed25519 signing key from the same seed for challenge-response
     const signKp = nacl.sign.keyPair.fromSeed(stealthKp.secretKey.slice(0, 32));
     const signPubkey = bs58.encode(signKp.publicKey);
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    // Bearer links default to a shorter expiry — they're bearer cash, anyone with
+    // the link can claim, so a 7-day window is too dangerous if it leaks.
+    const defaultHours = mode === "bearer" ? 24 : 24 * 7;
+    const ttlHours = expiresInHours ?? defaultHours;
+    const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
     const invoice = await prisma.stealthInvoice.create({
       data: {
         cofreAddress,
-        recipientWallet,
+        recipientWallet: mode === "bound" ? (recipientWallet ?? null) : null,
+        mode,
         invoiceRef: invoiceRef ?? null,
         memo: memo ?? null,
         stealthPubkey,

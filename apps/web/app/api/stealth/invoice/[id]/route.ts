@@ -21,12 +21,11 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       id: invoice.id,
       cofreAddress: invoice.cofreAddress,
       recipientWallet: invoice.recipientWallet,
+      mode: invoice.mode,
       invoiceRef: invoice.invoiceRef,
       memo: invoice.memo,
       stealthPubkey: invoice.stealthPubkey,
-      amountHint: invoice.amountHint
-        ? Buffer.from(invoice.amountHint).toString("utf-8")
-        : null,
+      amountHint: invoice.amountHint ? Buffer.from(invoice.amountHint).toString("utf-8") : null,
       status: invoice.status,
       expiresAt: invoice.expiresAt.toISOString(),
       createdAt: invoice.createdAt.toISOString(),

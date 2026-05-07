@@ -18,7 +18,46 @@ model AuditLink {
   signature    Bytes
   createdAt    DateTime @default(now())
 
+  accessLogs   AuditAccessLog[]
+
   @@index([cofreAddress])
+}
+
+model AuditAccessLog {
+  id          String   @id @default(uuid())
+  auditLinkId String
+  accessedAt  DateTime @default(now())
+  ip          String?
+  userAgent   String?
+  action      String
+
+  auditLink   AuditLink @relation(fields: [auditLinkId], references: [id], onDelete: Cascade)
+
+  @@index([auditLinkId])
+  @@index([auditLinkId, accessedAt])
+}
+
+model RecurringPayment {
+  id            String    @id @default(uuid())
+  cofreAddress  String
+  vaultIndex    Int       @default(0)
+  label         String
+  recipient     String
+  mode          String    @default("bound")
+  amount        String
+  mint          String
+  cadence       String
+  nextDueAt     DateTime
+  lastRunAt     DateTime?
+  privacy       String    @default("private")
+  status        String    @default("active")
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([cofreAddress])
+  @@index([cofreAddress, status])
+  @@index([nextDueAt])
 }
 
 model Vault {
@@ -85,7 +124,8 @@ model SubVault {
 model StealthInvoice {
   id                  String   @id @default(uuid())
   cofreAddress        String
-  recipientWallet     String
+  recipientWallet     String?
+  mode                String   @default("bound")
   invoiceRef          String?
   memo                String?
   memoCiphertext      Bytes?

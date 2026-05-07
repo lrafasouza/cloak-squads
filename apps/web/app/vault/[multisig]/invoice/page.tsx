@@ -45,7 +45,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
-import { BookOpen, CheckCircle2, Copy, Link2 } from "lucide-react";
+import { AlertTriangle, BookOpen, CheckCircle2, Copy, Link2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
@@ -80,6 +80,8 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   const [memo, setMemo] = useState("");
   const [amount, setAmount] = useState("");
   const [recipientWallet, setRecipientWallet] = useState("");
+  const [invoiceMode, setInvoiceMode] = useState<"bound" | "bearer">("bound");
+  const [bearerExpiryHours, setBearerExpiryHours] = useState<number>(24);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -182,10 +184,12 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       if (!multisigAddress) throw new Error("Invalid multisig address.");
       if (!wallet.publicKey) throw new Error("Connect a multisig member wallet first.");
       if (!selectedToken) throw new Error("Select a token.");
+      if (invoiceMode === "bound" && !recipientWallet.trim()) {
+        throw new Error("Recipient wallet is required for bound invoices.");
+      }
 
       const decimals = selectedToken.decimals;
       const tokenUnits = isSol ? solAmountToLamports(amount) : tokenAmountToUnits(amount, decimals);
-      const recipientPubkey = new PublicKey(recipientWallet.trim());
 
       const [vaultPda] = multisigSdk.getVaultPda({ multisigPda: multisigAddress, index: 0 });
 
@@ -267,7 +271,9 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
           invoiceRef: invoiceRef.trim() || undefined,
           memo: memo.trim() || undefined,
           amount: tokenUnits.toString(),
-          recipientWallet: recipientPubkey.toBase58(),
+          mode: invoiceMode,
+          ...(invoiceMode === "bound" ? { recipientWallet: recipientWallet.trim() } : {}),
+          ...(invoiceMode === "bearer" ? { expiresInHours: bearerExpiryHours } : {}),
           vaultIndex: 0,
         }),
       });
@@ -282,6 +288,17 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
       };
       updateStep("invoice", { status: "success", description: "Claim link created." });
       updateStep("commitment", { status: "running" });
+
+      // Resolve the viewing key bound into the UTXO commitment.
+      // - Bound mode: the recipient wallet picked at create time.
+      // - Bearer mode: the stealth box public key returned by the API. The
+      //   matching secret lives in the URL fragment, so anyone with the link
+      //   can prove ownership at claim time. The actual destination wallet is
+      //   chosen at claim time (passed as the fullWithdraw destination).
+      const recipientPubkey =
+        invoiceMode === "bound"
+          ? new PublicKey(recipientWallet.trim())
+          : new PublicKey(stealthData.stealthPubkey);
 
       // Step 2: Generate Cloak UTXO commitment
       const keypair = await generateUtxoKeypair();
@@ -519,6 +536,51 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                 )}
 
                 <div>
+                  <Label>Link mode</Label>
+                  <div className="mt-1.5 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setInvoiceMode("bound")}
+                      className={`rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+                        invoiceMode === "bound"
+                          ? "border-accent bg-accent-soft text-ink"
+                          : "border-border bg-surface text-ink-muted hover:bg-surface-2"
+                      }`}
+                    >
+                      <div className="font-medium">Bound to wallet</div>
+                      <div className="mt-0.5 text-[11px] text-ink-subtle">
+                        Recipient locked at create time. 7-day expiry.
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInvoiceMode("bearer")}
+                      className={`rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+                        invoiceMode === "bearer"
+                          ? "border-accent bg-accent-soft text-ink"
+                          : "border-border bg-surface text-ink-muted hover:bg-surface-2"
+                      }`}
+                    >
+                      <div className="font-medium">Bearer link</div>
+                      <div className="mt-0.5 text-[11px] text-ink-subtle">
+                        Anyone with the link picks the destination at claim time.
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {invoiceMode === "bearer" && (
+                  <div className="flex gap-2 rounded-lg border border-signal-warn/30 bg-signal-warn/5 px-3 py-2.5 text-[11px] leading-relaxed text-ink-muted">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-signal-warn" />
+                    <span>
+                      <span className="font-medium text-ink">Bearer cash.</span> Anyone with the
+                      link can claim. Treat the URL as a private secret — share over a confidential
+                      channel and use a short expiry.
+                    </span>
+                  </div>
+                )}
+
+                <div>
                   <Label htmlFor="invoiceRef">Invoice reference</Label>
                   <Input
                     id="invoiceRef"
@@ -576,19 +638,41 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="recipient">Recipient wallet</Label>
-                  <Input
-                    id="recipient"
-                    type="text"
-                    autoComplete="off"
-                    spellCheck={false}
-                    value={recipientWallet}
-                    onChange={(e) => setRecipientWallet(e.target.value)}
-                    placeholder="Solana wallet address"
-                    className="mt-1.5 font-mono"
-                  />
-                </div>
+                {invoiceMode === "bound" ? (
+                  <div>
+                    <Label htmlFor="recipient">Recipient wallet</Label>
+                    <Input
+                      id="recipient"
+                      type="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={recipientWallet}
+                      onChange={(e) => setRecipientWallet(e.target.value)}
+                      placeholder="Solana wallet address"
+                      className="mt-1.5 font-mono"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <Label htmlFor="bearerExpiry">Link expires in</Label>
+                    <select
+                      id="bearerExpiry"
+                      value={bearerExpiryHours}
+                      onChange={(e) => setBearerExpiryHours(Number(e.target.value))}
+                      className="mt-1.5 block w-full rounded-md border border-border-strong bg-surface-2 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      <option value={1}>1 hour</option>
+                      <option value={6}>6 hours</option>
+                      <option value={24}>24 hours (default)</option>
+                      <option value={72}>3 days</option>
+                      <option value={168}>7 days</option>
+                      <option value={720}>30 days (max)</option>
+                    </select>
+                    <p className="mt-1 text-[11px] text-ink-subtle">
+                      Shorter expiry limits the blast radius if the link leaks.
+                    </p>
+                  </div>
+                )}
 
                 <label className="flex items-start gap-2 text-sm text-ink-muted">
                   <input
@@ -597,13 +681,20 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                     onChange={(e) => setConfirmChecked(e.target.checked)}
                     className="mt-0.5 h-4 w-4 rounded border-border accent-accent"
                   />
-                  I confirm the recipient and amount are correct before creating this invoice.
+                  {invoiceMode === "bound"
+                    ? "I confirm the recipient and amount are correct before creating this invoice."
+                    : "I understand anyone with this link can claim — I'll share it over a private channel."}
                 </label>
 
                 {!pending && (
                   <Button
                     type="submit"
-                    disabled={!confirmChecked || !amount || !recipientWallet || !wallet.publicKey}
+                    disabled={
+                      !confirmChecked ||
+                      !amount ||
+                      (invoiceMode === "bound" && !recipientWallet) ||
+                      !wallet.publicKey
+                    }
                     className="w-full"
                   >
                     Create invoice + proposal

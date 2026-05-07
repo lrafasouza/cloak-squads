@@ -25,7 +25,8 @@ import { use, useEffect, useState } from "react";
 type StealthInvoice = {
   id: string;
   cofreAddress: string;
-  recipientWallet: string;
+  recipientWallet: string | null;
+  mode: "bound" | "bearer";
   invoiceRef: string | null;
   memo: string | null;
   stealthPubkey: string;
@@ -184,7 +185,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
     };
 
     void loadInvoice();
-  }, [fetchWithAuth, stealthId, secretKey]);
+  }, [stealthId, secretKey]);
 
   const handleClaim = async () => {
     if (!invoice || !wallet.publicKey || !secretKey) return;
@@ -501,18 +502,37 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
 
                 {!wallet.publicKey ? (
                   <p className="mt-4 text-sm text-amber-300">Connect your wallet to continue.</p>
-                ) : invoice.recipientWallet !== wallet.publicKey.toBase58() ? (
+                ) : invoice.mode === "bound" &&
+                  invoice.recipientWallet !== wallet.publicKey.toBase58() ? (
                   <div className="mt-4 rounded-md border border-red-900 bg-red-950 p-3 text-sm text-red-200">
                     <p className="font-medium">Wrong wallet</p>
                     <p className="mt-1 text-xs text-signal-danger">
                       This invoice was created for wallet{" "}
-                      <span className="font-mono">{truncateAddress(invoice.recipientWallet)}</span>.
-                      Connect that wallet to claim.
+                      <span className="font-mono">
+                        {invoice.recipientWallet
+                          ? truncateAddress(invoice.recipientWallet)
+                          : "(unknown)"}
+                      </span>
+                      . Connect that wallet to claim.
                     </p>
                   </div>
                 ) : (
                   <div className="mt-4">
-                    <p className="mb-3 text-sm text-accent">Correct wallet connected</p>
+                    {invoice.mode === "bearer" ? (
+                      <div className="mb-4 rounded-md border border-amber-700/40 bg-amber-900/10 p-3 text-xs text-amber-200">
+                        <p className="font-medium">Bearer invoice</p>
+                        <p className="mt-1">
+                          Anyone holding this link can claim. Funds will withdraw to{" "}
+                          <span className="font-mono">
+                            {truncateAddress(wallet.publicKey.toBase58())}
+                          </span>{" "}
+                          — the wallet you're connected with right now. Switch wallets before
+                          clicking Claim if you want a different destination.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="mb-3 text-sm text-accent">Correct wallet connected</p>
+                    )}
                     <Button onClick={handleClaim} disabled={claiming}>
                       {claiming ? "Claiming funds..." : "Claim funds"}
                     </Button>

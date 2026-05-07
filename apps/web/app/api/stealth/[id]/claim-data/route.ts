@@ -1,6 +1,6 @@
-import { prisma } from "@/lib/prisma";
 import { checkChallenge, consumeChallenge } from "@/lib/claim-challenge";
 import { decryptField, isEncrypted } from "@/lib/field-crypto";
+import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { requireWalletAuth } from "@/lib/wallet-auth";
 import bs58 from "bs58";
@@ -28,7 +28,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const hdrs = await headers();
   const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
   const ip = (raw.split(",")[0] ?? raw).trim();
-  if (!(await checkRateLimitAsync(rateLimitBucket(ip, "claim-data", auth.publicKey), "signature"))) {
+  if (
+    !(await checkRateLimitAsync(rateLimitBucket(ip, "claim-data", auth.publicKey), "signature"))
+  ) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
@@ -51,7 +53,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
     }
 
-    if (invoice.recipientWallet !== auth.publicKey) {
+    // Bound invoices require the connected wallet to match the recipient encoded
+    // at create time. Bearer invoices skip this check — possession of the stealth
+    // signing key (verified below via the challenge signature) is the access proof.
+    if (invoice.mode !== "bearer" && invoice.recipientWallet !== auth.publicKey) {
       return NextResponse.json(
         { error: "Connected wallet is not the invoice recipient." },
         { status: 403 },
@@ -61,7 +66,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // All invoices must have signPubkey — legacy invoices were voided by migration.
     if (!invoice.signPubkey) {
       return NextResponse.json(
-        { error: "Invoice is not eligible for claim (missing signing key). Please request a new invoice." },
+        {
+          error:
+            "Invoice is not eligible for claim (missing signing key). Please request a new invoice.",
+        },
         { status: 403 },
       );
     }
@@ -90,17 +98,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const signatureBytes = base64urlDecode(parsed.data.challengeSignature);
     const signPubkeyBytes = bs58.decode(invoice.signPubkey);
 
-    const validSig = nacl.sign.detached.verify(
-      challenge,
-      signatureBytes,
-      signPubkeyBytes,
-    );
+    const validSig = nacl.sign.detached.verify(challenge, signatureBytes, signPubkeyBytes);
 
     if (!validSig) {
-      return NextResponse.json(
-        { error: "Invalid challenge signature." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Invalid challenge signature." }, { status: 403 });
     }
 
     // Step 4: Atomically consume the challenge (one-time use).
