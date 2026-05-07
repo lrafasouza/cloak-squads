@@ -33,7 +33,6 @@ import {
   Shield,
   ShieldAlert,
   Users,
-  Vault,
   Wallet,
   X,
 } from "lucide-react";
@@ -551,8 +550,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-3 text-xs font-medium text-ink-muted cursor-default">
-                  <Vault className="h-3.5 w-3.5 text-ink-subtle" />
+                <div className="inline-flex h-8 items-center rounded-md border border-border bg-surface px-3 text-xs font-medium text-ink-muted cursor-default">
                   <span className="tabular-nums">{usdValue ?? `${balanceSol} SOL`}</span>
                 </div>
               </TooltipTrigger>
