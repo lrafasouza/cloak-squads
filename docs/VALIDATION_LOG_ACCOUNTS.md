@@ -7,6 +7,21 @@ This log is the single source of truth for what was actually verified vs what is
 
 ---
 
+## ✅ BUG-6 — RESOLVED 2026-05-07 (parametrized vault_index in runtime handlers)
+
+**Resolution summary:** parametrized `issue_license`, `revoke_audit`, and `emergency_close_license` to accept `vault_index: u8` as instruction data. Admin handlers (`init_cofre`, `set_operator`, `add_signer_view`, `remove_signer_view`, `init_view_distribution`) remain hardcoded to vault[0] by design — these are governance-critical and should require Primary threshold.
+
+- Program upgraded on devnet at slot `460739362` (program ID `AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq` preserved).
+- IDL bumped 0.1.0 → 0.2.0; copied to `apps/web/lib/idl/`.
+- Front-end locks removed in SendModal, send/page, payroll/page, invoice/page, recurring/page, sub-vaults/page.
+- New integration test `tests/integration/f1-send-from-subvault.test.ts` proves vault[1] can issue+execute a license.
+- `createVaultProposal` and `createBatchIssueLicenseProposal` now assert that no inner ix marks a foreign vault PDA as signer (defense in depth against vaultIndex drift).
+- `translateOnchainError` maps `InstructionDidNotDeserialize` to a friendly "hard-refresh" message for stale-bundle scenarios.
+
+Original bug report below for historical context.
+
+---
+
 ## 🛑 BUG-6 — Private ops from sub-vault are architecturally impossible (2026-05-06 ~22:00)
 
 **Reported by user:** payroll proposal #23 (Jetsul → recipients) was created and approved, but `VaultTransactionExecute` fails with:
