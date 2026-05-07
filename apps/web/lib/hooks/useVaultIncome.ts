@@ -152,7 +152,7 @@ export function useVaultIncomeSync(multisig: string): void {
     };
 
     const subId = connection.onAccountChange(vaultPda, onChange, "confirmed");
-    console.info(
+    console.debug(
       `[income-sync] watching vault PDA ${vaultPda.toBase58()} for deposits (subId=${subId}, rpc=${connection.rpcEndpoint.replace(/\?api-key=.*/, "?api-key=***")})`,
     );
 
@@ -204,7 +204,7 @@ async function refreshIncomeFromChain(
     if (res?.ok) {
       const data = (await res.json().catch(() => null)) as { entries?: IncomeEntry[] } | null;
       const count = data?.entries?.length ?? 0;
-      console.info(`[income-sync] force-sync returned ${count} entries`);
+      console.debug(`[income-sync] force-sync returned ${count} entries`);
       if (data?.entries) {
         queryClient.setQueryData(vaultIncomeQueryKey(multisig), data.entries);
       }
