@@ -447,9 +447,29 @@ export default function RecurringPage({
 
         updateStep("persist", { status: "success" });
         updateStep("bump", { status: "running" });
-        await fetchWithAuth(
+        const bumpRes = await fetchWithAuth(
           `/api/recurring/${encodeURIComponent(multisigAddress.toBase58())}/${encodeURIComponent(item.id)}/run`,
           { method: "POST" },
+        );
+        if (!bumpRes.ok) {
+          const body = (await bumpRes.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(
+            body?.error ??
+              "Proposal landed on-chain but the schedule did not roll forward. Reload the page.",
+          );
+        }
+        const bumpData = (await bumpRes.json()) as {
+          lastRunAt: string | null;
+          nextDueAt: string;
+        };
+        // Patch local state right away so the row reflects the new schedule
+        // before the background reload returns.
+        setItems((prev) =>
+          prev.map((p) =>
+            p.id === item.id
+              ? { ...p, lastRunAt: bumpData.lastRunAt, nextDueAt: bumpData.nextDueAt }
+              : p,
+          ),
         );
         updateStep("bump", { status: "success" });
         completeTransaction({
@@ -524,9 +544,27 @@ export default function RecurringPage({
       });
 
       updateStep("bump", { status: "running" });
-      await fetchWithAuth(
+      const bumpRes = await fetchWithAuth(
         `/api/recurring/${encodeURIComponent(multisigAddress.toBase58())}/${encodeURIComponent(item.id)}/run`,
         { method: "POST" },
+      );
+      if (!bumpRes.ok) {
+        const body = (await bumpRes.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(
+          body?.error ??
+            "Proposal landed on-chain but the schedule did not roll forward. Reload the page.",
+        );
+      }
+      const bumpData = (await bumpRes.json()) as {
+        lastRunAt: string | null;
+        nextDueAt: string;
+      };
+      setItems((prev) =>
+        prev.map((p) =>
+          p.id === item.id
+            ? { ...p, lastRunAt: bumpData.lastRunAt, nextDueAt: bumpData.nextDueAt }
+            : p,
+        ),
       );
       updateStep("bump", { status: "success" });
       completeTransaction({
@@ -708,7 +746,7 @@ export default function RecurringPage({
               icon={AlertCircle}
               tone="danger"
               items={groups.due}
-              running={running}
+              runningId={running}
               onRun={handleRun}
               onPause={handlePauseToggle}
               onDelete={(id) => setConfirmDelete(id)}
@@ -721,7 +759,7 @@ export default function RecurringPage({
               icon={Calendar}
               tone="neutral"
               items={groups.upcoming}
-              running={running}
+              runningId={running}
               onRun={handleRun}
               onPause={handlePauseToggle}
               onDelete={(id) => setConfirmDelete(id)}
@@ -734,7 +772,7 @@ export default function RecurringPage({
               icon={Pause}
               tone="muted"
               items={groups.paused}
-              running={running}
+              runningId={running}
               onRun={handleRun}
               onPause={handlePauseToggle}
               onDelete={(id) => setConfirmDelete(id)}
@@ -775,7 +813,7 @@ function SectionList({
   icon: Icon,
   tone,
   items,
-  running,
+  runningId,
   onRun,
   onPause,
   onDelete,
@@ -785,7 +823,7 @@ function SectionList({
   icon: typeof AlertCircle;
   tone: "danger" | "neutral" | "muted";
   items: RecurringPayment[];
-  running: string | null;
+  runningId: string | null;
   onRun: (item: RecurringPayment) => void;
   onPause: (item: RecurringPayment) => void;
   onDelete: (id: string) => void;
@@ -797,6 +835,7 @@ function SectionList({
       : tone === "muted"
         ? "text-ink-subtle"
         : "text-ink-muted";
+  const anyRunning = runningId !== null;
 
   return (
     <div>
@@ -810,7 +849,8 @@ function SectionList({
           <RecurringRow
             key={item.id}
             item={item}
-            running={running === item.id}
+            isRunning={runningId === item.id}
+            anyRunning={anyRunning}
             onRun={() => onRun(item)}
             onPause={() => onPause(item)}
             onDelete={() => onDelete(item.id)}
@@ -824,14 +864,16 @@ function SectionList({
 
 function RecurringRow({
   item,
-  running,
+  isRunning,
+  anyRunning,
   onRun,
   onPause,
   onDelete,
   connectedWallet,
 }: {
   item: RecurringPayment;
-  running: boolean;
+  isRunning: boolean;
+  anyRunning: boolean;
   onRun: () => void;
   onPause: () => void;
   onDelete: () => void;
@@ -907,17 +949,32 @@ function RecurringRow({
           <Button
             size="sm"
             onClick={onRun}
-            disabled={running || !connectedWallet}
+            disabled={anyRunning || !connectedWallet}
             variant={due.tone === "danger" || due.tone === "warning" ? "default" : "outline"}
+            title={
+              anyRunning && !isRunning
+                ? "Another schedule is running. Wait for it to finish."
+                : undefined
+            }
           >
-            <Send className="mr-1.5 h-3.5 w-3.5" />
-            {running ? "Running" : "Run now"}
+            {isRunning ? (
+              <>
+                <span className="mr-1.5 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                Running
+              </>
+            ) : (
+              <>
+                <Send className="mr-1.5 h-3.5 w-3.5" />
+                Run now
+              </>
+            )}
           </Button>
         )}
         <button
           type="button"
           onClick={onPause}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+          disabled={isRunning}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
           aria-label={isPaused ? "Resume schedule" : "Pause schedule"}
           title={isPaused ? "Resume" : "Pause"}
         >
@@ -926,7 +983,8 @@ function RecurringRow({
         <button
           type="button"
           onClick={onDelete}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-surface-2 hover:text-signal-danger"
+          disabled={isRunning}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-surface-2 hover:text-signal-danger disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Delete schedule"
           title="Delete"
         >
