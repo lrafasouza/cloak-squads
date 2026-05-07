@@ -20,13 +20,16 @@ function adapterNetworkFromEnv() {
 
 export function WalletProviders({ children }: { children: ReactNode }) {
   const endpoint = process.env.NEXT_PUBLIC_RPC_URL ?? clusterApiUrl(adapterNetworkFromEnv());
+  // Helius needs the api-key on the WS URL too. web3.js derives wss from the
+  // HTTP URL but strips query strings, so we pass it explicitly when set.
+  const wsEndpoint = process.env.NEXT_PUBLIC_RPC_WS_URL;
 
   // Empty array: @solana/wallet-adapter-react v0.15 auto-detects all installed wallets
   // that implement the Wallet Standard (Phantom, Backpack, Solflare, Coinbase, Glow, etc.)
   const wallets = useMemo(() => [], []);
 
   return (
-    <ConnectionProvider endpoint={endpoint}>
+    <ConnectionProvider endpoint={endpoint} {...(wsEndpoint ? { config: { wsEndpoint } } : {})}>
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>

@@ -31,7 +31,8 @@ async function getOrcaDevnetQuote(
 ) {
   await ensureDevnetConfig();
 
-  const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.devnet.solana.com";
+  const rpcUrl = process.env.FALLBACK_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL;
+  if (!rpcUrl) throw new Error("RPC URL not configured (FALLBACK_RPC_URL or NEXT_PUBLIC_RPC_URL).");
   const rpc = createSolanaRpc(rpcUrl);
   const inputMintPk = inputMint === SOL_MINT ? SOL_MINT : DEVNET_USDC;
 

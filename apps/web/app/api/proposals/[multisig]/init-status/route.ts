@@ -3,7 +3,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import { NextResponse } from "next/server";
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.devnet.solana.com";
+const RPC_URL = process.env.FALLBACK_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? "";
 const SQUADS_PROGRAM_ID = process.env.NEXT_PUBLIC_SQUADS_PROGRAM_ID;
 
 export type InitStatusResponse = {
@@ -27,6 +27,10 @@ export async function GET(_request: Request, context: { params: Promise<{ multis
   }
 
   const multisigPda = new PublicKey(multisigAddress);
+
+  if (!RPC_URL) {
+    return NextResponse.json({ error: "RPC URL not configured." }, { status: 500 });
+  }
 
   const connection = new Connection(RPC_URL, { commitment: "confirmed" });
 

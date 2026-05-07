@@ -13,10 +13,7 @@ export type IncomeEntry = {
   toLabel?: string | undefined; // undefined = primary vault
 };
 
-const RPC_URL =
-  process.env.FALLBACK_RPC_URL ??
-  process.env.NEXT_PUBLIC_RPC_URL ??
-  "https://api.devnet.solana.com";
+const RPC_URL = process.env.FALLBACK_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? "";
 const SQUADS_PROGRAM_ID = process.env.NEXT_PUBLIC_SQUADS_PROGRAM_ID ?? "";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -103,6 +100,10 @@ export async function GET(
     multisigPk = new PublicKey(multisig);
   } catch {
     return NextResponse.json({ error: "Invalid multisig address." }, { status: 400 });
+  }
+
+  if (!RPC_URL) {
+    return NextResponse.json({ error: "RPC URL not configured." }, { status: 500 });
   }
 
   let squadsProgram: PublicKey;

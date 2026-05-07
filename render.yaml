@@ -14,8 +14,16 @@ services:
         value: production
       - key: NEXT_PUBLIC_SOLANA_CLUSTER
         value: devnet
+      # Helius RPC. Set values in the Render dashboard (sync: false keeps the
+      # api-key out of git). Format:
+      #   https://devnet.helius-rpc.com/?api-key=YOUR_KEY
+      #   wss://devnet.helius-rpc.com/?api-key=YOUR_KEY
       - key: NEXT_PUBLIC_RPC_URL
-        value: https://api.devnet.solana.com
+        sync: false
+      - key: NEXT_PUBLIC_RPC_WS_URL
+        sync: false
+      - key: FALLBACK_RPC_URL
+        sync: false
       - key: NEXT_PUBLIC_CLOAK_PROGRAM_ID
         value: Zc1kHfp4rajSMeASFDwFFgkHRjv7dFQuLheJoQus27h
       - key: NEXT_PUBLIC_CLOAK_RELAY_URL

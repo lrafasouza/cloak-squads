@@ -58,7 +58,8 @@ function kitInstructionToWeb3(ix: Instruction): TransactionInstruction {
 async function buildOrcaDevnetSwap(rawSwapData: Record<string, unknown>, walletAddress: string) {
   await ensureDevnetConfig();
 
-  const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.devnet.solana.com";
+  const rpcUrl = process.env.FALLBACK_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL;
+  if (!rpcUrl) throw new Error("RPC URL not configured (FALLBACK_RPC_URL or NEXT_PUBLIC_RPC_URL).");
   const rpc = createSolanaRpc(rpcUrl);
 
   // Validate vault PDA

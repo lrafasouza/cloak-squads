@@ -3,6 +3,10 @@ import { z } from "zod";
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_SOLANA_CLUSTER: z.enum(["devnet", "mainnet-beta", "testnet", "localnet"]),
   NEXT_PUBLIC_RPC_URL: z.string().url(),
+  // Optional explicit WS endpoint. When omitted, web3.js derives it from the
+  // HTTP URL (https → wss). Helius needs the api-key on the WS URL too, so
+  // setting this explicitly avoids losing the query string.
+  NEXT_PUBLIC_RPC_WS_URL: z.string().url().optional(),
   NEXT_PUBLIC_CLOAK_PROGRAM_ID: z.string().min(32),
   NEXT_PUBLIC_CLOAK_RELAY_URL: z.string().url(),
   NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID: z.string().min(32),
@@ -24,6 +28,7 @@ const serverEnvSchema = z.object({
 export const publicEnv = publicEnvSchema.parse({
   NEXT_PUBLIC_SOLANA_CLUSTER: process.env.NEXT_PUBLIC_SOLANA_CLUSTER,
   NEXT_PUBLIC_RPC_URL: process.env.NEXT_PUBLIC_RPC_URL,
+  NEXT_PUBLIC_RPC_WS_URL: process.env.NEXT_PUBLIC_RPC_WS_URL,
   NEXT_PUBLIC_CLOAK_PROGRAM_ID: process.env.NEXT_PUBLIC_CLOAK_PROGRAM_ID,
   NEXT_PUBLIC_CLOAK_RELAY_URL: process.env.NEXT_PUBLIC_CLOAK_RELAY_URL,
   NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID: process.env.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID,
