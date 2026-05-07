@@ -462,7 +462,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         <WorkspaceHeader
           eyebrow="STEALTH INVOICE"
           title="Invoice sealed"
-          description="Share the claim link before continuing — the recipient needs it after the proposal is executed."
+          description="Share the claim link before continuing. The recipient needs it after the proposal is executed."
         />
 
         <div>
@@ -574,7 +574,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-signal-warn" />
                     <span>
                       <span className="font-medium text-ink">Bearer cash.</span> Anyone with the
-                      link can claim. Treat the URL as a private secret — share over a confidential
+                      link can claim. Treat the URL as a private secret. Share over a confidential
                       channel and use a short expiry.
                     </span>
                   </div>
@@ -617,7 +617,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                     >
                       {selectedToken
                         ? `${selectedToken.uiBalance} ${selectedToken.symbol} available`
-                        : "—"}
+                        : "-"}
                     </button>
                   </div>
                   <div className="mt-1.5 flex gap-2">
@@ -683,7 +683,7 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                   />
                   {invoiceMode === "bound"
                     ? "I confirm the recipient and amount are correct before creating this invoice."
-                    : "I understand anyone with this link can claim — I'll share it over a private channel."}
+                    : "I understand anyone with this link can claim. I'll share it over a private channel."}
                 </label>
 
                 {!pending && (

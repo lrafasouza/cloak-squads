@@ -526,7 +526,7 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                           <span className="font-mono">
                             {truncateAddress(wallet.publicKey.toBase58())}
                           </span>{" "}
-                          — the wallet you're connected with right now. Switch wallets before
+                          . That is the wallet you're connected with right now. Switch wallets before
                           clicking Claim if you want a different destination.
                         </p>
                       </div>
