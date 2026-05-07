@@ -167,6 +167,7 @@ export default function RecurringPage({
   const [showAdd, setShowAdd] = useState(false);
   const [running, setRunning] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmEarlyRun, setConfirmEarlyRun] = useState<RecurringPayment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<StatusFilter>("all");
 
@@ -250,6 +251,17 @@ export default function RecurringPage({
     paused.sort((a, b) => a.label.localeCompare(b.label));
     return { due, upcoming, paused };
   }, [filteredItems]);
+
+  // Entry point from row buttons. If the schedule is not due yet, route
+  // through a confirmation modal so the user has to acknowledge the early
+  // run. Due/overdue runs proceed straight to the on-chain flow.
+  const handleRunRequest = (item: RecurringPayment) => {
+    if (statusOf(item) === "upcoming") {
+      setConfirmEarlyRun(item);
+      return;
+    }
+    void handleRun(item);
+  };
 
   const handleRun = async (item: RecurringPayment) => {
     if (!multisigAddress || !wallet.publicKey) return;
@@ -747,7 +759,7 @@ export default function RecurringPage({
               tone="danger"
               items={groups.due}
               runningId={running}
-              onRun={handleRun}
+              onRun={handleRunRequest}
               onPause={handlePauseToggle}
               onDelete={(id) => setConfirmDelete(id)}
               connectedWallet={!!wallet.publicKey}
@@ -760,7 +772,7 @@ export default function RecurringPage({
               tone="neutral"
               items={groups.upcoming}
               runningId={running}
-              onRun={handleRun}
+              onRun={handleRunRequest}
               onPause={handlePauseToggle}
               onDelete={(id) => setConfirmDelete(id)}
               connectedWallet={!!wallet.publicKey}
@@ -773,7 +785,7 @@ export default function RecurringPage({
               tone="muted"
               items={groups.paused}
               runningId={running}
-              onRun={handleRun}
+              onRun={handleRunRequest}
               onPause={handlePauseToggle}
               onDelete={(id) => setConfirmDelete(id)}
               connectedWallet={!!wallet.publicKey}
@@ -803,6 +815,30 @@ export default function RecurringPage({
         cancelText="Cancel"
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
         onCancel={() => setConfirmDelete(null)}
+      />
+
+      <ConfirmModal
+        open={!!confirmEarlyRun}
+        title="Run before due date?"
+        description={
+          confirmEarlyRun
+            ? `${confirmEarlyRun.label} is not due until ${new Date(
+                confirmEarlyRun.nextDueAt,
+              ).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}. Running now creates a proposal today and rolls the schedule forward by one ${confirmEarlyRun.cadence} period.`
+            : ""
+        }
+        confirmText="Run early"
+        cancelText="Cancel"
+        onConfirm={() => {
+          const item = confirmEarlyRun;
+          setConfirmEarlyRun(null);
+          if (item) void handleRun(item);
+        }}
+        onCancel={() => setConfirmEarlyRun(null)}
       />
     </WorkspacePage>
   );
@@ -950,11 +986,13 @@ function RecurringRow({
             size="sm"
             onClick={onRun}
             disabled={anyRunning || !connectedWallet}
-            variant={due.tone === "danger" || due.tone === "warning" ? "default" : "outline"}
+            variant={due.tone === "danger" || due.tone === "warning" ? "default" : "ghost"}
             title={
               anyRunning && !isRunning
                 ? "Another schedule is running. Wait for it to finish."
-                : undefined
+                : due.tone === "neutral"
+                  ? "Not due yet. Click to run early."
+                  : undefined
             }
           >
             {isRunning ? (
@@ -965,7 +1003,7 @@ function RecurringRow({
             ) : (
               <>
                 <Send className="mr-1.5 h-3.5 w-3.5" />
-                Run now
+                {due.tone === "neutral" ? "Run early" : "Run now"}
               </>
             )}
           </Button>
