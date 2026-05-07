@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useSolPrice } from "@/lib/hooks/useSolPrice";
 import { lamportsToSolDisplay, useTreasuryFlow } from "@/lib/hooks/useTreasuryFlow";
 import { cn } from "@/lib/utils";
-import { ArrowDownRight, ArrowUpRight, Eye, Lock, Minus, Shield } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Eye, HelpCircle, Lock, Minus, Shield } from "lucide-react";
 import { MiniSparkline } from "./MiniSparkline";
 
 /**
@@ -25,25 +25,26 @@ import { MiniSparkline } from "./MiniSparkline";
 export function TreasuryFlowStrip({
   multisig,
   internalAddresses,
+  onPrivacyHelpClick,
 }: {
   multisig: string;
   /** Base58 PDAs the multisig owns (primary + every sub-vault). When provided,
    *  the KPI hook excludes intra-treasury moves from inflow/outflow. The parent
    *  dashboard owns the source of truth (`useVaultData`) and threads it down. */
   internalAddresses?: ReadonlySet<string> | undefined;
+  /** Optional handler for the "?" affordance on the privacy share card. */
+  onPrivacyHelpClick?: () => void;
 }) {
   const flow = useTreasuryFlow(multisig, 30, internalAddresses);
   const { data: solPrice } = useSolPrice();
 
   if (flow.loading) {
+    // Skeleton mirrors the asymmetric ribbon: 3-col / 3-col / 6-col.
     return (
-      <div className="grid gap-3 lg:grid-cols-3">
-        {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            className="h-[148px] rounded-2xl border border-border/60 bg-surface shimmer-bg"
-          />
-        ))}
+      <div className="grid gap-3 lg:grid-cols-12">
+        <div className="h-[148px] rounded-panel border border-border/60 bg-surface shimmer-bg lg:col-span-3" />
+        <div className="h-[148px] rounded-panel border border-border/60 bg-surface shimmer-bg lg:col-span-3" />
+        <div className="h-[148px] rounded-panel border border-border/60 bg-surface shimmer-bg lg:col-span-6" />
       </div>
     );
   }
@@ -58,49 +59,59 @@ export function TreasuryFlowStrip({
   const inflowSol = bigIntLamportsToSolNumber(flow.inflowLamports);
   const outflowSol = bigIntLamportsToSolNumber(flow.outflowLamports);
 
+  // Asymmetric grid (3/3/6): privacy share gets DOUBLE the column real
+  // estate. The width imbalance is the message — the % shielded KPI is the
+  // moat Squads cannot show, so it earns the headline slot.
   return (
-    <div className="grid gap-3 lg:grid-cols-3">
-      <FlowCard
-        label="Inflow"
-        period="Last 30 days"
-        emptyTitle="No inflow yet"
-        emptyDescription="Share the deposit address to start tracking."
-        empty={noInflow}
-        value={`+${lamportsToSolDisplay(flow.inflowLamports)}`}
-        unit="SOL"
-        usd={solPrice ? inflowSol * solPrice : null}
-        delta={flow.inflowDelta}
-        deltaTone={(d) => (d > 0 ? "positive" : d < 0 ? "danger" : "neutral")}
-        sparkValues={inflowSparkValues}
-        sparkTone="positive"
-        sparkId={`inflow-${multisig.slice(0, 8)}`}
-        icon={ArrowDownRight}
-      />
-      <FlowCard
-        label="Outflow"
-        period="Last 30 days"
-        emptyTitle="No outflow yet"
-        emptyDescription="Send your first payment to populate this view."
-        empty={noOutflow}
-        value={lamportsToSolDisplay(flow.outflowLamports)}
-        unit="SOL"
-        usd={solPrice ? outflowSol * solPrice : null}
-        delta={flow.outflowDelta}
-        // For outflow, growth is the unwelcome direction; tone inverts.
-        deltaTone={(d) => (d > 0 ? "danger" : d < 0 ? "positive" : "neutral")}
-        sparkValues={outflowSparkValues}
-        sparkTone="muted"
-        sparkId={`outflow-${multisig.slice(0, 8)}`}
-        icon={ArrowUpRight}
-      />
-      <PrivacyShareCard
-        share={flow.privacyShare}
-        privateCount={flow.privateCount}
-        publicCount={flow.publicCount}
-        privateLamports={flow.privateOutflowLamports}
-        publicLamports={flow.publicOutflowLamports}
-        empty={noOutflow}
-      />
+    <div className="grid gap-3 lg:grid-cols-12">
+      <div className="lg:col-span-3">
+        <FlowCard
+          label="Inflow"
+          period="Last 30 days"
+          emptyTitle="No inflow yet"
+          emptyDescription="Share the deposit address to start tracking."
+          empty={noInflow}
+          value={`+${lamportsToSolDisplay(flow.inflowLamports)}`}
+          unit="SOL"
+          usd={solPrice ? inflowSol * solPrice : null}
+          delta={flow.inflowDelta}
+          deltaTone={(d) => (d > 0 ? "positive" : d < 0 ? "danger" : "neutral")}
+          sparkValues={inflowSparkValues}
+          sparkTone="positive"
+          sparkId={`inflow-${multisig.slice(0, 8)}`}
+          icon={ArrowDownRight}
+        />
+      </div>
+      <div className="lg:col-span-3">
+        <FlowCard
+          label="Outflow"
+          period="Last 30 days"
+          emptyTitle="No outflow yet"
+          emptyDescription="Send your first payment to populate this view."
+          empty={noOutflow}
+          value={lamportsToSolDisplay(flow.outflowLamports)}
+          unit="SOL"
+          usd={solPrice ? outflowSol * solPrice : null}
+          delta={flow.outflowDelta}
+          // For outflow, growth is the unwelcome direction; tone inverts.
+          deltaTone={(d) => (d > 0 ? "danger" : d < 0 ? "positive" : "neutral")}
+          sparkValues={outflowSparkValues}
+          sparkTone="muted"
+          sparkId={`outflow-${multisig.slice(0, 8)}`}
+          icon={ArrowUpRight}
+        />
+      </div>
+      <div className="lg:col-span-6">
+        <PrivacyShareCard
+          share={flow.privacyShare}
+          privateCount={flow.privateCount}
+          publicCount={flow.publicCount}
+          privateLamports={flow.privateOutflowLamports}
+          publicLamports={flow.publicOutflowLamports}
+          empty={noOutflow}
+          {...(onPrivacyHelpClick ? { onHelpClick: onPrivacyHelpClick } : {})}
+        />
+      </div>
     </div>
   );
 }
@@ -158,7 +169,7 @@ function FlowCard({
   icon: typeof ArrowUpRight;
 }) {
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-surface transition-colors duration-200 hover:border-accent/20">
+    <div className="card-panel group relative flex h-full flex-col overflow-hidden">
       <div className="flex items-start justify-between gap-3 px-5 pt-5">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-eyebrow text-ink-subtle">
@@ -234,6 +245,7 @@ function PrivacyShareCard({
   privateLamports,
   publicLamports,
   empty,
+  onHelpClick,
 }: {
   share: number | null;
   privateCount: number;
@@ -241,35 +253,49 @@ function PrivacyShareCard({
   privateLamports: bigint;
   publicLamports: bigint;
   empty: boolean;
+  onHelpClick?: () => void;
 }) {
   const pct = share !== null ? Math.round(share * 100) : null;
 
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-surface transition-colors duration-200 hover:border-accent/20">
-      <div className="flex items-start justify-between gap-3 px-5 pt-5">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-eyebrow text-ink-subtle">
-            <Shield className="h-3 w-3" aria-hidden="true" />
-            Privacy share
-            <span className="text-ink-subtle/60" aria-hidden="true">
-              ·
-            </span>
-            <span className="text-ink-subtle/60 normal-case tracking-normal">Last 30 days</span>
-          </div>
+    <div className="card-panel privacy-halo group relative flex h-full flex-col overflow-hidden">
+      <div className="px-5 pt-5">
+        {/* Eyebrow row — label + period + optional "?" */}
+        <div className="flex items-center gap-1.5 text-eyebrow text-ink-subtle">
+          <Shield className="h-3 w-3" aria-hidden="true" />
+          Privacy share
+          <span className="text-ink-subtle/60" aria-hidden="true">
+            ·
+          </span>
+          <span className="text-ink-subtle/60 normal-case tracking-normal">Last 30 days</span>
+          {onHelpClick && (
+            <button
+              type="button"
+              onClick={onHelpClick}
+              className="ml-auto flex h-4 w-4 items-center justify-center rounded-full text-ink-subtle/70 transition-aegis hover:bg-surface-2 hover:text-accent"
+              aria-label="How privacy works"
+              title="How privacy works"
+            >
+              <HelpCircle className="h-3.5 w-3.5" strokeWidth={1.75} />
+            </button>
+          )}
+        </div>
 
-          {empty ? (
-            <div className="mt-3">
-              <p className="font-display text-2xl font-semibold tracking-tight text-ink-subtle">
-                Awaiting first outflow
-              </p>
-              <p className="mt-1 text-xs text-ink-subtle">
-                Once you send a payment we'll show how much went private.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="mt-2.5 flex items-baseline gap-1.5">
-                <p className="font-display text-3xl font-semibold tabular-nums tracking-tight text-accent">
+        {empty ? (
+          <div className="mt-3">
+            <p className="font-display text-2xl font-semibold tracking-tight text-ink-subtle">
+              Awaiting first outflow
+            </p>
+            <p className="mt-1 text-xs text-ink-subtle">
+              Once you send a payment we'll show how much went private.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-2.5 flex items-end justify-between gap-4">
+            {/* Left — value stack */}
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-1.5">
+                <p className="font-display text-4xl font-semibold tabular-nums tracking-tight text-accent">
                   {pct}%
                 </p>
                 <span className="text-sm font-medium text-ink-subtle">shielded</span>
@@ -281,11 +307,13 @@ function PrivacyShareCard({
                 </span>
                 <span className="tabular-nums">{publicCount}</span> public
               </p>
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* Bar — full-width footer, mirrors how Inflow/Outflow place their
+          sparkline at the bottom. Lives in the same card, no internal split. */}
       <div className="mt-auto px-5 pb-5 pt-4">
         <SegmentedBar
           privateLamports={privateLamports}

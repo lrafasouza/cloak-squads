@@ -26,23 +26,45 @@ export function PendingProposalsCard({
   const pending = proposals.filter(
     (p) => p.status === "active" || p.status === "approved" || p.status === "draft",
   );
-  if (pending.length === 0) return null;
+
+  // Empty state — keep the card present so the dashboard layout stays
+  // stable and to surface a clear "next action" CTA. Eliminates the dead
+  // hole that appeared whenever the queue drained.
+  if (pending.length === 0) {
+    return (
+      <div className="card-panel flex flex-col items-start gap-3 px-5 py-6 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-eyebrow">Proposal Queue</p>
+          <p className="mt-2 text-sm text-ink">No proposals awaiting signatures.</p>
+          <p className="mt-0.5 text-xs text-ink-subtle">
+            Send a payment, run payroll, or initiate a swap to start one.
+          </p>
+        </div>
+        <Link
+          href={`/vault/${multisig}/send`}
+          className="inline-flex h-9 items-center gap-2 rounded-md border border-border-strong bg-transparent px-3.5 text-xs font-semibold text-ink transition-aegis hover:bg-surface-2"
+        >
+          New transaction
+        </Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-surface transition-colors duration-200 hover:border-accent/15">
+    <div className="card-panel">
       {/* Header */}
       <div className="flex items-end justify-between px-5 pt-5 pb-4">
         <div className="flex items-baseline gap-2.5">
           <span className="font-display text-3xl font-semibold tabular-nums tracking-tight text-ink">
             {pending.length}
           </span>
-          <span className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">
+          <span className="text-eyebrow">
             Pending {pending.length === 1 ? "Proposal" : "Proposals"}
           </span>
         </div>
         <Link
           href={`/vault/${multisig}/proposals`}
-          className="text-xs text-ink-subtle transition-colors hover:text-accent"
+          className="text-xs text-ink-subtle transition-aegis hover:text-accent"
         >
           View all
         </Link>
