@@ -18,9 +18,7 @@ const cols = [
   {
     title: "Developers",
     links: [
-      { label: "Documentation", href: "https://docs.aegis.cloak.dev", external: true },
       { label: "GitHub", href: "https://github.com/cloak-dev/aegis", external: true },
-      { label: "SDK guide", href: "https://docs.aegis.cloak.dev/sdk", external: true },
     ],
   },
   {

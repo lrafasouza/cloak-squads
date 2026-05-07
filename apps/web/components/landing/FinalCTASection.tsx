@@ -127,15 +127,6 @@ export function FinalCTASection() {
                 <span>Create your vault</span>
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
-              <a
-                href="https://docs.aegisz.xyz"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-medium text-ink-muted transition-colors hover:text-ink"
-              >
-                Read the docs
-                <ArrowRight className="h-3.5 w-3.5 opacity-60" />
-              </a>
             </div>
           </motion.div>
         </div>
