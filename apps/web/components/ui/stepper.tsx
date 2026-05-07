@@ -20,11 +20,11 @@ export function Stepper({ steps, current, className }: StepperProps) {
             <div className="flex flex-col items-center gap-2.5">
               <div
                 className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors",
+                  "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-aegis",
                   done
-                    ? "bg-accent text-accent-ink"
+                    ? "bg-accent text-accent-ink shadow-raise-1"
                     : active
-                      ? "bg-accent/15 text-accent"
+                      ? "bg-accent-soft text-accent ring-1 ring-accent/35"
                       : "bg-surface-2 text-ink-subtle",
                 )}
               >
@@ -42,7 +42,7 @@ export function Stepper({ steps, current, className }: StepperProps) {
             {i < steps.length - 1 && (
               <div
                 className={cn(
-                  "mx-5 mb-5 h-[2px] w-16 flex-1 transition-colors sm:w-28",
+                  "mx-5 mb-5 h-[2px] w-16 flex-1 transition-aegis sm:w-28",
                   i < current ? "bg-accent/50" : "bg-border",
                 )}
               />

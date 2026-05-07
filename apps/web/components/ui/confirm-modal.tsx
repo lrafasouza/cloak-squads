@@ -1,11 +1,17 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, HelpCircle, X } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Button } from "./button";
+import { AlertTriangle, HelpCircle } from "lucide-react";
+import { type ReactNode, useEffect, useRef } from "react";
 
 interface ConfirmModalProps {
   open: boolean;
@@ -19,6 +25,17 @@ interface ConfirmModalProps {
   isLoading?: boolean;
 }
 
+/**
+ * Generic confirm/destructive modal — used wherever an irreversible
+ * action needs explicit acknowledgement (Remove member, Cancel
+ * recurring, Sign audit export, etc.).
+ *
+ * Uses the Dialog primitive so every confirm modal automatically gets
+ * the heraldic gold seal at the top edge, the modal radius, the
+ * inset highlight, and the same enter/exit easing as Send / Receive /
+ * Swap. Drops the previous local framer-motion implementation in
+ * favour of the shared primitive.
+ */
 export function ConfirmModal({
   open,
   title,
@@ -31,95 +48,69 @@ export function ConfirmModal({
   isLoading = false,
 }: ConfirmModalProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
-  const [mounted, setMounted] = useState(false);
 
+  // Focus the primary action so keyboard users can confirm with Enter
+  // or back out with Escape (Dialog primitive handles ESC).
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (open) {
-      confirmRef.current?.focus();
-    }
+    if (open) confirmRef.current?.focus();
   }, [open]);
 
-  const node = (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-bg/80 backdrop-blur-sm"
-            onClick={onCancel}
-          />
-          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 10 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
+  const isDestructive = confirmVariant === "destructive";
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v && !isLoading) onCancel();
+      }}
+    >
+      <DialogContent size="sm">
+        <DialogHeader>
+          <div className="flex items-start gap-3.5 pr-8">
+            <div
               className={cn(
-                "pointer-events-auto w-[calc(100%-2rem)] max-w-md",
-                "rounded-xl border border-border bg-surface p-6 shadow-raise-2",
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border",
+                isDestructive
+                  ? "border-signal-danger/35 bg-signal-danger/10 text-signal-danger"
+                  : "border-accent/30 bg-accent-soft text-accent",
               )}
             >
-              <div className="relative flex items-start gap-4">
-                <div
-                  className={cn(
-                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-                    confirmVariant === "destructive"
-                      ? "bg-signal-danger/15 text-signal-danger"
-                      : "bg-accent-soft text-accent",
-                  )}
-                >
-                  {confirmVariant === "destructive" ? (
-                    <AlertTriangle className="h-5 w-5" />
-                  ) : (
-                    <HelpCircle className="h-5 w-5" />
-                  )}
-                </div>
-
-                <div className="flex-1 pr-10">
-                  <h3 className="font-display text-lg font-semibold text-ink">{title}</h3>
-                  <div className="mt-2 text-sm text-ink-muted leading-relaxed">{description}</div>
-
-                  <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                    <Button variant="outline" onClick={onCancel} disabled={isLoading}>
-                      {cancelText}
-                    </Button>
-                    <Button
-                      ref={confirmRef}
-                      variant={confirmVariant}
-                      onClick={onConfirm}
-                      disabled={isLoading}
-                      isLoading={isLoading}
-                    >
-                      {confirmText}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="absolute right-0 top-0">
-                  <button
-                    type="button"
-                    onClick={onCancel}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-2 transition-colors"
-                    aria-label="Close"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
+              {isDestructive ? (
+                <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+              ) : (
+                <HelpCircle className="h-5 w-5" aria-hidden="true" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p
+                className={cn(
+                  "text-eyebrow",
+                  isDestructive ? "text-signal-danger" : "text-ink-muted",
+                )}
+              >
+                {isDestructive ? "Destructive · Confirm" : "Confirm"}
+              </p>
+              <DialogTitle className="mt-0.5">{title}</DialogTitle>
+              <DialogDescription>{description}</DialogDescription>
+            </div>
           </div>
-        </>
-      )}
-    </AnimatePresence>
-  );
+        </DialogHeader>
 
-  if (!mounted) return null;
-  return createPortal(node, document.body);
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel} disabled={isLoading}>
+            {cancelText}
+          </Button>
+          <Button
+            ref={confirmRef}
+            variant={confirmVariant}
+            onClick={onConfirm}
+            disabled={isLoading}
+            isLoading={isLoading}
+          >
+            {confirmText}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }

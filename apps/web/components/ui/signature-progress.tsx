@@ -26,7 +26,7 @@ export function SignatureProgress({
             <span
               key={i}
               className={cn(
-                "h-1.5 w-1.5 rounded-full transition-colors",
+                "h-1.5 w-1.5 rounded-full transition-aegis",
                 i < approvals ? "bg-accent" : "bg-border-strong",
               )}
             />
