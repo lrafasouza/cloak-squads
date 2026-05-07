@@ -70,15 +70,19 @@ export function CloakBanner() {
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        "group relative flex flex-col gap-2.5 overflow-hidden rounded-xl border border-white/[0.06] p-3.5",
-        "bg-gradient-to-br from-[#3b21af]/20 via-[#1a1035]/40 to-[#0f0a1e]/60",
-        "transition-all duration-300 hover:from-[#3b21af]/30 hover:via-[#1a1035]/50 hover:to-[#0f0a1e]/70",
-        "hover:border-[#8b5aef]/30 hover:shadow-[0_0_20px_rgba(139,90,239,0.15)]",
-        "hover:-translate-y-0.5"
+        // Self-contained dark-purple "island" — identical in both themes.
+        // Solid bg + opaque purple border so the warm cream surface in light
+        // mode never bleeds through and washes out the Cloak identity.
+        "group relative flex flex-col gap-2.5 overflow-hidden rounded-xl border p-3.5",
+        "border-[#3b21af]/40 bg-[#0f0a1e]",
+        "bg-gradient-to-br from-[#3b21af] via-[#1a1035] to-[#0f0a1e]",
+        "transition-all duration-300",
+        "hover:border-[#8b5aef]/60 hover:shadow-[0_0_24px_rgba(139,90,239,0.25)]",
+        "hover:-translate-y-0.5",
       )}
     >
       {/* Background glow effect */}
-      <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[#8b5aef]/10 blur-2xl transition-all duration-500 group-hover:bg-[#8b5aef]/20" />
+      <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[#8b5aef]/25 blur-2xl transition-all duration-500 group-hover:bg-[#8b5aef]/40" />
       
       {/* Top row: Logo + badge */}
       <div className="relative flex items-center justify-between">
