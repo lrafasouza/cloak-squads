@@ -515,9 +515,9 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredTransactions.map((tx) => (
+                        {filteredTransactions.map((tx, idx) => (
                           <tr
-                            key={tx.nullifier}
+                            key={`${tx.timestamp}-${tx.nullifier}-${idx}`}
                             className="border-b border-border/20 transition-colors last:border-b-0 hover:bg-surface-2/30"
                           >
                             <td className="px-5 py-3.5 whitespace-nowrap text-ink">
