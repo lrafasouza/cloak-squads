@@ -23,25 +23,84 @@ const SYNC_THROTTLE_MS = 30_000;
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Module-level capture so the inspection endpoint can surface fetch errors
+ * without requiring server-log access.
+ */
+let lastFetchError: { message: string; at: string } | null = null;
+
+export function getLastFetchError() {
+  return lastFetchError;
+}
+
+const FETCH_CONCURRENCY = 8;
+
+/**
+ * Fetch parsed transactions one at a time with bounded concurrency, instead
+ * of using `getParsedTransactions` (the batch API). Several RPC providers
+ * return `null` for every entry in a batch call without raising an error
+ * even when the underlying transactions exist; the singular endpoint
+ * handles the same data more reliably. The trade-off is N round-trips
+ * instead of 1, but N is small (we cap upstream at 200 sigs).
+ */
 async function fetchParsedTxBatch(
   connection: Connection,
   signatures: string[],
   attempt = 0,
 ): Promise<(ParsedTransactionWithMeta | null)[]> {
   if (signatures.length === 0) return [];
+
+  const results: (ParsedTransactionWithMeta | null)[] = new Array(signatures.length).fill(null);
+  let cursor = 0;
+  const errors: string[] = [];
+
+  async function worker() {
+    while (cursor < signatures.length) {
+      const idx = cursor++;
+      const sig = signatures[idx];
+      if (!sig) continue;
+      try {
+        const tx = await connection.getParsedTransaction(sig, {
+          commitment: "confirmed",
+          maxSupportedTransactionVersion: 0,
+        });
+        results[idx] = tx;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes("429") && attempt < 3) {
+          // Re-throw to let the outer retry handle the whole batch.
+          throw err;
+        }
+        errors.push(message.slice(0, 200));
+      }
+    }
+  }
+
   try {
-    return await connection.getParsedTransactions(signatures, {
-      commitment: "confirmed",
-      maxSupportedTransactionVersion: 0,
-    });
+    await Promise.all(
+      Array.from({ length: Math.min(FETCH_CONCURRENCY, signatures.length) }, () => worker()),
+    );
   } catch (err) {
-    const is429 = err instanceof Error && err.message.includes("429");
-    if (is429 && attempt < 3) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("429") && attempt < 3) {
       await delay(600 * 2 ** attempt);
       return fetchParsedTxBatch(connection, signatures, attempt + 1);
     }
-    return signatures.map(() => null);
+    lastFetchError = { message: message.slice(0, 500), at: new Date().toISOString() };
+    console.error("[vault-income-sync] getParsedTransaction failed:", message.slice(0, 500));
   }
+
+  if (errors.length > 0 && !lastFetchError) {
+    lastFetchError = {
+      message: `${errors.length}/${signatures.length} singular fetches failed; first: ${errors[0]}`,
+      at: new Date().toISOString(),
+    };
+    console.error(
+      `[vault-income-sync] ${errors.length}/${signatures.length} getParsedTransaction calls returned errors`,
+    );
+  }
+
+  return results;
 }
 
 type ParsedIncome = {
@@ -56,6 +115,7 @@ type ParsedIncome = {
 export type ParseRejection = {
   signature: string;
   reason:
+    | "rpc_returned_null"
     | "tx_meta_missing"
     | "tx_failed"
     | "vault_not_in_accounts"
@@ -362,6 +422,8 @@ export async function syncVaultIncome(
 
 export type SyncInspection = {
   rpcUrl: string;
+  /** RPC hostname (no api key) so we can confirm which provider answered. */
+  rpcHost?: string;
   cluster: string;
   targets: Array<{ vaultIndex: number; address: string; sigsFetched: number }>;
   totalSigsFetched: number;
@@ -371,6 +433,8 @@ export type SyncInspection = {
   parsedAsIncome: number;
   rejections: ParseRejection[];
   newestSigSampled?: { signature: string; blockTime: number; vaultAddress: string };
+  /** Most recent non-429 error from getParsedTransactions, if any. */
+  lastFetchError?: { message: string; at: string };
 };
 
 export async function inspectVaultIncomeSync(multisig: string): Promise<SyncInspection> {
@@ -489,7 +553,10 @@ export async function inspectVaultIncomeSync(multisig: string): Promise<SyncInsp
   for (const t of unseenList) {
     const tx = txMap.get(t.signature);
     if (!tx) {
-      rejections.push({ signature: t.signature, reason: "tx_meta_missing" });
+      // The signature exists per getSignaturesForAddress but the RPC node
+      // returned null when we asked for the parsed body. Distinct from
+      // tx.meta missing inside a returned tx.
+      rejections.push({ signature: t.signature, reason: "rpc_returned_null" });
       continue;
     }
     txsResolved += 1;
@@ -504,6 +571,11 @@ export async function inspectVaultIncomeSync(multisig: string): Promise<SyncInsp
     if (parsed) parsedAsIncome += 1;
   }
 
+  let rpcHost: string | undefined;
+  try {
+    rpcHost = new URL(RPC_URL).hostname;
+  } catch {}
+
   const result: SyncInspection = {
     rpcUrl: "configured",
     cluster,
@@ -515,12 +587,19 @@ export async function inspectVaultIncomeSync(multisig: string): Promise<SyncInsp
     parsedAsIncome,
     rejections: rejections.slice(0, 30),
   };
+  if (rpcHost) {
+    result.rpcHost = rpcHost;
+  }
   if (newest) {
     result.newestSigSampled = {
       signature: newest.signature,
       blockTime: newest.blockTime,
       vaultAddress: newest.vaultAddress,
     };
+  }
+  const fetchErr = getLastFetchError();
+  if (fetchErr) {
+    result.lastFetchError = fetchErr;
   }
   return result;
 }
