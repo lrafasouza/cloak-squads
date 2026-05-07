@@ -2,6 +2,7 @@
 
 import { TokenLogo } from "@/components/ui/token-logo";
 import { WarningCallout } from "@/components/ui/warning-callout";
+import { DepositAddressChip } from "@/components/vault/DepositAddressChip";
 import { useSolPrice } from "@/lib/hooks/useSolPrice";
 import type { SubVaultBalance } from "@/lib/use-vault-data";
 import NumberFlow from "@number-flow/react";
@@ -28,7 +29,11 @@ interface OverviewCardProps {
 }
 
 function usd(value: number) {
-  return value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+  return value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  });
 }
 
 function formatSol(value: string, decimals = 4) {
@@ -37,6 +42,7 @@ function formatSol(value: string, decimals = 4) {
 }
 
 export function OverviewCard({
+  multisig,
   balanceSol,
   primaryBalanceSol,
   usdcUi,
@@ -59,7 +65,10 @@ export function OverviewCard({
   const primarySol = Number.parseFloat(primaryBalanceSol) || 0;
   const accountRows = [
     { label: "Primary", sol: primarySol },
-    ...subVaultBreakdown.map((sv) => ({ label: sv.name, sol: Number.parseFloat(sv.balanceSol) || 0 })),
+    ...subVaultBreakdown.map((sv) => ({
+      label: sv.name,
+      sol: Number.parseFloat(sv.balanceSol) || 0,
+    })),
   ].filter((r) => r.sol > 0 || subVaultBreakdown.length === 0);
 
   const hasSubVaults = subVaultBreakdown.length > 0;
@@ -68,7 +77,6 @@ export function OverviewCard({
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-border/60 bg-surface shadow-raise-1 transition-colors duration-200 hover:border-accent/20">
       <div className="relative p-6 md:p-8">
-
         {/* Header */}
         <div className="flex items-center justify-between">
           <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle/60">
@@ -128,7 +136,6 @@ export function OverviewCard({
           >
             <div className="overflow-hidden">
               <div className="space-y-px rounded-xl border border-border/50 bg-bg/40 overflow-hidden">
-
                 {/* SOL row — always first */}
                 <div className="flex items-center gap-3 px-4 py-3">
                   <TokenLogo symbol="SOL" size={20} />
@@ -136,7 +143,9 @@ export function OverviewCard({
                     <p className="text-sm font-medium text-ink">SOL</p>
                     {hasSubVaults && accountRows.length > 1 && (
                       <p className="text-[10px] text-ink-subtle mt-0.5">
-                        {accountRows.map((r) => `${r.label} ${formatSol(String(r.sol), 3)}`).join(" · ")}
+                        {accountRows
+                          .map((r) => `${r.label} ${formatSol(String(r.sol), 3)}`)
+                          .join(" · ")}
                       </p>
                     )}
                   </div>
@@ -159,13 +168,17 @@ export function OverviewCard({
                     </div>
                     <div className="text-right">
                       <p className="font-mono text-sm font-medium tabular-nums text-ink">
-                        {usdcTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {usdcTotal.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </p>
-                      <p className="text-[11px] tabular-nums text-ink-subtle/50">{usd(usdcTotal)}</p>
+                      <p className="text-[11px] tabular-nums text-ink-subtle/50">
+                        {usd(usdcTotal)}
+                      </p>
                     </div>
                   </div>
                 )}
-
               </div>
             </div>
           </div>
@@ -197,6 +210,10 @@ export function OverviewCard({
             <ArrowLeftRight className="h-4 w-4" strokeWidth={1.5} />
             Swap
           </button>
+        </div>
+
+        <div className="mt-5">
+          <DepositAddressChip multisig={multisig} vaultIndex={0} vaultName="Primary" />
         </div>
       </div>
 
