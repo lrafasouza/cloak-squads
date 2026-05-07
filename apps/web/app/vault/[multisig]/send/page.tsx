@@ -24,7 +24,12 @@ import { createVaultProposal } from "@/lib/squads-sdk";
 import { SOL_MINT, tokenAmountToUnits } from "@/lib/tokens";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
-import { assertPrivateSolMinimum, solAmountToLamports } from "@cloak-squads/core/amount";
+import {
+  MIN_PRIVATE_DEPOSIT_LAMPORTS,
+  MIN_PRIVATE_DEPOSIT_SOL,
+  assertPrivateSolMinimum,
+  solAmountToLamports,
+} from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import { cofrePda } from "@cloak-squads/core/pda";
@@ -210,6 +215,15 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   const amountMin =
     sendMode === "private" && isSol ? "0.01" : isSol ? "0.000000001" : "0.000001";
   const amountPlaceholder = isSol ? "0.0" : "0.00";
+
+  const belowPrivateMin = useMemo(() => {
+    if (sendMode !== "private" || !isSol || !amount.trim()) return false;
+    try {
+      return solAmountToLamports(amount) < MIN_PRIVATE_DEPOSIT_LAMPORTS;
+    } catch {
+      return false;
+    }
+  }, [sendMode, isSol, amount]);
 
   const usdPreview = useMemo(() => {
     const num = Number.parseFloat(amount);
@@ -795,10 +809,18 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                       className="flex-1"
                       required
                       disabled={pending}
+                      aria-invalid={belowPrivateMin || undefined}
                     />
                   </div>
 
-                  {isPrivate && (
+                  {belowPrivateMin && (
+                    <p className="mt-1.5 text-xs text-signal-danger">
+                      Increase to at least {MIN_PRIVATE_DEPOSIT_SOL} SOL — Cloak rejects smaller
+                      private deposits.
+                    </p>
+                  )}
+
+                  {isPrivate && !belowPrivateMin && (
                     <p className="mt-1.5 text-xs text-ink-muted">
                       Private sends route through the Cloak shielded pool. USDC private sends are
                       available on mainnet.
@@ -868,7 +890,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                   {!pending && (
                     <Button
                       type="submit"
-                      disabled={!confirmChecked || !wallet.publicKey}
+                      disabled={!confirmChecked || !wallet.publicKey || belowPrivateMin}
                       className="w-full sm:w-auto"
                     >
                       {isPrivate ? `Send ${tokenLabel} privately` : `Send ${tokenLabel}`}

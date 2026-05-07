@@ -21,7 +21,12 @@ import { lamportsToSol } from "@/lib/sol";
 import { createVaultProposal } from "@/lib/squads-sdk";
 import { SOL_MINT, tokenAmountToUnits } from "@/lib/tokens";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
-import { assertPrivateSolMinimum, solAmountToLamports } from "@cloak-squads/core/amount";
+import {
+  MIN_PRIVATE_DEPOSIT_LAMPORTS,
+  MIN_PRIVATE_DEPOSIT_SOL,
+  assertPrivateSolMinimum,
+  solAmountToLamports,
+} from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import { encryptMemo, serializeEncryptedMemo } from "@cloak-squads/core/memo-crypto";
@@ -170,6 +175,15 @@ export function SendModal({
   const amountMin =
     mode === "private" && isSol ? "0.01" : isSol ? "0.000000001" : "0.000001";
   const amountPlaceholder = isSol ? "0.0" : "0.00";
+
+  const belowPrivateMin = useMemo(() => {
+    if (mode !== "private" || !isSol || !amount.trim()) return false;
+    try {
+      return solAmountToLamports(amount) < MIN_PRIVATE_DEPOSIT_LAMPORTS;
+    } catch {
+      return false;
+    }
+  }, [mode, isSol, amount]);
 
   useEffect(() => {
     if (open) {
@@ -800,8 +814,15 @@ export function SendModal({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 disabled={pending}
+                aria-invalid={belowPrivateMin || undefined}
               />
             </div>
+            {belowPrivateMin && (
+              <p className="text-xs text-signal-danger">
+                Increase to at least {MIN_PRIVATE_DEPOSIT_SOL} SOL — Cloak rejects smaller private
+                deposits.
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -842,7 +863,9 @@ export function SendModal({
           <DialogFooter className="p-0 pt-0">
             <Button
               type="submit"
-              disabled={pending || !recipient.trim() || !amount || !wallet.publicKey}
+              disabled={
+                pending || !recipient.trim() || !amount || !wallet.publicKey || belowPrivateMin
+              }
               className="w-full gap-2"
             >
               <Send className="h-4 w-4" />

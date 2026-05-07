@@ -28,7 +28,12 @@ import { SOL_MINT } from "@/lib/tokens";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cn } from "@/lib/utils";
-import { assertPrivateSolMinimum, solAmountToLamports } from "@cloak-squads/core/amount";
+import {
+  MIN_PRIVATE_DEPOSIT_LAMPORTS,
+  MIN_PRIVATE_DEPOSIT_SOL,
+  assertPrivateSolMinimum,
+  solAmountToLamports,
+} from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import { cofrePda } from "@cloak-squads/core/pda";
@@ -1080,7 +1085,20 @@ function AddRecurringModal({
   const recipientOnCurve = recipientPk ? PublicKey.isOnCurve(recipientPk.toBuffer()) : false;
   const amountValid = /^[0-9.]+$/.test(amount) && Number(amount) > 0;
   const privacyConflict = privacy === "private" && recipientValid && !recipientOnCurve;
-  const valid = label.trim().length > 0 && recipientValid && amountValid && !privacyConflict;
+  const belowPrivateMin = useMemo(() => {
+    if (privacy !== "private" || !amount.trim()) return false;
+    try {
+      return solAmountToLamports(amount) < MIN_PRIVATE_DEPOSIT_LAMPORTS;
+    } catch {
+      return false;
+    }
+  }, [privacy, amount]);
+  const valid =
+    label.trim().length > 0 &&
+    recipientValid &&
+    amountValid &&
+    !privacyConflict &&
+    !belowPrivateMin;
 
   const handleCreate = async () => {
     setError(null);
@@ -1227,8 +1245,15 @@ function AddRecurringModal({
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
                 className="flex-1 font-mono"
+                aria-invalid={belowPrivateMin || undefined}
               />
             </div>
+            {belowPrivateMin && (
+              <p className="mt-1.5 text-xs text-signal-danger">
+                Increase to at least {MIN_PRIVATE_DEPOSIT_SOL} SOL — Cloak rejects smaller private
+                deposits.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

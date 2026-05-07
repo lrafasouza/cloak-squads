@@ -24,7 +24,12 @@ import { createVaultProposal } from "@/lib/squads-sdk";
 import { SOL_MINT, tokenAmountToUnits } from "@/lib/tokens";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
-import { assertPrivateSolMinimum, solAmountToLamports } from "@cloak-squads/core/amount";
+import {
+  MIN_PRIVATE_DEPOSIT_LAMPORTS,
+  MIN_PRIVATE_DEPOSIT_SOL,
+  assertPrivateSolMinimum,
+  solAmountToLamports,
+} from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import { cofrePda } from "@cloak-squads/core/pda";
@@ -125,6 +130,15 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
   const amountStep = isSol ? "0.000000001" : "0.000001";
   const amountMin = isSol ? "0.01" : "0.000001";
   const amountPlaceholder = isSol ? "0.0" : "0.00";
+
+  const belowPrivateMin = useMemo(() => {
+    if (!isSol || !amount.trim()) return false;
+    try {
+      return solAmountToLamports(amount) < MIN_PRIVATE_DEPOSIT_LAMPORTS;
+    } catch {
+      return false;
+    }
+  }, [isSol, amount]);
 
   const handleMaxAmount = useCallback(() => {
     if (selectedToken) setAmount(selectedToken.uiBalance);
@@ -660,8 +674,15 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       className="flex-1 font-mono"
+                      aria-invalid={belowPrivateMin || undefined}
                     />
                   </div>
+                  {belowPrivateMin && (
+                    <p className="mt-1.5 text-xs text-signal-danger">
+                      Increase to at least {MIN_PRIVATE_DEPOSIT_SOL} SOL — Cloak rejects smaller
+                      private deposits.
+                    </p>
+                  )}
                 </div>
 
                 {invoiceMode === "bound" ? (
@@ -719,7 +740,8 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                       !confirmChecked ||
                       !amount ||
                       (invoiceMode === "bound" && !recipientWallet) ||
-                      !wallet.publicKey
+                      !wallet.publicKey ||
+                      belowPrivateMin
                     }
                     className="w-full"
                   >

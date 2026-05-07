@@ -30,7 +30,12 @@ import { createVaultProposal } from "@/lib/squads-sdk";
 import { SOL_MINT, formatTokenAmount, tokenAmountToUnits } from "@/lib/tokens";
 import { proposalSummariesQueryKey } from "@/lib/use-proposal-summaries";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
-import { assertPrivateSolMinimum } from "@cloak-squads/core/amount";
+import {
+  MIN_PRIVATE_DEPOSIT_LAMPORTS,
+  MIN_PRIVATE_DEPOSIT_SOL,
+  assertPrivateSolMinimum,
+  solAmountToLamports,
+} from "@cloak-squads/core/amount";
 import { assertCofreInitialized } from "@cloak-squads/core/cofre-status";
 import { computePayloadHash } from "@cloak-squads/core/hashing";
 import { cofrePda } from "@cloak-squads/core/pda";
@@ -243,13 +248,30 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
     return duplicates;
   }, [recipients]);
 
+  const manualBelowPrivateMin = useMemo(() => {
+    if (!isSol || !manualAmount.trim()) return false;
+    try {
+      return solAmountToLamports(manualAmount) < MIN_PRIVATE_DEPOSIT_LAMPORTS;
+    } catch {
+      return false;
+    }
+  }, [isSol, manualAmount]);
+
   const canAddManual = useMemo(() => {
     if (!manualName.trim() || !manualWallet.trim() || !manualAmount) return false;
     const num = Number.parseFloat(manualAmount);
     if (Number.isNaN(num) || num <= 0) return false;
     if (recipients.length >= 10) return false;
+    if (manualBelowPrivateMin) return false;
     return true;
-  }, [manualName, manualWallet, manualAmount, recipients.length]);
+  }, [manualName, manualWallet, manualAmount, recipients.length, manualBelowPrivateMin]);
+
+  const csvRecipientsBelowMin = useMemo(() => {
+    if (!isSol) return [] as string[];
+    return recipients
+      .filter((r) => BigInt(r.amount) < MIN_PRIVATE_DEPOSIT_LAMPORTS)
+      .map((r) => r.name || r.wallet.slice(0, 8));
+  }, [isSol, recipients]);
 
   const dryRunRows = useMemo(
     () =>
@@ -969,8 +991,15 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                         onChange={(e) => setManualAmount(e.target.value)}
                         placeholder={isSol ? "0.5" : "0.00"}
                         className="flex-1 font-mono"
+                        aria-invalid={manualBelowPrivateMin || undefined}
                       />
                     </div>
+                    {manualBelowPrivateMin && (
+                      <p className="mt-1.5 text-xs text-signal-danger">
+                        Increase to at least {MIN_PRIVATE_DEPOSIT_SOL} SOL — Cloak rejects smaller
+                        private deposits.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="payroll-memo">Memo (optional)</Label>
@@ -993,6 +1022,15 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                 </div>
               </PanelBody>
             </Panel>
+
+            {csvRecipientsBelowMin.length > 0 && (
+              <InlineAlert tone="danger">
+                {csvRecipientsBelowMin.length === 1
+                  ? `${csvRecipientsBelowMin[0]} is below the Cloak minimum of ${MIN_PRIVATE_DEPOSIT_SOL} SOL.`
+                  : `${csvRecipientsBelowMin.length} recipients are below the Cloak minimum of ${MIN_PRIVATE_DEPOSIT_SOL} SOL: ${csvRecipientsBelowMin.join(", ")}.`}{" "}
+                Increase those amounts before building notes.
+              </InlineAlert>
+            )}
 
             {/* Recipients list */}
             {recipients.length > 0 && (
@@ -1348,11 +1386,18 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                       <button
                         type="button"
                         onClick={() => void buildNotes()}
-                        disabled={pending || duplicateWallets.size > 0 || zkWarmup === "warming"}
+                        disabled={
+                          pending ||
+                          duplicateWallets.size > 0 ||
+                          zkWarmup === "warming" ||
+                          csvRecipientsBelowMin.length > 0
+                        }
                         title={
                           zkWarmup === "warming"
                             ? "Initializing ZK engine, please wait…"
-                            : undefined
+                            : csvRecipientsBelowMin.length > 0
+                              ? `Below Cloak minimum: ${csvRecipientsBelowMin.join(", ")}`
+                              : undefined
                         }
                         className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-border-strong bg-bg px-3.5 py-2 text-xs font-semibold text-ink transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                       >
