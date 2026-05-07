@@ -8,9 +8,11 @@ The product surface is a treasury app: create a vault with members and threshold
 
 ## What makes Aegis different
 
+- **Private send**: the core primitive. A Squads-approved transfer routed through the Cloak shield pool, breaking the on-chain link between vault and recipient. No vault address shows up in the recipient's history; no recipient shows up in the vault's outflow trace.
 - **Bearer invoice** (Aegis exclusive): a claim link you can post publicly or DM without knowing the recipient's wallet upfront. The recipient picks the destination wallet at claim time. Single-claim, default 24h expiry, fully revocable. No other project in the Solana privacy stack does this.
+- **Recurring payments**: schedule weekly, biweekly, monthly, or quarterly payouts with a label and cadence. Each cycle is one click to create the proposal. Public or private per schedule, with a monthly outflow KPI strip and overdue indicators on the dashboard.
 - **Shielded payroll**: drop a CSV, one Squads vote pays everyone, every line is shielded into a single atomic payout. Salaries never appear on-chain.
-- **Scoped audit links**: time-limited, read-only links for accountants or regulators, scoped by date, member, or category. Exports are Ed25519-signed, tamper-evident, and verifiable offline. Every view is logged.
+- **Scoped audit links**: time-limited, read-only links for accountants or regulators, scoped by date, member, or category. Exports are Ed25519-signed, tamper-evident, and verifiable offline. Every view is logged with IP and timestamp.
 - **Squads-native**: real multisig governance, not a custodial wrapper. Members, thresholds, and votes work exactly as Squads users expect.
 
 ## How it differs from Arcium, Umbra, Darklake
@@ -22,8 +24,7 @@ Those projects shield wallet-to-wallet payments. Aegis wraps the full treasury s
 - [Landing](https://aegisz.xyz/): product overview, use cases, comparison, FAQ.
 - [Open Vault](https://aegisz.xyz/vault): main app, create or open a vault, run payments, manage members.
 - [Create Vault](https://aegisz.xyz/create): new-vault wizard.
-- [Claim invoice](https://aegisz.xyz/claim): recipient-side flow for bearer and bound invoices.
-- [Audit link](https://aegisz.xyz/audit/[linkId]): read-only auditor view scoped by the link issuer.
+
 
 ## Legal
 
@@ -37,4 +38,5 @@ Those projects shield wallet-to-wallet payments. Aegis wraps the full treasury s
 - **What if the Operator is compromised?** It can only execute payments your team already approved, and cannot create or approve new ones. Replace it with a normal Squads vote.
 - **Do permissions expire?** Yes. Every permission is single-use and time-bound (60s default), and is burned on first execute.
 - **When is a bearer invoice dangerous?** Anyone with the link can claim, like bearer cash. Default 24h expiry, red-badge UI, revocable before claim. Use bound mode to lock the recipient.
+- **How do recurring payments work?** Aegis tracks the schedule (label, cadence, recipient, next due date) in its database. Each cycle you click Run, which creates a fresh Squads proposal for that period. There is no upfront fund lock and no autonomous on-chain agent. Deleting a schedule does not refund anything because nothing was held in escrow; pending proposals from past Run clicks remain in the Transactions queue and need to be cancelled there separately.
 - **Mainnet ready?** Devnet only. Mainnet ships after external audit.
