@@ -814,7 +814,7 @@ export default function RecurringPage({
         title="Delete recurring payment"
         description={
           <>
-            This stops the schedule. Past on-chain payments are unaffected.
+            This stops the schedule. Past on-chain payments are unaffected
             <TooltipProvider delayDuration={150}>
               <Tooltip>
                 <TooltipTrigger asChild>
