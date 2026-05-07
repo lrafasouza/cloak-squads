@@ -176,7 +176,7 @@ function CopyAddress({ address }: { address: string }) {
     <button
       type="button"
       onClick={copy}
-      className="flex items-center gap-1.5 font-mono text-xs text-ink-muted transition-colors hover:text-ink"
+      className="flex items-center gap-1.5 font-mono text-xs text-ink-muted transition-aegis hover:text-ink"
     >
       <span>
         {address.slice(0, 8)}…{address.slice(-8)}
@@ -549,7 +549,7 @@ export default function ProposalApprovalPage({
         <div className="mb-6 flex items-center gap-2 text-sm text-ink-muted">
           <Link
             href={`/vault/${multisigParam}/proposals`}
-            className="flex items-center gap-1 transition-colors hover:text-ink"
+            className="flex items-center gap-1 transition-aegis hover:text-ink"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Transactions
@@ -598,7 +598,7 @@ export default function ProposalApprovalPage({
           {/* Left column — details */}
           <div className="space-y-4 lg:col-span-3">
             {/* Transfer details */}
-            <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-raise-1">
+            <div className="card-panel overflow-hidden">
               <div className="border-b border-border px-5 py-4">
                 <h2 className="text-sm font-semibold text-ink">
                   {isPayroll
@@ -618,16 +618,16 @@ export default function ProposalApprovalPage({
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-border">
-                            <th className="pb-3 pr-4 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                            <th className="pb-3 pr-4 text-left text-eyebrow">
                               Name
                             </th>
-                            <th className="pb-3 pr-4 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                            <th className="pb-3 pr-4 text-left text-eyebrow">
                               Wallet
                             </th>
-                            <th className="pb-3 pr-4 text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                            <th className="pb-3 pr-4 text-right text-eyebrow">
                               Amount
                             </th>
-                            <th className="pb-3 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                            <th className="pb-3 text-left text-eyebrow">
                               Memo
                             </th>
                           </tr>
@@ -687,7 +687,7 @@ export default function ProposalApprovalPage({
                       <button
                         type="button"
                         onClick={() => void loadDraft()}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-surface-3"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-ink transition-aegis hover:bg-surface-3"
                       >
                         <RefreshCw className="h-3.5 w-3.5" />
                         Retry
@@ -823,7 +823,7 @@ export default function ProposalApprovalPage({
             </div>
 
             {/* Timeline — compact */}
-            <div className="rounded-xl border border-border bg-surface shadow-raise-1">
+            <div className="card-panel">
               <div className="border-b border-border px-5 py-3.5">
                 <h2 className="text-sm font-semibold text-ink">Timeline</h2>
               </div>
@@ -886,8 +886,8 @@ export default function ProposalApprovalPage({
             </div>
 
             {/* Technical details */}
-            <details className="group overflow-hidden rounded-xl border border-border bg-surface">
-              <summary className="flex cursor-pointer items-center justify-between px-5 py-3.5 text-sm text-ink-muted transition-colors hover:text-ink">
+            <details className="group card-panel overflow-hidden">
+              <summary className="flex cursor-pointer items-center justify-between px-5 py-3.5 text-sm text-ink-muted transition-aegis hover:text-ink">
                 <span className="font-medium">Technical details</span>
                 <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
               </summary>
@@ -931,7 +931,7 @@ export default function ProposalApprovalPage({
           {/* Right column — approvals + actions */}
           <div className="space-y-4 lg:col-span-2">
             {/* Approvals */}
-            <div className="rounded-xl border border-border bg-surface p-5 shadow-raise-1">
+            <div className="card-panel p-5">
               <h2 className="mb-4 text-sm font-semibold text-ink">Approvals</h2>
               <ApprovalBar approvals={approvals} threshold={threshold} />
               <MemberVoteGrid
@@ -942,7 +942,7 @@ export default function ProposalApprovalPage({
             </div>
 
             {/* Vote */}
-            <div className="rounded-xl border border-border bg-surface p-5 shadow-raise-1">
+            <div className="card-panel p-5">
               <h2 className="mb-4 text-sm font-semibold text-ink">Your vote</h2>
               {memberVote ? (
                 <div
@@ -986,7 +986,7 @@ export default function ProposalApprovalPage({
             </div>
 
             {/* Execute */}
-            <div className="rounded-xl border border-border bg-surface p-5 shadow-raise-1">
+            <div className="card-panel p-5">
               <h2 className="mb-4 text-sm font-semibold text-ink">Execute</h2>
               {executeComplete ? (
                 <div className="space-y-3">

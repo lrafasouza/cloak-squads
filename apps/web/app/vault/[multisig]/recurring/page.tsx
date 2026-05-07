@@ -624,7 +624,7 @@ export default function RecurringPage({
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Link href="/" className="text-sm text-accent transition-colors hover:text-accent-hover">
+        <Link href="/" className="text-sm text-accent transition-aegis hover:text-accent-hover">
           Back to picker
         </Link>
         <h1 className="mt-6 text-2xl font-semibold text-ink">Invalid multisig address</h1>
@@ -704,7 +704,7 @@ export default function RecurringPage({
               type="button"
               onClick={() => setFilter(key)}
               className={cn(
-                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-aegis",
                 filter === key
                   ? "bg-accent-soft text-accent"
                   : "text-ink-muted hover:bg-surface-2 hover:text-ink",
@@ -816,7 +816,7 @@ export default function RecurringPage({
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    className="ml-1 inline-flex h-4 w-4 -translate-y-px items-center justify-center rounded-full align-middle text-ink-subtle transition-colors hover:text-ink"
+                    className="ml-1 inline-flex h-4 w-4 -translate-y-px items-center justify-center rounded-full align-middle text-ink-subtle transition-aegis hover:text-ink"
                     aria-label="What about pending proposals?"
                   >
                     <HelpCircle className="h-3.5 w-3.5" />
@@ -938,7 +938,7 @@ function RecurringRow({
   const due = formatRelativeDate(item.nextDueAt);
 
   return (
-    <div className="group flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-surface-2/30 sm:flex-row sm:items-center">
+    <div className="group flex flex-col gap-3 px-5 py-4 transition-aegis hover:bg-surface-2/30 sm:flex-row sm:items-center">
       {/* Identity */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="shrink-0 rounded-lg ring-1 ring-border/60">
@@ -1031,7 +1031,7 @@ function RecurringRow({
           type="button"
           onClick={onPause}
           disabled={isRunning}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-subtle transition-aegis hover:bg-surface-2 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
           aria-label={isPaused ? "Resume schedule" : "Pause schedule"}
           title={isPaused ? "Resume" : "Pause"}
         >
@@ -1041,7 +1041,7 @@ function RecurringRow({
           type="button"
           onClick={onDelete}
           disabled={isRunning}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-surface-2 hover:text-signal-danger disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-subtle transition-aegis hover:bg-surface-2 hover:text-signal-danger disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Delete schedule"
           title="Delete"
         >
@@ -1134,7 +1134,7 @@ function AddRecurringModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/85 backdrop-blur-md p-4">
-      <div className="relative w-full max-w-lg rounded-xl border border-border-strong bg-surface shadow-raise-2">
+      <div className="relative w-full max-w-lg rounded-modal border border-border-strong bg-surface shadow-raise-2">
         <div className="border-b border-border px-6 py-5">
           <p className="text-eyebrow text-accent">NEW SCHEDULE</p>
           <h3 className="mt-1 text-lg font-semibold text-ink">Recurring payment</h3>
@@ -1151,7 +1151,7 @@ function AddRecurringModal({
                 type="button"
                 onClick={() => setPrivacy("private")}
                 className={cn(
-                  "flex flex-col items-start gap-1 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors",
+                  "flex flex-col items-start gap-1 rounded-list border px-3 py-2.5 text-left text-sm transition-aegis",
                   privacy === "private"
                     ? "border-accent bg-accent-soft text-ink"
                     : "border-border bg-surface text-ink-muted hover:bg-surface-2",
@@ -1169,7 +1169,7 @@ function AddRecurringModal({
                 type="button"
                 onClick={() => setPrivacy("public")}
                 className={cn(
-                  "flex flex-col items-start gap-1 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors",
+                  "flex flex-col items-start gap-1 rounded-list border px-3 py-2.5 text-left text-sm transition-aegis",
                   privacy === "public"
                     ? "border-accent bg-accent-soft text-ink"
                     : "border-border bg-surface text-ink-muted hover:bg-surface-2",
@@ -1232,7 +1232,7 @@ function AddRecurringModal({
           <div>
             <Label htmlFor="rec-amount">Amount</Label>
             <div className="mt-1.5 flex gap-2">
-              <div className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 text-sm font-medium text-ink">
+              <div className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 text-sm font-medium text-ink">
                 <TokenLogo symbol="SOL" size={16} />
                 SOL
               </div>
@@ -1263,7 +1263,7 @@ function AddRecurringModal({
                 id="rec-cadence"
                 value={cadence}
                 onChange={(e) => setCadence(e.target.value as Cadence)}
-                className="mt-1.5 block min-h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm text-ink focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                className="mt-1.5 block min-h-11 w-full rounded-md border border-border bg-surface px-3 text-sm text-ink focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               >
                 <option value="weekly">Every week</option>
                 <option value="biweekly">Every 2 weeks</option>

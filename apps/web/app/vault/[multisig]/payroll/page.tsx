@@ -766,7 +766,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   if (!multisigAddress) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <Link href="/" className="text-sm text-accent transition-colors hover:text-accent-hover">
+        <Link href="/" className="text-sm text-accent transition-aegis hover:text-accent-hover">
           Back to picker
         </Link>
         <h1 className="mt-6 text-2xl font-semibold text-ink">Invalid multisig address</h1>
@@ -842,7 +842,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <Link
                 href={`/vault/${multisig}/proposals/${createdPayroll.transactionIndex}`}
-                className="inline-flex min-h-11 items-center justify-center rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-raise-1 transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:scale-[0.98]"
+                className="inline-flex min-h-11 items-center justify-center rounded-md bg-gradient-to-r from-accent to-accent-hover px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:scale-[0.98]"
               >
                 View proposal
               </Link>
@@ -886,7 +886,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
           <button
             type="button"
             onClick={() => setActiveTab("recipients")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-aegis ${
               activeTab === "recipients"
                 ? "bg-accent-soft text-accent"
                 : "text-ink-muted hover:bg-surface-2 hover:text-ink"
@@ -908,7 +908,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                 setConfirmChecked(false);
               }
             }}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-aegis ${
               activeTab === "review"
                 ? "bg-accent-soft text-accent"
                 : "text-ink-muted hover:bg-surface-2 hover:text-ink"
@@ -933,7 +933,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                       type="button"
                       disabled={pending}
                       onClick={() => setSelectedVaultIndex(acct.vaultIndex)}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                      className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-aegis disabled:cursor-not-allowed disabled:opacity-40 ${
                         selectedVaultIndex === acct.vaultIndex
                           ? "border-accent/40 bg-accent/10 text-accent"
                           : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
@@ -978,7 +978,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                       <Label htmlFor="payroll-amount">Amount ({tokenLabel})</Label>
                     </div>
                     <div className="mt-1.5 flex gap-2">
-                      <div className="flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink">
+                      <div className="flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink">
                         <TokenLogo symbol="SOL" size={16} />
                         SOL
                       </div>
@@ -1076,7 +1076,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                         <button
                           type="button"
                           onClick={() => removeRecipient(i)}
-                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-signal-danger/15 hover:text-signal-danger transition-colors"
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-muted transition-aegis hover:bg-signal-danger/15 hover:text-signal-danger"
                           aria-label={`Remove ${r.name}`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -1097,7 +1097,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                   <button
                     type="button"
                     onClick={downloadTemplate}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink"
                   >
                     <Download className="h-3.5 w-3.5" />
                     Download template
@@ -1121,7 +1121,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                     <button
                       type="button"
                       onClick={() => setShowCsvTextarea(true)}
-                      className="text-sm text-accent transition-colors hover:text-accent-hover"
+                      className="text-sm text-accent transition-aegis hover:text-accent-hover"
                     >
                       Or paste CSV content
                     </button>
@@ -1205,7 +1205,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                     {/* Inline summary — values, no cards */}
                     <div className="grid grid-cols-3 gap-x-6 gap-y-3 sm:gap-x-10">
                       <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        <p className="text-eyebrow">
                           Total payout
                         </p>
                         <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
@@ -1216,7 +1216,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                         </p>
                       </div>
                       <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        <p className="text-eyebrow">
                           Recipients
                         </p>
                         <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
@@ -1225,7 +1225,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                         </p>
                       </div>
                       <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                        <p className="text-eyebrow">
                           Private notes
                         </p>
                         <p
@@ -1253,7 +1253,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                             type="button"
                             onClick={() => setMode(m)}
                             aria-pressed={mode === m}
-                            className={`relative flex flex-col gap-1 rounded-lg border px-4 py-3.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                            className={`relative flex flex-col gap-1 rounded-list border px-4 py-3.5 text-left text-sm transition-aegis focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                               mode === m
                                 ? "border-accent/30 bg-accent-soft"
                                 : "border-border bg-bg hover:border-border-strong"
@@ -1290,19 +1290,19 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border bg-surface-2/40 text-left">
-                              <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                              <th className="px-4 py-2.5 text-eyebrow">
                                 #
                               </th>
-                              <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                              <th className="px-4 py-2.5 text-eyebrow">
                                 Recipient
                               </th>
-                              <th className="hidden px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle sm:table-cell">
+                              <th className="hidden px-4 py-2.5 text-eyebrow sm:table-cell">
                                 Wallet
                               </th>
-                              <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                              <th className="px-4 py-2.5 text-right text-eyebrow">
                                 Amount
                               </th>
-                              <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">
+                              <th className="px-4 py-2.5 text-eyebrow">
                                 Note
                               </th>
                             </tr>
@@ -1311,7 +1311,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                             {dryRunRows.map((row) => (
                               <tr
                                 key={`${row.wallet}-${row.index}`}
-                                className="transition-colors hover:bg-surface-2/30"
+                                className="transition-aegis hover:bg-surface-2/30"
                               >
                                 <td className="px-4 py-3 font-mono text-xs text-ink-subtle">
                                   {row.index + 1}
@@ -1366,7 +1366,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                               <button
                                 type="button"
                                 aria-label='Why "Build notes"?'
-                                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-ink-subtle transition-aegis hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                               >
                                 <HelpCircle className="h-3.5 w-3.5" />
                               </button>
@@ -1399,7 +1399,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                               ? `Below Cloak minimum: ${csvRecipientsBelowMin.join(", ")}`
                               : undefined
                         }
-                        className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-border-strong bg-bg px-3.5 py-2 text-xs font-semibold text-ink transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-border-strong bg-bg px-3.5 py-2 text-xs font-semibold text-ink transition-aegis hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <PlayCircle className="h-3.5 w-3.5 shrink-0" />
                         {zkWarmup === "warming"
@@ -1438,7 +1438,7 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                           <button
                             type="button"
                             onClick={() => setActiveTab("recipients")}
-                            className="inline-flex items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink"
+                            className="inline-flex items-center gap-1.5 text-sm text-ink-muted transition-aegis hover:text-ink"
                           >
                             <ArrowLeft className="h-3.5 w-3.5" />
                             Back
