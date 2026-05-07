@@ -1,5 +1,6 @@
 "use client";
 
+import { useTheme, type Theme } from "@/components/providers/ThemeProvider";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";
@@ -19,9 +20,12 @@ import {
   ExternalLink,
   Fuel,
   LogOut,
+  Monitor,
+  Moon,
   Repeat,
   Shield,
   ShieldAlert,
+  Sun,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -335,6 +339,8 @@ function MenuPanel({
           </>
         )}
         <Keyline />
+        <AppearanceSection />
+        <Keyline />
         <ActionsSection
           address={address}
           disconnecting={disconnecting}
@@ -570,6 +576,56 @@ function VaultSection({
           </span>
         </Link>
       )}
+    </div>
+  );
+}
+
+/* ─── Appearance ────────────────────────────────────────────────────────── */
+
+const THEME_OPTIONS: Array<{ value: Theme; label: string; icon: typeof Sun }> = [
+  { value: "system", label: "System", icon: Monitor },
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+];
+
+function AppearanceSection() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <span className="text-[10px] font-semibold uppercase tracking-eyebrow text-ink-subtle">
+        Appearance
+      </span>
+      <div
+        role="radiogroup"
+        aria-label="Theme"
+        className="inline-flex items-center rounded-md border border-border bg-surface-2 p-0.5"
+      >
+        {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
+          const active = mounted && theme === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              aria-label={label}
+              title={label}
+              onClick={() => setTheme(value)}
+              className={cn(
+                "inline-flex h-6 w-6 items-center justify-center rounded-[5px] transition-aegis",
+                active
+                  ? "bg-accent text-accent-ink shadow-raise-1"
+                  : "text-ink-subtle hover:bg-surface-3 hover:text-ink",
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
