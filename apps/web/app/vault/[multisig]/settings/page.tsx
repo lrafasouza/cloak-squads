@@ -111,7 +111,7 @@ function InlineEditField({
             setDraft(value);
             setEditing(true);
           }}
-          className="ml-4 flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+          className="ml-4 flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink"
         >
           <Pencil className="h-3 w-3" />
           Edit
@@ -158,7 +158,7 @@ function InlineEditField({
                 setSaving(false);
               }
             }}
-            className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-accent to-accent-hover px-3 py-1.5 text-xs font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
             {saving ? "Saving…" : "Save"}
@@ -166,7 +166,7 @@ function InlineEditField({
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="rounded-md border border-border px-3 py-1.5 text-xs text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+            className="rounded-md border border-border-strong px-3 py-1.5 text-xs text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink"
           >
             Cancel
           </button>
@@ -335,7 +335,7 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
             action={
               <Link
                 href={`/vault/${multisig}/members`}
-                className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
+                className="rounded-md bg-gradient-to-r from-accent to-accent-hover px-3 py-1.5 text-xs font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow"
               >
                 Manage
               </Link>
@@ -443,7 +443,7 @@ export default function SettingsPage({ params }: { params: Promise<{ multisig: s
             action={
               <Link
                 href={`/vault/${multisig}/audit`}
-                className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
+                className="rounded-md bg-gradient-to-r from-accent to-accent-hover px-3 py-1.5 text-xs font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow"
               >
                 Open
               </Link>
