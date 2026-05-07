@@ -40,11 +40,31 @@ Wallet B = operator (executes private payments)
 10. Watch the ZK proof generate in the browser (~30 seconds) and the Cloak shield transaction confirm
 11. Wallet B receives SOL. The on-chain trace shows operator → Cloak pool. The vault is not visible.
 
-**To test Stealth Invoices:**
-1. From the vault, click **Invoice** → create a stealth invoice
+**To test Stealth Invoices (bound):**
+1. From the vault, click **Invoice** → leave mode on **Bound to wallet** → fill recipient + amount
 2. Copy the secret claim link
-3. Open the link in an incognito window with any devnet wallet
-4. Claim the invoice — the UTXO is decrypted and withdrawn via Cloak to your wallet
+3. Open the link in an incognito window connected with the recipient wallet
+4. Claim the invoice — the UTXO is decrypted and withdrawn via Cloak to that wallet
+
+**To test Bearer Invoices (the marquee feature):**
+1. From the vault, click **Invoice** → switch mode to **Bearer link** → set amount and a short expiry
+2. Create the proposal, approve, and execute as a multisig member
+3. The operator runs the Cloak deposit from the Operator tab as in any private send
+4. Open the claim link in an incognito window connected with **any** devnet wallet (no recipient was committed at create time)
+5. Click Claim — the funds settle into whichever wallet you connected at claim time
+
+**To test Recurring Payments:**
+1. Click **Recurring** → New schedule → choose Privacy (Private routes through Cloak, Public is a vault transfer)
+2. Pick cadence (monthly is the default), amount, recipient, and first due date
+3. The schedule lands under either "Due now" (if the date is today / past) or "Upcoming"
+4. Click **Run now** to create the proposal for this cycle. If you click before the due date you'll see a confirmation modal. After the run, `nextDueAt` rolls forward by one cadence period and `lastRunAt` updates instantly
+5. Approve and execute the proposal in the Transactions tab as you would any other private send
+
+**To test Audit Links and signed exports:**
+1. From the vault, click **Audit** → create a link with the scope you want
+2. Copy the link and open it in an incognito window — that view is recorded in the access log
+3. Back in the admin, expand the link row to see "Access log" with the IP and timestamp of each view and export
+4. Download the CSV or JSON; open the file and confirm the `# signature=` header (CSV) or signature wrapper (JSON). The signature can be verified offline against the Aegis backend public key
 
 **To test Payroll:**
 1. Click **Payroll** → upload or manually enter 2–3 recipients
@@ -123,8 +143,12 @@ Every privacy feature in Aegis includes a corresponding auditability mechanism:
 |---|---|---|
 | Private Send | Recipient and amount hidden from public | Proposer retains UTXO private key; can prove payment to auditor |
 | Payroll Batches | Individual salaries not visible on-chain | Operator log + per-recipient execution receipts |
-| Stealth Invoices | Vendor wallet not exposed in proposal | Invoice record in vault DB; auditor link reveals claimant |
-| Audit Links | No public exposure | Time-limited, scoped read access granted to accountant or regulator; revocable anytime |
+| Stealth Invoices (bound) | Vendor wallet not exposed in proposal | Invoice record in vault DB; auditor link reveals claimant |
+| Stealth Invoices (bearer) | No recipient committed at create time, only the amount and a hash of the link secret | Claim record captures the destination wallet + claim time + IP; auditor link reveals where the funds actually settled |
+| Recurring Payments | Per-cycle proposals identical to a one-shot private send (private mode) or a public Squads transfer (public mode) | Schedule history in vault DB tracks each run; per-cycle proposal references back to the schedule label |
+| Audit Links | No public exposure of the underlying ledger | Time-limited, scoped read access granted to accountant or regulator; revocable anytime |
+| Audit Access Log | Auditor activity is itself private to the vault | Every view and export is recorded with action, IP, and timestamp; surfaced under each link in the admin |
+| Signed Exports | Tamper-evident snapshots | CSV and JSON downloads carry an Ed25519 signature covering `signedAt + vault + linkId + body`; offline-verifiable against the Aegis backend public key |
 
 Audit links support granular access controls: `amounts_only`, `time_ranged`, and `full_history` scopes — so a treasury can share exactly what a regulator needs, nothing more. Each link is Ed25519-signed and expires automatically.
 
@@ -148,7 +172,10 @@ Aegis is built on top of **Squads Protocol v4** using the `@sqds/multisig` SDK (
 - **Privacy via Cloak** — zero-knowledge shield pool routing that breaks the on-chain link between your vault and recipients
 - **Payroll automation** — CSV import, batch proposals, and per-recipient execution
 - **Stealth invoicing** — secret claim links where recipients withdraw without exposing their wallet
-- **Scoped audit links** — time-limited, revocable read access for accountants and regulators, delivering compliance-ready confidentiality without full anonymity
+- **Bearer invoices** — issue a claim link with no recipient wallet at all; whoever opens the link picks where the funds settle at claim time, the same way Request Finance email links work but routed through Cloak
+- **Recurring payments** — schedule monthly retainers, biweekly payroll, or quarterly vendor payments with cadence tracking; each cycle is one-click executed, public or private per schedule
+- **Scoped audit links with verifiable exports** — time-limited, revocable read access for accountants and regulators; every CSV/JSON export is Ed25519-signed by the Aegis backend so auditors can verify provenance offline, and an on-page access log records every view and download
+- **Selective disclosure receipts** — proposers retain UTXO keys and can hand a regulator everything needed to reconstruct one specific payment without revealing the rest
 
 Your existing Squads vault, members, thresholds, and approval flow remain completely unchanged. Aegis proposals are standard Squads vault transactions that call the Aegis gatekeeper program. The same gatekeeper licensing model is designed to be integrated by Realms and custom multisig protocols via CPI — Squads is the first integration, not the last.
 
@@ -266,8 +293,12 @@ Every private payment in Aegis passes through three Cloak SDK calls: `generateUt
 | Private Send | Devnet | Proposal → gatekeeper license → operator deposits to Cloak shield pool → `fullWithdraw` to recipient |
 | Public Send | Working | Standard Squads vault transfer, no privacy layer |
 | Payroll Batches | Devnet | CSV upload → batch license proposal → operator executes each row via Cloak |
-| Stealth Invoices | Devnet | Secret claim links — recipient decrypts UTXO and withdraws via Cloak SDK |
-| Audit Links | Devnet | Scoped, revocable read access for accountants and regulators (Ed25519-signed) |
+| Stealth Invoices (bound) | Devnet | Secret claim links — recipient decrypts UTXO and withdraws via Cloak SDK |
+| Stealth Invoices (bearer) | Devnet | Same flow without binding a recipient wallet; whoever opens the link chooses the destination at claim time. Default 24h expiry with explicit "bearer cash" warning in the UI |
+| Recurring Payments | Devnet | Schedule weekly / biweekly / monthly / quarterly payouts; one-click Run creates a fresh proposal each cycle. Public or private per schedule, with monthly outflow KPI strip and overdue indicators |
+| Audit Links | Devnet | Scoped (full / amounts only / time-ranged), revocable read access for accountants and regulators |
+| Audit Access Log | Devnet | Every view and export is recorded with IP and timestamp; the admin sees who opened the link and when |
+| Signed Audit Exports | Devnet | CSV and JSON exports are Ed25519-signed by the Aegis backend; signature header on the file so auditors verify offline |
 | Vault Import | Devnet | Discovers your existing Squads multisigs; mainnet import in progress (see Roadmap) |
 | Operator Dashboard | Working | Queue view, ZK proof progress, per-recipient execution, batch payroll processing |
 | Member Management | Working | Add/remove members, change threshold — all via Squads config proposals |
@@ -411,8 +442,12 @@ This is the cleanest possible design given the program-owned vault constraint, w
 - [x] Private send via Cloak shield pool
 - [x] Atomic vault → operator auto-funding in a single approved execution
 - [x] Payroll batches (CSV upload, per-recipient operator execution, up to 10 recipients)
-- [x] Stealth invoices with secret claim links
+- [x] Stealth invoices with secret claim links (bound mode)
+- [x] Bearer invoices: claim links with no recipient wallet committed at create time
+- [x] Recurring payments: weekly/biweekly/monthly/quarterly schedules with per-cycle one-click run, public or private per schedule
 - [x] Scoped audit links (Ed25519-signed, time-limited, revocable)
+- [x] Audit access log: every view and export captured with IP + timestamp, surfaced in the admin
+- [x] Server-signed audit exports: CSV and JSON downloads carry an Ed25519 signature header for offline verification
 - [x] Token swap proposals (SOL ↔ USDC via Raydium / Orca)
 - [x] Vault import from existing Squads multisigs
 - [x] Member management (add/remove, change threshold)
