@@ -359,6 +359,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       proposals
         .filter((p) => {
           if (!p.hasDraft) return false;
+          // Operator inbox is for shielded payloads only — private single
+          // transfers and payrolls, which the operator must relay through
+          // Cloak. Swaps execute directly via Squads and public sends are
+          // plain on-chain transfers; neither needs the operator.
+          const needsOperator =
+            (p.type === "single" && p.kind !== "public") || p.type === "payroll";
+          if (!needsOperator) return false;
           if (executedMap[p.transactionIndex]) return false;
           if (isProposalPendingStatus(p.status)) return true;
           if (p.status === "executed") return true;
