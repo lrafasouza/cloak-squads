@@ -75,9 +75,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    const invoice = await prisma.stealthInvoice.update({
-      where: { id },
+    // Atomic claim — only succeeds if status is still "pending". Two
+    // concurrent claimants on the same bearer link both reach this point;
+    // exactly one wins.
+    const updateResult = await prisma.stealthInvoice.updateMany({
+      where: { id, status: "pending" },
       data: { status: "claimed", claimedAt: new Date(), claimedBy },
+    });
+    if (updateResult.count !== 1) {
+      return NextResponse.json(
+        { error: "Invoice already claimed." },
+        { status: 409 },
+      );
+    }
+
+    const invoice = await prisma.stealthInvoice.findUnique({
+      where: { id },
       select: { id: true, status: true, claimedAt: true },
     });
 

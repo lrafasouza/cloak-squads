@@ -21,6 +21,12 @@ export async function GET(_req: Request, context: { params: Promise<{ multisig: 
     return NextResponse.json({ error: "Invalid vault address." }, { status: 400 });
   }
 
+  // Sub-vault labels (names, icons) are private organizational metadata —
+  // e.g. "Q1 Payroll", "Treasury", "Marketing budget". Even though sub-vault
+  // PDAs are derivable on-chain, the labels reveal intent and must not leak.
+  const auth = await requireVaultMember(multisig);
+  if (auth instanceof NextResponse) return auth;
+
   if (!isPrismaAvailable()) return NextResponse.json([]);
 
   const subVaults = await prisma.subVault.findMany({

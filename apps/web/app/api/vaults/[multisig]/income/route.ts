@@ -1,4 +1,5 @@
 import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
+import { requireVaultMember } from "@/lib/vault-membership";
 import { inspectVaultIncomeSync, readVaultIncome, syncVaultIncome } from "@/lib/vault-income-sync";
 import { PublicKey } from "@solana/web3.js";
 import { headers } from "next/headers";
@@ -60,9 +61,11 @@ export async function GET(request: Request, context: { params: Promise<{ multisi
   }
 
   // ?debug=true bypasses the normal flow and returns a structured trace of
-  // what the sync would have done, so deposits that don't show up in the UI
-  // can be diagnosed without server-log access. Read-only — never writes.
+  // what the sync would have done. Trace can include RPC errors, internal
+  // sync state, and rejection details — gate to vault members only.
   if (searchParams.get("debug") === "true") {
+    const auth = await requireVaultMember(multisig);
+    if (auth instanceof NextResponse) return auth;
     const inspection = await inspectVaultIncomeSync(multisig);
     return NextResponse.json(inspection, {
       headers: { "Cache-Control": "no-store" },

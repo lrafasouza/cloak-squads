@@ -24,7 +24,8 @@ export type ParseRejection = {
     | "vault_not_in_accounts"
     | "balance_undefined"
     | "diff_too_small"
-    | "diff_negative_or_zero";
+    | "diff_negative_or_zero"
+    | "block_time_missing";
   detail?: string;
 };
 
@@ -128,11 +129,18 @@ export function parseIncome(
     }
   }
 
+  // Reject txs without a real blockTime — silently substituting Date.now()
+  // poisons audit records with the wrong timestamp.
+  if (sigInfo.blockTime == null) {
+    rejections?.push({ signature: sigInfo.signature, reason: "block_time_missing" });
+    return null;
+  }
+
   return {
     signature: sigInfo.signature,
     amountLamports,
     fromAddress: from,
-    blockTime: new Date((sigInfo.blockTime ?? Math.floor(Date.now() / 1000)) * 1000),
+    blockTime: new Date(sigInfo.blockTime * 1000),
     vaultIndex,
     toLabel,
   };

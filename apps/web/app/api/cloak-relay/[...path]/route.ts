@@ -9,11 +9,23 @@ function relayBaseUrl() {
   return (process.env.NEXT_PUBLIC_CLOAK_RELAY_URL ?? DEFAULT_CLOAK_RELAY_URL).replace(/\/$/, "");
 }
 
+// Block path segments that URL normalization would resolve outside the
+// relay base, or that try to inject a host-change.
+function isSafeSegment(segment: string): boolean {
+  if (segment.length === 0) return false;
+  if (segment === "." || segment === "..") return false;
+  if (segment.includes("/") || segment.includes("\\")) return false;
+  return !/[\x00-\x1f]/.test(segment);
+}
+
 async function proxyRelayRequest(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
   const { path } = await params;
+  if (!path.every(isSafeSegment)) {
+    return new NextResponse("Invalid path", { status: 400 });
+  }
   const upstream = new URL(`${relayBaseUrl()}/${path.join("/")}`);
   upstream.search = req.nextUrl.search;
 

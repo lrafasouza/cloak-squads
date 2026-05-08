@@ -1,5 +1,6 @@
 import { getCurrentCluster } from "@/lib/cluster";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
+import { requireVaultMember } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
@@ -11,6 +12,12 @@ export async function GET(_request: Request, context: { params: Promise<{ vault:
   } catch {
     return NextResponse.json({ error: "Invalid vault address." }, { status: 400 });
   }
+
+  // Audit-link metadata reveals the vault's audit posture (scope, expiry, who
+  // issued each link). Restrict to vault members — external auditors should
+  // use their specific link ID, not enumerate.
+  const auth = await requireVaultMember(vault);
+  if (auth instanceof NextResponse) return auth;
 
   if (!isPrismaAvailable()) {
     return NextResponse.json([]);

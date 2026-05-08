@@ -52,9 +52,66 @@ export type SignedAuditExport = {
 };
 
 /**
- * Sign an export payload. The signature covers `signedAt || vault || linkId || data`
- * so an auditor verifying offline binds the export to one specific link, not
- * just the bytes.
+ * Build the canonical message bytes covered by the export signature.
+ *
+ * Pipe-delimited concatenation is NOT injective — `vault="a|b"` + `linkId="c"`
+ * collides with `vault="a"` + `linkId="b|c"`. We avoid that by length-prefixing
+ * each component (4-byte big-endian) so each field's start/end is unambiguous,
+ * and we hash the data payload before binding so the message size stays small
+ * regardless of export size.
+ *
+ * Layout:
+ *   "aegis-audit-export-v1\0"
+ *   len(signedAt)    || signedAt
+ *   len(vault)       || vault
+ *   len(linkId)      || linkId
+ *   len(contentType) || contentType
+ *   sha256(data)     (32 bytes, fixed)
+ */
+const SIGN_DOMAIN_SEP = "aegis-audit-export-v1\0";
+
+function lengthPrefixed(text: string): Uint8Array {
+  const bytes = new TextEncoder().encode(text);
+  const out = new Uint8Array(4 + bytes.length);
+  new DataView(out.buffer).setUint32(0, bytes.length, false);
+  out.set(bytes, 4);
+  return out;
+}
+
+function concatBytes(...parts: Uint8Array[]): Uint8Array {
+  const total = parts.reduce((n, p) => n + p.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
+export function buildAuditExportMessage(args: {
+  signedAt: string;
+  vault: string;
+  linkId: string;
+  contentType: string;
+  data: string;
+}): Uint8Array {
+  const { createHash } = require("node:crypto") as typeof import("node:crypto");
+  const dataHash = Uint8Array.from(createHash("sha256").update(args.data).digest());
+  return concatBytes(
+    new TextEncoder().encode(SIGN_DOMAIN_SEP),
+    lengthPrefixed(args.signedAt),
+    lengthPrefixed(args.vault),
+    lengthPrefixed(args.linkId),
+    lengthPrefixed(args.contentType),
+    dataHash,
+  );
+}
+
+/**
+ * Sign an export payload. The signature binds the data to a specific link with
+ * a domain separator and length-prefixed fields so external verifiers can
+ * reproduce the message bytes deterministically.
  */
 export function signAuditExport(args: {
   vault: string;
@@ -64,7 +121,13 @@ export function signAuditExport(args: {
 }): SignedAuditExport {
   const kp = getAuditSigningKeypair();
   const signedAt = new Date().toISOString();
-  const message = new TextEncoder().encode(`${signedAt}|${args.vault}|${args.linkId}|${args.data}`);
+  const message = buildAuditExportMessage({
+    signedAt,
+    vault: args.vault,
+    linkId: args.linkId,
+    contentType: args.contentType,
+    data: args.data,
+  });
   const signature = nacl.sign.detached(message, kp.secretKey);
   return {
     data: args.data,

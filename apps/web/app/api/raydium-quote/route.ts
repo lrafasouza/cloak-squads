@@ -1,3 +1,5 @@
+import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
+import { requireWalletAuth } from "@/lib/wallet-auth";
 import {
   setNativeMintWrappingStrategy,
   setWhirlpoolsConfig,
@@ -5,6 +7,7 @@ import {
 } from "@orca-so/whirlpools";
 import { address, createNoopSigner, createSolanaRpc } from "@solana/kit";
 import { PublicKey } from "@solana/web3.js";
+import { headers } from "next/headers";
 import { type NextRequest, NextResponse } from "next/server";
 
 const RAYDIUM_API = "https://api-v3.raydium.io";
@@ -75,6 +78,16 @@ async function getOrcaDevnetQuote(
 }
 
 export async function GET(request: NextRequest) {
+  const auth = await requireWalletAuth();
+  if (auth instanceof NextResponse) return auth;
+
+  const hdrs = await headers();
+  const rawIp = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
+  const ip = (rawIp.split(",")[0] ?? rawIp).trim();
+  if (!(await checkRateLimitAsync(rateLimitBucket(ip, "swap-quote", auth.publicKey), "default"))) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const { searchParams } = request.nextUrl;
   const cluster = process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet";
   const inputMint = searchParams.get("inputMint") ?? SOL_MINT;
@@ -87,11 +100,8 @@ export async function GET(request: NextRequest) {
       const quote = await getOrcaDevnetQuote(inputMint, outputMint, amount, slippageBps);
       return NextResponse.json(quote);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return NextResponse.json(
-        { error: "Orca devnet quote failed", details: message },
-        { status: 500 },
-      );
+      console.error("[api/raydium-quote] orca devnet failed:", err);
+      return NextResponse.json({ error: "Orca devnet quote failed" }, { status: 500 });
     }
   }
 
@@ -99,9 +109,8 @@ export async function GET(request: NextRequest) {
   try {
     const response = await fetch(targetUrl, { headers: { Accept: "application/json" } });
     if (!response.ok) {
-      const err = await response.text().catch(() => "Unknown error");
       return NextResponse.json(
-        { error: `Raydium API error: ${response.status}`, details: err },
+        { error: `Raydium API error: ${response.status}` },
         { status: response.status },
       );
     }
@@ -135,9 +144,7 @@ export async function GET(request: NextRequest) {
       rawSwapData: { source: "raydium", ...swapData },
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: "Failed to fetch from Raydium", details: String(err) },
-      { status: 500 },
-    );
+    console.error("[api/raydium-quote] failed:", err);
+    return NextResponse.json({ error: "Failed to fetch from Raydium" }, { status: 500 });
   }
 }

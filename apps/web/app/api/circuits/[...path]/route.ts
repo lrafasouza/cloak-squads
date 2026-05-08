@@ -19,11 +19,25 @@ export const runtime = "nodejs";
 // Stream the response without buffering whole .zkey (~tens of MB) into RAM twice.
 export const dynamic = "force-dynamic";
 
+// Reject any path segment that would let URL normalization escape the
+// `/circuits/` prefix or hit a different host. Keeps callers to literal
+// artifact paths only.
+function isSafeSegment(segment: string): boolean {
+  if (segment.length === 0) return false;
+  if (segment === "." || segment === "..") return false;
+  if (segment.includes("/") || segment.includes("\\")) return false;
+  // Block raw NULs and control chars
+  return !/[\x00-\x1f]/.test(segment);
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
   const { path } = await params;
+  if (!path.every(isSafeSegment)) {
+    return new NextResponse("Invalid path", { status: 400 });
+  }
   const subPath = path.join("/");
   const upstream = `${S3_BASE}/${subPath}`;
 
@@ -52,6 +66,9 @@ export async function HEAD(
   { params }: { params: Promise<{ path: string[] }> },
 ) {
   const { path } = await params;
+  if (!path.every(isSafeSegment)) {
+    return new NextResponse(null, { status: 400 });
+  }
   const subPath = path.join("/");
   const upstream = `${S3_BASE}/${subPath}`;
 

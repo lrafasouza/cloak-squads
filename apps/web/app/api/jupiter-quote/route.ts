@@ -1,6 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
+import { requireWalletAuth } from "@/lib/wallet-auth";
+import { headers } from "next/headers";
+import { type NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
+  const auth = await requireWalletAuth();
+  if (auth instanceof NextResponse) return auth;
+
+  const hdrs = await headers();
+  const rawIp = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
+  const ip = (rawIp.split(",")[0] ?? rawIp).trim();
+  if (!(await checkRateLimitAsync(rateLimitBucket(ip, "swap-quote", auth.publicKey), "default"))) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const searchParams = request.nextUrl.searchParams.toString();
   const targetUrl = `https://api.jup.ag/swap/v2/order?${searchParams}`;
 
@@ -12,19 +25,16 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text().catch(() => "Unknown error");
       return NextResponse.json(
-        { error: `Jupiter API error: ${response.status}`, details: errorText },
-        { status: response.status }
+        { error: `Jupiter API error: ${response.status}` },
+        { status: response.status },
       );
     }
 
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch from Jupiter", details: String(error) },
-      { status: 500 }
-    );
+    console.error("[api/jupiter-quote] failed:", error);
+    return NextResponse.json({ error: "Failed to fetch from Jupiter" }, { status: 500 });
   }
 }

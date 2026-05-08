@@ -154,19 +154,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ multi
 
     return NextResponse.json(result);
   } catch (error) {
+    // Full error stays in server logs; the client gets a generic message so
+    // we don't leak Prisma codes / DB schema hints / connection strings.
     console.error("[api/vaults] update failed:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P1001") {
-      return NextResponse.json(
-        { error: "Database unavailable.", details: "Could not reach the local Postgres server." },
-        { status: 503 },
-      );
+      return NextResponse.json({ error: "Database unavailable." }, { status: 503 });
     }
-    const message =
-      error instanceof Prisma.PrismaClientKnownRequestError
-        ? `[${error.code}] ${error.message}`
-        : error instanceof Error
-          ? error.message
-          : "Could not update vault.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Could not update vault." }, { status: 500 });
   }
 }

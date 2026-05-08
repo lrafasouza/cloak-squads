@@ -1,3 +1,5 @@
+import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
+import { requireWalletAuth } from "@/lib/wallet-auth";
 import {
   setNativeMintWrappingStrategy,
   setWhirlpoolsConfig,
@@ -16,6 +18,7 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
+import { headers } from "next/headers";
 import { type NextRequest, NextResponse } from "next/server";
 
 const RAYDIUM_API = "https://api-v3.raydium.io";
@@ -108,6 +111,16 @@ async function buildOrcaDevnetSwap(rawSwapData: Record<string, unknown>, walletA
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireWalletAuth();
+  if (auth instanceof NextResponse) return auth;
+
+  const hdrs = await headers();
+  const rawIp = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
+  const ip = (rawIp.split(",")[0] ?? rawIp).trim();
+  if (!(await checkRateLimitAsync(rateLimitBucket(ip, "swap-build", auth.publicKey), "write"))) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const cluster = process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet";
 
   try {
@@ -140,9 +153,8 @@ export async function POST(request: NextRequest) {
     });
 
     if (!response.ok) {
-      const err = await response.text().catch(() => "Unknown error");
       return NextResponse.json(
-        { error: `Raydium API error: ${response.status}`, details: err },
+        { error: `Raydium API error: ${response.status}` },
         { status: response.status },
       );
     }
@@ -150,9 +162,9 @@ export async function POST(request: NextRequest) {
     const data = await response.json();
     return NextResponse.json(data);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    console.error("[api/raydium-swap] failed:", err);
     return NextResponse.json(
-      { error: "Failed to build swap transaction", details: message },
+      { error: "Failed to build swap transaction" },
       { status: 500 },
     );
   }

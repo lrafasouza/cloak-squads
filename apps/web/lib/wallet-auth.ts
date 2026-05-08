@@ -88,11 +88,16 @@ export function verifyWalletAuthHeaders(hdrs: {
     // v2: aegis:v2:{pubkey}:{ts}:{nonce}:{method}:{path+query}:{bodyHash}
     // Path may contain a query string (e.g. /api/payrolls/X/Y?includeSensitive=true).
     // We trim trailing slash on the pathname only; query is left as-is.
+    if (!nonce || nonce.length === 0) {
+      // v2 requires a nonce — without it, a captured signature replays for
+      // the same {method, path, bodyHash, ts} within the 5min window.
+      return { ok: false, error: "Missing wallet auth nonce.", status: 401 };
+    }
     const queryStart = path.indexOf("?");
     const pathname = queryStart >= 0 ? path.slice(0, queryStart) : path;
     const search = queryStart >= 0 ? path.slice(queryStart) : "";
     const normalizedPath = (pathname.replace(/\/$/, "") || "/") + search;
-    const message = `aegis:v2:${pubkeyB58}:${timestampStr}:${nonce ?? ""}:${method.toUpperCase()}:${normalizedPath}:${bodyHash}`;
+    const message = `aegis:v2:${pubkeyB58}:${timestampStr}:${nonce}:${method.toUpperCase()}:${normalizedPath}:${bodyHash}`;
     const messageBytes = new TextEncoder().encode(message);
     const valid = nacl.sign.detached.verify(messageBytes, signatureBytes, pubkeyBytes);
     if (!valid) {

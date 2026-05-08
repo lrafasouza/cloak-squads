@@ -7,15 +7,28 @@
  * the wallet for every request.
  */
 import { SESSION_COOKIE_NAME, SESSION_TTL_MS, createSessionToken } from "@/lib/auth-session";
+import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import nacl from "tweetnacl";
 
 const AUTH_WINDOW_SECS = 5 * 60;
+const NONCE_TTL_SECS = AUTH_WINDOW_SECS + 30; // outlive timestamp window
+const NONCE_USED_VALUE = "1";
 
 export async function POST(request: Request) {
+  // Rate-limit by IP — login spends CPU on signature verification and is
+  // unauthenticated. 10/min per IP keeps a wallet popping the signing prompt
+  // legitimate within budget.
+  const hdrs = await headers();
+  const rawIp = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
+  const ip = (rawIp.split(",")[0] ?? rawIp).trim();
+  if (!(await checkRateLimitAsync(rateLimitBucket(ip, "auth-login"), 10, 60_000))) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -74,6 +87,16 @@ export async function POST(request: Request) {
   if (!valid) {
     return NextResponse.json({ error: "Invalid signature." }, { status: 401 });
   }
+
+  // Replay protection: a captured login signature is valid for the timestamp
+  // window (5min). Reserve the nonce so a second presentation fails. Bucket
+  // is keyed on (pubkey, nonce) so the namespace is per-wallet.
+  const nonceKey = rateLimitBucket(pubkeyB58, `login-nonce:${nonce}`);
+  const firstUse = await checkRateLimitAsync(nonceKey, 1, NONCE_TTL_SECS * 1000);
+  if (!firstUse) {
+    return NextResponse.json({ error: "Login nonce already used." }, { status: 401 });
+  }
+  void NONCE_USED_VALUE;
 
   const { token, expiresAt } = createSessionToken(pubkeyB58);
 

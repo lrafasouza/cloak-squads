@@ -1,5 +1,11 @@
+import { decryptField, isEncrypted } from "@/lib/field-crypto";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+
+function readMemo(memo: string | null): string | null {
+  if (!memo) return null;
+  return isEncrypted(memo) ? decryptField(memo) : memo;
+}
 
 /**
  * GET /api/stealth/invoice/[id]
@@ -23,7 +29,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       recipientWallet: invoice.recipientWallet,
       mode: invoice.mode,
       invoiceRef: invoice.invoiceRef,
-      memo: invoice.memo,
+      memo: readMemo(invoice.memo),
       stealthPubkey: invoice.stealthPubkey,
       amountHint: invoice.amountHint ? Buffer.from(invoice.amountHint).toString("utf-8") : null,
       status: invoice.status,

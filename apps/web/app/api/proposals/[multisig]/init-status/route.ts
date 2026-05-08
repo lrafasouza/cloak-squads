@@ -1,7 +1,9 @@
 import { getCurrentCluster } from "@/lib/cluster";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
+import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { Connection, PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 const RPC_URL = process.env.FALLBACK_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? "";
@@ -25,6 +27,15 @@ export async function GET(_request: Request, context: { params: Promise<{ multis
     new PublicKey(multisigAddress);
   } catch {
     return NextResponse.json({ error: "Invalid multisig address." }, { status: 400 });
+  }
+
+  // Loops up to (txIndex - staleTxIndex) RPC calls per request. Public, so
+  // rate-limit by IP to keep the RPC quota safe.
+  const hdrs = await headers();
+  const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
+  const ip = (raw.split(",")[0] ?? raw).trim();
+  if (!(await checkRateLimitAsync(rateLimitBucket(ip, "init-status"), 5, 60_000))) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   const multisigPda = new PublicKey(multisigAddress);

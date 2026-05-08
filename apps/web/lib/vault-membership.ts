@@ -14,7 +14,11 @@ import * as multisigSdk from "@sqds/multisig";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
-const CACHE_TTL_MS = 60_000;
+// 15s — short enough that a removed member loses access quickly even when
+// the explicit POST /api/vaults/[multisig]/refresh-membership invalidation
+// is not called. Replace with Redis-backed cache before mainnet so
+// multi-instance deploys agree on the same view.
+const CACHE_TTL_MS = 15_000;
 
 type MemberCacheEntry = {
   members: string[];

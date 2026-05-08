@@ -52,8 +52,13 @@ export function parsePayrollCsv(
   errors: string[];
 } {
   const schema = buildSchema(decimals);
-  const lines = csvText
-    .split("\n")
+  // Strip UTF-8 BOM (﻿) from the very first byte if present — Excel exports
+  // on macOS/Windows include it and trim() does not remove it (BOM is not in
+  // ECMAScript white-space). Without this, the first row fails with a confusing
+  // "Invalid Solana wallet address" error.
+  const normalized = csvText.replace(/^﻿/, "");
+  const lines = normalized
+    .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
 

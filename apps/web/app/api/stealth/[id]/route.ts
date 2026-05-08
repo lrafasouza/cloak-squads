@@ -1,8 +1,15 @@
 import { getCurrentCluster } from "@/lib/cluster";
+import { decryptField, isEncrypted } from "@/lib/field-crypto";
 import { prisma } from "@/lib/prisma";
 import { requireVaultMember } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
+
+function readMemo(memo: string | null): string | null {
+  if (!memo) return null;
+  // Legacy rows pre-encryption-rollout were stored plaintext.
+  return isEncrypted(memo) ? decryptField(memo) : memo;
+}
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -32,7 +39,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         recipientWallet: invoice.recipientWallet,
         mode: invoice.mode,
         invoiceRef: invoice.invoiceRef,
-        memo: invoice.memo,
+        memo: readMemo(invoice.memo),
         stealthPubkey: invoice.stealthPubkey,
         amountHint: invoice.amountHint ? Buffer.from(invoice.amountHint).toString("utf-8") : null,
         status: invoice.status,

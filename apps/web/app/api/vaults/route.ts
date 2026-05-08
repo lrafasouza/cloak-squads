@@ -146,7 +146,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const message = error instanceof Error ? error.message : "Could not save vault metadata.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Generic message — full error is in server logs only.
+    return NextResponse.json({ error: "Could not save vault metadata." }, { status: 500 });
   }
 }

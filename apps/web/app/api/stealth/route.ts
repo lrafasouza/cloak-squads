@@ -1,4 +1,5 @@
 import { getCurrentCluster } from "@/lib/cluster";
+import { encryptField } from "@/lib/field-crypto";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
 import { requireVaultMember } from "@/lib/vault-membership";
@@ -110,6 +111,12 @@ export async function POST(request: Request) {
     const ttlHours = expiresInHours ?? defaultHours;
     const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
+    // Encrypt memo at rest (AES-256-GCM via JWT-derived key). A DB dump or
+    // backup leak no longer exposes the plaintext memo. The schema's
+    // memoCiphertext/memoNonce/memoEphemeralPk fields are reserved for a
+    // future ECIES path keyed on stealthPubkey (server can't read).
+    const encryptedMemo = memo ? encryptField(memo) : null;
+
     const invoice = await prisma.stealthInvoice.create({
       data: {
         cofreAddress,
@@ -117,7 +124,7 @@ export async function POST(request: Request) {
         recipientWallet: mode === "bound" ? (recipientWallet ?? null) : null,
         mode,
         invoiceRef: invoiceRef ?? null,
-        memo: memo ?? null,
+        memo: encryptedMemo,
         stealthPubkey,
         signPubkey,
         amountHint: Buffer.from(amount),

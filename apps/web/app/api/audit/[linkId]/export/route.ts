@@ -7,6 +7,22 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+/**
+ * Canonical JSON: keys sorted, no whitespace, no trailing newline.
+ * Required so that an external verifier can reproduce the exact bytes that
+ * the server signed without depending on V8/JSCore key-order quirks.
+ */
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(",")}]`;
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  const parts = keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`);
+  return `{${parts.join(",")}}`;
+}
+
 const exportSchema = z.object({
   format: z.enum(["csv", "json"]),
 });
@@ -53,18 +69,14 @@ export async function POST(request: Request, context: { params: Promise<{ linkId
     const data =
       parsed.data.format === "csv"
         ? exportAuditToCSV(transactions)
-        : JSON.stringify(
-            {
-              linkId,
-              vault: link.cofreAddress,
-              exportedAt: new Date().toISOString(),
-              scope: link.scope,
-              scopeParams: link.scopeParams,
-              transactions,
-            },
-            null,
-            2,
-          );
+        : canonicalJson({
+            linkId,
+            vault: link.cofreAddress,
+            exportedAt: new Date().toISOString(),
+            scope: link.scope,
+            scopeParams: link.scopeParams,
+            transactions,
+          });
 
     const signed = signAuditExport({
       vault: link.cofreAddress,
