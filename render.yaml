@@ -60,14 +60,15 @@ services:
       # remove after the rotate-field-crypto script completes.
       - key: FIELD_CRYPTO_KEY_PREVIOUS
         sync: false
-      # Ed25519 signing seed (32 bytes, base64) for audit-export signatures.
-      # `generateValue` produces a random hex string; the audit-sign helper
-      # derives a 32-byte seed via SHA-256 if the env is not literally a
-      # base64-encoded 32-byte seed (current behavior — see audit-sign.ts).
-      # For a true 32-byte seed, generate manually:
-      #   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+      # Ed25519 signing seed for audit-export signatures. audit-sign.ts
+      # accepts either a base64-of-32-byte seed (preferred) or any non-empty
+      # string (SHA-256-hashed to derive the seed). Render's generateValue
+      # produces a 256-bit random hex string — falls into the hash path,
+      # which is cryptographically equivalent. Each export envelope embeds
+      # its verifying publicKey so historical exports remain offline-
+      # verifiable across rotations.
       - key: AUDIT_EXPORT_SIGN_KEY
-        sync: false
+        generateValue: true
       - key: COINGECKO_API_KEY
         sync: false
 
