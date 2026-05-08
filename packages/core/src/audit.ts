@@ -123,20 +123,38 @@ export function deriveViewKeyFromSecret(
   return blake3(input).slice(0, 32);
 }
 
+export type AuditTransactionSubtype =
+  | "send"
+  | "payroll"
+  | "swap"
+  | "income"
+  | "invoice";
+
 export type FilteredAuditTransaction = {
   timestamp: number;
   type: "deposit" | "transfer" | "withdraw";
+  /** Optional finer-grained classification under `type`. Lets the viewer
+   *  show "Payroll" or "Swap" without inventing new values for `type`,
+   *  which is consumed by filters that only know the three core kinds. */
+  subtype?: AuditTransactionSubtype;
   amount?: string | undefined;
+  /** Identifier for display. NOT a real ZK nullifier — this is a recipient
+   *  slice, a payroll line label, or "REDACTED" depending on scope. */
   nullifier: string;
   status: "confirmed" | "pending" | "failed";
+  /** Source/destination sub-vault index. 0 = primary vault. Undefined when
+   *  the row is derived from data that doesn't carry a vault index. */
+  vaultIndex?: number;
 };
 
 export type AuditExportRow = {
   timestamp: string;
   type: string;
+  subtype: string;
   amount: string;
   nullifier: string;
   status: string;
+  vaultIndex: string;
 };
 
 /**
@@ -174,12 +192,14 @@ export function exportAuditToCSV(transactions: FilteredAuditTransaction[]): stri
   const rows: AuditExportRow[] = transactions.map((tx) => ({
     timestamp: new Date(tx.timestamp).toISOString(),
     type: tx.type,
+    subtype: tx.subtype ?? "",
     amount: tx.amount ?? "N/A",
     nullifier: tx.nullifier,
     status: tx.status,
+    vaultIndex: tx.vaultIndex !== undefined ? String(tx.vaultIndex) : "",
   }));
 
-  const headers = ["timestamp", "type", "amount", "nullifier", "status"];
+  const headers = ["timestamp", "type", "subtype", "amount", "nullifier", "status", "vaultIndex"];
   const csvLines = [
     headers.join(","),
     ...rows.map((row) =>

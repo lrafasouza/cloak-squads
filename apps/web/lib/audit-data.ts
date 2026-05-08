@@ -1,13 +1,27 @@
+import { getCurrentCluster } from "@/lib/cluster";
 import { prisma } from "@/lib/prisma";
 import type { FilteredAuditTransaction } from "@cloak-squads/core/audit";
 
 /**
  * Pull real transaction history for an audit link from the application DB.
  *
- * The public viewer (`/audit/[linkId]`) and the admin page need to render the
- * same set of rows; this is the shared source of truth. We surface
- * ProposalDraft + PayrollDraft entries; archived (failed/cancelled) drafts are
- * marked as `failed` so the auditor sees the full picture, not just successes.
+ * Source of truth for both the public viewer (`/audit/[linkId]`) and the
+ * signed export endpoint. Surfaces every category that affects the vault's
+ * money picture so an external auditor can reconcile income against outflow:
+ *
+ *   - ProposalDraft   → outbound transfers (private + public sends)
+ *   - PayrollDraft    → expanded one row per recipient
+ *   - SwapDraft       → in-vault swaps
+ *   - StealthInvoice  → shielded invoices (claimed = paid; pending = open)
+ *   - VaultIncome     → on-chain deposits indexed from the chain
+ *
+ * Filtering rules:
+ *   - Cluster is enforced at every query so devnet rows can never leak into
+ *     a mainnet export.
+ *   - Time-range scope is applied AFTER aggregation since each source has a
+ *     different timestamp column.
+ *   - "amounts_only" scope redacts the nullifier client-facing string but
+ *     keeps amounts intact (matches the existing scope semantic).
  */
 export async function loadAuditTransactions(args: {
   cofreAddress: string;
@@ -16,43 +30,137 @@ export async function loadAuditTransactions(args: {
   limit?: number;
 }): Promise<FilteredAuditTransaction[]> {
   const limit = args.limit ?? 200;
+  const cluster = getCurrentCluster();
+  const where = { cofreAddress: args.cofreAddress, cluster };
 
-  const [drafts, payrolls] = await Promise.all([
+  const redact = args.scope === "amounts_only";
+
+  const [proposals, payrolls, swaps, invoices, incomes] = await Promise.all([
     prisma.proposalDraft.findMany({
-      where: { cofreAddress: args.cofreAddress },
+      where,
       orderBy: { createdAt: "desc" },
       take: limit,
     }),
     prisma.payrollDraft.findMany({
-      where: { cofreAddress: args.cofreAddress },
+      where,
       orderBy: { createdAt: "desc" },
+      take: limit,
+      include: { recipients: true },
+    }),
+    prisma.swapDraft.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+    prisma.stealthInvoice.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+    prisma.vaultIncome.findMany({
+      where,
+      orderBy: { blockTime: "desc" },
       take: limit,
     }),
   ]);
 
   const out: FilteredAuditTransaction[] = [];
 
-  for (const d of drafts) {
+  for (const draft of proposals) {
     out.push({
       type: "transfer",
-      amount: d.amount,
-      nullifier: args.scope === "amounts_only" ? "REDACTED" : d.recipient.slice(0, 16),
-      status: d.archivedAt ? "failed" : "confirmed",
-      timestamp: d.createdAt.getTime(),
+      subtype: "send",
+      amount: draft.amount,
+      nullifier: redact ? "REDACTED" : draft.recipient.slice(0, 16),
+      // archivedAt is set when a draft is cancelled/superseded — surface it
+      // so the auditor sees the failure, not just the happy path.
+      status: draft.archivedAt ? "failed" : "confirmed",
+      timestamp: draft.createdAt.getTime(),
+      vaultIndex: draft.vaultIndex,
     });
   }
 
-  for (const p of payrolls) {
+  for (const payroll of payrolls) {
+    // Each recipient gets its own row. A payroll batch with 5 recipients
+    // shows 5 transfers in the audit, not "1 transfer of $X to payroll:5"
+    // — the latter is a regulatory red flag (looks like structuring).
+    for (const recipient of payroll.recipients) {
+      out.push({
+        type: "transfer",
+        subtype: "payroll",
+        amount: recipient.amount,
+        nullifier: redact ? "REDACTED" : recipient.wallet.slice(0, 16),
+        status: "confirmed",
+        timestamp: payroll.createdAt.getTime(),
+        vaultIndex: payroll.vaultIndex,
+      });
+    }
+    if (payroll.recipients.length === 0) {
+      // Defensive: a payroll draft with zero recipients should never exist
+      // (POST validates min(1)), but if one slipped through we still want
+      // to surface its existence rather than silently drop it.
+      out.push({
+        type: "transfer",
+        subtype: "payroll",
+        amount: payroll.totalAmount,
+        nullifier: redact ? "REDACTED" : `payroll-empty:${payroll.id.slice(0, 8)}`,
+        status: "failed",
+        timestamp: payroll.createdAt.getTime(),
+        vaultIndex: payroll.vaultIndex,
+      });
+    }
+  }
+
+  for (const swap of swaps) {
     out.push({
       type: "transfer",
-      amount: p.totalAmount,
-      nullifier: args.scope === "amounts_only" ? "REDACTED" : `payroll:${p.recipientCount}`,
+      subtype: "swap",
+      amount: swap.inputAmount,
+      nullifier: redact
+        ? "REDACTED"
+        : `${swap.inputSymbol}→${swap.outputSymbol}`,
       status: "confirmed",
-      timestamp: p.createdAt.getTime(),
+      timestamp: swap.createdAt.getTime(),
+      vaultIndex: swap.vaultIndex,
     });
   }
 
-  // Time-range filter
+  for (const invoice of invoices) {
+    // Stealth invoices are inbound from the vault's perspective: the vault
+    // collects funds via a private claim. Pending = link issued, no claim
+    // yet. Claimed = paid. Anything else (expired, revoked) shows failed.
+    const status: FilteredAuditTransaction["status"] =
+      invoice.status === "claimed"
+        ? "confirmed"
+        : invoice.status === "pending"
+          ? "pending"
+          : "failed";
+    out.push({
+      type: "deposit",
+      subtype: "invoice",
+      amount: invoice.utxoAmount ?? undefined,
+      nullifier: redact
+        ? "REDACTED"
+        : `invoice:${invoice.id.slice(0, 8)}`,
+      status,
+      timestamp: (invoice.claimedAt ?? invoice.createdAt).getTime(),
+      vaultIndex: invoice.vaultIndex,
+    });
+  }
+
+  for (const income of incomes) {
+    out.push({
+      type: "deposit",
+      subtype: "income",
+      amount: income.amountLamports,
+      nullifier: redact ? "REDACTED" : income.fromAddress.slice(0, 16),
+      status: "confirmed",
+      timestamp: income.blockTime.getTime(),
+      vaultIndex: income.vaultIndex,
+    });
+  }
+
+  // Time-range filter — applied uniformly across all sources.
   const startDate = args.scopeParams?.startDate;
   const endDate = args.scopeParams?.endDate;
   if (args.scope === "time_ranged" && startDate !== undefined && endDate !== undefined) {

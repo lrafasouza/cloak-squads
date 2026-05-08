@@ -11,8 +11,6 @@ import {
   type FilteredAuditTransaction,
   deriveViewKeyFromSecret,
   exportAuditToCSV,
-  filterAuditData,
-  generateDeterministicMockData,
   validateAuditFragment,
 } from "@cloak-squads/core/audit";
 import {
@@ -157,7 +155,9 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
     void loadMetadata();
   }, [linkId, fragmentValid]);
 
-  // Derive view key and load transactions (mock for now)
+  // Load transactions from the canonical audit endpoint. Single source of
+  // truth — the same `loadAuditTransactions` server-side that the signed
+  // export uses, so the viewer and the CSV always agree on what happened.
   useEffect(() => {
     if (!metadata || !secretKey) return;
 
@@ -169,125 +169,37 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
     } catch {
       scopeParams = {};
     }
+    // Derive the view key from the URL fragment. Reserved for future ZK
+    // verification (proving each row is in a Merkle commitment); today the
+    // fragment is just an access gate, but keeping the derivation here keeps
+    // the call-site stable for when the cryptographic side lands.
     const viewKey = deriveViewKeyFromSecret(secretKey, {
       linkId: metadata.id,
       scope: metadata.scope,
       startDate: BigInt((scopeParams.startDate as number | undefined) ?? 0),
       endDate: BigInt((scopeParams.endDate as number | undefined) ?? Date.now()),
     });
-
     void viewKey;
 
     const loadRealData = async () => {
       try {
-        const auditParam = `auditLinkId=${encodeURIComponent(linkId)}`;
-        const [singleRes, payrollRes] = await Promise.all([
-          fetch(`/api/proposals/${encodeURIComponent(metadata.cofreAddress)}?${auditParam}`),
-          fetch(`/api/payrolls/${encodeURIComponent(metadata.cofreAddress)}?${auditParam}`),
-        ]);
-
-        const realTxs: FilteredAuditTransaction[] = [];
-
-        if (singleRes.ok) {
-          const drafts = (await singleRes.json()) as Array<{
-            amount: string;
-            recipient: string;
-            createdAt: string;
-            archivedAt?: string | null;
-          }>;
-          for (const d of drafts) {
-            // If the draft was archived (proposal failed/was cancelled), mark as failed
-            const status: FilteredAuditTransaction["status"] = d.archivedAt
-              ? "failed"
-              : "confirmed";
-            realTxs.push({
-              type: "transfer",
-              amount: metadata.scope === "amounts_only" ? d.amount : d.amount,
-              nullifier: metadata.scope === "amounts_only" ? "REDACTED" : d.recipient.slice(0, 16),
-              status,
-              timestamp: new Date(d.createdAt).getTime(),
-            });
-          }
-        }
-
-        if (payrollRes.ok) {
-          const payrolls = (await payrollRes.json()) as Array<{
-            totalAmount: string;
-            recipientCount: number;
-            createdAt: string;
-          }>;
-          for (const p of payrolls) {
-            realTxs.push({
-              type: "transfer",
-              amount: p.totalAmount,
-              nullifier:
-                metadata.scope === "amounts_only" ? "REDACTED" : `payroll:${p.recipientCount}`,
-              status: "confirmed",
-              timestamp: new Date(p.createdAt).getTime(),
-            });
-          }
-        }
-
-        // Also fetch archived drafts to detect failed/cancelled proposals
-        try {
-          const archivedRes = await fetch(
-            `/api/proposals/${encodeURIComponent(metadata.cofreAddress)}?includeArchived=true&${auditParam}`,
-          );
-          if (archivedRes.ok) {
-            const archivedDrafts = (await archivedRes.json()) as Array<{
-              amount: string;
-              recipient: string;
-              createdAt: string;
-              archivedAt?: string | null;
-            }>;
-            for (const d of archivedDrafts) {
-              if (!d.archivedAt) continue;
-              // Check if this failed draft is already in the list
-              const nullifier =
-                metadata.scope === "amounts_only" ? "REDACTED" : d.recipient.slice(0, 16);
-              const existingIdx = realTxs.findIndex((tx) => tx.nullifier === nullifier);
-              if (existingIdx >= 0) {
-                realTxs[existingIdx]!.status = "failed";
-              } else {
-                // Add failed transaction that wasn't in the non-archived list
-                realTxs.push({
-                  type: "transfer",
-                  amount: d.amount,
-                  nullifier,
-                  status: "failed",
-                  timestamp: new Date(d.createdAt).getTime(),
-                });
-              }
-            }
-          }
-        } catch {
-          // Archived status check is best-effort; don't block audit view
-        }
-
-        if (realTxs.length > 0) {
-          const filtered = filterAuditData(
-            realTxs,
-            metadata.scope,
-            scopeParams as { startDate: number; endDate: number },
-          );
-          setTransactions(filtered);
+        const res = await fetch(`/api/audit/${encodeURIComponent(linkId)}/transactions`);
+        if (!res.ok) {
+          // Don't fall back to mock data — an empty audit must read as
+          // empty, not as a fabricated demo dataset. Auditor sees "0
+          // transactions" and the operator can investigate.
+          setTransactions([]);
           return;
         }
+        const body = (await res.json()) as { transactions: FilteredAuditTransaction[] };
+        setTransactions(body.transactions ?? []);
       } catch {
-        // Fall through to mock data
+        setTransactions([]);
       }
-
-      const mockData = generateDeterministicMockData(metadata.id, 8);
-      const filtered = filterAuditData(
-        mockData,
-        metadata.scope,
-        scopeParams as { startDate: number; endDate: number },
-      );
-      setTransactions(filtered);
     };
 
     void loadRealData();
-  }, [metadata, secretKey]);
+  }, [metadata, secretKey, linkId]);
 
   const filteredTransactions = useMemo(
     () =>

@@ -9,41 +9,79 @@ import { NextResponse } from "next/server";
 import nacl from "tweetnacl";
 import { z } from "zod";
 
-const auditLinkCreateSchema = z.object({
-  cofreAddress: z.string().refine(
-    (val) => {
-      try {
-        // PDAs (multisig addresses) are valid but off-curve
-        new PublicKey(val);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    { message: "Invalid cofre address" },
-  ),
-  scope: z.enum(["full", "amounts_only", "time_ranged"]),
-  scopeParams: z
-    .object({
-      startDate: z.number().int().positive().optional(),
-      endDate: z.number().int().positive().optional(),
-    })
-    .optional(),
-  expiresAt: z.number().int().positive(),
-  issuedBy: z.string().refine(
-    (val) => {
-      try {
-        // Wallet addresses may be PDAs (off-curve but valid)
-        new PublicKey(val);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    { message: "Invalid issuer address" },
-  ),
-  signature: z.string().min(64).max(256),
-});
+// Hard cap on link lifetime. Mirrors the UI ceiling (365 days) so a malicious
+// or buggy client can't mint a 100-year link by sending an arbitrary epoch.
+const MAX_LINK_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000;
+// Small clock-skew tolerance so a freshly-built `expiresAt` doesn't fail the
+// "must be in the future" check by a few hundred ms of network latency.
+const PAST_TOLERANCE_MS = 60 * 1000;
+
+const auditLinkCreateSchema = z
+  .object({
+    cofreAddress: z.string().refine(
+      (val) => {
+        try {
+          // PDAs (multisig addresses) are valid but off-curve
+          new PublicKey(val);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: "Invalid cofre address" },
+    ),
+    scope: z.enum(["full", "amounts_only", "time_ranged"]),
+    scopeParams: z
+      .object({
+        startDate: z.number().int().positive().optional(),
+        endDate: z.number().int().positive().optional(),
+      })
+      .strict()
+      .optional(),
+    expiresAt: z
+      .number()
+      .int()
+      .positive()
+      .refine((t) => t > Date.now() - PAST_TOLERANCE_MS, {
+        message: "expiresAt must be in the future.",
+      })
+      .refine((t) => t <= Date.now() + MAX_LINK_LIFETIME_MS, {
+        message: "expiresAt cannot be more than 365 days from now.",
+      }),
+    issuedBy: z.string().refine(
+      (val) => {
+        try {
+          // Wallet addresses may be PDAs (off-curve but valid)
+          new PublicKey(val);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: "Invalid issuer address" },
+    ),
+    signature: z.string().min(64).max(256),
+  })
+  .superRefine((data, ctx) => {
+    if (data.scope !== "time_ranged") return;
+    const start = data.scopeParams?.startDate;
+    const end = data.scopeParams?.endDate;
+    if (start === undefined || end === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["scopeParams"],
+        message: "time_ranged scope requires both startDate and endDate.",
+      });
+      return;
+    }
+    if (start >= end) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["scopeParams"],
+        message: "scopeParams.startDate must be strictly before endDate.",
+      });
+    }
+  });
 
 export async function POST(request: Request) {
   let body: unknown;
