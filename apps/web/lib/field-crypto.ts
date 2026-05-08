@@ -2,16 +2,20 @@
  * Server-side field-level encryption for sensitive database fields.
  *
  * Algorithm: AES-256-GCM
- * Key: SHA-256(JWT_SIGNING_SECRET)
- * IV: 12 random bytes per encryption
- * Output format: "v1." + base64(iv + ciphertext + authTag)
+ * Key:       SHA-256(FIELD_CRYPTO_KEY) when set, otherwise SHA-256(JWT_SIGNING_SECRET)
+ *            for backward compatibility with deployments that haven't split
+ *            the secrets yet. Migrating to FIELD_CRYPTO_KEY mid-flight will
+ *            invalidate every previously-encrypted row, so the rotation
+ *            requires a re-encrypt script (out of scope here).
+ * IV:        12 random bytes per encryption
+ * Output:    "v1." + base64(iv + ciphertext + authTag)
  *
  * The "v1." prefix enables version detection and future key rotation.
  * Legacy rows without the prefix are treated as unencrypted plaintext
  * (backward-compat read path only; all writes produce v1. format).
  *
  * Key rotation path (future): introduce "v2.{kid}.{ciphertext}" and
- * keep JWT_SIGNING_SECRET_PREVIOUS in env during the transition window.
+ * keep FIELD_CRYPTO_KEY_PREVIOUS in env during the transition window.
  */
 
 const ALGO = "aes-256-gcm";
@@ -24,9 +28,16 @@ let cachedKey: Buffer | null = null;
 function getKey(): Buffer {
   if (cachedKey) return cachedKey;
 
-  const secret = process.env.JWT_SIGNING_SECRET;
+  // Prefer the purpose-specific FIELD_CRYPTO_KEY. Fall back to
+  // JWT_SIGNING_SECRET so deployments that haven't split secrets yet keep
+  // decrypting their existing rows. Operators who set FIELD_CRYPTO_KEY for
+  // the first time on an existing DB must run a re-encrypt migration —
+  // changing the key mid-flight makes every prior `v1.` row undecryptable.
+  const secret = process.env.FIELD_CRYPTO_KEY ?? process.env.JWT_SIGNING_SECRET;
   if (!secret || secret.length < 16) {
-    throw new Error("JWT_SIGNING_SECRET must be at least 16 characters for field encryption.");
+    throw new Error(
+      "FIELD_CRYPTO_KEY (or JWT_SIGNING_SECRET fallback) must be at least 16 characters.",
+    );
   }
 
   const { createHash } = require("crypto") as typeof import("crypto");

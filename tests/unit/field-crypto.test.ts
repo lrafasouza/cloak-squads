@@ -5,7 +5,7 @@
  * vitest sets process.env before each test file via the setup below.
  */
 
-import { beforeAll, describe, expect, test } from "vitest";
+import { beforeAll, describe, expect, test, vi } from "vitest";
 import { decryptField, encryptField, isEncrypted } from "../../apps/web/lib/field-crypto";
 
 beforeAll(() => {
@@ -95,5 +95,46 @@ describe("isEncrypted", () => {
 
   test("returns false for arbitrary base64 without v1. prefix (legacy)", () => {
     expect(isEncrypted("SGVsbG8gV29ybGQ=")).toBe(false);
+  });
+});
+
+describe("key derivation precedence", () => {
+  test("FIELD_CRYPTO_KEY takes precedence over JWT_SIGNING_SECRET", async () => {
+    // Use vi.resetModules so each import gets a fresh cachedKey closure.
+    vi.resetModules();
+    process.env.JWT_SIGNING_SECRET = "jwt-fallback-key-1234567890abcd";
+    process.env.FIELD_CRYPTO_KEY = "purpose-specific-key-987654321xy";
+    const { encryptField: encryptA, decryptField: decryptA } = await import(
+      "../../apps/web/lib/field-crypto"
+    );
+    const ct = encryptA("payload");
+    expect(decryptA(ct)).toBe("payload");
+
+    // Drop FIELD_CRYPTO_KEY — the JWT fallback derives a *different* key, so
+    // the ciphertext from above must fail to decrypt under the fallback path.
+    vi.resetModules();
+    delete process.env.FIELD_CRYPTO_KEY;
+    const { decryptField: decryptB } = await import("../../apps/web/lib/field-crypto");
+    expect(() => decryptB(ct)).toThrow();
+  });
+
+  test("falls back to JWT_SIGNING_SECRET when FIELD_CRYPTO_KEY is unset", async () => {
+    vi.resetModules();
+    delete process.env.FIELD_CRYPTO_KEY;
+    process.env.JWT_SIGNING_SECRET = "jwt-only-deployment-1234567890";
+    const { encryptField: encA, decryptField: decA } = await import(
+      "../../apps/web/lib/field-crypto"
+    );
+    expect(decA(encA("legacy-deploy"))).toBe("legacy-deploy");
+  });
+
+  test("throws when neither key is set", async () => {
+    vi.resetModules();
+    delete process.env.FIELD_CRYPTO_KEY;
+    delete process.env.JWT_SIGNING_SECRET;
+    const { encryptField: encC } = await import("../../apps/web/lib/field-crypto");
+    expect(() => encC("data")).toThrow(/FIELD_CRYPTO_KEY/);
+    // Restore for subsequent suites
+    process.env.JWT_SIGNING_SECRET = "test-secret-at-least-16-chars-long";
   });
 });

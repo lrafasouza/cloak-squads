@@ -10,7 +10,9 @@
  * Payload:      `{ aud: 'aegis-session', sub: <pubkey>, exp: <ms epoch> }`
  *
  * The cookie is httpOnly + SameSite=Lax + (secure in prod). HMAC secret is
- * derived from `JWT_SIGNING_SECRET` so rotating the env rotates all sessions.
+ * derived from `SESSION_HMAC_KEY` (preferred) or `JWT_SIGNING_SECRET` as a
+ * backward-compat fallback. Rotating either invalidates all live sessions —
+ * users re-login on next request, which is fine for a 30-min cookie.
  */
 import crypto from "node:crypto";
 
@@ -19,11 +21,21 @@ export const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const TOKEN_AUDIENCE = "aegis-session";
 
 function getSecret(): Buffer {
-  const secret = process.env.JWT_SIGNING_SECRET;
-  if (!secret || secret.length < 16) {
-    throw new Error("JWT_SIGNING_SECRET must be set (>=16 chars).");
+  // Prefer the purpose-specific env so a single leaked secret doesn't
+  // simultaneously compromise sessions, encrypted PII, and audit signatures.
+  // When SESSION_HMAC_KEY is set we domain-separate the derived bytes; when
+  // we fall back to JWT_SIGNING_SECRET we keep the *legacy* derivation so
+  // existing session cookies still verify after the rollout (they'd 401
+  // otherwise and pop a wallet sign on every connected user simultaneously).
+  const explicit = process.env.SESSION_HMAC_KEY;
+  if (explicit && explicit.length >= 16) {
+    return crypto.createHash("sha256").update(`session-hmac-v1:${explicit}`).digest();
   }
-  return crypto.createHash("sha256").update(secret).digest();
+  const fallback = process.env.JWT_SIGNING_SECRET;
+  if (!fallback || fallback.length < 16) {
+    throw new Error("SESSION_HMAC_KEY (or JWT_SIGNING_SECRET fallback) must be set (>=16 chars).");
+  }
+  return crypto.createHash("sha256").update(fallback).digest();
 }
 
 function base64UrlEncode(input: Buffer | string): string {

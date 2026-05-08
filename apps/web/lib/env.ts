@@ -15,7 +15,24 @@ const publicEnvSchema = z.object({
 
 const serverEnvSchema = z.object({
   DATABASE_URL: z.string().min(1),
+  // Shared fallback for SESSION_HMAC_KEY / FIELD_CRYPTO_KEY / AUDIT_EXPORT_SIGN_KEY
+  // when those purpose-specific vars are not set. New deployments should set
+  // each of the three explicitly so a single leak does not compromise all
+  // three subsystems (sessions, encrypted PII, audit signatures) at once.
   JWT_SIGNING_SECRET: z.string().min(16),
+  // HMAC key for session cookies (auth-session). Falls back to
+  // JWT_SIGNING_SECRET. Rotating invalidates all live session cookies.
+  SESSION_HMAC_KEY: z.string().min(16).optional(),
+  // AES-256-GCM key for field-crypto (stealth memos, UTXO secrets). Falls
+  // back to JWT_SIGNING_SECRET. Rotating without a re-encrypt script makes
+  // every `v1.` ciphertext row undecryptable.
+  FIELD_CRYPTO_KEY: z.string().min(16).optional(),
+  // Ed25519 signing seed (32 bytes, base64-encoded) for audit export
+  // signatures. Falls back to JWT_SIGNING_SECRET in audit-sign.ts. Rotating
+  // means previously-issued export signatures stop verifying with the
+  // current public key — embed the publicKey in the export envelope so old
+  // exports are still verifiable offline against the snapshot pubkey.
+  AUDIT_EXPORT_SIGN_KEY: z.string().min(1).optional(),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
   FALLBACK_RPC_URL: z.string().url().optional(),
   REDIS_URL: z.string().url().optional(),
@@ -41,6 +58,9 @@ export function getServerEnv() {
   return serverEnvSchema.parse({
     DATABASE_URL: process.env.DATABASE_URL,
     JWT_SIGNING_SECRET: process.env.JWT_SIGNING_SECRET,
+    SESSION_HMAC_KEY: process.env.SESSION_HMAC_KEY,
+    FIELD_CRYPTO_KEY: process.env.FIELD_CRYPTO_KEY,
+    AUDIT_EXPORT_SIGN_KEY: process.env.AUDIT_EXPORT_SIGN_KEY,
     LOG_LEVEL: process.env.LOG_LEVEL,
     FALLBACK_RPC_URL: process.env.FALLBACK_RPC_URL,
     REDIS_URL: process.env.REDIS_URL,
