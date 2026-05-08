@@ -1790,7 +1790,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                 </p>
               </div>
             ) : (
-              <div className="card-panel overflow-hidden">
+              <div className="card-panel w-full overflow-hidden">
                 {/* Header — visually parallels the active-draft header on
                     the right column */}
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 px-5 py-4">
