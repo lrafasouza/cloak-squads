@@ -1,10 +1,12 @@
 "use client";
 
+import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
 import { ApprovalButtons } from "@/components/proposal/ApprovalButtons";
 import type { CommitmentCheckState } from "@/components/proposal/CommitmentCheck";
 import { ExecuteButton } from "@/components/proposal/ExecuteButton";
 import { Button } from "@/components/ui/button";
 import { Countdown } from "@/components/ui/countdown";
+import { ReceiptRow } from "@/components/ui/receipt-row";
 import { useToast } from "@/components/ui/toast-provider";
 import { InlineAlert } from "@/components/ui/workspace";
 import { isProposalExecuted } from "@/lib/operator-execution-history";
@@ -29,13 +31,20 @@ import {
   Circle,
   Copy,
   ExternalLink,
+  Hash,
+  Key,
   Loader2,
+  Lock,
+  Repeat,
   RefreshCw,
+  Send,
   Settings,
   ShieldCheck,
+  Users,
   X,
   XCircle,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 
@@ -138,33 +147,6 @@ function StatusBadge({ status }: { status: ProposalStatusKind | "unknown" | "loc
   );
 }
 
-function ApprovalBar({ approvals, threshold }: { approvals: number; threshold: number | null }) {
-  if (threshold === null) return null;
-  const pct = Math.min(100, (approvals / threshold) * 100);
-  return (
-    <div className="space-y-2">
-      <div className="flex items-baseline justify-between">
-        <span className="font-mono text-2xl font-bold tabular-nums text-ink">
-          {approvals}
-          <span className="text-base font-medium text-ink-muted">/{threshold}</span>
-        </span>
-        <span className="text-xs text-ink-muted">approvals required</span>
-      </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
-        <div
-          className="h-full rounded-full bg-accent transition-all duration-500"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      {approvals < threshold && (
-        <p className="text-xs text-ink-subtle">
-          {threshold - approvals} more approval{threshold - approvals !== 1 ? "s" : ""} needed
-        </p>
-      )}
-    </div>
-  );
-}
-
 function CopyAddress({ address }: { address: string }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
@@ -186,55 +168,65 @@ function CopyAddress({ address }: { address: string }) {
   );
 }
 
-function MemberVoteGrid({
-  members,
-  approvedVoters,
-  rejectedVoters,
-}: {
-  members: string[];
-  approvedVoters: string[];
-  rejectedVoters: string[];
-}) {
-  if (members.length === 0) return null;
-  const approvedSet = new Set(approvedVoters);
-  const rejectedSet = new Set(rejectedVoters);
+type MemberRowVote = "approved" | "pending" | "rejected";
 
+const VOTE_CHIP: Record<
+  MemberRowVote,
+  { icon: typeof CheckCircle2; label: string; cls: string }
+> = {
+  approved: {
+    icon: CheckCircle2,
+    label: "Approved",
+    cls: "bg-accent-soft text-accent",
+  },
+  rejected: {
+    icon: XCircle,
+    label: "Rejected",
+    cls: "bg-signal-danger/10 text-signal-danger",
+  },
+  pending: {
+    icon: Circle,
+    label: "Pending",
+    cls: "bg-surface-3 text-ink-subtle",
+  },
+};
+
+function VoteChip({ vote }: { vote: MemberRowVote }) {
+  const cfg = VOTE_CHIP[vote];
+  const Icon = cfg.icon;
   return (
-    <div className="mt-4 border-t border-border/50 pt-4">
-      <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-        Members
-      </p>
-      <div className="flex flex-col gap-2">
-        {members.map((addr) => {
-          const vote = approvedSet.has(addr)
-            ? "approved"
-            : rejectedSet.has(addr)
-              ? "rejected"
-              : "pending";
-          return (
-            <div key={addr} className="flex items-center justify-between gap-3">
-              <span className="font-mono text-xs text-ink-muted">
-                {addr.slice(0, 6)}…{addr.slice(-4)}
-              </span>
-              {vote === "approved" && (
-                <span className="flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold text-accent">
-                  <CheckCircle2 className="h-3 w-3" /> Approved
-                </span>
-              )}
-              {vote === "rejected" && (
-                <span className="flex items-center gap-1 rounded-full bg-signal-danger/10 px-2 py-0.5 text-[10px] font-semibold text-signal-danger">
-                  <XCircle className="h-3 w-3" /> Rejected
-                </span>
-              )}
-              {vote === "pending" && (
-                <span className="flex items-center gap-1 rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-ink-subtle">
-                  <Circle className="h-3 w-3" /> Pending
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${cfg.cls}`}
+    >
+      <Icon className="h-3 w-3" />
+      {cfg.label}
+    </span>
+  );
+}
+
+const RECEIPT_SKELETON_ROWS: ReadonlyArray<{ lw: string; vw: string }> = [
+  { lw: "56px", vw: "120px" },
+  { lw: "76px", vw: "180px" },
+  { lw: "48px", vw: "100px" },
+  { lw: "62px", vw: "140px" },
+];
+
+function ReceiptSkeleton({ label }: { label: string }) {
+  return (
+    <div className="space-y-1" aria-busy="true" aria-label={label}>
+      {RECEIPT_SKELETON_ROWS.map((row, i) => (
+        <div key={i} className="receipt-row">
+          <span
+            className="block h-3 animate-pulse rounded-full bg-surface-2"
+            style={{ width: row.lw }}
+          />
+          <span className="leader" aria-hidden="true" />
+          <span
+            className="block h-3 animate-pulse rounded-full bg-surface-2"
+            style={{ width: row.vw }}
+          />
+        </div>
+      ))}
     </div>
   );
 }
@@ -542,74 +534,235 @@ export default function ProposalApprovalPage({
         ? "locked"
         : status;
 
+  const kindMeta: { icon: LucideIcon; title: string; subline: string } = (() => {
+    if (isPayroll && payrollDraft) {
+      const tokenMint = payrollDraft.recipients[0]?.invariants.tokenMint ?? SOL_MINT;
+      const count = payrollDraft.recipients.length;
+      return {
+        icon: Users,
+        title: "Payroll batch",
+        subline: `${count} recipient${count !== 1 ? "s" : ""} · ${formatRawAmount(payrollDraft.totalAmount, tokenMint)} total`,
+      };
+    }
+    if (isSwap && swapDraft) {
+      return {
+        icon: Repeat,
+        title: "Token swap",
+        subline: `${formatRawAmount(swapDraft.inputAmount, swapDraft.inputMint)} → ${formatRawAmount(swapDraft.outputAmount, swapDraft.outputMint)} (est.)`,
+      };
+    }
+    if (transactionType === "config") {
+      return {
+        icon: Settings,
+        title: "Vault configuration",
+        subline: "Updates settings, members, or threshold.",
+      };
+    }
+    if (draft) {
+      const formatted = formatRawAmount(draft.amount, draft.invariants?.tokenMint ?? SOL_MINT);
+      const shortAddr = `${draft.recipient.slice(0, 6)}…${draft.recipient.slice(-4)}`;
+      if (draft.kind === "private") {
+        return {
+          icon: ShieldCheck,
+          title: "Private send",
+          subline: `${formatted} → ${shortAddr} · Shielded via Cloak`,
+        };
+      }
+      return {
+        icon: Send,
+        title: "Public transfer",
+        subline: `${formatted} → ${shortAddr}`,
+      };
+    }
+    return {
+      icon: Hash,
+      title: draftLoading ? "Loading proposal" : "Vault proposal",
+      subline: draftLoading
+        ? "Fetching on-chain state…"
+        : "On-chain transaction. Details may live only on-chain.",
+    };
+  })();
+  const KindIcon = kindMeta.icon;
+
+  // ── Quorum ledger derivation ─────────────────────────────────────
+  // Sort members so approvers appear first, then pending, then rejected;
+  // tag the connected wallet with a "You" pill.
+  const myAddress = wallet.publicKey?.toBase58() ?? null;
+  const approvedSet = new Set(approvedVoters);
+  const rejectedSet = new Set(rejectedVoters);
+  const sortOrder: Record<MemberRowVote, number> = { approved: 0, pending: 1, rejected: 2 };
+  const memberRows = members
+    .map((addr) => {
+      const vote: MemberRowVote = approvedSet.has(addr)
+        ? "approved"
+        : rejectedSet.has(addr)
+          ? "rejected"
+          : "pending";
+      return {
+        addr,
+        vote,
+        isYou: myAddress === addr,
+        initials: addr.slice(0, 2),
+        short: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
+      };
+    })
+    .sort((a, b) => sortOrder[a.vote] - sortOrder[b.vote]);
+  const quorumPct =
+    threshold === null ? 0 : Math.min(100, Math.round((approvals / threshold) * 100));
+
+  // ── Safety strip · "what stage are we on?" ──────────────────────
+  // Mirrors Stripe / Apple Pay pre-charge confirmation patterns:
+  // a single calm ribbon that names the gate before the action button.
+  type SafetyTone = "warn" | "lock" | "ready";
+  const safetyState: { tone: SafetyTone; eyebrow: string; body: React.ReactNode } | null = (() => {
+    if (executeComplete) return null;
+    if (status === "rejected" || status === "cancelled" || status === "missing" || status === "loading") {
+      return null;
+    }
+    if (status === "active") {
+      if (threshold !== null && approvals < threshold) {
+        const need = threshold - approvals;
+        return {
+          tone: "warn",
+          eyebrow: "Awaiting quorum",
+          body: `${need} more approval${need !== 1 ? "s" : ""} before this can execute.`,
+        };
+      }
+      if (threshold !== null && approvals >= threshold) {
+        return {
+          tone: "ready",
+          eyebrow: "Quorum reached",
+          body: "Awaiting on-chain confirmation.",
+        };
+      }
+    }
+    if (status === "approved") {
+      if (isLocked && unlocksAtMs !== null) {
+        return {
+          tone: "lock",
+          eyebrow: "Time lock active",
+          body: (
+            <>
+              Unlocks in <Countdown to={unlocksAtMs} />.
+            </>
+          ),
+        };
+      }
+      return {
+        tone: "ready",
+        eyebrow: "All clear",
+        body: "Threshold met, time lock cleared. Ready to execute.",
+      };
+    }
+    return null;
+  })();
+  const safetyClasses: Record<SafetyTone, { wrap: string; chip: string; eyebrow: string }> = {
+    warn: {
+      wrap: "border-signal-warn/30 bg-signal-warn/5",
+      chip: "bg-signal-warn/15 text-signal-warn",
+      eyebrow: "text-signal-warn",
+    },
+    lock: {
+      wrap: "border-brass/30 bg-brass/5",
+      chip: "bg-brass/20 text-accent",
+      eyebrow: "text-accent",
+    },
+    ready: {
+      wrap: "border-accent/30 bg-accent-soft",
+      chip: "bg-accent/15 text-accent",
+      eyebrow: "text-accent",
+    },
+  };
+  const SafetyIcon: Record<SafetyTone, typeof CheckCircle2> = {
+    warn: AlertTriangle,
+    lock: Lock,
+    ready: CheckCircle2,
+  };
+
+  // ── Settled ribbon copy ─────────────────────────────────────────
+  const settledTitle = isSwap
+    ? "Swap executed"
+    : transactionType === "config"
+      ? "Configuration applied"
+      : isPayroll
+        ? "Payroll batch executed"
+        : draft?.kind === "private"
+          ? "Vault license issued"
+          : "Transfer settled";
+  const settledHint = isSwap
+    ? "Tokens swapped, funds returned to the vault."
+    : transactionType === "config"
+      ? "Vault settings have been updated."
+      : isPayroll
+        ? "The Squads proposal is complete."
+        : draft?.kind === "private"
+          ? "Squads side complete. Operator delivers next."
+          : "Funds were sent from the vault.";
+
   return (
     <div className="min-h-screen bg-bg">
       <div className="mx-auto w-full max-w-4xl px-4 py-6 md:px-6 md:py-8">
-        {/* Back + breadcrumb */}
-        <div className="mb-6 flex items-center gap-2 text-sm text-ink-muted">
-          <Link
-            href={`/vault/${multisigParam}/proposals`}
-            className="flex items-center gap-1 transition-aegis hover:text-ink"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Transactions
-          </Link>
-          <ChevronRight className="h-3.5 w-3.5 text-ink-subtle" />
-          <span className="font-mono text-ink">#{id}</span>
-        </div>
+        {/* Back link — standalone, above the hero */}
+        <Link
+          href={`/vault/${multisigParam}/proposals`}
+          className="text-eyebrow mb-4 inline-flex items-center gap-1.5 text-ink-muted transition-aegis hover:text-ink"
+        >
+          <ArrowLeft className="h-3 w-3" aria-hidden="true" />
+          Back to transactions
+        </Link>
 
-        {/* Header */}
-        <div className="mb-6 flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold tracking-tight text-ink">
-                {isPayroll
-                  ? "Payroll batch"
-                  : isSwap
-                    ? "Swap"
-                    : transactionType === "config"
-                      ? "Config"
-                      : draft?.kind === "private"
-                        ? "Private send"
-                        : "Transfer"}{" "}
-                #{id}
-              </h1>
-              <StatusBadge status={displayStatus} />
-              {isLocked && unlocksAtMs !== null && (
-                <span className="font-mono text-xs text-signal-warn">
-                  Unlocks in <Countdown to={unlocksAtMs} />
-                </span>
-              )}
-              {sourceVaultName && (
-                <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
-                  From {sourceVaultName}
-                </span>
-              )}
+        {/* ── Hero · Identity-locked proposal crest ──
+            Mirrors /operator hero pattern: Æ watermark + Fraunces title +
+            chip row positions the proposal as a private-bank signing item. */}
+        <section className="card-hero relative mb-6">
+          <HeraldicWatermark size={320} opacity={0.04} />
+          <div className="relative flex flex-col gap-4 p-6 md:flex-row md:items-start md:gap-6 md:p-7">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-accent/40 bg-accent-soft text-accent shadow-raise-1">
+              <KindIcon className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
             </div>
-            {memberVote && (
-              <p className="mt-1 text-xs text-ink-muted">
-                Your vote: <span className="font-semibold capitalize text-ink">{memberVote}</span>
-              </p>
-            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-eyebrow">Proposal · #{id}</p>
+              <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink md:text-3xl">
+                {kindMeta.title}
+              </h1>
+              <p className="mt-1.5 text-sm text-ink-muted">{kindMeta.subline}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <StatusBadge status={displayStatus} />
+                {isLocked && unlocksAtMs !== null && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-signal-warn/10 px-2.5 py-1 font-mono text-xs text-signal-warn">
+                    Unlocks in <Countdown to={unlocksAtMs} />
+                  </span>
+                )}
+                {sourceVaultName && (
+                  <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                    From {sourceVaultName}
+                  </span>
+                )}
+                {memberVote && (
+                  <span className="text-eyebrow inline-flex items-center gap-1">
+                    Your vote ·{" "}
+                    <span className="font-semibold capitalize text-ink">{memberVote}</span>
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
 
         <div className="grid gap-4 lg:grid-cols-5">
           {/* Left column — details */}
           <div className="space-y-4 lg:col-span-3">
-            {/* Transfer details */}
+            {/* ── Receipt · "what this signs" ──
+                Dotted-leader receipt rows (Stripe / Apple Wallet pre-charge
+                pattern). Payroll keeps tabular form because it's a list. */}
             <div className="card-panel overflow-hidden">
-              <div className="border-b border-border px-5 py-4">
-                <h2 className="text-sm font-semibold text-ink">
+              <header className="border-b border-border/60 px-5 py-3.5">
+                <p className="text-eyebrow">
                   {isPayroll
-                    ? "Payroll recipients"
-                    : isSwap
-                      ? "Swap details"
-                      : transactionType === "config"
-                        ? "Configuration"
-                        : "Transfer details"}
-                </h2>
-              </div>
+                    ? `Recipients${payrollDraft ? ` · ${payrollDraft.recipients.length}` : ""}`
+                    : "Receipt · what this signs"}
+                </p>
+              </header>
 
               <div className="p-5">
                 {isPayroll ? (
@@ -618,18 +771,10 @@ export default function ProposalApprovalPage({
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-border">
-                            <th className="pb-3 pr-4 text-left text-eyebrow">
-                              Name
-                            </th>
-                            <th className="pb-3 pr-4 text-left text-eyebrow">
-                              Wallet
-                            </th>
-                            <th className="pb-3 pr-4 text-right text-eyebrow">
-                              Amount
-                            </th>
-                            <th className="pb-3 text-left text-eyebrow">
-                              Memo
-                            </th>
+                            <th className="pb-3 pr-4 text-left text-eyebrow">Name</th>
+                            <th className="pb-3 pr-4 text-left text-eyebrow">Wallet</th>
+                            <th className="pb-3 pr-4 text-right text-eyebrow">Amount</th>
+                            <th className="pb-3 text-left text-eyebrow">Memo</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
@@ -663,10 +808,7 @@ export default function ProposalApprovalPage({
                       </table>
                     </div>
                   ) : draftLoading ? (
-                    <div className="flex items-center gap-3 py-6 text-ink-muted">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-border-strong border-t-accent" />
-                      <span className="text-sm">Loading payroll data…</span>
-                    </div>
+                    <ReceiptSkeleton label="Loading payroll data" />
                   ) : draftError ? (
                     <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-signal-warn/10">
@@ -697,88 +839,52 @@ export default function ProposalApprovalPage({
                     <InlineAlert>No persisted payroll draft found for this proposal.</InlineAlert>
                   )
                 ) : swapDraft ? (
-                  <dl className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <dt className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                        From
-                      </dt>
-                      <dd className="font-mono text-lg font-bold tabular-nums text-ink">
-                        {formatRawAmount(swapDraft.inputAmount, swapDraft.inputMint)}
-                      </dd>
-                    </div>
-                    <div className="border-t border-border/50 pt-4 flex items-center justify-between">
-                      <dt className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                        To (est.)
-                      </dt>
-                      <dd className="font-mono text-lg font-bold tabular-nums text-ink">
-                        {formatRawAmount(swapDraft.outputAmount, swapDraft.outputMint)}
-                      </dd>
-                    </div>
+                  <div className="space-y-1">
+                    <ReceiptRow label="From">
+                      {formatRawAmount(swapDraft.inputAmount, swapDraft.inputMint)}
+                    </ReceiptRow>
+                    <ReceiptRow label="To (est.)">
+                      {formatRawAmount(swapDraft.outputAmount, swapDraft.outputMint)}
+                    </ReceiptRow>
                     {swapDraft.memo && (
-                      <div className="border-t border-border/50 pt-4">
-                        <dt className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                          Memo
-                        </dt>
-                        <dd className="text-sm text-ink">{swapDraft.memo}</dd>
-                      </div>
+                      <ReceiptRow label="Memo" mono={false} tone="muted">
+                        {swapDraft.memo}
+                      </ReceiptRow>
                     )}
-                  </dl>
-                ) : draft ? (
-                  <dl className="space-y-4">
-                    <div className="flex items-start justify-between">
-                      <dt className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                        Amount
-                      </dt>
-                      <dd className="font-mono text-lg font-bold tabular-nums text-ink">
-                        {formatRawAmount(draft.amount, draft.invariants?.tokenMint ?? SOL_MINT)}
-                      </dd>
-                    </div>
-                    <div className="border-t border-border/50 pt-4">
-                      <dt className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                        Recipient
-                      </dt>
-                      <dd className="break-all font-mono text-sm text-ink">{draft.recipient}</dd>
-                    </div>
-                    {draft.memo && (
-                      <div className="border-t border-border/50 pt-4">
-                        <dt className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                          Memo
-                        </dt>
-                        <dd className="text-sm text-ink">{draft.memo}</dd>
-                      </div>
-                    )}
-                  </dl>
-                ) : draftLoading ? (
-                  <div className="flex items-center gap-3 py-6 text-ink-muted">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-border-strong border-t-accent" />
-                    <span className="text-sm">Loading proposal data…</span>
                   </div>
+                ) : draft ? (
+                  <div className="space-y-1">
+                    <ReceiptRow label="Amount">
+                      {formatRawAmount(draft.amount, draft.invariants?.tokenMint ?? SOL_MINT)}
+                    </ReceiptRow>
+                    <ReceiptRow label="Recipient" mono={false}>
+                      <CopyAddress address={draft.recipient} />
+                    </ReceiptRow>
+                    {draft.memo && (
+                      <ReceiptRow label="Memo" mono={false} tone="muted">
+                        {draft.memo}
+                      </ReceiptRow>
+                    )}
+                    <ReceiptRow
+                      label="Privacy"
+                      mono={false}
+                      tone={draft.kind === "private" ? "accent" : "muted"}
+                    >
+                      {draft.kind === "private" ? "Shielded via Cloak" : "Public transfer"}
+                    </ReceiptRow>
+                  </div>
+                ) : draftLoading ? (
+                  <ReceiptSkeleton label="Loading proposal data" />
                 ) : transactionType === "config" ? (
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-3 rounded-lg bg-surface-2 p-4">
-                      <Settings className="mt-0.5 h-4 w-4 shrink-0 text-ink-muted" />
-                      <div>
-                        <p className="text-sm font-semibold text-ink">Configuration proposal</p>
-                        <p className="mt-0.5 text-xs text-ink-muted">
-                          This proposal updates the vault settings or member list. Details are
-                          stored on-chain.
-                        </p>
-                      </div>
-                    </div>
-                    <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                      <div>
-                        <dt className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                          Type
-                        </dt>
-                        <dd className="mt-0.5 text-ink">Vault configuration</dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                          Index
-                        </dt>
-                        <dd className="mt-0.5 font-mono text-ink">#{id}</dd>
-                      </div>
-                    </dl>
+                  <div className="space-y-1">
+                    <ReceiptRow label="Type" mono={false}>
+                      Vault configuration
+                    </ReceiptRow>
+                    <ReceiptRow label="Index">#{id}</ReceiptRow>
+                    <p className="mt-3 text-xs text-ink-muted">
+                      Configuration proposals update vault settings or the member list. Details are
+                      stored on-chain.
+                    </p>
                   </div>
                 ) : draftError === 503 ? (
                   <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
@@ -822,68 +928,112 @@ export default function ProposalApprovalPage({
               </div>
             </div>
 
-            {/* Timeline — compact */}
-            <div className="card-panel">
-              <div className="border-b border-border px-5 py-3.5">
-                <h2 className="text-sm font-semibold text-ink">Timeline</h2>
-              </div>
-              <ol className="divide-y divide-border/50">
-                {[
-                  {
-                    label: "Draft loaded",
-                    done: draft !== null || payrollDraft !== null || swapDraft !== null,
-                    current: false,
-                  },
-                  {
-                    label: "Proposal opened",
-                    done: status !== "loading" && status !== "missing",
-                    current: false,
-                  },
-                  {
-                    label: "Votes collected",
-                    done: approvals > 0,
-                    current: status === "active" && !(threshold !== null && approvals >= threshold),
-                    detail: threshold !== null ? `${approvals}/${threshold}` : `${approvals}`,
-                  },
-                  {
-                    label: "Threshold reached",
-                    done:
-                      status === "approved" ||
-                      (status === "active" && threshold !== null && approvals >= threshold) ||
-                      executeComplete,
-                    current:
-                      (status === "approved" ||
-                        (status === "active" && threshold !== null && approvals >= threshold)) &&
-                      !executeComplete,
-                  },
-                  {
-                    label: "Executed",
-                    done: executeComplete,
-                    current: false,
-                  },
-                ].map((step) => (
-                  <li key={step.label} className="flex items-center gap-3 px-5 py-3">
-                    {step.done ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-accent" />
-                    ) : (
-                      <Circle
-                        className={`h-3.5 w-3.5 shrink-0 ${step.current ? "text-signal-warn" : "text-border-strong"}`}
-                      />
-                    )}
-                    <span
-                      className={`text-sm ${step.done ? "text-ink" : step.current ? "text-signal-warn" : "text-ink-subtle"}`}
-                    >
-                      {step.label}
-                    </span>
-                    {step.detail && (
-                      <span className="ml-auto text-xs font-mono text-ink-muted">
-                        {step.detail}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            </div>
+            {/* ── Timeline · brass rail ──
+                Vertical rail with brass-toned markers. Filled disc = done,
+                pulsing ring = current, hollow = pending. Mirrors the heraldic
+                signing-stage pattern from the operator page. */}
+            {(() => {
+              const steps: Array<{
+                label: string;
+                done: boolean;
+                current: boolean;
+                detail?: string;
+              }> = [
+                {
+                  label: "Draft loaded",
+                  done: draft !== null || payrollDraft !== null || swapDraft !== null,
+                  current: false,
+                },
+                {
+                  label: "Proposal opened",
+                  done: status !== "loading" && status !== "missing",
+                  current: false,
+                },
+                {
+                  label: "Votes collected",
+                  done: approvals > 0,
+                  current:
+                    status === "active" && !(threshold !== null && approvals >= threshold),
+                  detail: threshold !== null ? `${approvals}/${threshold}` : `${approvals}`,
+                },
+                {
+                  label: "Threshold reached",
+                  done:
+                    status === "approved" ||
+                    (status === "active" && threshold !== null && approvals >= threshold) ||
+                    executeComplete,
+                  current:
+                    (status === "approved" ||
+                      (status === "active" && threshold !== null && approvals >= threshold)) &&
+                    !executeComplete,
+                },
+                {
+                  label: "Executed",
+                  done: executeComplete,
+                  current: false,
+                },
+              ];
+              return (
+                <div className="card-panel">
+                  <header className="border-b border-border/60 px-5 py-3.5">
+                    <p className="text-eyebrow">Timeline · {steps.length} stages</p>
+                  </header>
+                  <ol className="px-5 py-4">
+                    {steps.map((step, i) => {
+                      const isLast = i === steps.length - 1;
+                      return (
+                        <li
+                          key={step.label}
+                          className="relative grid grid-cols-[24px_1fr_auto] items-center gap-3 py-2.5"
+                        >
+                          {/* connector rail (skipped for last step) */}
+                          {!isLast && (
+                            <span
+                              aria-hidden="true"
+                              className={`pointer-events-none absolute left-[11px] top-1/2 h-full w-px ${
+                                step.done ? "bg-brass/40" : "bg-border"
+                              }`}
+                            />
+                          )}
+                          {/* marker */}
+                          <span className="relative z-10 flex justify-center">
+                            {step.done ? (
+                              <span className="flex h-3 w-3 items-center justify-center rounded-full bg-accent shadow-[0_0_0_4px_hsl(var(--surface))]">
+                                <span className="h-1 w-1 rounded-full bg-accent-ink" />
+                              </span>
+                            ) : step.current ? (
+                              <span className="relative flex h-3 w-3 items-center justify-center rounded-full border-2 border-signal-warn bg-surface shadow-[0_0_0_4px_hsl(var(--surface))]">
+                                <span className="absolute inset-0 animate-ping rounded-full bg-signal-warn/40" />
+                              </span>
+                            ) : (
+                              <span className="h-3 w-3 rounded-full border-2 border-border-strong bg-surface shadow-[0_0_0_4px_hsl(var(--surface))]" />
+                            )}
+                          </span>
+                          {/* label */}
+                          <span
+                            className={`text-sm ${
+                              step.done
+                                ? "text-ink"
+                                : step.current
+                                  ? "text-signal-warn"
+                                  : "text-ink-subtle"
+                            }`}
+                          >
+                            {step.label}
+                          </span>
+                          {/* detail */}
+                          {step.detail && (
+                            <span className="font-mono text-xs tabular-nums text-ink-muted">
+                              {step.detail}
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              );
+            })()}
 
             {/* Technical details */}
             <details className="group card-panel overflow-hidden">
@@ -928,132 +1078,141 @@ export default function ProposalApprovalPage({
             </details>
           </div>
 
-          {/* Right column — approvals + actions */}
-          <div className="space-y-4 lg:col-span-2">
-            {/* Approvals */}
+          {/* ── Right column · sticky action stack ──
+              Master/detail signing console pattern (Stripe / Carbon). The
+              column tracks the user as they scroll the receipt + timeline,
+              keeping the next action always one glance away. */}
+          <aside className="lg:col-span-2 lg:sticky lg:top-6 lg:self-start space-y-4">
+            {/* ── Quorum ledger ── */}
             <div className="card-panel p-5">
-              <h2 className="mb-4 text-sm font-semibold text-ink">Approvals</h2>
-              <ApprovalBar approvals={approvals} threshold={threshold} />
-              <MemberVoteGrid
-                members={members}
-                approvedVoters={approvedVoters}
-                rejectedVoters={rejectedVoters}
-              />
-            </div>
-
-            {/* Vote */}
-            <div className="card-panel p-5">
-              <h2 className="mb-4 text-sm font-semibold text-ink">Your vote</h2>
-              {memberVote ? (
-                <div
-                  className={`flex items-center gap-2.5 rounded-lg px-3.5 py-3 ${memberVote === "approved" ? "bg-accent-soft" : "bg-signal-danger/10"}`}
-                >
-                  {memberVote === "approved" ? (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-accent" />
-                  ) : (
-                    <XCircle className="h-4 w-4 shrink-0 text-signal-danger" />
-                  )}
-                  <div>
-                    <p
-                      className={`text-sm font-semibold ${memberVote === "approved" ? "text-accent" : "text-signal-danger"}`}
-                    >
-                      You{" "}
-                      {memberVote === "approved"
-                        ? "approved"
-                        : memberVote === "rejected"
-                          ? "rejected"
-                          : "cancelled"}{" "}
-                      this proposal
-                    </p>
-                    <p className="mt-0.5 text-xs text-ink-muted">
-                      One vote per member is recorded on-chain.
-                    </p>
-                  </div>
+              <header className="mb-4 flex items-baseline justify-between">
+                <p className="text-eyebrow">Quorum · approvals</p>
+                {threshold !== null && (
+                  <span className="text-xs text-ink-subtle">
+                    {quorumPct}% of threshold
+                  </span>
+                )}
+              </header>
+              {threshold === null ? (
+                <div className="space-y-2.5">
+                  <div className="h-7 w-1/3 animate-pulse rounded-md bg-surface-2" />
+                  <div className="h-1.5 w-full animate-pulse rounded-full bg-surface-2" />
                 </div>
               ) : (
+                <div className="space-y-3">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-display text-3xl font-semibold tabular-nums tracking-tight text-ink">
+                      {approvals}
+                    </span>
+                    <span className="text-base font-medium text-ink-subtle">/ {threshold}</span>
+                    <span className="ml-auto text-eyebrow">required</span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
+                    <div
+                      className="h-full rounded-full bg-accent transition-all duration-500"
+                      style={{ width: `${quorumPct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              {memberRows.length > 0 && (
+                <div className="mt-5 border-t border-border/50 pt-4">
+                  <p className="text-eyebrow mb-3">Ledger · {memberRows.length} member{memberRows.length !== 1 ? "s" : ""}</p>
+                  <ul className="space-y-2">
+                    {memberRows.map((row) => (
+                      <li key={row.addr} className="flex items-center gap-3">
+                        <span
+                          aria-hidden="true"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brass/30 bg-surface-2 font-mono text-[10px] font-semibold text-ink-muted"
+                        >
+                          {row.initials}
+                        </span>
+                        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                          <span className="truncate font-mono text-xs text-ink-muted">
+                            {row.short}
+                          </span>
+                          {row.isYou && (
+                            <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-eyebrow text-accent">
+                              You
+                            </span>
+                          )}
+                        </div>
+                        <VoteChip vote={row.vote} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* ── Safety strip · what's blocking the next stage ── */}
+            {safetyState &&
+              (() => {
+                const cls = safetyClasses[safetyState.tone];
+                const Icon = SafetyIcon[safetyState.tone];
+                return (
+                  <div className={`rounded-panel border px-4 py-3.5 ${cls.wrap}`}>
+                    <div className="flex items-start gap-3">
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${cls.chip}`}>
+                        <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className={`text-eyebrow ${cls.eyebrow}`}>{safetyState.eyebrow}</p>
+                        <p className="mt-1 text-sm text-ink">{safetyState.body}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+            {/* ── Vote panel · only when the user hasn't voted yet ── */}
+            {!memberVote && status === "active" && (
+              <div className="card-panel p-5">
+                <p className="text-eyebrow mb-3">Your vote</p>
                 <ApprovalButtons
                   multisig={multisigParam}
                   transactionIndex={id}
                   disabled={approveBlocked}
                   onSubmitted={onVoteSubmitted}
                 />
-              )}
-              {signature && (
-                <p className="mt-3 break-all rounded-lg border border-accent/20 bg-accent-soft px-3 py-2 font-mono text-xs text-accent">
-                  {signature}
-                </p>
-              )}
-            </div>
+                {signature && (
+                  <p className="mt-3 break-all rounded-lg border border-accent/20 bg-accent-soft px-3 py-2 font-mono text-[10px] text-accent">
+                    {signature}
+                  </p>
+                )}
+              </div>
+            )}
 
-            {/* Execute */}
-            <div className="card-panel p-5">
-              <h2 className="mb-4 text-sm font-semibold text-ink">Execute</h2>
-              {executeComplete ? (
-                <div className="space-y-3">
-                  <div className="flex items-start gap-2.5 rounded-lg bg-accent-soft px-3.5 py-3">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
-                    <div>
-                      <p className="text-sm font-semibold text-accent">
-                        {isSwap
-                          ? "Swap executed"
-                          : transactionType === "config"
-                            ? "Configuration applied"
-                            : draft !== null || isPayroll
-                              ? "Transaction executed"
-                              : "Transfer complete"}
+            {/* ── Action panel · execute or settled ribbon ── */}
+            {executeComplete ? (
+              <div className="card-panel relative overflow-hidden p-5">
+                <HeraldicWatermark size={160} opacity={0.05} />
+                <div className="relative">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-accent shadow-raise-1">
+                      <CheckCircle2 className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-eyebrow text-accent">Settled · on chain</p>
+                      <p className="mt-1 font-display text-lg font-semibold tracking-tight text-ink">
+                        {settledTitle}
                       </p>
-                      <p className="mt-0.5 text-xs text-ink-muted">
-                        {isSwap
-                          ? "Tokens swapped, funds returned to the vault."
-                          : transactionType === "config"
-                            ? "The vault settings have been updated."
-                            : draft !== null || isPayroll
-                              ? "The Squads proposal is complete."
-                              : "Funds were sent from the vault."}
-                      </p>
-                      {executeSignature && (
-                        <p className="mt-2 break-all rounded-md border border-accent/20 bg-bg/40 px-2.5 py-1.5 font-mono text-[10px] text-ink-muted">
-                          {executeSignature}
-                        </p>
-                      )}
+                      <p className="mt-1 text-xs text-ink-muted">{settledHint}</p>
                     </div>
                   </div>
-                  {((draft !== null && draft.kind !== "public") || isPayroll) &&
-                    (operatorDelivered ? (
-                      <div className="flex items-start gap-2.5 rounded-lg border border-signal-positive/25 bg-signal-positive/10 px-3.5 py-3">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-signal-positive" />
-                        <div>
-                          <p className="text-sm font-semibold text-signal-positive">
-                            Private delivery complete
-                          </p>
-                          <p className="mt-0.5 text-xs text-ink-muted">
-                            {isPayroll
-                              ? "The Operator delivered the funds to all recipients."
-                              : "The Operator delivered the funds to the recipient."}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-start gap-2.5 rounded-lg border border-signal-warn/25 bg-signal-warn/10 px-3.5 py-3">
-                        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-signal-warn" />
-                        <div>
-                          <p className="text-sm font-semibold text-ink">Waiting for Operator</p>
-                          <p className="mt-0.5 text-xs text-ink-muted">
-                            The Operator must now execute the private delivery so the SOL is sent to
-                            the recipient.
-                          </p>
-                          <Link
-                            href={`/vault/${multisigParam}/operator?proposal=${encodeURIComponent(id)}`}
-                            className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink shadow-raise-1 transition-opacity hover:opacity-90"
-                          >
-                            Go to Operator
-                            <ExternalLink className="h-3 w-3" />
-                          </Link>
-                        </div>
-                      </div>
-                    ))}
+                  {executeSignature && (
+                    <div className="mt-4 rounded-lg border border-border bg-bg/40 px-3 py-2">
+                      <p className="text-eyebrow mb-1 text-ink-subtle">Signature</p>
+                      <p className="break-all font-mono text-[10px] text-ink-muted">
+                        {executeSignature}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              ) : (
+              </div>
+            ) : (
+              <div className="card-panel p-5">
+                <p className="text-eyebrow mb-3">Execute</p>
                 <div className="space-y-3">
                   <ExecuteButton
                     className="w-full"
@@ -1088,28 +1247,63 @@ export default function ProposalApprovalPage({
                           : "Reject proposal"}
                     </Button>
                   )}
-                  {!executeComplete && executeBlocked && status !== "loading" && (
-                    <p className="text-xs text-ink-subtle">
-                      {isLocked && unlocksAtMs !== null ? (
-                        <>
-                          Time lock active. Unlocks in <Countdown to={unlocksAtMs} />.
-                        </>
-                      ) : status === "active" && threshold !== null ? (
-                        `Needs ${Math.max(0, threshold - approvals)} more approval${Math.max(0, threshold - approvals) !== 1 ? "s" : ""}.`
-                      ) : (
-                        `Execute requires approved status. Current: ${status}.`
-                      )}
-                    </p>
-                  )}
                   {cancelError && (
                     <p className="rounded-md border border-signal-danger/30 bg-signal-danger/10 px-3 py-2 text-xs text-signal-danger">
                       {cancelError}
                     </p>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            )}
+
+            {/* ── Operator hand-off · cinematic next-stage card ──
+                Shown only after on-chain settlement when the value still
+                needs to flow through the Operator (private send / payroll). */}
+            {executeComplete &&
+              ((draft !== null && draft.kind !== "public") || isPayroll) &&
+              (operatorDelivered ? (
+                <div className="rounded-panel border border-signal-positive/25 bg-signal-positive/8 px-4 py-3.5">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-signal-positive/15 text-signal-positive">
+                      <CheckCircle2 className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-eyebrow text-signal-positive">
+                        Private delivery · settled
+                      </p>
+                      <p className="mt-1 text-sm text-ink">
+                        {isPayroll
+                          ? "Operator delivered to all recipients."
+                          : "Operator delivered to the recipient."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-panel border border-brass/30 bg-brass/5 px-4 py-3.5">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brass/40 bg-accent-soft text-accent">
+                      <Key className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-eyebrow text-accent">Awaiting · Operator key</p>
+                      <p className="mt-1 text-sm text-ink">
+                        {isPayroll
+                          ? "The Operator must release SOL to all recipients."
+                          : "The Operator must release SOL to the recipient."}
+                      </p>
+                      <Link
+                        href={`/vault/${multisigParam}/operator?proposal=${encodeURIComponent(id)}`}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink shadow-raise-1 transition-opacity hover:opacity-90"
+                      >
+                        Hand off to Operator
+                        <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </aside>
         </div>
       </div>
     </div>
