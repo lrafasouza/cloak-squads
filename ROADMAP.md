@@ -36,6 +36,7 @@ Autenticação usa session cookie httpOnly (uma assinatura de carteira a cada 30
 - [x] **Audit Links** escopados (`full_history`, `amounts_only`, `time_ranged`), revogáveis, com expiração
 - [x] **Audit Access Log** — view e export gravados com IP + timestamp, expostos no admin sob cada link
 - [x] **Signed Exports** — CSV e JSON com header Ed25519 (`signedAt | vault | linkId | data`), verificáveis offline
+- [x] **Audit fidelity (Sprint A, `176aaad`)** — payroll abre uma linha por recipient; cluster filter aplicado em todas as queries; `VaultIncome`, `StealthInvoice`, `SwapDraft` agregados no feed (proof-of-reserves reconciliável); mock fallback removido do viewer; endpoint canônico `/api/audit/[linkId]/transactions` é fonte única para viewer + signed export; `expiresAt` validado server-side (futuro + ≤365d); `time_ranged` exige `startDate`+`endDate`; cap on-chain `Cofre.MAX_REVOKED=256` exibido no admin com warning ≥80%
 - [x] **Treasury KPI strip** — DB-backed income indexer, exclui movimentos intra-tesouraria
 
 ### Governance

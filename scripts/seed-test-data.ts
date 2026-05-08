@@ -35,6 +35,11 @@ type DemoData = {
 const RPC_URL = process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
 const isReset = process.argv.includes("--reset");
 
+// Seeded rows MUST carry the same cluster the live app filters by, otherwise
+// queries that scope by `cluster: getCurrentCluster()` (e.g. loadAuditTransactions,
+// /api/audit-links/[vault], /api/payrolls/[multisig]) will silently skip them.
+const SEED_CLUSTER = process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet";
+
 async function main() {
   const connection = new Connection(RPC_URL, "confirmed");
   const prisma = new PrismaClient();
@@ -88,6 +93,7 @@ async function main() {
   const draft1 = await prisma.proposalDraft.create({
     data: {
       cofreAddress,
+      cluster: SEED_CLUSTER,
       transactionIndex: "1",
       amount: "100000",
       recipient: Keypair.generate().publicKey.toBase58(),
@@ -100,6 +106,7 @@ async function main() {
   const payrollDraft = await prisma.payrollDraft.create({
     data: {
       cofreAddress,
+      cluster: SEED_CLUSTER,
       transactionIndex: "2",
       memo: "demo payroll",
       totalAmount: "300000",
@@ -135,6 +142,7 @@ async function main() {
   const draft2 = await prisma.proposalDraft.create({
     data: {
       cofreAddress,
+      cluster: SEED_CLUSTER,
       transactionIndex: "2",
       amount: "300000",
       recipient: "(payroll)",
@@ -147,6 +155,7 @@ async function main() {
   const draft3 = await prisma.proposalDraft.create({
     data: {
       cofreAddress,
+      cluster: SEED_CLUSTER,
       transactionIndex: "3",
       amount: "50000",
       recipient: Keypair.generate().publicKey.toBase58(),
@@ -161,6 +170,7 @@ async function main() {
   const audit1 = await prisma.auditLink.create({
     data: {
       cofreAddress,
+      cluster: SEED_CLUSTER,
       diversifier: Buffer.alloc(32, 7),
       scope: "time_ranged",
       scopeParams: JSON.stringify({ startDate: 1700000000, endDate: 1800000000 }),
@@ -173,6 +183,7 @@ async function main() {
   const audit2 = await prisma.auditLink.create({
     data: {
       cofreAddress,
+      cluster: SEED_CLUSTER,
       diversifier: Buffer.alloc(32, 9),
       scope: "amounts_only",
       scopeParams: null,
@@ -186,11 +197,15 @@ async function main() {
   const stealthInvoice = await prisma.stealthInvoice.create({
     data: {
       cofreAddress,
+      cluster: SEED_CLUSTER,
       recipientWallet: Keypair.generate().publicKey.toBase58(),
       invoiceRef: "INV-DEMO-001",
       memo: "demo stealth invoice",
       stealthPubkey: stealthKeypair.publicKey.toBase58(),
-      amountHintEncrypted: Buffer.alloc(48, 11),
+      // Schema field is `amountHint`. The seed previously misnamed it
+      // `amountHintEncrypted` and the Prisma client rejected the row at
+      // runtime, so the demo state never actually included a stealth invoice.
+      amountHint: Buffer.alloc(48, 11),
       status: "pending",
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     },

@@ -4,6 +4,16 @@ import { concatBytes, domainSeparator } from "./encoding";
 
 export type AuditScope = "full" | "amounts_only" | "time_ranged";
 
+/**
+ * Maximum number of audit-link revocations the on-chain `Cofre` account can
+ * hold. Mirrors `Cofre::MAX_REVOKED` in `programs/cloak-gatekeeper/src/state.rs`.
+ *
+ * Each revocation pushes a 16-byte truncated diversifier into the `Vec` and
+ * triggers a realloc — there is no GC. The frontend should warn before this
+ * cap is hit so an operator can plan a migration (today: deploy a new cofre).
+ */
+export const MAX_REVOKED_AUDIT = 256;
+
 export type AuditLinkMetadata = {
   linkId: string;
   scope: AuditScope;

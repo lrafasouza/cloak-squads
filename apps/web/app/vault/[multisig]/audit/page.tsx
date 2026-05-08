@@ -17,15 +17,20 @@ import {
   PanelHeader,
   WorkspacePage,
 } from "@/components/ui/workspace";
+import { publicEnv } from "@/lib/env";
 import { buildRevokeAuditIxBrowser } from "@/lib/gatekeeper-instructions";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cn } from "@/lib/utils";
+import IDL from "@/lib/idl/cloak_gatekeeper.json";
+import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import {
   type AuditScope,
+  MAX_REVOKED_AUDIT,
   base64urlEncode,
   generateAuditLinkSecret,
 } from "@cloak-squads/core/audit";
+import { cofrePda } from "@cloak-squads/core/pda";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import {
@@ -131,6 +136,10 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
 
   const [links, setLinks] = useState<AuditLinkSummary[]>([]);
   const [linksLoading, setLinksLoading] = useState(true);
+  // On-chain `Cofre.revoked_audit` Vec length. The cofre realloc-grows by
+  // 16 bytes per revocation up to MAX_REVOKED_AUDIT (256). null = not yet
+  // fetched; -1 = cofre not initialized yet.
+  const [revokedOnChain, setRevokedOnChain] = useState<number | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [lastCreatedUrl, setLastCreatedUrl] = useState<string | null>(null);
@@ -188,6 +197,38 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
   useEffect(() => {
     void loadLinks();
   }, [loadLinks]);
+
+  // Fetch the on-chain Cofre once per page mount so the admin sees how
+  // close they are to the revocation cap. Best-effort — if the cofre is
+  // not initialised yet (new vault) or RPC fails, the tile renders "—".
+  useEffect(() => {
+    if (!multisigAddress) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const gatekeeperProgram = new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID);
+        const [cofreAddr] = cofrePda(multisigAddress, gatekeeperProgram);
+        const accountInfo = await connection.getAccountInfo(cofreAddr);
+        if (cancelled) return;
+        if (!accountInfo) {
+          setRevokedOnChain(-1);
+          return;
+        }
+        const coder = new BorshAccountsCoder(IDL as Idl);
+        const decoded = coder.decode<{ revokedAudit?: Array<unknown> }>(
+          "Cofre",
+          accountInfo.data,
+        );
+        setRevokedOnChain(Array.isArray(decoded?.revokedAudit) ? decoded.revokedAudit.length : 0);
+      } catch (err) {
+        console.error("[audit] cofre revocation count fetch failed:", err);
+        if (!cancelled) setRevokedOnChain(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, multisigAddress]);
 
   const handleCreateLink = async () => {
     if (!wallet.publicKey || !wallet.signMessage || !multisigAddress) {
@@ -579,6 +620,36 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
               </p>
             </div>
           </div>
+          {/* On-chain revocation cap status. The Cofre PDA stores executed
+              revocations as a Vec<[u8; 16]> with a hard ceiling of 256
+              entries (no GC). Surfacing this lets the admin notice well
+              before a revoke proposal reverts with RevocationCapacity. */}
+          {revokedOnChain !== null && revokedOnChain >= 0 ? (
+            (() => {
+              const pct = (revokedOnChain / MAX_REVOKED_AUDIT) * 100;
+              const tone =
+                pct >= 95
+                  ? "text-signal-danger"
+                  : pct >= 80
+                    ? "text-signal-warn"
+                    : "text-ink-subtle";
+              return (
+                <p
+                  className={cn(
+                    "mt-4 inline-flex items-center gap-1.5 text-[11px] font-medium",
+                    tone,
+                  )}
+                >
+                  <Shield className="h-3 w-3" aria-hidden="true" />
+                  On-chain revocations:{" "}
+                  <span className="font-mono tabular-nums">
+                    {revokedOnChain} / {MAX_REVOKED_AUDIT}
+                  </span>
+                  {pct >= 80 ? <span>· approaching cap</span> : null}
+                </p>
+              );
+            })()
+          ) : null}
         </div>
       </div>
 
