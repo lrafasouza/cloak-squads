@@ -39,11 +39,10 @@ services:
           name: aegis-db
           property: connectionString
       # ── Crypto keys ─────────────────────────────────────────────────
-      # JWT_SIGNING_SECRET is the legacy single-secret for sessions, field
-      # crypto, audit signatures and claim challenges. The three vars below
-      # are purpose-specific — set explicitly so a leak in one subsystem
-      # does NOT compromise the other three. JWT_SIGNING_SECRET stays as a
-      # backward-compat fallback during the migration window.
+      # JWT_SIGNING_SECRET is DEPRECATED — the runtime crypto helpers no
+      # longer read it. Kept only so deployments mid-migration don't fail
+      # the env-schema parse. Remove from the dashboard once you've
+      # confirmed the four purpose-specific keys below are all set.
       - key: JWT_SIGNING_SECRET
         generateValue: true
       # HMAC key for stateless tokens (session cookie + claim challenge).

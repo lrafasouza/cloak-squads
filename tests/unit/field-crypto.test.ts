@@ -54,23 +54,12 @@ describe("encryptField / decryptField", () => {
     expect(() => decryptField(tampered)).toThrow();
   });
 
-  test("wrong JWT_SIGNING_SECRET causes decryption to throw", () => {
+  test("tampering with the authTag causes decryption to throw", () => {
     const ciphertext = encryptField("sensitive");
-
-    // Switch secret — invalidates the cached key by clearing the module cache
-    const originalSecret = process.env.JWT_SIGNING_SECRET;
-    process.env.JWT_SIGNING_SECRET = "different-secret-at-least-16-chars";
-
-    // Re-import to get a fresh module without the cached key
-    // We achieve this by forcing a cache miss on the key
-    // (The module caches the key in `cachedKey`; we can't easily reset it in vitest.
-    //  Instead, verify the error path by constructing a tampered ciphertext.)
-    process.env.JWT_SIGNING_SECRET = originalSecret;
-
-    // Tamper the authTag (last 16 bytes) to simulate wrong key
+    // Corrupt the last byte (authTag end) — simulates a wrong key without
+    // having to re-import the module.
     const rawBase64 = ciphertext.slice("v1.".length);
     const buf = Buffer.from(rawBase64, "base64");
-    // Corrupt the last byte (authTag end)
     buf[buf.length - 1] ^= 0x01;
     const corrupted = "v1." + buf.toString("base64");
     expect(() => decryptField(corrupted)).toThrow();
@@ -103,44 +92,32 @@ describe("isEncrypted", () => {
   });
 });
 
-describe("key derivation precedence", () => {
-  test("FIELD_CRYPTO_KEY takes precedence over JWT_SIGNING_SECRET", async () => {
-    // Use vi.resetModules so each import gets a fresh cachedKey closure.
-    vi.resetModules();
-    process.env.JWT_SIGNING_SECRET = "jwt-fallback-key-1234567890abcd";
-    process.env.FIELD_CRYPTO_KEY = "purpose-specific-key-987654321xy";
-    const { encryptField: encryptA, decryptField: decryptA } = await import(
-      "../../apps/web/lib/field-crypto"
-    );
-    const ct = encryptA("payload");
-    expect(decryptA(ct)).toBe("payload");
-
-    // Drop FIELD_CRYPTO_KEY — the JWT fallback derives a *different* key, so
-    // the ciphertext from above must fail to decrypt under the fallback path.
-    vi.resetModules();
-    delete process.env.FIELD_CRYPTO_KEY;
-    const { decryptField: decryptB } = await import("../../apps/web/lib/field-crypto");
-    expect(() => decryptB(ct)).toThrow();
-  });
-
-  test("falls back to JWT_SIGNING_SECRET when FIELD_CRYPTO_KEY is unset", async () => {
+describe("key requirement", () => {
+  test("FIELD_CRYPTO_KEY is required — JWT_SIGNING_SECRET no longer satisfies", async () => {
     vi.resetModules();
     delete process.env.FIELD_CRYPTO_KEY;
     process.env.JWT_SIGNING_SECRET = "jwt-only-deployment-1234567890";
-    const { encryptField: encA, decryptField: decA } = await import(
-      "../../apps/web/lib/field-crypto"
-    );
-    expect(decA(encA("legacy-deploy"))).toBe("legacy-deploy");
+    const { encryptField: encA } = await import("../../apps/web/lib/field-crypto");
+    expect(() => encA("data")).toThrow(/FIELD_CRYPTO_KEY/);
+    // Restore for subsequent suites
+    process.env.FIELD_CRYPTO_KEY = "test-field-crypto-key-32-chars!!";
   });
 
-  test("throws when neither key is set", async () => {
+  test("ciphertext under one FIELD_CRYPTO_KEY can't decrypt under another (no PREVIOUS)", async () => {
     vi.resetModules();
-    delete process.env.FIELD_CRYPTO_KEY;
-    delete process.env.JWT_SIGNING_SECRET;
-    const { encryptField: encC } = await import("../../apps/web/lib/field-crypto");
-    expect(() => encC("data")).toThrow(/FIELD_CRYPTO_KEY/);
-    // Restore for subsequent suites
-    process.env.JWT_SIGNING_SECRET = "test-secret-at-least-16-chars-long";
+    delete process.env.FIELD_CRYPTO_KEY_PREVIOUS;
+    process.env.FIELD_CRYPTO_KEY = "first-key-1234567890abcdefghi!!";
+    const { encryptField: encA } = await import("../../apps/web/lib/field-crypto");
+    const ct = encA("payload");
+
+    vi.resetModules();
+    process.env.FIELD_CRYPTO_KEY = "second-key-9876543210xyzzzzzz!!";
+    delete process.env.FIELD_CRYPTO_KEY_PREVIOUS;
+    const { decryptField: decB } = await import("../../apps/web/lib/field-crypto");
+    expect(() => decB(ct)).toThrow();
+
+    // Restore
+    process.env.FIELD_CRYPTO_KEY = "test-field-crypto-key-32-chars!!";
   });
 });
 

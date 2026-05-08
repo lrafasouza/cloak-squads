@@ -7,9 +7,9 @@
  * Safe to run multiple times — only touches rows whose fields do NOT
  * already have the "v1." prefix. Prints a dry-run summary first.
  *
- * Required env: DATABASE_URL + (FIELD_CRYPTO_KEY OR JWT_SIGNING_SECRET).
- * Mirrors the precedence in `apps/web/lib/field-crypto.ts:getKey` so the
- * script always cifra com a mesma chave que o runtime usa para descriptografar.
+ * Required env: DATABASE_URL, FIELD_CRYPTO_KEY.
+ * Mirrors the runtime helper in `apps/web/lib/field-crypto.ts` so this
+ * script always writes with the same key that production reads with.
  */
 
 import { PrismaClient } from "@prisma/client";
@@ -25,16 +25,9 @@ const IV_LENGTH = 12;
 const V1_PREFIX = "v1.";
 
 function getKey(): Buffer {
-  // Prefer FIELD_CRYPTO_KEY to match the runtime helper. Falling back to
-  // JWT_SIGNING_SECRET keeps the script working on deployments that
-  // haven't split secrets yet — but if the runtime is reading from
-  // FIELD_CRYPTO_KEY, this script must too, otherwise we'd write rows
-  // that production cannot decrypt.
-  const secret = process.env.FIELD_CRYPTO_KEY ?? process.env.JWT_SIGNING_SECRET;
+  const secret = process.env.FIELD_CRYPTO_KEY;
   if (!secret || secret.length < 16) {
-    throw new Error(
-      "FIELD_CRYPTO_KEY (or JWT_SIGNING_SECRET fallback) must be at least 16 chars",
-    );
+    throw new Error("FIELD_CRYPTO_KEY must be at least 16 chars");
   }
   return createHash("sha256").update(secret).digest();
 }

@@ -10,9 +10,11 @@
  * Payload:      `{ aud: 'aegis-session', sub: <pubkey>, exp: <ms epoch> }`
  *
  * The cookie is httpOnly + SameSite=Lax + (secure in prod). HMAC secret is
- * derived from `SESSION_HMAC_KEY` (preferred) or `JWT_SIGNING_SECRET` as a
- * backward-compat fallback. Rotating either invalidates all live sessions —
- * users re-login on next request, which is fine for a 30-min cookie.
+ * derived from `SESSION_HMAC_KEY` with a `session-hmac-v1:` domain
+ * separator so the same env can also feed `claim-challenge` (under a
+ * different separator) without the two derived keys colliding. Rotating
+ * SESSION_HMAC_KEY invalidates every live session — users re-login on
+ * the next request, which is fine for a 30-min cookie.
  */
 import crypto from "node:crypto";
 
@@ -21,21 +23,14 @@ export const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const TOKEN_AUDIENCE = "aegis-session";
 
 function getSecret(): Buffer {
-  // Prefer the purpose-specific env so a single leaked secret doesn't
-  // simultaneously compromise sessions, encrypted PII, and audit signatures.
-  // When SESSION_HMAC_KEY is set we domain-separate the derived bytes; when
-  // we fall back to JWT_SIGNING_SECRET we keep the *legacy* derivation so
-  // existing session cookies still verify after the rollout (they'd 401
-  // otherwise and pop a wallet sign on every connected user simultaneously).
-  const explicit = process.env.SESSION_HMAC_KEY;
-  if (explicit && explicit.length >= 16) {
-    return crypto.createHash("sha256").update(`session-hmac-v1:${explicit}`).digest();
+  const key = process.env.SESSION_HMAC_KEY;
+  if (!key || key.length < 16) {
+    // Production boot already fails-loud via env.ts superRefine; this guard
+    // catches dev/test environments that haven't migrated off JWT_SIGNING_SECRET
+    // yet and surfaces the right env-var name in the error.
+    throw new Error("SESSION_HMAC_KEY must be set (>=16 chars).");
   }
-  const fallback = process.env.JWT_SIGNING_SECRET;
-  if (!fallback || fallback.length < 16) {
-    throw new Error("SESSION_HMAC_KEY (or JWT_SIGNING_SECRET fallback) must be set (>=16 chars).");
-  }
-  return crypto.createHash("sha256").update(fallback).digest();
+  return crypto.createHash("sha256").update(`session-hmac-v1:${key}`).digest();
 }
 
 function base64UrlEncode(input: Buffer | string): string {

@@ -2,9 +2,8 @@
  * Server-side field-level encryption for sensitive database fields.
  *
  * Algorithm: AES-256-GCM
- * Encrypt key: SHA-256(FIELD_CRYPTO_KEY) — falls back to JWT_SIGNING_SECRET
- *              if the purpose-specific env is unset (production boot
- *              already fails-loud when missing — see env.ts).
+ * Encrypt key: SHA-256(FIELD_CRYPTO_KEY). Mandatory — production boot
+ *              fails-loud via env.ts superRefine when missing.
  * Decrypt key: tries the encrypt key first; on AES-GCM auth-tag failure
  *              falls back to SHA-256(FIELD_CRYPTO_KEY_PREVIOUS) when set.
  *              This is the dual-read window during a key rotation —
@@ -45,17 +44,14 @@ function deriveKey(secret: string): Buffer {
 function getCurrentKey(): Buffer {
   if (cachedCurrent) return cachedCurrent;
 
-  // Prefer the purpose-specific FIELD_CRYPTO_KEY. Fall back to
-  // JWT_SIGNING_SECRET so deployments that haven't split secrets yet keep
-  // decrypting their existing rows. Operators rotating FIELD_CRYPTO_KEY
-  // must set FIELD_CRYPTO_KEY_PREVIOUS during the migration window —
-  // dropping the old key without a back-fill makes every prior `v1.` row
-  // permanently undecryptable.
-  const secret = process.env.FIELD_CRYPTO_KEY ?? process.env.JWT_SIGNING_SECRET;
+  // FIELD_CRYPTO_KEY is mandatory. Operators rotating it must set
+  // FIELD_CRYPTO_KEY_PREVIOUS during the migration window — see
+  // `rotate-field-crypto.ts` for the runbook. Dropping the old key
+  // without a back-fill makes every prior `v1.` row permanently
+  // undecryptable.
+  const secret = process.env.FIELD_CRYPTO_KEY;
   if (!secret || secret.length < 16) {
-    throw new Error(
-      "FIELD_CRYPTO_KEY (or JWT_SIGNING_SECRET fallback) must be at least 16 characters.",
-    );
+    throw new Error("FIELD_CRYPTO_KEY must be at least 16 characters.");
   }
   cachedCurrent = deriveKey(secret);
   return cachedCurrent;

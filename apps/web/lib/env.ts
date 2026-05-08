@@ -16,13 +16,12 @@ const publicEnvSchema = z.object({
 const serverEnvSchema = z
   .object({
     DATABASE_URL: z.string().min(1),
-    // Legacy single-secret. Acts as a backward-compat fallback for the
-    // four purpose-specific keys below when they're not set explicitly.
-    // New deployments should set each purpose-specific var so a leak in
-    // one subsystem doesn't compromise all four (sessions, claim
-    // challenges, field-encrypted PII, audit signatures). Production
-    // boot fails-loud below if any purpose-specific key is missing.
-    JWT_SIGNING_SECRET: z.string().min(16),
+    // DEPRECATED — kept in the schema only so existing `.env` files don't
+    // fail validation during the cutover. The runtime crypto helpers no
+    // longer read this env (they each require their purpose-specific key).
+    // Remove from your env after confirming SESSION_HMAC_KEY,
+    // FIELD_CRYPTO_KEY, and AUDIT_EXPORT_SIGN_KEY are all set.
+    JWT_SIGNING_SECRET: z.string().min(16).optional(),
     // HMAC key for stateless tokens — session cookies (`auth-session`)
     // and stealth-claim challenges (`claim-challenge`). Each call site
     // domain-separates further (`session-hmac-v1:`, `challenge-hmac-v1:`)
@@ -38,10 +37,12 @@ const serverEnvSchema = z
     // Decrypt path tries FIELD_CRYPTO_KEY first, falls back to
     // FIELD_CRYPTO_KEY_PREVIOUS. Unset under steady state.
     FIELD_CRYPTO_KEY_PREVIOUS: z.string().min(16).optional(),
-    // Ed25519 signing seed (32 bytes, base64-encoded) for audit export
-    // signatures. Each export embeds the verifying `publicKey` in its
-    // envelope, so rotating only impacts new exports — historical
-    // exports remain verifiable offline against their bundled pubkey.
+    // Ed25519 signing seed for audit export signatures. Either base64 of
+    // 32 bytes (preferred) or any non-empty string (audit-sign.ts derives
+    // the seed via SHA-256 in that case). Each export embeds the verifying
+    // `publicKey` in its envelope, so rotating only impacts new exports —
+    // historical exports remain verifiable offline against their bundled
+    // pubkey.
     AUDIT_EXPORT_SIGN_KEY: z.string().min(1).optional(),
     LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
     FALLBACK_RPC_URL: z.string().url().optional(),

@@ -22,27 +22,17 @@ const CONSUME_TTL_SECS = 120; // 2× TTL — covers full challenge validity wind
 
 /**
  * HMAC secret for the challenge token. Shares `SESSION_HMAC_KEY` with
- * `auth-session` because both are stateless HMAC subsystems, but
- * domain-separates with `challenge-hmac-v1:` so the derived bytes are
- * distinct from the session-cookie key. Falls back to the legacy
- * `JWT_SIGNING_SECRET` so existing deploys keep working until the operator
- * sets `SESSION_HMAC_KEY` explicitly (production boot already requires it
- * via env.ts superRefine — see the comment there).
+ * `auth-session` because both are stateless HMAC subsystems, but the
+ * `challenge-hmac-v1:` domain separator below ensures the derived bytes
+ * are distinct from the session-cookie key (which uses `session-hmac-v1:`).
+ * A leak of one cannot forge tokens of the other.
  */
 function getSecret(): Buffer {
-  const explicit = process.env.SESSION_HMAC_KEY;
-  if (explicit && explicit.length >= 16) {
-    return createHash("sha256").update(`challenge-hmac-v1:${explicit}`).digest();
+  const key = process.env.SESSION_HMAC_KEY;
+  if (!key || key.length < 16) {
+    throw new Error("SESSION_HMAC_KEY must be set (>=16 chars).");
   }
-  const fallback = process.env.JWT_SIGNING_SECRET;
-  if (!fallback || fallback.length < 16) {
-    throw new Error(
-      "SESSION_HMAC_KEY (or JWT_SIGNING_SECRET fallback) must be set (>=16 chars).",
-    );
-  }
-  // Legacy derivation kept exactly as-is so existing in-flight challenges
-  // (≤60 s TTL) still verify after the rollout.
-  return Buffer.from(fallback);
+  return createHash("sha256").update(`challenge-hmac-v1:${key}`).digest();
 }
 
 function base64urlEncode(bytes: Uint8Array): string {
