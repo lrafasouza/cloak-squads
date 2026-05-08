@@ -26,6 +26,7 @@
  *   5. Once dry-run reports zero rows under PREVIOUS, unset
  *      FIELD_CRYPTO_KEY_PREVIOUS and redeploy.
  */
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 const ALGO = "aes-256-gcm";
 const IV_LENGTH = 12;
@@ -37,7 +38,6 @@ let cachedPrevious: Buffer | null = null;
 let cachedPreviousLoaded = false;
 
 function deriveKey(secret: string): Buffer {
-  const { createHash } = require("crypto") as typeof import("crypto");
   return createHash("sha256").update(secret).digest();
 }
 
@@ -91,11 +91,10 @@ export function _resetFieldCryptoKeyCache(): void {
  * accept the previous key too (see `decryptField`).
  */
 export function encryptField(plaintext: string): string {
-  const crypto = require("crypto") as typeof import("crypto");
   const key = getCurrentKey();
-  const iv = crypto.randomBytes(IV_LENGTH);
+  const iv = randomBytes(IV_LENGTH);
 
-  const cipher = crypto.createCipheriv(ALGO, key, iv);
+  const cipher = createCipheriv(ALGO, key, iv);
   const encrypted = Buffer.concat([
     cipher.update(plaintext, "utf8"),
     cipher.final(),
@@ -106,8 +105,7 @@ export function encryptField(plaintext: string): string {
 }
 
 function tryDecrypt(key: Buffer, iv: Buffer, encrypted: Buffer, authTag: Buffer): string {
-  const crypto = require("crypto") as typeof import("crypto");
-  const decipher = crypto.createDecipheriv(ALGO, key, iv);
+  const decipher = createDecipheriv(ALGO, key, iv);
   decipher.setAuthTag(authTag);
   return decipher.update(encrypted) + decipher.final("utf8");
 }

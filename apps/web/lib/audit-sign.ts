@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import nacl from "tweetnacl";
 
 /**
@@ -42,7 +43,6 @@ export function getAuditSigningKeypair(): nacl.SignKeyPair {
   if (explicit.length < 1) {
     throw new Error("AUDIT_EXPORT_SIGN_KEY must be non-empty.");
   }
-  const { createHash } = require("node:crypto") as typeof import("node:crypto");
   const seed = createHash("sha256").update(`audit-export-v1:${explicit}`).digest();
   cached = nacl.sign.keyPair.fromSeed(Uint8Array.from(seed));
   return cached;
@@ -103,7 +103,6 @@ export function buildAuditExportMessage(args: {
   contentType: string;
   data: string;
 }): Uint8Array {
-  const { createHash } = require("node:crypto") as typeof import("node:crypto");
   const dataHash = Uint8Array.from(createHash("sha256").update(args.data).digest());
   return concatBytes(
     new TextEncoder().encode(SIGN_DOMAIN_SEP),
