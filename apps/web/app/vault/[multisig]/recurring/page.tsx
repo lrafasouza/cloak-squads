@@ -4,17 +4,14 @@ import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { StatCard } from "@/components/ui/stat-card";
 import { useToast } from "@/components/ui/toast-provider";
 import { TokenLogo } from "@/components/ui/token-logo";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import {
-  EmptyPanel,
   InlineAlert,
   Panel,
-  WorkspaceHeader,
   WorkspacePage,
 } from "@/components/ui/workspace";
 import { publicEnv } from "@/lib/env";
@@ -639,158 +636,225 @@ export default function RecurringPage({
   const monthlySub =
     stats.monthlyUsd != null ? `${stats.monthlySol.toFixed(2)} SOL committed` : "USD price loading";
 
+  const pausedCount = items.filter((i) => i.status === "paused").length;
+
   return (
     <WorkspacePage>
-      <WorkspaceHeader
-        eyebrow="RECURRING"
-        title="Recurring payments"
-        description="Track scheduled payouts and run them on demand. Aegis tracks the schedule, you click Run."
-        action={
-          <Button onClick={() => setShowAdd(true)} disabled={!wallet.publicKey}>
-            <Plus className="mr-1.5 h-4 w-4" /> New schedule
-          </Button>
-        }
-      />
+      <div className="space-y-6">
+        {/* ── Hero · Identity-locked recurring crest ──
+            Æ watermark + Fraunces title positions the page as a calendar
+            that signs value, not just a list. */}
+        <section className="card-hero relative">
+          <div className="relative flex flex-col gap-4 p-6 md:flex-row md:items-center md:gap-6 md:p-7">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-accent/40 bg-accent-soft text-accent shadow-raise-1">
+              <CalendarClock className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-eyebrow">Recurring · scheduled outflow</p>
+              <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink md:text-3xl">
+                Recurring payments
+              </h1>
+              <p className="mt-1.5 text-sm text-ink-muted">
+                Aegis tracks the cadence. You sign each run with one click.
+              </p>
+            </div>
+            <Button
+              onClick={() => setShowAdd(true)}
+              disabled={!wallet.publicKey}
+              className="self-start md:self-auto"
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> New schedule
+            </Button>
+          </div>
+        </section>
 
-      {/* KPI strip */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <StatCard
-          label="Active schedules"
-          value={loading ? "..." : stats.activeCount.toString()}
-          icon={Repeat}
-          sub={
-            stats.activeCount === 0
-              ? "Nothing scheduled yet"
-              : `${stats.activeCount} live, ${items.filter((i) => i.status === "paused").length} paused`
-          }
-        />
-        <StatCard
-          label="Monthly outflow"
-          value={loading ? "..." : monthlyDisplay}
-          icon={TrendingUp}
-          sub={loading ? "" : monthlySub}
-        />
-        <StatCard
-          label="Due this week"
-          value={loading ? "..." : (stats.dueCount + stats.dueIn7dCount).toString()}
-          icon={CalendarClock}
-          sub={
-            stats.dueCount > 0
-              ? `${stats.dueCount} overdue, ${stats.dueIn7dCount} upcoming`
-              : `${stats.dueIn7dCount} upcoming`
-          }
-        />
-      </div>
+        {/* ── KPI strip · 3 numbers ──
+            Active schedules · Monthly outflow · Due this week. Mirrors the
+            operator KPI strip for vocabulary consistency. */}
+        <div className="grid gap-3 lg:grid-cols-3">
+          <div className="card-panel relative p-5">
+            <div className="flex items-center gap-1.5 text-eyebrow">
+              <Repeat className="h-3 w-3" aria-hidden="true" />
+              Active schedules
+            </div>
+            <p className="mt-2.5 font-display text-3xl font-semibold tabular-nums tracking-tight text-ink">
+              {loading ? "…" : stats.activeCount}
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">
+              {loading
+                ? "Loading…"
+                : stats.activeCount === 0
+                  ? "Nothing scheduled yet."
+                  : `${stats.activeCount} live · ${pausedCount} paused`}
+            </p>
+          </div>
 
-      {error && (
-        <InlineAlert tone="danger" className="mb-4">
-          {error}
-        </InlineAlert>
-      )}
+          <div className="card-panel relative p-5">
+            <div className="flex items-center gap-1.5 text-eyebrow">
+              <TrendingUp className="h-3 w-3" aria-hidden="true" />
+              Monthly outflow
+            </div>
+            <p className="mt-2.5 font-display text-3xl font-semibold tabular-nums tracking-tight text-ink">
+              {loading ? "…" : monthlyDisplay}
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">{loading ? "" : monthlySub}</p>
+          </div>
 
-      {/* Filters */}
-      {!loading && items.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-1 border-b border-border pb-2">
-          {(
-            [
-              ["all", "All", items.length],
-              ["due", "Due now", groups.due.length],
-              ["active", "Active", items.filter((i) => i.status === "active").length],
-              ["paused", "Paused", items.filter((i) => i.status === "paused").length],
-            ] as Array<[StatusFilter, string, number]>
-          ).map(([key, label, count]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setFilter(key)}
+          <div
+            className={cn(
+              "card-panel relative p-5",
+              stats.dueCount > 0 && "border-signal-warn/30",
+            )}
+          >
+            <div className="flex items-center gap-1.5 text-eyebrow">
+              <CalendarClock className="h-3 w-3" aria-hidden="true" />
+              Due this week
+            </div>
+            <p
               className={cn(
-                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-aegis",
-                filter === key
-                  ? "bg-accent-soft text-accent"
-                  : "text-ink-muted hover:bg-surface-2 hover:text-ink",
+                "mt-2.5 font-display text-3xl font-semibold tabular-nums tracking-tight",
+                stats.dueCount > 0 ? "text-signal-warn" : "text-ink",
               )}
             >
-              {label}
-              {count > 0 && <span className="text-xs text-ink-subtle tabular-nums">{count}</span>}
-            </button>
-          ))}
+              {loading ? "…" : stats.dueCount + stats.dueIn7dCount}
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">
+              {loading
+                ? ""
+                : stats.dueCount > 0
+                  ? `${stats.dueCount} overdue · ${stats.dueIn7dCount} upcoming`
+                  : `${stats.dueIn7dCount} upcoming`}
+            </p>
+          </div>
         </div>
-      )}
 
-      {/* List */}
-      {loading ? (
-        <Panel>
-          <div className="divide-y divide-border/40">
-            {[0, 1, 2].map((n) => (
-              <div key={n} className="flex items-center gap-3 px-5 py-4">
-                <div className="h-10 w-10 shimmer-bg rounded-lg" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 w-40 shimmer-bg rounded" />
-                  <div className="h-2.5 w-64 shimmer-bg rounded" />
-                </div>
-                <div className="h-7 w-20 shimmer-bg rounded" />
-              </div>
+        {error && <InlineAlert tone="danger">{error}</InlineAlert>}
+
+        {/* ── Filters · editorial pills ── */}
+        {!loading && items.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 border-b border-border/60 pb-2">
+            <span className="text-eyebrow mr-2 hidden text-ink-subtle sm:inline">Filter</span>
+            {(
+              [
+                ["all", "All", items.length],
+                ["due", "Due now", groups.due.length],
+                ["active", "Active", items.filter((i) => i.status === "active").length],
+                ["paused", "Paused", pausedCount],
+              ] as Array<[StatusFilter, string, number]>
+            ).map(([key, label, count]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setFilter(key)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-aegis",
+                  filter === key
+                    ? "bg-accent-soft text-accent"
+                    : "text-ink-muted hover:bg-surface-2 hover:text-ink",
+                )}
+              >
+                {label}
+                {count > 0 && (
+                  <span className="font-mono text-[10px] tabular-nums text-ink-subtle">
+                    {count}
+                  </span>
+                )}
+              </button>
             ))}
           </div>
-        </Panel>
-      ) : items.length === 0 ? (
-        <EmptyPanel
-          title="No recurring payments yet"
-          description="Set up a schedule for payroll, retainers, or vendor invoices. Aegis tracks the cadence and queues a proposal whenever you click Run."
-          action={
-            <Button onClick={() => setShowAdd(true)} disabled={!wallet.publicKey}>
-              <Plus className="mr-1.5 h-4 w-4" /> Create your first schedule
-            </Button>
-          }
-        />
-      ) : filteredItems.length === 0 ? (
-        <EmptyPanel
-          title="Nothing matches this filter"
-          description="Switch back to All to see every scheduled payment."
-        />
-      ) : (
-        <div className="space-y-6">
-          {groups.due.length > 0 && (
-            <SectionList
-              title="Due now"
-              icon={AlertCircle}
-              tone="danger"
-              items={groups.due}
-              runningId={running}
-              onRun={handleRunRequest}
-              onPause={handlePauseToggle}
-              onDelete={(id) => setConfirmDelete(id)}
-              connectedWallet={!!wallet.publicKey}
-            />
-          )}
-          {groups.upcoming.length > 0 && (
-            <SectionList
-              title="Upcoming"
-              icon={Calendar}
-              tone="neutral"
-              items={groups.upcoming}
-              runningId={running}
-              onRun={handleRunRequest}
-              onPause={handlePauseToggle}
-              onDelete={(id) => setConfirmDelete(id)}
-              connectedWallet={!!wallet.publicKey}
-            />
-          )}
-          {groups.paused.length > 0 && (
-            <SectionList
-              title="Paused"
-              icon={Pause}
-              tone="muted"
-              items={groups.paused}
-              runningId={running}
-              onRun={handleRunRequest}
-              onPause={handlePauseToggle}
-              onDelete={(id) => setConfirmDelete(id)}
-              connectedWallet={!!wallet.publicKey}
-            />
-          )}
-        </div>
-      )}
+        )}
+
+        {/* ── List ── */}
+        {loading ? (
+          <Panel>
+            <div className="divide-y divide-border/40">
+              {[0, 1, 2].map((n) => (
+                <div key={n} className="flex items-center gap-3 px-5 py-4">
+                  <div className="h-10 w-10 animate-pulse rounded-lg bg-surface-2" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-40 animate-pulse rounded-full bg-surface-2" />
+                    <div className="h-2.5 w-64 animate-pulse rounded-full bg-surface-2" />
+                  </div>
+                  <div className="h-8 w-20 animate-pulse rounded-md bg-surface-2" />
+                </div>
+              ))}
+            </div>
+          </Panel>
+        ) : items.length === 0 ? (
+          <div className="card-panel relative overflow-hidden px-6 py-12 text-center md:py-16">
+            <div className="relative">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-accent/40 bg-accent-soft text-accent shadow-raise-1">
+                <CalendarClock className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
+              </div>
+              <p className="mt-4 text-eyebrow">No schedules yet</p>
+              <h3 className="mt-1 font-display text-xl font-semibold tracking-tight text-ink">
+                The cadence is yours to set
+              </h3>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-ink-muted">
+                Set up a recurring run for payroll, retainers, or vendor invoices. Aegis tracks the
+                cycle and queues a proposal whenever you click Run.
+              </p>
+              <Button
+                onClick={() => setShowAdd(true)}
+                disabled={!wallet.publicKey}
+                className="mt-5"
+              >
+                <Plus className="mr-1.5 h-4 w-4" /> Create your first schedule
+              </Button>
+            </div>
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="card-panel px-5 py-8 text-center">
+            <p className="text-eyebrow">No matches</p>
+            <p className="mt-1 text-sm text-ink-muted">
+              Nothing fits this filter. Switch to <span className="font-semibold text-ink">All</span>{" "}
+              to see every scheduled payment.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {groups.due.length > 0 && (
+              <SectionList
+                title="Due now"
+                icon={AlertCircle}
+                tone="danger"
+                items={groups.due}
+                runningId={running}
+                onRun={handleRunRequest}
+                onPause={handlePauseToggle}
+                onDelete={(id) => setConfirmDelete(id)}
+                connectedWallet={!!wallet.publicKey}
+              />
+            )}
+            {groups.upcoming.length > 0 && (
+              <SectionList
+                title="Upcoming"
+                icon={Calendar}
+                tone="neutral"
+                items={groups.upcoming}
+                runningId={running}
+                onRun={handleRunRequest}
+                onPause={handlePauseToggle}
+                onDelete={(id) => setConfirmDelete(id)}
+                connectedWallet={!!wallet.publicKey}
+              />
+            )}
+            {groups.paused.length > 0 && (
+              <SectionList
+                title="Paused"
+                icon={Pause}
+                tone="muted"
+                items={groups.paused}
+                runningId={running}
+                onRun={handleRunRequest}
+                onPause={handlePauseToggle}
+                onDelete={(id) => setConfirmDelete(id)}
+                connectedWallet={!!wallet.publicKey}
+              />
+            )}
+          </div>
+        )}
+      </div>
 
       {showAdd && (
         <AddRecurringModal
@@ -889,16 +953,30 @@ function SectionList({
       ? "text-signal-danger"
       : tone === "muted"
         ? "text-ink-subtle"
-        : "text-ink-muted";
+        : "text-accent";
+  const dotColor =
+    tone === "danger"
+      ? "bg-signal-danger"
+      : tone === "muted"
+        ? "bg-ink-subtle"
+        : "bg-accent";
   const anyRunning = runningId !== null;
 
   return (
-    <div>
-      <div className={cn("mb-2 flex items-center gap-1.5 text-eyebrow", headerColor)}>
-        <Icon className="h-3 w-3" aria-hidden="true" />
-        {title}
-        <span className="text-ink-subtle/60">({items.length})</span>
-      </div>
+    <section>
+      <header className="mb-2.5 flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotColor)}
+        />
+        <p className={cn("text-eyebrow inline-flex items-center gap-1.5", headerColor)}>
+          <Icon className="h-3 w-3" aria-hidden="true" />
+          {title}
+        </p>
+        <span className="font-mono text-[10px] tabular-nums text-ink-subtle">
+          {items.length}
+        </span>
+      </header>
       <Panel className="divide-y divide-border/40">
         {items.map((item) => (
           <RecurringRow
@@ -913,7 +991,7 @@ function SectionList({
           />
         ))}
       </Panel>
-    </div>
+    </section>
   );
 }
 
@@ -938,22 +1016,27 @@ function RecurringRow({
   const due = formatRelativeDate(item.nextDueAt);
 
   return (
-    <div className="group flex flex-col gap-3 px-5 py-4 transition-aegis hover:bg-surface-2/30 sm:flex-row sm:items-center">
+    <div className="group flex flex-col gap-3 px-5 py-4 transition-aegis hover:bg-surface-2/40 sm:flex-row sm:items-center">
       {/* Identity */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div className="shrink-0 rounded-lg ring-1 ring-border/60">
-          <VaultIdenticon seed={item.recipient} size={36} className="rounded-lg" />
+        <div
+          className={cn(
+            "shrink-0 overflow-hidden rounded-list ring-1",
+            item.privacy === "private" ? "ring-brass/40" : "ring-border/60",
+          )}
+        >
+          <VaultIdenticon seed={item.recipient} size={36} />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <p className="truncate text-sm font-semibold text-ink">{item.label}</p>
             {item.privacy === "private" ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold text-accent">
+              <span className="inline-flex items-center gap-1 rounded-full border border-brass/30 bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold tracking-eyebrow text-accent">
                 <Lock className="h-2.5 w-2.5" aria-hidden="true" />
                 Private
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-md bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-ink-subtle">
+              <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium tracking-eyebrow text-ink-subtle">
                 <Eye className="h-2.5 w-2.5" aria-hidden="true" />
                 Public
               </span>
@@ -978,14 +1061,14 @@ function RecurringRow({
 
       {/* Amount */}
       <div className="shrink-0 sm:text-right">
-        <p className="font-mono text-base font-semibold tabular-nums text-ink">
-          {lamportsToSol(item.amount)}{" "}
-          <span className="text-xs font-medium text-ink-subtle">SOL</span>
+        <p className="font-display text-lg font-semibold tabular-nums tracking-tight text-ink">
+          {lamportsToSol(item.amount)}
+          <span className="ml-1 text-xs font-medium text-ink-subtle">SOL</span>
         </p>
         {!isPaused && (
           <p
             className={cn(
-              "mt-0.5 text-xs font-medium tabular-nums",
+              "mt-0.5 text-[11px] font-medium uppercase tracking-eyebrow tabular-nums",
               due.tone === "danger"
                 ? "text-signal-danger"
                 : due.tone === "warning"
@@ -1134,13 +1217,15 @@ function AddRecurringModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/85 backdrop-blur-md p-4">
-      <div className="relative w-full max-w-lg rounded-modal border border-border-strong bg-surface shadow-raise-2">
-        <div className="border-b border-border px-6 py-5">
-          <p className="text-eyebrow text-accent">NEW SCHEDULE</p>
-          <h3 className="mt-1 text-lg font-semibold text-ink">Recurring payment</h3>
-          <p className="mt-1 text-xs text-ink-subtle">
-            Aegis tracks the cadence. You click Run when each cycle is due.
-          </p>
+      <div className="relative w-full max-w-md overflow-hidden rounded-modal border border-border-strong bg-surface shadow-raise-2">
+        {/* Heraldic gold seal — the "we are about to sign value" signal */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-accent/0 via-accent to-accent/0"
+        />
+        <div className="border-b border-border px-5 py-3.5">
+          <p className="text-eyebrow">Schedule · new</p>
+          <h3 className="mt-0.5 text-base font-semibold text-ink">Recurring payment</h3>
         </div>
 
         <div className="space-y-4 px-6 py-5">
@@ -1153,11 +1238,11 @@ function AddRecurringModal({
                 className={cn(
                   "flex flex-col items-start gap-1 rounded-list border px-3 py-2.5 text-left text-sm transition-aegis",
                   privacy === "private"
-                    ? "border-accent bg-accent-soft text-ink"
+                    ? "border-brass/40 bg-accent-soft text-ink shadow-raise-1"
                     : "border-border bg-surface text-ink-muted hover:bg-surface-2",
                 )}
               >
-                <span className="flex items-center gap-1.5 font-medium">
+                <span className="flex items-center gap-1.5 font-semibold">
                   <Lock className="h-3.5 w-3.5" />
                   Private
                 </span>
@@ -1171,11 +1256,11 @@ function AddRecurringModal({
                 className={cn(
                   "flex flex-col items-start gap-1 rounded-list border px-3 py-2.5 text-left text-sm transition-aegis",
                   privacy === "public"
-                    ? "border-accent bg-accent-soft text-ink"
+                    ? "border-accent bg-accent-soft text-ink shadow-raise-1"
                     : "border-border bg-surface text-ink-muted hover:bg-surface-2",
                 )}
               >
-                <span className="flex items-center gap-1.5 font-medium">
+                <span className="flex items-center gap-1.5 font-semibold">
                   <Eye className="h-3.5 w-3.5" />
                   Public
                 </span>

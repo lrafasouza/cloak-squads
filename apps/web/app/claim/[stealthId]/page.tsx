@@ -1,6 +1,5 @@
 "use client";
 
-import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
 import { Address, type AegisStatus, StatusBadge } from "@/components/ui/aegis";
 import { Button } from "@/components/ui/button";
 import { ReceiptRow } from "@/components/ui/receipt-row";
@@ -393,7 +392,6 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
       <main className="min-h-screen bg-bg">
         <section className="mx-auto w-full max-w-3xl px-4 py-10 md:py-14">
           <div className="card-hero relative p-8 md:p-10">
-            <HeraldicWatermark size={320} />
             <div className="relative">
               <div className="text-eyebrow">Aegis · Private payment</div>
               <div className="mt-3 h-10 w-56 rounded-md shimmer-bg" />
@@ -452,7 +450,6 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
       <main className="min-h-screen bg-bg">
         <section className="mx-auto w-full max-w-2xl px-4 py-16 md:py-20">
           <div className="card-panel relative overflow-hidden p-8 md:p-10 text-center">
-            <HeraldicWatermark size={280} />
             <div className="relative">
               <span
                 className={`mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full ${
@@ -504,7 +501,6 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
       <section className="mx-auto w-full max-w-3xl px-4 py-10 md:py-14">
         {/* Hero — leads with the amount, the recipient's anchor */}
         <div className="card-hero relative overflow-hidden p-8 md:p-10">
-          <HeraldicWatermark size={360} />
           <div className="relative">
             <div className="flex items-start justify-between gap-4">
               <div className="text-eyebrow text-accent">Aegis · Private payment</div>

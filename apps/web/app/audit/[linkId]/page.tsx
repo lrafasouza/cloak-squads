@@ -1,6 +1,5 @@
 "use client";
 
-import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
 import { type AegisStatus, StatusBadge } from "@/components/ui/aegis";
 import { Button } from "@/components/ui/button";
 import { ReceiptRow } from "@/components/ui/receipt-row";
@@ -364,7 +363,6 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
       <main className="min-h-screen bg-bg">
         <section className="mx-auto w-full max-w-7xl px-4 py-10 md:py-14 md:px-6">
           <div className="card-hero relative p-8 md:p-10">
-            <HeraldicWatermark size={320} />
             <div className="relative">
               <div className="text-eyebrow">Aegis · Public audit</div>
               <div className="mt-3 h-10 w-72 rounded-md shimmer-bg" />
@@ -394,7 +392,6 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
       <section className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 md:py-10">
         {/* Hero — audit cover with KPI ribbon */}
         <div className="card-hero relative overflow-hidden p-7 md:p-9">
-          <HeraldicWatermark size={360} />
           <div className="relative">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="max-w-2xl">

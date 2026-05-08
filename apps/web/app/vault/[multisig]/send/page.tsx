@@ -3,16 +3,10 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ReceiptRow } from "@/components/ui/receipt-row";
 import { TokenLogo } from "@/components/ui/token-logo";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
-import {
-  InlineAlert,
-  Panel,
-  PanelBody,
-  PanelHeader,
-  WorkspaceHeader,
-  WorkspacePage,
-} from "@/components/ui/workspace";
+import { InlineAlert, WorkspacePage } from "@/components/ui/workspace";
 import { RecipientInput } from "@/components/vault/RecipientInput";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
@@ -52,7 +46,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronDown, Send } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Eye, Lock, Send, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -675,79 +669,124 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   const tokenLabel = selectedToken?.symbol ?? "SOL";
   const isPrivate = sendMode === "private";
 
+  const previewRecipient = recipient
+    ? recipient.length > 12
+      ? `${recipient.slice(0, 6)}…${recipient.slice(-4)}`
+      : recipient
+    : "—";
+  const previewAmount = amount ? `${amount} ${tokenLabel}` : "—";
+  const previewSourceVault =
+    allAccounts.find((a) => a.vaultIndex === selectedVaultIndex)?.name ?? "Primary";
+
   return (
     <WorkspacePage>
-      <div className="space-y-8">
-        <WorkspaceHeader
-          eyebrow="SEND"
-          title={isPrivate ? `Send ${tokenLabel} privately` : `Send ${tokenLabel}`}
-          description={
-            isPrivate
-              ? `Create a sealed ${tokenLabel} transfer through your Squads vault. The recipient address stays unlinkable on-chain.`
-              : `Create a standard Squads vault ${tokenLabel} transfer. Visible to all signers on-chain.`
-          }
-        />
+      <div className="space-y-6">
+        {/* ── Hero · Identity-locked send crest ──
+            Æ watermark + Fraunces title + identity icon. Tone shifts from
+            ShieldCheck (private) to Send (public) to telegraph the routing. */}
+        <section className="card-hero relative">
+          <div className="relative flex flex-col gap-4 p-6 md:flex-row md:items-center md:gap-6 md:p-7">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-accent/40 bg-accent-soft text-accent shadow-raise-1">
+              {isPrivate ? (
+                <ShieldCheck className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
+              ) : (
+                <Send className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-eyebrow">
+                Send · {isPrivate ? "shielded via Cloak" : "public on-chain"}
+              </p>
+              <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink md:text-3xl">
+                {isPrivate ? `Send ${tokenLabel} privately` : `Send ${tokenLabel}`}
+              </h1>
+              <p className="mt-1.5 text-sm text-ink-muted">
+                {isPrivate
+                  ? "Routed through the shielded pool. Recipient and amount stay unlinkable on-chain."
+                  : "Standard Squads vault transfer. Visible to all signers on-chain."}
+              </p>
+            </div>
+          </div>
+        </section>
 
-        <div>
-          {/* Mode toggle */}
-          <div className="inline-flex rounded-lg border border-border bg-surface p-1">
-            {(["private", "public"] as const).map((mode) => (
+        <form
+          onSubmit={isPrivate ? handlePrivateSend : handlePublicSend}
+          className="grid gap-4 lg:grid-cols-5"
+        >
+          {/* ── Form column ── */}
+          <div className="space-y-4 lg:col-span-3">
+            {/* Mode cards */}
+            <div className="grid grid-cols-2 gap-2">
               <button
-                key={mode}
                 type="button"
                 onClick={() => {
-                  setSendMode(mode);
-                  if (mode === "private") setSelectedMint(SOL_MINT);
+                  setSendMode("private");
+                  setSelectedMint(SOL_MINT);
                 }}
-                className={`rounded-md px-4 py-1.5 text-sm font-medium transition-aegis ${
-                  sendMode === mode ? "bg-accent-soft text-accent" : "text-ink-muted hover:text-ink"
+                disabled={pending}
+                className={`flex flex-col items-start gap-1 rounded-list border px-3.5 py-3 text-left text-sm transition-aegis disabled:cursor-not-allowed ${
+                  isPrivate
+                    ? "border-brass/40 bg-accent-soft text-ink shadow-raise-1"
+                    : "border-border bg-surface text-ink-muted hover:bg-surface-2"
                 }`}
               >
-                {mode === "private" ? "Private Send" : "Public Send"}
+                <span className="flex items-center gap-1.5 font-semibold">
+                  <Lock className="h-3.5 w-3.5" />
+                  Private send
+                </span>
+                <span className="text-[11px] leading-snug text-ink-subtle">
+                  Routes through Cloak. Recipient hidden on-chain.
+                </span>
               </button>
-            ))}
-          </div>
-
-          <Panel className="mt-4">
-            <PanelHeader
-              icon={Send}
-              title="Transfer details"
-              description={
-                isPrivate
-                  ? "Funds are routed through the shielded pool, so the recipient address stays unlinkable on-chain."
-                  : "Public send creates a standard Squads vault transfer visible to all signers on-chain."
-              }
-            />
-            <PanelBody>
-              <form
-                onSubmit={isPrivate ? handlePrivateSend : handlePublicSend}
-                className="space-y-5"
+              <button
+                type="button"
+                onClick={() => setSendMode("public")}
+                disabled={pending}
+                className={`flex flex-col items-start gap-1 rounded-list border px-3.5 py-3 text-left text-sm transition-aegis disabled:cursor-not-allowed ${
+                  !isPrivate
+                    ? "border-accent bg-accent-soft text-ink shadow-raise-1"
+                    : "border-border bg-surface text-ink-muted hover:bg-surface-2"
+                }`}
               >
+                <span className="flex items-center gap-1.5 font-semibold">
+                  <Eye className="h-3.5 w-3.5" />
+                  Public send
+                </span>
+                <span className="text-[11px] leading-snug text-ink-subtle">
+                  Direct vault transfer. Visible on block explorers.
+                </span>
+              </button>
+            </div>
+
+            {/* Form panel */}
+            <div className="card-panel overflow-hidden">
+              <header className="border-b border-border/60 px-5 py-3.5">
+                <p className="text-eyebrow">Transfer details</p>
+              </header>
+              <div className="space-y-5 p-5">
                 {/* From account */}
                 {subVaultAccounts.length > 0 && (
                   <div>
                     <Label>From account</Label>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {allAccounts.map((acct) => {
-                        return (
-                          <button
-                            key={acct.vaultIndex}
-                            type="button"
-                            disabled={pending}
-                            onClick={() => {
-                              setSelectedVaultIndex(acct.vaultIndex);
-                              setAmount("");
-                            }}
-                            className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-aegis disabled:cursor-not-allowed disabled:opacity-40 ${
-                              selectedVaultIndex === acct.vaultIndex
-                                ? "border-accent/40 bg-accent-soft text-accent"
-                                : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
-                            }`}
-                          >
-                            {acct.name}
-                          </button>
-                        );
-                      })}
+                      {allAccounts.map((acct) => (
+                        <button
+                          key={acct.vaultIndex}
+                          type="button"
+                          disabled={pending}
+                          onClick={() => {
+                            setSelectedVaultIndex(acct.vaultIndex);
+                            setAmount("");
+                          }}
+                          className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-aegis disabled:cursor-not-allowed disabled:opacity-40 ${
+                            selectedVaultIndex === acct.vaultIndex
+                              ? "border-accent/40 bg-accent-soft text-accent"
+                              : "border-border bg-surface text-ink-muted hover:border-border-strong hover:text-ink"
+                          }`}
+                        >
+                          {acct.name}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -847,64 +886,92 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                 {/* Contextual alerts */}
                 {error && <InlineAlert tone="danger">{error}</InlineAlert>}
 
-                {!isPrivate && (
-                  <InlineAlert tone="info">
-                    Creates a standard Squads vault {tokenLabel} transfer. The recipient and amount
-                    will be visible on-chain.
-                  </InlineAlert>
-                )}
-
                 {!isPrivate && recipientNeedsAta && !isSol && (
                   <InlineAlert tone="warning">
                     Recipient has no {tokenLabel} token account. The vault will pay ~0.002 SOL to
                     create one automatically.
                   </InlineAlert>
                 )}
+              </div>
+            </div>
+          </div>
 
-                {/* Confirm */}
-                <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink-muted">
-                  <input
-                    type="checkbox"
-                    checked={confirmChecked}
-                    onChange={(e) => setConfirmChecked(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-accent"
-                  />
-                  <span className="flex-1">
-                    I confirm the recipient address and{" "}
-                    <span className="font-mono font-medium text-ink">
-                      {amount || "0"} {tokenLabel}
-                    </span>{" "}
-                    amount are correct before creating this proposal.
-                  </span>
-                </label>
-
-                {/* Actions */}
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Link
-                    href={`/vault/${multisig}`}
-                    className="inline-flex w-full shrink-0 items-center justify-center rounded-md border border-border-strong bg-transparent px-4 py-2 text-sm font-medium text-ink transition-aegis hover:bg-surface-2 sm:w-auto"
-                  >
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back
-                  </Link>
-                  {!pending && (
-                    <Button
-                      type="submit"
-                      disabled={!confirmChecked || !wallet.publicKey || belowPrivateMin}
-                      className="w-full sm:w-auto"
-                    >
-                      {isPrivate ? `Send ${tokenLabel} privately` : `Send ${tokenLabel}`}
-                    </Button>
+          {/* ── Receipt sidebar · sticky ──
+              Live "what you're about to sign" preview. Mirrors the
+              proposal/[id] receipt block + sticky action column pattern. */}
+          <aside className="space-y-4 lg:col-span-2 lg:sticky lg:top-6 lg:self-start">
+            <div className="card-panel relative overflow-hidden p-5">
+              <div className="relative">
+                <p className="text-eyebrow">Receipt · what you'll sign</p>
+                <div className="mt-3 space-y-1">
+                  <ReceiptRow label="Amount">{previewAmount}</ReceiptRow>
+                  <ReceiptRow label="To" mono={false}>
+                    <span className="font-mono">{previewRecipient}</span>
+                  </ReceiptRow>
+                  {memo && (
+                    <ReceiptRow label="Memo" mono={false}>
+                      {memo}
+                    </ReceiptRow>
                   )}
+                  <ReceiptRow label="From" mono={false}>
+                    {previewSourceVault}
+                  </ReceiptRow>
+                  <ReceiptRow
+                    label="Privacy"
+                    mono={false}
+                    tone={isPrivate ? "accent" : "muted"}
+                  >
+                    {isPrivate ? "Shielded via Cloak" : "Public on-chain"}
+                  </ReceiptRow>
                 </div>
+              </div>
+            </div>
 
-                {!wallet.publicKey && (
-                  <p className="text-xs text-signal-warn">Connect a wallet to create a proposal.</p>
+            <div className="card-panel p-5">
+              <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink-muted">
+                <input
+                  type="checkbox"
+                  checked={confirmChecked}
+                  onChange={(e) => setConfirmChecked(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-accent"
+                />
+                <span className="flex-1">
+                  I confirm{" "}
+                  <span className="font-mono font-medium text-ink">
+                    {amount || "0"} {tokenLabel}
+                  </span>{" "}
+                  to <span className="font-mono font-medium text-ink">{previewRecipient}</span> is
+                  correct.
+                </span>
+              </label>
+
+              <div className="mt-4 space-y-2">
+                {!pending && (
+                  <Button
+                    type="submit"
+                    disabled={!confirmChecked || !wallet.publicKey || belowPrivateMin}
+                    className="w-full"
+                  >
+                    {isPrivate ? `Send ${tokenLabel} privately` : `Send ${tokenLabel}`}
+                  </Button>
                 )}
-              </form>
-            </PanelBody>
-          </Panel>
-        </div>
+                <Link
+                  href={`/vault/${multisig}`}
+                  className="inline-flex w-full items-center justify-center rounded-md border border-border-strong bg-transparent px-4 py-2 text-sm font-medium text-ink transition-aegis hover:bg-surface-2"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Link>
+              </div>
+
+              {!wallet.publicKey && (
+                <p className="mt-3 text-xs text-signal-warn">
+                  Connect a wallet to create a proposal.
+                </p>
+              )}
+            </div>
+          </aside>
+        </form>
       </div>
     </WorkspacePage>
   );

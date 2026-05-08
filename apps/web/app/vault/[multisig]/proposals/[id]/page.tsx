@@ -1,6 +1,5 @@
 "use client";
 
-import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
 import { ApprovalButtons } from "@/components/proposal/ApprovalButtons";
 import type { CommitmentCheckState } from "@/components/proposal/CommitmentCheck";
 import { ExecuteButton } from "@/components/proposal/ExecuteButton";
@@ -715,7 +714,6 @@ export default function ProposalApprovalPage({
             Mirrors /operator hero pattern: Æ watermark + Fraunces title +
             chip row positions the proposal as a private-bank signing item. */}
         <section className="card-hero relative mb-6">
-          <HeraldicWatermark size={320} opacity={0.04} />
           <div className="relative flex flex-col gap-4 p-6 md:flex-row md:items-start md:gap-6 md:p-7">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-accent/40 bg-accent-soft text-accent shadow-raise-1">
               <KindIcon className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
@@ -1186,7 +1184,6 @@ export default function ProposalApprovalPage({
             {/* ── Action panel · execute or settled ribbon ── */}
             {executeComplete ? (
               <div className="card-panel relative overflow-hidden p-5">
-                <HeraldicWatermark size={160} opacity={0.05} />
                 <div className="relative">
                   <div className="flex items-start gap-3">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-accent shadow-raise-1">

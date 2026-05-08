@@ -21,7 +21,6 @@ import {
   X as XIcon,
 } from "lucide-react";
 
-import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ReceiptRow } from "@/components/ui/receipt-row";
 import {
@@ -1611,7 +1610,6 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             (Fireblocks / Coinbase Custody pattern). Æ watermark + Fraunces
             title position the page as a private-bank signing console. */}
         <section className="card-hero relative">
-          <HeraldicWatermark size={300} opacity={0.04} />
           <div className="relative flex flex-col gap-4 p-6 md:flex-row md:items-center md:gap-6 md:p-7">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-accent/40 bg-accent-soft text-accent shadow-raise-1">
               <Key className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />

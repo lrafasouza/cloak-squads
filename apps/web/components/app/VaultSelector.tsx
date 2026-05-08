@@ -1,6 +1,5 @@
 "use client";
 
-import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
 import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import { useSolPrice } from "@/lib/hooks/useSolPrice";
 import { useVaultBalance } from "@/lib/hooks/useVaultBalance";
@@ -306,14 +305,6 @@ export function VaultSelector({ multisig, name, className }: VaultSelectorProps)
             : "border-border hover:border-border-strong hover:bg-surface-2 hover:shadow-raise-1",
         )}
       >
-        {/* Watermark — subtle Æ behind the content. 80px / 5% opacity reads
-            as a brass embossing rather than decoration on a card this small. */}
-        <HeraldicWatermark
-          size={88}
-          opacity={0.05}
-          className="-bottom-3 -right-2 top-auto"
-        />
-
         {/* Identity row */}
         <div className="relative flex items-center gap-2.5">
           <VaultIdenticon seed={multisig} size={36} className="shrink-0 rounded-lg" />

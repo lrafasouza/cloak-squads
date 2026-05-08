@@ -11,7 +11,6 @@ import {
   Panel,
   PanelBody,
   PanelHeader,
-  WorkspaceHeader,
   WorkspacePage,
 } from "@/components/ui/workspace";
 import { RecipientInput } from "@/components/vault/RecipientInput";
@@ -777,17 +776,30 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
   if (createdPayroll) {
     return (
       <WorkspacePage>
-        <WorkspaceHeader
-          eyebrow="PAYROLL"
-          title="Claim links ready"
-          description="Share each link with the matching recipient. These secret links are only shown in this browser session."
-          action={
-            <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
-              Max 10
-            </span>
-          }
-        />
-        <Panel>
+        <div className="space-y-6">
+          {/* ── Hero · Settled crest ── */}
+          <section className="card-hero relative">
+            <div className="relative flex flex-col gap-4 p-6 md:flex-row md:items-center md:gap-6 md:p-7">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-accent/40 bg-accent-soft text-accent shadow-raise-1">
+                <CheckCircle2 className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-eyebrow text-accent">Payroll · claim links ready</p>
+                <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink md:text-3xl">
+                  {createdPayroll.claimLinks.length} private claim
+                  {createdPayroll.claimLinks.length === 1 ? " link" : " links"}
+                </h1>
+                <p className="mt-1.5 text-sm text-ink-muted">
+                  Share each link with its recipient. They're only shown in this browser session.
+                </p>
+              </div>
+              <span className="self-start rounded-full border border-brass/30 bg-accent-soft px-2.5 py-1 text-[10px] font-semibold uppercase tracking-eyebrow text-accent md:self-auto">
+                Proposal #{createdPayroll.transactionIndex}
+              </span>
+            </div>
+          </section>
+
+          <Panel>
           <PanelHeader
             icon={CheckCircle2}
             title={`Claim links created · Proposal #${createdPayroll.transactionIndex}`}
@@ -863,24 +875,36 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
             </div>
           </PanelBody>
         </Panel>
+        </div>
       </WorkspacePage>
     );
   }
 
   return (
     <WorkspacePage>
-      <WorkspaceHeader
-        eyebrow="PAYROLL"
-        title={`Batch private ${tokenLabel} settle`}
-        description="Add recipients manually or import from CSV, build private notes, then submit for vault approval."
-        action={
-          <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
-            Max 10
-          </span>
-        }
-      />
-
       <div className="space-y-6">
+        {/* ── Hero · Identity-locked payroll crest ── */}
+        <section className="card-hero relative">
+          <div className="relative flex flex-col gap-4 p-6 md:flex-row md:items-center md:gap-6 md:p-7">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-accent/40 bg-accent-soft text-accent shadow-raise-1">
+              <Users className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-eyebrow">Payroll · batch private settle</p>
+              <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink md:text-3xl">
+                Pay the table privately
+              </h1>
+              <p className="mt-1.5 text-sm text-ink-muted">
+                Add recipients manually or import a CSV. Aegis builds the private notes; you sign one
+                vault proposal.
+              </p>
+            </div>
+            <span className="self-start rounded-full border border-brass/30 bg-accent-soft px-2.5 py-1 text-[10px] font-semibold uppercase tracking-eyebrow text-accent md:self-auto">
+              Max 10 recipients
+            </span>
+          </div>
+        </section>
+
         {/* Tab bar */}
         <div className="flex items-center gap-0.5 border-b border-border pb-1">
           <button
@@ -1202,41 +1226,35 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
                 {recipients.length > 0 && (
                   <>
-                    {/* Inline summary — values, no cards */}
+                    {/* ── Summary · 3 numbers in heraldic Fraunces ── */}
                     <div className="grid grid-cols-3 gap-x-6 gap-y-3 sm:gap-x-10">
                       <div>
-                        <p className="text-eyebrow">
-                          Total payout
-                        </p>
-                        <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
+                        <p className="text-eyebrow">Total payout</p>
+                        <p className="mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight text-ink">
                           {displayAmount(totalAmount.toString(), decimals, isSol)}
-                          <span className="ml-1.5 text-sm font-normal text-ink-muted">
+                          <span className="ml-1.5 text-sm font-medium text-ink-subtle">
                             {tokenLabel}
                           </span>
                         </p>
                       </div>
                       <div>
-                        <p className="text-eyebrow">
-                          Recipients
-                        </p>
-                        <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
+                        <p className="text-eyebrow">Recipients</p>
+                        <p className="mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight text-ink">
                           {recipients.length}
-                          <span className="text-sm font-normal text-ink-muted">/10</span>
+                          <span className="text-sm font-medium text-ink-subtle">/10</span>
                         </p>
                       </div>
                       <div>
-                        <p className="text-eyebrow">
-                          Private notes
-                        </p>
+                        <p className="text-eyebrow">Private notes</p>
                         <p
-                          className={`mt-1 font-mono text-2xl font-semibold tabular-nums ${
+                          className={`mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight ${
                             parsedNotes.length === recipients.length && parsedNotes.length > 0
                               ? "text-signal-positive"
                               : "text-ink-muted"
                           }`}
                         >
                           {parsedNotes.length}
-                          <span className="text-sm font-normal text-ink-muted">
+                          <span className="text-sm font-medium text-ink-subtle">
                             /{recipients.length}
                           </span>
                         </p>

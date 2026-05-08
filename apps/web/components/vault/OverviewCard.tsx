@@ -71,20 +71,31 @@ export function OverviewCard({
   const totalUsd = solUsd != null ? solUsd + usdcTotal : null;
 
   const primarySol = Number.parseFloat(primaryBalanceSol) || 0;
-  const accountRows = [
-    { label: "Primary", sol: primarySol },
-    ...subVaultBreakdown.map((sv) => ({
-      label: sv.name,
-      sol: Number.parseFloat(sv.balanceSol) || 0,
-    })),
-  ].filter((r) => r.sol > 0 || subVaultBreakdown.length === 0);
+  const subUsdcTotal = subVaultBreakdown.reduce(
+    (acc, sv) => acc + (Number.parseFloat(sv.usdcUi) || 0),
+    0,
+  );
+  const primaryUsdc = Math.max(0, usdcTotal - subUsdcTotal);
 
   const hasSubVaults = subVaultBreakdown.length > 0;
   const hasUsdc = usdcTotal > 0;
 
+  // Per-vault matrix rows — one row per account, columns for each token.
+  // Filtered so empty accounts don't pollute the ledger.
+  const vaultRows = [
+    { label: "Primary", sol: primarySol, usdc: primaryUsdc },
+    ...subVaultBreakdown.map((sv) => ({
+      label: sv.name,
+      sol: Number.parseFloat(sv.balanceSol) || 0,
+      usdc: Number.parseFloat(sv.usdcUi) || 0,
+    })),
+  ].filter((v) => v.sol > 0 || v.usdc > 0);
+
+  const rowUsd = (v: { sol: number; usdc: number }) =>
+    (solPrice != null ? v.sol * solPrice : 0) + v.usdc;
+
   return (
     <section className="card-hero group">
-      {/* Watermark — Æ embossing in the bottom-right of the card */}
       <HeraldicWatermark size={360} opacity={0.04} />
 
       <div className="relative p-6 md:p-8">
@@ -162,53 +173,158 @@ export function OverviewCard({
               )}
             >
               <div className="overflow-hidden">
-                <div className="space-y-px overflow-hidden rounded-xl border border-border/50 bg-bg/40">
-                  {/* SOL row */}
-                  <div className="flex items-center gap-3 px-4 py-3">
-                    <TokenLogo symbol="SOL" size={20} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-ink">SOL</p>
-                      {hasSubVaults && accountRows.length > 1 && (
-                        <p className="mt-0.5 text-[10px] text-ink-subtle">
-                          {accountRows
-                            .map((r) => `${r.label} ${formatSol(String(r.sol), 3)}`)
-                            .join(" · ")}
-                        </p>
+                {/* Account × token matrix — when sub-vaults exist, every row
+                    is a vault and every column is a token. One glance to
+                    compare "what's where" without jumping between sections. */}
+                {hasSubVaults ? (
+                  <div className="overflow-hidden rounded-xl border border-border/60 bg-bg/30">
+                    {/* Column header */}
+                    <div
+                      className={cn(
+                        "grid items-center gap-x-5 border-b border-border/50 px-4 py-2",
+                        hasUsdc
+                          ? "grid-cols-[minmax(4rem,1fr)_auto_auto_auto]"
+                          : "grid-cols-[minmax(4rem,1fr)_auto_auto]",
                       )}
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono text-sm font-medium tabular-nums text-ink">
-                        {formatSol(balanceSol, 6)}
-                      </p>
-                      {solUsd != null && (
-                        <p className="text-[11px] tabular-nums text-ink-subtle/60">
-                          {usd(solUsd)}
-                        </p>
+                    >
+                      <span className="text-[9px] font-medium uppercase tracking-[0.22em] text-ink-subtle/60">
+                        Account
+                      </span>
+                      <span className="flex items-center justify-end gap-1.5 text-[9px] font-medium uppercase tracking-[0.22em] text-ink-subtle/60">
+                        <TokenLogo symbol="SOL" size={11} />
+                        SOL
+                      </span>
+                      {hasUsdc && (
+                        <span className="flex items-center justify-end gap-1.5 text-[9px] font-medium uppercase tracking-[0.22em] text-ink-subtle/60">
+                          <TokenLogo symbol="USDC" size={11} />
+                          USDC
+                        </span>
                       )}
+                      <span className="text-right text-[9px] font-medium uppercase tracking-[0.22em] text-ink-subtle/60">
+                        Value
+                      </span>
                     </div>
-                  </div>
 
-                  {/* USDC row */}
-                  {hasUsdc && (
-                    <div className="flex items-center gap-3 border-t border-border/40 px-4 py-3">
-                      <TokenLogo symbol="USDC" size={20} />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-ink">USDC</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-mono text-sm font-medium tabular-nums text-ink">
+                    {/* Vault rows */}
+                    {vaultRows.map((v) => {
+                      const vUsd = rowUsd(v);
+                      return (
+                        <div
+                          key={v.label}
+                          className={cn(
+                            "grid items-baseline gap-x-5 border-t border-border/30 px-4 py-2.5 first:border-t-0",
+                            hasUsdc
+                              ? "grid-cols-[minmax(4rem,1fr)_auto_auto_auto]"
+                              : "grid-cols-[minmax(4rem,1fr)_auto_auto]",
+                          )}
+                        >
+                          <span className="truncate text-[13px] text-ink">{v.label}</span>
+                          <span className="text-right font-mono text-[13px] tabular-nums text-ink-muted">
+                            {v.sol > 0 ? formatSol(String(v.sol), 4) : "—"}
+                          </span>
+                          {hasUsdc && (
+                            <span className="text-right font-mono text-[13px] tabular-nums text-ink-muted">
+                              {v.usdc > 0
+                                ? v.usdc.toLocaleString("en-US", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })
+                                : "—"}
+                            </span>
+                          )}
+                          <span className="text-right font-mono text-[13px] tabular-nums text-ink">
+                            {solPrice != null ? usd(vUsd) : "—"}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {/* Total row — serif label, bold mono total */}
+                    <div
+                      className={cn(
+                        "grid items-baseline gap-x-5 border-t border-border/60 bg-surface-2/30 px-4 py-3",
+                        hasUsdc
+                          ? "grid-cols-[minmax(4rem,1fr)_auto_auto_auto]"
+                          : "grid-cols-[minmax(4rem,1fr)_auto_auto]",
+                      )}
+                    >
+                      <span className="font-display text-[13px] tracking-tight text-ink-muted">
+                        Total
+                      </span>
+                      <span className="text-right font-mono text-[13px] font-medium tabular-nums text-ink">
+                        {formatSol(balanceSol, 4)}
+                      </span>
+                      {hasUsdc && (
+                        <span className="text-right font-mono text-[13px] font-medium tabular-nums text-ink">
                           {usdcTotal.toLocaleString("en-US", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
-                        </p>
-                        <p className="text-[11px] tabular-nums text-ink-subtle/60">
-                          {usd(usdcTotal)}
-                        </p>
-                      </div>
+                        </span>
+                      )}
+                      <span className="text-right font-mono text-sm font-medium tabular-nums text-ink">
+                        {totalUsd != null ? usd(totalUsd) : "—"}
+                      </span>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  // Single-vault — collapse to plain token list. No matrix needed.
+                  <div className="overflow-hidden rounded-xl border border-border/60 bg-bg/30">
+                    <div className="grid grid-cols-[1fr_auto_5.5rem] items-center gap-x-4 border-b border-border/50 px-4 py-2">
+                      <span className="text-[9px] font-medium uppercase tracking-[0.22em] text-ink-subtle/60">
+                        Asset
+                      </span>
+                      <span className="text-right text-[9px] font-medium uppercase tracking-[0.22em] text-ink-subtle/60">
+                        Holdings
+                      </span>
+                      <span className="text-right text-[9px] font-medium uppercase tracking-[0.22em] text-ink-subtle/60">
+                        Value
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-[1fr_auto_5.5rem] items-center gap-x-4 px-4 py-3">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <TokenLogo symbol="SOL" size={22} />
+                        <span className="text-sm font-medium text-ink">SOL</span>
+                      </div>
+                      <span className="text-right font-mono text-sm tabular-nums text-ink">
+                        {formatSol(balanceSol, 6)}
+                      </span>
+                      <span className="text-right font-mono text-sm tabular-nums text-ink">
+                        {solUsd != null ? usd(solUsd) : "—"}
+                      </span>
+                    </div>
+
+                    {hasUsdc && (
+                      <div className="grid grid-cols-[1fr_auto_5.5rem] items-center gap-x-4 border-t border-border/40 px-4 py-3">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <TokenLogo symbol="USDC" size={22} />
+                          <span className="text-sm font-medium text-ink">USDC</span>
+                        </div>
+                        <span className="text-right font-mono text-sm tabular-nums text-ink">
+                          {usdcTotal.toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                        <span className="text-right font-mono text-sm tabular-nums text-ink">
+                          {usd(usdcTotal)}
+                        </span>
+                      </div>
+                    )}
+
+                    {totalUsd != null && (
+                      <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-4 border-t border-border/60 bg-surface-2/30 px-4 py-3">
+                        <span className="font-display text-[13px] tracking-tight text-ink-muted">
+                          Total
+                        </span>
+                        <span className="font-mono text-sm font-medium tabular-nums text-ink">
+                          {usd(totalUsd)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
