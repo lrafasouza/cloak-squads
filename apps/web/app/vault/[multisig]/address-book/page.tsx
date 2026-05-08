@@ -20,6 +20,7 @@ import {
   Check,
   Copy,
   ExternalLink,
+  Loader2,
   Pencil,
   Plus,
   Search,
@@ -44,17 +45,21 @@ function isValidPubkey(value: string): boolean {
   }
 }
 
-/* ── Inline new-contact form ─────────────────────────────────────────────
-   Drops into the right rail. Identicon previews live as the user types
-   the address — gives an at-a-glance check that they pasted the right
-   wallet. */
-function NewContactForm({
+/* ── New-contact modal ──────────────────────────────────────────────────
+   Mirrors the AddMember (/members) and AddAccount (/sub-vaults) modal
+   pattern: gold seal across the top, eyebrow + display title, identicon
+   that swaps in live as the address validates, three input fields,
+   Cancel/Save actions. Reachable from the header CTA, the empty-state
+   CTA, and the "no contact selected" panel. */
+function NewContactModal({
+  open,
+  onClose,
   onCreate,
-  onCancel,
   creating,
 }: {
+  open: boolean;
+  onClose: () => void;
   onCreate: (input: { label: string; address: string; notes?: string }) => Promise<unknown>;
-  onCancel: () => void;
   creating: boolean;
 }) {
   const [label, setLabel] = useState("");
@@ -63,9 +68,17 @@ function NewContactForm({
   const [error, setError] = useState<string | null>(null);
   const labelRef = useRef<HTMLInputElement>(null);
 
+  /* Reset + focus on each open. We avoid mounting/unmounting the inputs
+     so the autofocus arrives on the next tick after open flips true. */
   useEffect(() => {
-    setTimeout(() => labelRef.current?.focus(), 0);
-  }, []);
+    if (open) {
+      setLabel("");
+      setAddress("");
+      setNotes("");
+      setError(null);
+      setTimeout(() => labelRef.current?.focus(), 0);
+    }
+  }, [open]);
 
   const addressValid = isValidPubkey(address.trim());
 
@@ -88,22 +101,49 @@ function NewContactForm({
       };
       if (notes.trim()) input.notes = notes.trim();
       await onCreate(input);
-      onCancel();
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save contact.");
     }
   }
 
+  if (!open) return null;
+
   return (
-    <Panel>
-      <PanelHeader
-        icon={BookUser}
-        title="New contact"
-        description="Saves to your wallet's contact list."
-      />
-      <PanelBody className="space-y-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 p-4 backdrop-blur-md"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !creating) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && !creating) onClose();
+      }}
+    >
+      {/* biome-ignore lint/a11y/useSemanticElements: <dialog> element doesn't fit the heraldic frame; manual a11y via role+aria-modal */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ab-new-title"
+        className="relative w-full max-w-md overflow-hidden rounded-modal border border-border bg-surface p-6 shadow-raise-2"
+      >
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-accent/0 via-accent to-accent/0"
+        />
+        <p className="text-eyebrow">Address book · New contact</p>
+        <h3
+          id="ab-new-title"
+          className="mt-0.5 font-display text-xl font-semibold tracking-tight text-ink"
+        >
+          Save a contact
+        </h3>
+        <p className="mt-1.5 text-sm text-ink-muted">
+          Saved with your connected wallet — available across every vault for quick recipient
+          selection.
+        </p>
+
         {/* Identity preview — identicon swaps in once the address is valid */}
-        <div className="flex items-center gap-3 rounded-list border border-border bg-bg/40 px-3 py-2.5">
+        <div className="mt-5 flex items-center gap-3 rounded-list border border-border bg-bg/40 px-3 py-2.5">
           <div className="shrink-0 overflow-hidden rounded-lg border border-border/70 bg-surface-2">
             {addressValid ? (
               <VaultIdenticon seed={address.trim()} size={40} />
@@ -123,95 +163,105 @@ function NewContactForm({
           </div>
         </div>
 
-        <div>
-          <label htmlFor="ab-new-label" className="mb-1 block text-eyebrow">
-            Label
-          </label>
-          <input
-            id="ab-new-label"
-            ref={labelRef}
-            type="text"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.preventDefault();
-            }}
-            maxLength={64}
-            placeholder="Treasury, Alice, Vendor…"
-            className={cn(
-              "w-full rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
-            )}
-          />
+        <div className="mt-4 space-y-3">
+          <div>
+            <label htmlFor="ab-new-label" className="mb-1 block text-eyebrow">
+              Label
+            </label>
+            <input
+              id="ab-new-label"
+              ref={labelRef}
+              type="text"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
+              maxLength={64}
+              placeholder="Treasury, Alice, Vendor…"
+              className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink placeholder-ink-subtle focus:border-accent focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="ab-new-address" className="mb-1 block text-eyebrow">
+              Wallet address
+            </label>
+            <input
+              id="ab-new-address"
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && addressValid && label.trim() && !creating) {
+                  e.preventDefault();
+                  void handleSubmit();
+                }
+              }}
+              maxLength={44}
+              placeholder="Solana public key"
+              spellCheck={false}
+              className={cn(
+                "w-full rounded-md border bg-surface-2 px-3 py-2 font-mono text-sm text-ink placeholder-ink-subtle focus:outline-none",
+                addressValid
+                  ? "border-accent/40 focus:border-accent"
+                  : address.trim()
+                    ? "border-signal-danger/40"
+                    : "border-border focus:border-accent",
+              )}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="ab-new-notes" className="mb-1 block text-eyebrow">
+              Note <span className="text-ink-subtle/70">(optional)</span>
+            </label>
+            <input
+              id="ab-new-notes"
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && addressValid && label.trim() && !creating) {
+                  e.preventDefault();
+                  void handleSubmit();
+                }
+              }}
+              maxLength={280}
+              placeholder="Vendor for design retainer…"
+              className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-ink placeholder-ink-subtle focus:border-accent focus:outline-none"
+            />
+          </div>
         </div>
 
-        <div>
-          <label htmlFor="ab-new-address" className="mb-1 block text-eyebrow">
-            Wallet address
-          </label>
-          <input
-            id="ab-new-address"
-            type="text"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.preventDefault();
-            }}
-            maxLength={44}
-            placeholder="Solana public key"
-            spellCheck={false}
-            className={cn(
-              "w-full rounded-md border bg-surface px-3 py-2 font-mono text-sm text-ink",
-              addressValid
-                ? "border-accent/40"
-                : address.trim()
-                  ? "border-signal-danger/40"
-                  : "border-border",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
-            )}
-          />
-        </div>
+        {error && <p className="mt-3 text-xs text-signal-danger">{error}</p>}
 
-        <div>
-          <label htmlFor="ab-new-notes" className="mb-1 block text-eyebrow">
-            Note <span className="text-ink-subtle/70">(optional)</span>
-          </label>
-          <input
-            id="ab-new-notes"
-            type="text"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.preventDefault();
-            }}
-            maxLength={280}
-            placeholder="Vendor for design retainer…"
-            className={cn(
-              "w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
-            )}
-          />
-        </div>
-
-        {error ? <p className="text-xs text-signal-danger">{error}</p> : null}
-
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="default"
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={creating}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink disabled:opacity-40"
+          >
+            <X className="h-3.5 w-3.5" />
+            Cancel
+          </button>
+          <button
+            type="button"
             onClick={() => void handleSubmit()}
             disabled={creating || !label.trim() || !addressValid}
-            className="flex-1"
+            className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-accent to-accent-hover px-4 py-2 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow disabled:opacity-50"
           >
-            <Check className="mr-1.5 h-3.5 w-3.5" />
+            {creating ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Check className="h-3.5 w-3.5" />
+            )}
             {creating ? "Saving…" : "Save contact"}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onCancel} disabled={creating}>
-            Cancel
-          </Button>
+          </button>
         </div>
-      </PanelBody>
-    </Panel>
+      </div>
+    </div>
   );
 }
 
@@ -515,19 +565,17 @@ export default function AddressBookPage() {
         title="Address book"
         description="Saved wallet addresses live with your account, not the vault. They're available across every vault you connect to for quick recipient selection."
         action={
-          !isAdding ? (
-            <button
-              type="button"
-              onClick={() => {
-                setIsAdding(true);
-                setEditId(null);
-              }}
-              className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-accent to-accent-hover px-4 py-2 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow"
-            >
-              <Plus className="h-4 w-4" />
-              New contact
-            </button>
-          ) : null
+          <button
+            type="button"
+            onClick={() => {
+              setIsAdding(true);
+              setEditId(null);
+            }}
+            className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-accent to-accent-hover px-4 py-2 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow"
+          >
+            <Plus className="h-4 w-4" />
+            New contact
+          </button>
         }
       />
 
@@ -674,17 +722,9 @@ export default function AddressBookPage() {
           )}
         </div>
 
-        {/* RIGHT — sticky inspector / form */}
+        {/* RIGHT — sticky inspector / edit form */}
         <div className="space-y-3 lg:sticky lg:top-6 lg:self-start">
-          {isAdding ? (
-            <NewContactForm
-              onCreate={async (input) => {
-                await create(input);
-              }}
-              onCancel={() => setIsAdding(false)}
-              creating={creating}
-            />
-          ) : editingEntry ? (
+          {editingEntry ? (
             <EditContactForm
               entry={editingEntry}
               onSave={handleUpdate}
@@ -812,6 +852,15 @@ export default function AddressBookPage() {
           </div>
         </div>
       </div>
+
+      <NewContactModal
+        open={isAdding}
+        onClose={() => setIsAdding(false)}
+        onCreate={async (input) => {
+          await create(input);
+        }}
+        creating={creating}
+      />
 
       <ConfirmModal
         open={!!deleteId}
