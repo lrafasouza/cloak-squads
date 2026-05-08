@@ -1,5 +1,6 @@
 "use client";
 
+import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
 import { type AegisStatus, StatusBadge } from "@/components/ui/aegis";
 import { Button } from "@/components/ui/button";
 import { ReceiptRow } from "@/components/ui/receipt-row";
@@ -18,6 +19,7 @@ import {
   ArrowDownLeft,
   ArrowRightLeft,
   ArrowUpRight,
+  BadgeCheck,
   Download,
   FileJson,
   Loader2,
@@ -390,8 +392,9 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
   return (
     <main className="min-h-screen bg-bg">
       <section className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 md:py-10">
-        {/* Hero — audit cover with KPI ribbon */}
+        {/* Hero — audit cover with KPI ribbon and Æ watermark */}
         <div className="card-hero relative overflow-hidden p-7 md:p-9">
+          <HeraldicWatermark />
           <div className="relative">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="max-w-2xl">
@@ -401,6 +404,13 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
                 </h1>
                 <p className="mt-2 text-sm leading-6 text-ink-muted">
                   {getScopeDescription(metadata.scope)}
+                </p>
+                {/* Provenance — exports are Ed25519-signed by the issuer.
+                    Auditors should see this immediately so the report is
+                    read as accountable, not advisory. */}
+                <p className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-accent/25 bg-accent-soft/60 px-2.5 py-1 text-[11px] font-medium text-accent">
+                  <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                  Provenance · exports are Ed25519-signed
                 </p>
               </div>
               <StatusBadge status={SCOPE_BADGE[metadata.scope]}>
@@ -453,12 +463,10 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
         <div className="mt-6 card-panel overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-border px-3 py-2 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-0.5">
-              {(
-                [
-                  { id: "transactions" as const, label: "Transactions", count: transactions.length },
-                  { id: "scope" as const, label: "Scope", count: 0 },
-                ]
-              ).map(({ id, label, count }) => {
+              {[
+                { id: "transactions" as const, label: "Transactions", count: transactions.length },
+                { id: "scope" as const, label: "Scope", count: 0 },
+              ].map(({ id, label, count }) => {
                 const isActive = activeTab === id;
                 return (
                   <button
@@ -477,9 +485,7 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
                       <span
                         className={cn(
                           "rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
-                          isActive
-                            ? "bg-accent/20 text-accent"
-                            : "bg-surface-3 text-ink-subtle",
+                          isActive ? "bg-accent/20 text-accent" : "bg-surface-3 text-ink-subtle",
                         )}
                       >
                         {count}
@@ -516,24 +522,31 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
 
           {activeTab === "transactions" ? (
             <div>
-              {/* Sub-stats + filters strip */}
-              <div className="flex flex-col gap-4 border-b border-border/50 px-5 py-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-5 text-xs text-ink-muted">
-                  <span>
+              {/* Sub-stats + filters strip — dot+label pattern matches the
+                  proposals queue ribbon so failed/pending read as the
+                  same governance signals across the product. */}
+              <div className="flex flex-col gap-3 border-b border-border/50 px-5 py-3.5 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs">
+                  <span className="text-ink-muted">
                     <span className="text-ink-subtle">Showing</span>{" "}
-                    <span className="font-mono text-ink tabular-nums">
+                    <span className="font-mono tabular-nums text-ink">
                       {filteredTransactions.length}
                     </span>{" "}
-                    of {transactions.length}
+                    <span className="text-ink-subtle">of</span>{" "}
+                    <span className="font-mono tabular-nums text-ink-muted">
+                      {transactions.length}
+                    </span>
                   </span>
                   {totals.failed > 0 ? (
-                    <span className="font-mono text-signal-danger tabular-nums">
-                      {totals.failed} failed
+                    <span className="inline-flex items-center gap-1.5 text-signal-danger">
+                      <span className="h-1.5 w-1.5 rounded-full bg-signal-danger" />
+                      <span className="font-mono tabular-nums">{totals.failed}</span> failed
                     </span>
                   ) : null}
                   {totals.pending > 0 ? (
-                    <span className="font-mono text-signal-warn tabular-nums">
-                      {totals.pending} pending
+                    <span className="inline-flex items-center gap-1.5 text-signal-warn">
+                      <span className="h-1.5 w-1.5 rounded-full bg-signal-warn" />
+                      <span className="font-mono tabular-nums">{totals.pending}</span> pending
                     </span>
                   ) : null}
                 </div>
@@ -685,12 +698,8 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
                     <ReceiptRow label="Audit link ID">
                       <span className="text-[12px]">{metadata.id.slice(0, 18)}…</span>
                     </ReceiptRow>
-                    <ReceiptRow label="Vault">
-                      {truncateAddress(metadata.cofreAddress)}
-                    </ReceiptRow>
-                    <ReceiptRow label="Issued by">
-                      {truncateAddress(metadata.issuedBy)}
-                    </ReceiptRow>
+                    <ReceiptRow label="Vault">{truncateAddress(metadata.cofreAddress)}</ReceiptRow>
+                    <ReceiptRow label="Issued by">{truncateAddress(metadata.issuedBy)}</ReceiptRow>
                     <ReceiptRow label="Created" mono={false}>
                       {new Date(metadata.createdAt).toLocaleString()}
                     </ReceiptRow>
