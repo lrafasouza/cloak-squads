@@ -1,27 +1,230 @@
 "use client";
 
-import { AddressPill } from "@/components/ui/address-pill";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { InlineAlert, WorkspaceHeader, WorkspacePage } from "@/components/ui/workspace";
+import { VaultIdenticon } from "@/components/ui/vault-identicon";
+import {
+  InlineAlert,
+  Panel,
+  PanelBody,
+  PanelHeader,
+  WorkspaceHeader,
+  WorkspacePage,
+} from "@/components/ui/workspace";
+import { findEntryByAddress, useAddressBook } from "@/lib/hooks/useAddressBook";
 import { createAddMemberProposal, createRemoveMemberProposal } from "@/lib/squads-sdk";
 import { proposalSummariesQueryKey, useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
+import { cn } from "@/lib/utils";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  Check,
   Clock,
   Copy,
   ExternalLink,
+  Key,
   Loader2,
   Shield,
   Trash2,
   UserPlus,
   Users,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { use, useMemo, useRef, useState } from "react";
+
+/* ── Threshold gauge ────────────────────────────────────────────────────
+   Visual reading of T-of-N: N concentric pips around an arc, T of which
+   are filled in brass. Reads at a glance — "are we at quorum, half, full?"
+   Sized to sit in the hero shoulder. */
+function ThresholdGauge({
+  threshold,
+  total,
+  size = 100,
+}: {
+  threshold: number;
+  total: number;
+  size?: number;
+}) {
+  const stroke = 8;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const filled = total > 0 ? (threshold / total) * circumference : 0;
+
+  return (
+    <div className="relative inline-flex items-center justify-center">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+        <title>{`${threshold} of ${total} signatures required`}</title>
+        {/* Track */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="hsl(var(--border))"
+          strokeWidth={stroke}
+        />
+        {/* Filled arc — sweeps from 12 o'clock */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="hsl(var(--accent))"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${filled} ${circumference - filled}`}
+          strokeDashoffset={circumference / 4}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-mono text-2xl font-semibold tabular-nums text-ink">
+          {threshold}
+          <span className="text-base font-normal text-ink-subtle">/{total}</span>
+        </span>
+        <span className="mt-0.5 text-[9px] font-medium uppercase tracking-eyebrow text-ink-subtle">
+          Quorum
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Member row ─────────────────────────────────────────────────────────
+   Identicon + label-or-address + role pill + inline icon actions. The
+   connected member gets a brass active rail; selectable for the right-rail
+   inspector. */
+function MemberRow({
+  index,
+  address,
+  isMe,
+  isOnly,
+  contactLabel,
+  isSelected,
+  onSelect,
+  onCopy,
+  onRemove,
+}: {
+  index: number;
+  address: string;
+  isMe: boolean;
+  isOnly: boolean;
+  contactLabel: string | null;
+  isSelected: boolean;
+  onSelect: () => void;
+  onCopy: () => void;
+  onRemove: () => void;
+}) {
+  const short = `${address.slice(0, 8)}…${address.slice(-6)}`;
+
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: native <button> can't host the absolute action buttons inside
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      aria-label={`Inspect member ${contactLabel ?? short}`}
+      aria-pressed={isSelected}
+      className={cn(
+        "group relative flex items-center gap-4 px-5 py-4 transition-aegis",
+        "cursor-pointer hover:bg-surface-2/60",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40",
+        isSelected && "bg-surface-2/80",
+      )}
+    >
+      {/* Brass rail — selected state */}
+      {isSelected && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-brass"
+        />
+      )}
+
+      <span className="relative z-10 w-6 shrink-0 text-right font-mono text-xs text-ink-subtle">
+        {index + 1}
+      </span>
+
+      <div className="relative z-10 shrink-0 overflow-hidden rounded-lg border border-border/70 bg-surface-2">
+        <VaultIdenticon seed={address} size={36} />
+      </div>
+
+      <div className="relative z-10 min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-semibold text-ink">{contactLabel ?? short}</p>
+          {isMe && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-eyebrow text-accent">
+              <Key className="h-2.5 w-2.5" aria-hidden="true" />
+              You
+            </span>
+          )}
+        </div>
+        {contactLabel && <p className="mt-0.5 font-mono text-[11px] text-ink-subtle">{short}</p>}
+      </div>
+
+      <div className="relative z-10 hidden shrink-0 sm:block">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent">
+          <Shield className="h-2.5 w-2.5" aria-hidden="true" />
+          Signer
+        </span>
+      </div>
+
+      <div
+        className={cn(
+          "relative z-10 flex shrink-0 items-center gap-1 transition-opacity",
+          "opacity-100 sm:opacity-0 sm:group-hover:opacity-100",
+          isSelected && "sm:opacity-100",
+        )}
+      >
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCopy();
+          }}
+          className="flex h-8 w-8 items-center justify-center rounded-md text-ink-subtle transition-aegis hover:bg-surface-2 hover:text-ink"
+          aria-label="Copy address"
+          title="Copy address"
+        >
+          <Copy className="h-3.5 w-3.5" />
+        </button>
+        <a
+          href={`https://solana.fm/address/${address}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="flex h-8 w-8 items-center justify-center rounded-md text-ink-subtle transition-aegis hover:bg-surface-2 hover:text-ink"
+          aria-label="View on SolanaFM"
+          title="View on SolanaFM"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
+        {!isOnly && !isMe && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-ink-subtle transition-aegis hover:bg-signal-danger/15 hover:text-signal-danger"
+            aria-label="Propose removal"
+            title="Propose removal"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function MembersPage({
   params,
@@ -31,6 +234,7 @@ export default function MembersPage({
   const { multisig } = use(params);
   const { data, isLoading, error } = useVaultData(multisig);
   const { data: proposals = [] } = useProposalSummaries(multisig);
+  const { entries: contacts } = useAddressBook();
   const { connection } = useConnection();
   const wallet = useWallet();
   const queryClient = useQueryClient();
@@ -42,6 +246,8 @@ export default function MembersPage({
 
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
   const [removeLoading, setRemoveLoading] = useState(false);
+
+  const [selectedAddr, setSelectedAddr] = useState<string | null>(null);
 
   const submittingRef = useRef(false);
 
@@ -62,6 +268,16 @@ export default function MembersPage({
       ),
     [proposals],
   );
+
+  /* When data lands, default the inspector to the connected member if
+     present, else the first member. */
+  const effectiveSelected = useMemo(() => {
+    if (!data) return null;
+    if (selectedAddr && data.members.includes(selectedAddr)) return selectedAddr;
+    const me = wallet.publicKey?.toBase58();
+    if (me && data.members.includes(me)) return me;
+    return data.members[0] ?? null;
+  }, [data, selectedAddr, wallet.publicKey]);
 
   async function handleAddMember() {
     if (submittingRef.current || !wallet.publicKey || !multisigPda || !wallet.sendTransaction)
@@ -116,7 +332,6 @@ export default function MembersPage({
     setRemoveLoading(true);
     try {
       const newMemberCount = data.memberCount - 1;
-      // Squads rejects threshold > member count (InvalidThreshold). Lower it in the same tx.
       const needsThresholdChange = data.threshold > newMemberCount;
       const newThreshold = needsThresholdChange ? Math.max(1, newMemberCount) : null;
       await createRemoveMemberProposal({
@@ -168,62 +383,99 @@ export default function MembersPage({
     );
   }
 
+  const me = wallet.publicKey?.toBase58();
+  const selectedContact = effectiveSelected
+    ? (findEntryByAddress(contacts, effectiveSelected)?.label ?? null)
+    : null;
+
   return (
     <WorkspacePage>
-      <div className="space-y-8">
-        <WorkspaceHeader
-          eyebrow="VAULT"
-          title="Members"
-          description={`${data.memberCount} members · ${data.threshold}/${data.memberCount} threshold required`}
-          action={
-            <button
-              type="button"
-              onClick={() => {
-                setAddAddress("");
-                setAddError(null);
-                setAddModalOpen(true);
-              }}
-              className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-accent to-accent-hover px-4 py-2 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow"
-            >
-              <UserPlus className="h-4 w-4" />
-              Add Member
-            </button>
-          }
-        />
+      <WorkspaceHeader
+        eyebrow="Vault · Signers"
+        title="Members"
+        description={`${data.memberCount} ${data.memberCount === 1 ? "signer holds" : "signers hold"} keys to this vault. ${data.threshold} of ${data.memberCount} signature${data.threshold === 1 ? "" : "s"} required to move funds.`}
+        action={
+          <button
+            type="button"
+            onClick={() => {
+              setAddAddress("");
+              setAddError(null);
+              setAddModalOpen(true);
+            }}
+            className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-accent to-accent-hover px-4 py-2 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow"
+          >
+            <UserPlus className="h-4 w-4" />
+            Add member
+          </button>
+        }
+      />
 
-        <div className="flex flex-wrap items-center gap-6 text-sm">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-ink-subtle" />
-            <span className="text-ink-muted">Members</span>
-            <span className="font-semibold text-ink">{data.memberCount}</span>
-          </div>
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-2">
-            <Shield className="h-4 w-4 text-ink-subtle" />
-            <span className="text-ink-muted">Threshold</span>
-            <span className="font-semibold text-ink">
-              {data.threshold}/{data.memberCount}
-            </span>
-          </div>
-          {pendingMemberProposals.length > 0 && (
-            <>
-              <div className="h-4 w-px bg-border" />
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-ink-subtle" />
-                <span className="text-ink-muted">Pending</span>
-                <span className="font-semibold text-ink">{pendingMemberProposals.length}</span>
+      {/* ── Hero · Threshold gauge + KPIs ── */}
+      <div className="card-hero mb-6 overflow-hidden p-6 md:p-7">
+        <div className="grid gap-6 md:grid-cols-[auto_1fr] md:items-center">
+          <ThresholdGauge threshold={data.threshold} total={data.memberCount} size={120} />
+          <div>
+            <p className="text-eyebrow">Quorum policy</p>
+            <p className="mt-1 font-display text-2xl font-semibold leading-tight tracking-tight text-ink md:text-3xl">
+              {data.threshold} of {data.memberCount} signers required
+            </p>
+            <p className="mt-2 max-w-xl text-sm text-ink-muted">
+              {data.threshold === data.memberCount
+                ? "Unanimous consent — every signer must approve before a transaction executes."
+                : data.threshold === 1
+                  ? "Single-signer policy — any one member can move funds. Consider raising the threshold for production vaults."
+                  : `Majority control — any ${data.threshold} of ${data.memberCount} can approve. Below the threshold, proposals stay pending.`}
+            </p>
+
+            {/* KPI strip — terse, three numbers */}
+            <div className="mt-5 grid grid-cols-3 gap-4 border-t border-border/50 pt-4 sm:max-w-md">
+              <div>
+                <div className="flex items-center gap-1.5 text-eyebrow">
+                  <Users className="h-3 w-3" aria-hidden="true" />
+                  Members
+                </div>
+                <p className="mt-1 font-display text-xl font-semibold tabular-nums text-ink">
+                  {data.memberCount}
+                </p>
               </div>
-            </>
-          )}
+              <div>
+                <div className="flex items-center gap-1.5 text-eyebrow">
+                  <Shield className="h-3 w-3" aria-hidden="true" />
+                  Threshold
+                </div>
+                <p className="mt-1 font-display text-xl font-semibold tabular-nums text-ink">
+                  {data.threshold}
+                </p>
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 text-eyebrow">
+                  <Clock className="h-3 w-3" aria-hidden="true" />
+                  Pending
+                </div>
+                <p
+                  className={cn(
+                    "mt-1 font-display text-xl font-semibold tabular-nums",
+                    pendingMemberProposals.length > 0 ? "text-signal-warn" : "text-ink",
+                  )}
+                >
+                  {pendingMemberProposals.length}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
 
-        {pendingMemberProposals.length > 0 && (
+      {pendingMemberProposals.length > 0 && (
+        <div className="mb-6">
           <InlineAlert tone="warning">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-1 items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-ink">Pending member change</p>
                 <p className="mt-0.5 text-xs text-ink-muted">
-                  Sign or execute member and threshold proposals from the proposal queue.
+                  {pendingMemberProposals.length} config proposal
+                  {pendingMemberProposals.length === 1 ? "" : "s"} await
+                  {pendingMemberProposals.length === 1 ? "s" : ""} signature.
                 </p>
               </div>
               <Link
@@ -234,160 +486,148 @@ export default function MembersPage({
               </Link>
             </div>
           </InlineAlert>
-        )}
+        </div>
+      )}
 
-        {/* Desktop table */}
-        <div className="card-panel hidden overflow-hidden md:block">
-          <div
-            className="grid items-center gap-4 border-b border-border/50 px-6 py-3"
-            style={{ gridTemplateColumns: "3rem 1fr 10rem 5rem" }}
-          >
-            <span className="text-eyebrow">
-              #
-            </span>
-            <span className="text-eyebrow">
-              Address
-            </span>
-            <span className="text-right text-eyebrow">
-              Role
-            </span>
-            <span className="text-right text-eyebrow">
-              Actions
-            </span>
+      {/* ── Master / detail ── */}
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        {/* LEFT — members ledger */}
+        <div className="card-panel overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-border/60 px-5 py-4">
+            <div>
+              <p className="text-eyebrow">Roster · {data.memberCount} signers</p>
+              <h2 className="mt-0.5 font-display text-lg font-semibold tracking-tight text-ink">
+                Authorized keys
+              </h2>
+            </div>
+            <span className="text-eyebrow hidden sm:inline">Click to inspect</span>
           </div>
+
           <div className="divide-y divide-border/40">
             {data.members.map((addr, i) => {
-              const isMe = addr === wallet.publicKey?.toBase58();
+              const isMe = addr === me;
+              const contactLabel = findEntryByAddress(contacts, addr)?.label ?? null;
               return (
-                <div
+                <MemberRow
                   key={addr}
-                  className="group grid items-center gap-4 px-6 py-4 transition-aegis hover:bg-surface-2"
-                  style={{ gridTemplateColumns: "3rem 1fr 10rem 5rem" }}
-                >
-                  <span className="font-mono text-sm font-medium text-ink-subtle">{i + 1}</span>
-                  <div className="flex items-center gap-2">
-                    <AddressPill
-                      value={addr}
-                      chars={8}
-                      className="bg-transparent border-transparent px-0"
-                    />
-                    {isMe && (
-                      <span className="rounded-full border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
-                        You
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex justify-end">
-                    <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent">
-                      Signer
-                    </span>
-                  </div>
-                  <div className="flex justify-end gap-1">
-                    <button
-                      type="button"
-                      onClick={() => navigator.clipboard.writeText(addr)}
-                      title="Copy address"
-                      className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle transition-aegis hover:bg-surface-2 hover:text-ink"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </button>
-                    <a
-                      href={`https://solana.fm/address/${addr}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="View on SolanaFM"
-                      className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle transition-aegis hover:bg-surface-2 hover:text-ink"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                    {data.memberCount > 1 && !isMe && (
-                      <button
-                        type="button"
-                        onClick={() => setRemoveTarget(addr)}
-                        title="Propose removal"
-                        className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle transition-aegis hover:bg-signal-danger/15 hover:text-signal-danger"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+                  index={i}
+                  address={addr}
+                  isMe={isMe}
+                  isOnly={data.memberCount <= 1}
+                  contactLabel={contactLabel}
+                  isSelected={effectiveSelected === addr}
+                  onSelect={() => setSelectedAddr(addr)}
+                  onCopy={() => navigator.clipboard.writeText(addr)}
+                  onRemove={() => setRemoveTarget(addr)}
+                />
               );
             })}
           </div>
         </div>
 
-        {/* Mobile cards */}
-        <div className="md:hidden space-y-3">
-          {data.members.map((addr, i) => {
-            const isMe = addr === wallet.publicKey?.toBase58();
-            return (
-              <div
-                key={addr}
-                className="card-panel p-4 transition-aegis active:bg-surface-2"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs text-ink-subtle">#{i + 1}</span>
-                      <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent">
-                        Signer
-                      </span>
-                      {isMe && (
-                        <span className="rounded-full border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
-                          You
-                        </span>
-                      )}
+        {/* RIGHT — sticky inspector */}
+        <div className="space-y-3 lg:sticky lg:top-6 lg:self-start">
+          <Panel>
+            <PanelHeader
+              icon={Key}
+              title="Selected signer"
+              description="Identity, label, and removal action."
+            />
+            <PanelBody className="space-y-4">
+              {effectiveSelected ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="shrink-0 overflow-hidden rounded-lg border border-border/70 bg-surface-2">
+                      <VaultIdenticon seed={effectiveSelected} size={48} />
                     </div>
-                    <div className="mt-1 break-all font-mono text-sm text-ink">{addr}</div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink">
+                        {selectedContact ??
+                          `${effectiveSelected.slice(0, 8)}…${effectiveSelected.slice(-6)}`}
+                      </p>
+                      <p className="font-mono text-[11px] text-ink-subtle">Member · Signer</p>
+                    </div>
                   </div>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText(addr)}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-medium text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    Copy
-                  </button>
-                  <a
-                    href={`https://solana.fm/address/${addr}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-medium text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    View
-                  </a>
-                  {data.memberCount > 1 && !isMe && (
+
+                  <div className="space-y-1 rounded-list border border-border bg-bg/40 px-3 py-2">
+                    <p className="text-eyebrow">Public key</p>
+                    <p className="break-all font-mono text-[11px] leading-relaxed text-ink">
+                      {effectiveSelected}
+                    </p>
+                  </div>
+
+                  <div className="rounded-list border border-border bg-bg/40 px-3 py-2.5">
+                    <p className="text-eyebrow">Signing power</p>
+                    <p className="mt-0.5 text-sm text-ink">
+                      Counts as <span className="font-semibold">1 of {data.threshold}</span>{" "}
+                      required signatures.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => setRemoveTarget(addr)}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-signal-danger/30 px-3 py-2 text-xs font-medium text-signal-danger transition-aegis hover:bg-signal-danger/10"
+                      onClick={() => navigator.clipboard.writeText(effectiveSelected)}
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-medium text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy
+                    </button>
+                    <a
+                      href={`https://solana.fm/address/${effectiveSelected}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-medium text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Explorer
+                    </a>
+                  </div>
+
+                  {data.memberCount > 1 && effectiveSelected !== me && (
+                    <button
+                      type="button"
+                      onClick={() => setRemoveTarget(effectiveSelected)}
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-signal-danger/30 bg-signal-danger/5 px-3 py-2 text-xs font-medium text-signal-danger transition-aegis hover:bg-signal-danger/10"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      Remove
+                      Propose removal
                     </button>
                   )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                  {effectiveSelected === me && (
+                    <p className="rounded-list border border-dashed border-border bg-bg/40 px-3 py-2 text-[11px] leading-relaxed text-ink-subtle">
+                      You can't remove yourself. Another member must propose your removal.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-ink-subtle">Select a member to inspect.</p>
+              )}
+            </PanelBody>
+          </Panel>
 
-        <p className="text-xs leading-relaxed text-ink-subtle">
-          This vault requires any {data.threshold} of {data.memberCount} eligible member
-          {data.threshold === 1 ? "" : "s"} to approve a proposal before it can execute. Add/remove
-          actions create a Squads config proposal that members must sign.
-        </p>
+          <div className="card-panel space-y-2 px-4 py-3">
+            <p className="text-eyebrow">How threshold works</p>
+            <ul className="space-y-1.5 text-[11px] leading-relaxed text-ink-muted">
+              <li>
+                • Add or remove a signer by{" "}
+                <strong className="text-ink">creating a config proposal</strong>
+              </li>
+              <li>
+                • Removing a signer below the threshold{" "}
+                <strong className="text-ink">auto-lowers the threshold</strong> in the same tx
+              </li>
+              <li>• Every existing member sees the proposal and must sign</li>
+              <li>• Threshold = 1 means any single member can move funds (use cautiously)</li>
+            </ul>
+          </div>
+        </div>
       </div>
 
-      {/* Add Member modal */}
+      {/* ── Add Member modal ── */}
       {addModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 p-4 backdrop-blur-md">
           <div className="relative w-full max-w-md overflow-hidden rounded-modal border border-border bg-surface p-6 shadow-raise-2">
-            {/* Heraldic gold seal — matches the Dialog primitive */}
             <span
               aria-hidden="true"
               className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-accent/0 via-accent to-accent/0"
@@ -397,12 +637,9 @@ export default function MembersPage({
               Invite signer
             </h3>
             <p className="mt-1.5 text-sm text-ink-muted">
-              Creates a Squads config proposal. Members with signing rights will need to approve it.
+              Creates a Squads config proposal. Existing members must sign before the new key joins.
             </p>
-            <label
-              htmlFor="new-member-address"
-              className="text-eyebrow mt-5 block"
-            >
+            <label htmlFor="new-member-address" className="mt-5 block text-eyebrow">
               Member wallet address
             </label>
             <input
@@ -422,8 +659,9 @@ export default function MembersPage({
                 type="button"
                 onClick={() => setAddModalOpen(false)}
                 disabled={addLoading}
-                className="rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-ink-muted transition-aegis hover:bg-surface-2 hover:text-ink disabled:opacity-40"
               >
+                <X className="h-3.5 w-3.5" />
                 Cancel
               </button>
               <button
@@ -432,7 +670,11 @@ export default function MembersPage({
                 disabled={addLoading || !addAddress.trim()}
                 className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-accent to-accent-hover px-4 py-2 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow disabled:opacity-50"
               >
-                {addLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {addLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Check className="h-3.5 w-3.5" />
+                )}
                 {addLoading ? "Creating…" : "Create proposal"}
               </button>
             </div>
@@ -444,7 +686,7 @@ export default function MembersPage({
         open={removeTarget !== null}
         title="Remove member"
         description={(() => {
-          const who = removeTarget ? removeTarget.slice(0, 8) + "…" : "this member";
+          const who = removeTarget ? `${removeTarget.slice(0, 8)}…` : "this member";
           if (!data) return `Propose removal of ${who}?`;
           const newCount = data.memberCount - 1;
           const willLower = data.threshold > newCount;

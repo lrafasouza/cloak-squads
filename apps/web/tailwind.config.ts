@@ -43,6 +43,10 @@ const config: Config = {
           soft: "hsl(var(--accent-soft) / <alpha-value>)",
           ink: "hsl(var(--accent-ink) / <alpha-value>)",
         },
+        // Brass — lighter gold for active rails, segment swatches, and
+        // any "active without being primary" accent. Defined in
+        // globals.css per theme so it tracks with light/dark.
+        brass: "hsl(var(--brass) / <alpha-value>)",
         signal: {
           positive: "hsl(var(--signal-positive) / <alpha-value>)",
           warn: "hsl(var(--signal-warn) / <alpha-value>)",

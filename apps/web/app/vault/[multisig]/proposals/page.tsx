@@ -1,20 +1,25 @@
 "use client";
 
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { WorkspaceHeader, WorkspacePage } from "@/components/ui/workspace";
 import { publicEnv } from "@/lib/env";
 import { type IncomeEntry, useVaultIncome } from "@/lib/hooks/useVaultIncome";
 import { type ProposalSummary, truncateAddress } from "@/lib/proposals";
 import { lamportsToSol } from "@/lib/sol";
 import { proposalCancel, proposalReject } from "@/lib/squads-sdk";
 import { proposalSummariesQueryKey, useProposalSummaries } from "@/lib/use-proposal-summaries";
+import { cn } from "@/lib/utils";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDownToLine,
   ArrowRightLeft,
+  CheckCircle2,
+  Clock,
   ExternalLink,
   EyeOff,
+  FileText,
   Loader2,
   Plus,
   Send,
@@ -688,66 +693,153 @@ export default function TransactionsPage({
 
   const isLoading = activeTab === "income" ? incomeLoading : proposalsLoading;
 
-  const TABS: { id: TabId; label: string; count: number }[] = [
-    { id: "queue", label: "Queue", count: grouped.queue.length },
-    { id: "history", label: "History", count: grouped.history.length },
-    { id: "drafts", label: "Drafts", count: grouped.drafts.length },
-    { id: "income", label: "Income", count: incomeEntries.length },
+  const TABS: { id: TabId; label: string; count: number; icon: typeof Clock }[] = [
+    { id: "queue", label: "Queue", count: grouped.queue.length, icon: Clock },
+    { id: "history", label: "History", count: grouped.history.length, icon: CheckCircle2 },
+    { id: "drafts", label: "Drafts", count: grouped.drafts.length, icon: FileText },
+    { id: "income", label: "Income", count: incomeEntries.length, icon: ArrowDownToLine },
   ];
 
+  /* Hero KPI counts — derived from the same `grouped` slice we use for the
+     tabs so the numbers stay in lockstep. Income is summed separately
+     because each entry holds lamports, not a status. */
+  const totalIncomeSol = useMemo(() => {
+    const total = incomeEntries.reduce(
+      (sum, e) => sum + Number.parseFloat(lamportsToSol(e.amountLamports)),
+      0,
+    );
+    return total;
+  }, [incomeEntries]);
+
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-ink">Transactions</h1>
-          <p className="mt-0.5 text-xs text-ink-muted">
-            {grouped.queue.length > 0
-              ? `${grouped.queue.length} pending · ${proposals.length} total`
-              : `${proposals.length} total`}
-          </p>
+    <WorkspacePage>
+      <WorkspaceHeader
+        eyebrow="Vault · Activity"
+        title="Transactions"
+        description="Every proposal that touches this vault — queued for signing, executed, drafted, or received. Tap a row to inspect signatures, simulate, or sign."
+        action={
+          <Link
+            href={`/vault/${multisig}/send`}
+            className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-accent to-accent-hover px-4 py-2 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow"
+          >
+            <Plus className="h-4 w-4" />
+            New transaction
+          </Link>
+        }
+      />
+
+      {/* ── Hero · activity ledger ──
+          Four-number strip: pending · executed · drafts · income. Echoes
+          the operator hero (KPI strip) but framed for the vault-wide
+          activity view. The hero card is the single anchor on the page. */}
+      <div className="card-hero mb-6 overflow-hidden p-6 md:p-7">
+        <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-end">
+          <div>
+            <p className="text-eyebrow">Activity ledger</p>
+            <p className="mt-1.5 font-display text-4xl font-semibold leading-none tracking-tight text-ink md:text-5xl">
+              {proposals.length}
+              <span className="ml-2 font-sans text-base font-medium text-ink-subtle md:text-lg">
+                proposals
+              </span>
+            </p>
+            <p className="mt-2 text-sm text-ink-muted">
+              {grouped.queue.length === 0 && grouped.drafts.length === 0
+                ? "Queue is calm — no proposals awaiting signatures."
+                : grouped.queue.length === 1
+                  ? "1 proposal awaits your signature."
+                  : `${grouped.queue.length} proposals await signatures · ${grouped.drafts.length} draft${grouped.drafts.length === 1 ? "" : "s"} pending.`}
+            </p>
+          </div>
         </div>
-        <Link
-          href={`/vault/${multisig}/send`}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-accent-ink shadow-raise-1 transition-opacity hover:opacity-90"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          New transaction
-        </Link>
+
+        {/* KPI strip — 4 numbers · operator dashboard pattern */}
+        <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border/50 pt-5 sm:grid-cols-4">
+          <div>
+            <div className="flex items-center gap-1.5 text-eyebrow">
+              <Clock className="h-3 w-3" aria-hidden="true" />
+              Pending
+            </div>
+            <p
+              className={cn(
+                "mt-1.5 font-display text-2xl font-semibold tabular-nums tracking-tight",
+                grouped.queue.length > 0 ? "text-signal-warn" : "text-ink",
+              )}
+            >
+              {grouped.queue.length}
+            </p>
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5 text-eyebrow">
+              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+              Executed
+            </div>
+            <p className="mt-1.5 font-display text-2xl font-semibold tabular-nums tracking-tight text-ink">
+              {grouped.history.length}
+            </p>
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5 text-eyebrow">
+              <FileText className="h-3 w-3" aria-hidden="true" />
+              Drafts
+            </div>
+            <p className="mt-1.5 font-display text-2xl font-semibold tabular-nums tracking-tight text-ink">
+              {grouped.drafts.length}
+            </p>
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5 text-eyebrow">
+              <ArrowDownToLine className="h-3 w-3" aria-hidden="true" />
+              Income
+            </div>
+            <p className="mt-1.5 font-display text-2xl font-semibold tabular-nums tracking-tight text-signal-positive">
+              {totalIncomeSol > 0
+                ? totalIncomeSol.toLocaleString("en-US", { maximumFractionDigits: 4 })
+                : "0"}
+              <span className="ml-1 text-xs font-normal text-ink-subtle">SOL</span>
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="card-panel overflow-hidden">
-        {/* Tabs */}
+        {/* Heraldic tab strip — eyebrow-style, brass underline on active */}
         <div className="flex items-center gap-0.5 border-b border-border px-3 py-2">
-          {TABS.map(({ id, label, count }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-aegis ${
-                activeTab === id
-                  ? id === "income"
-                    ? "bg-signal-positive/10 text-signal-positive"
-                    : "bg-accent-soft text-accent"
-                  : "text-ink-muted hover:bg-surface-2 hover:text-ink"
-              }`}
-            >
-              {id === "income" && <ArrowDownToLine className="h-3 w-3" />}
-              {label}
-              {count > 0 && (
-                <span
-                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
-                    activeTab === id
-                      ? id === "income"
-                        ? "bg-signal-positive/20 text-signal-positive"
-                        : "bg-accent/20 text-accent"
-                      : "bg-surface-3 text-ink-subtle"
-                  }`}
-                >
-                  {count}
-                </span>
-              )}
-            </button>
-          ))}
+          {TABS.map(({ id, label, count, icon: Icon }) => {
+            const isActive = activeTab === id;
+            const isIncome = id === "income";
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveTab(id)}
+                className={cn(
+                  "relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-aegis",
+                  isActive
+                    ? isIncome
+                      ? "bg-signal-positive/10 text-signal-positive"
+                      : "bg-accent-soft text-accent"
+                    : "text-ink-muted hover:bg-surface-2 hover:text-ink",
+                )}
+              >
+                <Icon className="h-3 w-3" aria-hidden="true" />
+                {label}
+                {count > 0 && (
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
+                      isActive
+                        ? isIncome
+                          ? "bg-signal-positive/20 text-signal-positive"
+                          : "bg-accent/20 text-accent"
+                        : "bg-surface-3 text-ink-subtle",
+                    )}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Desktop table */}
@@ -761,18 +853,10 @@ export default function TransactionsPage({
                     className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
                     style={{ gridTemplateColumns: "1fr 1fr 8rem 5rem" }}
                   >
-                    <span className="text-eyebrow">
-                      Amount
-                    </span>
-                    <span className="text-eyebrow">
-                      From
-                    </span>
-                    <span className="text-right text-eyebrow">
-                      Date
-                    </span>
-                    <span className="text-right text-eyebrow">
-                      Tx
-                    </span>
+                    <span className="text-eyebrow">Amount</span>
+                    <span className="text-eyebrow">From</span>
+                    <span className="text-right text-eyebrow">Date</span>
+                    <span className="text-right text-eyebrow">Tx</span>
                   </div>
                 )
               : activeTab !== "queue"
@@ -782,24 +866,12 @@ export default function TransactionsPage({
                       className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
                       style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
                     >
-                      <span className="text-eyebrow">
-                        #
-                      </span>
-                      <span className="text-eyebrow">
-                        Type
-                      </span>
-                      <span className="text-eyebrow">
-                        Details
-                      </span>
-                      <span className="text-right text-eyebrow">
-                        Approvals
-                      </span>
-                      <span className="text-right text-eyebrow">
-                        Status
-                      </span>
-                      <span className="text-right text-eyebrow">
-                        Action
-                      </span>
+                      <span className="text-eyebrow">#</span>
+                      <span className="text-eyebrow">Type</span>
+                      <span className="text-eyebrow">Details</span>
+                      <span className="text-right text-eyebrow">Approvals</span>
+                      <span className="text-right text-eyebrow">Status</span>
+                      <span className="text-right text-eyebrow">Action</span>
                     </div>
                   )
                 : null}
@@ -841,24 +913,12 @@ export default function TransactionsPage({
                       className="grid items-center gap-4 border-b border-border/50 px-5 py-2"
                       style={{ gridTemplateColumns: "3rem 7rem 1fr 9rem 6rem 7rem" }}
                     >
-                      <span className="text-eyebrow">
-                        #
-                      </span>
-                      <span className="text-eyebrow">
-                        Type
-                      </span>
-                      <span className="text-eyebrow">
-                        Details
-                      </span>
-                      <span className="text-right text-eyebrow">
-                        Approvals
-                      </span>
-                      <span className="text-right text-eyebrow">
-                        Status
-                      </span>
-                      <span className="text-right text-eyebrow">
-                        Action
-                      </span>
+                      <span className="text-eyebrow">#</span>
+                      <span className="text-eyebrow">Type</span>
+                      <span className="text-eyebrow">Details</span>
+                      <span className="text-right text-eyebrow">Approvals</span>
+                      <span className="text-right text-eyebrow">Status</span>
+                      <span className="text-right text-eyebrow">Action</span>
                     </div>
                     <div className="divide-y divide-border/40">
                       {items.map((p) => (
@@ -997,6 +1057,6 @@ export default function TransactionsPage({
           {cancelError}
         </p>
       )}
-    </div>
+    </WorkspacePage>
   );
 }
