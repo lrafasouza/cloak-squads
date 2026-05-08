@@ -303,3 +303,28 @@ model PayrollRecipient {
 
   @@index([payrollDraftId])
 }
+
+// Cross-tab / cross-session backup of the operator's per-proposal Cloak
+// deposit cache. The fast path stays in sessionStorage (per-tab); this row
+// is the recovery copy so closing the tab between Deposit and Finalize does
+// not cause a duplicate on-chain deposit on retry.
+//
+// `encryptedPayload` holds field-crypto v1.* of the JSON-serialised
+// SerializedCloakDepositCache (signature, leafIndex, spendKeyHex,
+// blindingHex, optional outputUtxos + withdrawn flags). The plaintext
+// includes the one-time spend key — must never be stored unencrypted.
+//
+// Unique on (multisig, transactionIndex) so a retry upserts onto the same
+// row instead of multiplying entries.
+model OperatorDepositCache {
+  id               String   @id @default(uuid())
+  cofreAddress     String
+  transactionIndex String
+  cluster          String?
+  encryptedPayload String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([cofreAddress, transactionIndex])
+  @@index([cofreAddress])
+}

@@ -46,6 +46,7 @@ import {
 } from "@/lib/operator-execution-history";
 import {
   type CloakDepositCache,
+  type SerializedCloakDepositCache,
   cloakDepositCacheKey,
   deserializeCacheEntry,
   serializeCacheEntry,
@@ -194,7 +195,9 @@ type DecodedLicense = {
   expires_at?: unknown;
 };
 
-function readCloakDepositCache(
+type CacheFetcher = (input: string | URL, init?: RequestInit) => Promise<Response>;
+
+function readCloakDepositCacheLocal(
   multisig: string,
   transactionIndex: string,
 ): CloakDepositCache | null {
@@ -207,7 +210,7 @@ function readCloakDepositCache(
   }
 }
 
-function writeCloakDepositCache(
+function writeCloakDepositCacheLocal(
   multisig: string,
   transactionIndex: string,
   value: CloakDepositCache,
@@ -222,10 +225,72 @@ function writeCloakDepositCache(
   }
 }
 
-// TODO(operator-cache): sessionStorage is per-tab — closing the tab between
-// deposit and Finalize loses the cache and a retry will re-deposit. Persist
-// {leafIndex, depositSig, withdrawn, withdrawSignature} server-side on the
-// proposal record (operator-only) for full robustness across sessions.
+/**
+ * Server-side mirror of the per-tab sessionStorage cache. Closing the tab
+ * between Deposit success and the Finalize step used to lose the cache
+ * entirely — a retry would re-deposit on chain, draining operator funds.
+ *
+ * fetchWithAuth carries the session cookie; the server requires the caller
+ * to be the registered vault operator before the row can be read or written.
+ * The plaintext payload contains the one-time spend key, so the row is
+ * encrypted at rest by the server with field-crypto.
+ */
+async function readCloakDepositCache(
+  multisig: string,
+  transactionIndex: string,
+  fetchWithAuth?: CacheFetcher,
+): Promise<CloakDepositCache | null> {
+  const local = readCloakDepositCacheLocal(multisig, transactionIndex);
+  if (local) return local;
+  if (!fetchWithAuth) return null;
+
+  try {
+    const url = `/api/operator-deposit-cache?multisig=${encodeURIComponent(multisig)}&transactionIndex=${encodeURIComponent(transactionIndex)}`;
+    const res = await fetchWithAuth(url);
+    if (!res.ok) return null;
+    const body = (await res.json().catch(() => null)) as {
+      payload?: SerializedCloakDepositCache | null;
+    } | null;
+    if (!body?.payload) return null;
+    const restored = deserializeCacheEntry(body.payload);
+    // Re-hydrate sessionStorage so subsequent reads in this tab skip the round-trip.
+    writeCloakDepositCacheLocal(multisig, transactionIndex, restored);
+    return restored;
+  } catch {
+    // Network glitch — operator can still proceed with a fresh deposit if needed.
+    return null;
+  }
+}
+
+function writeCloakDepositCache(
+  multisig: string,
+  transactionIndex: string,
+  value: CloakDepositCache,
+  fetchWithAuth?: CacheFetcher,
+) {
+  writeCloakDepositCacheLocal(multisig, transactionIndex, value);
+
+  if (!fetchWithAuth) return;
+
+  // Fire-and-forget mirror to the server. The user's flow proceeds while the
+  // POST resolves in the background. Failures are logged but do not block
+  // execution — the local cache still works for same-tab retry.
+  void fetchWithAuth("/api/operator-deposit-cache", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      multisig,
+      transactionIndex,
+      payload: serializeCacheEntry(value),
+    }),
+  })
+    .then((res) => {
+      if (!res.ok) console.warn("[operator-deposit-cache] mirror POST returned", res.status);
+    })
+    .catch((err) => {
+      console.warn("[operator-deposit-cache] mirror POST failed:", err);
+    });
+}
 
 async function cloakDepositBrowser(
   connection: Parameters<typeof transact>[1]["connection"],
@@ -880,7 +945,14 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       }
       try {
         updateStep("prepare", { status: "running" });
-        const cachedDeposit = readCloakDepositCache(multisigAddress.toBase58(), depositCacheKey);
+        // sessionStorage first; falls back to /api/operator-deposit-cache so
+        // the cache survives a closed tab. Without the server fallback a
+        // retry from a fresh tab re-deposits on chain.
+        const cachedDeposit = await readCloakDepositCache(
+          multisigAddress.toBase58(),
+          depositCacheKey,
+          fetchWithAuth,
+        );
         let cloakResult: Awaited<ReturnType<typeof cloakDepositBrowser>>;
 
         if (cachedDeposit) {
@@ -957,10 +1029,12 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
         // confirmed, not after later steps. Carries withdrawn: false so the
         // recipient branch below knows withdraw still needs to run on retry.
         if (!cachedDeposit) {
-          writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, {
-            ...cloakResult,
-            withdrawn: false,
-          });
+          writeCloakDepositCache(
+            multisigAddress.toBase58(),
+            depositCacheKey,
+            { ...cloakResult, withdrawn: false },
+            fetchWithAuth,
+          );
         }
 
         // F4 invoice mode: use explicit invoiceId param or fall back to legacy commitmentClaim lookup
@@ -1052,12 +1126,18 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               description: "Funds delivered to the recipient.",
             });
             // Mark the cache entry as withdrawn so a later license-step
-            // failure doesn't trigger a duplicate withdraw on retry.
-            writeCloakDepositCache(multisigAddress.toBase58(), depositCacheKey, {
-              ...cloakResult,
-              withdrawn: true,
-              withdrawSignature: withdrawResult.signature,
-            });
+            // failure doesn't trigger a duplicate withdraw on retry. Mirror to
+            // the server too so a retry from a different tab sees the same.
+            writeCloakDepositCache(
+              multisigAddress.toBase58(),
+              depositCacheKey,
+              {
+                ...cloakResult,
+                withdrawn: true,
+                withdrawSignature: withdrawResult.signature,
+              },
+              fetchWithAuth,
+            );
           }
         } else {
           updateStep("deliver", { status: "success", description: "Cloak deposit cached." });
