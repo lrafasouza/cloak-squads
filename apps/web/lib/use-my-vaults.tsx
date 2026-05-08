@@ -1,5 +1,6 @@
 "use client";
 
+import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
@@ -72,52 +73,60 @@ export function MyVaultsProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { publicKey } = useWallet();
+  // /api/vaults/mine now requires session-cookie auth (owner === auth pubkey).
+  // fetchWithAuth lazily triggers the session sign-in popup if no cookie exists.
+  const { fetchWithAuth } = useWalletAuth();
   const scanningRef = useRef(false);
   const prevPubKeyRef = useRef<string | null>(null);
 
-  const doScan = useCallback(async (owner: string) => {
-    if (scanningRef.current) return;
-    scanningRef.current = true;
-    setLoading(true);
-    setError(null);
-
-    try {
-      const mineRes = await fetch(`/api/vaults/mine?owner=${encodeURIComponent(owner)}`);
-      const mineData: { vaults?: string[]; error?: string } = await mineRes.json();
-
-      if (mineData.error) {
-        setError(mineData.error);
-        return;
-      }
-
-      const addresses: string[] = mineData.vaults ?? [];
-
-      if (addresses.length === 0) {
-        setVaults([]);
-        writeCache(owner, []);
-        return;
-      }
-
-      const dbRes = await fetch(`/api/vaults?addresses=${encodeURIComponent(addresses.join(","))}`);
-      const dbData: { vaults?: AegisVault[]; error?: string } = await dbRes.json();
-
-      const dbMap = new Map((dbData.vaults ?? []).map((v) => [v.cofreAddress, v]));
-
-      const merged: AegisVault[] = addresses.map(
-        (addr) => dbMap.get(addr) ?? makePlaceholder(addr),
-      );
-
-      setVaults(merged);
-      writeCache(owner, merged);
+  const doScan = useCallback(
+    async (owner: string) => {
+      if (scanningRef.current) return;
+      scanningRef.current = true;
+      setLoading(true);
       setError(null);
-    } catch {
-      setError("Could not reach the network");
-    } finally {
-      setLoading(false);
-      setLoaded(true);
-      scanningRef.current = false;
-    }
-  }, []);
+
+      try {
+        const mineRes = await fetchWithAuth(`/api/vaults/mine?owner=${encodeURIComponent(owner)}`);
+        const mineData: { vaults?: string[]; error?: string } = await mineRes.json();
+
+        if (mineData.error) {
+          setError(mineData.error);
+          return;
+        }
+
+        const addresses: string[] = mineData.vaults ?? [];
+
+        if (addresses.length === 0) {
+          setVaults([]);
+          writeCache(owner, []);
+          return;
+        }
+
+        const dbRes = await fetch(
+          `/api/vaults?addresses=${encodeURIComponent(addresses.join(","))}`,
+        );
+        const dbData: { vaults?: AegisVault[]; error?: string } = await dbRes.json();
+
+        const dbMap = new Map((dbData.vaults ?? []).map((v) => [v.cofreAddress, v]));
+
+        const merged: AegisVault[] = addresses.map(
+          (addr) => dbMap.get(addr) ?? makePlaceholder(addr),
+        );
+
+        setVaults(merged);
+        writeCache(owner, merged);
+        setError(null);
+      } catch {
+        setError("Could not reach the network");
+      } finally {
+        setLoading(false);
+        setLoaded(true);
+        scanningRef.current = false;
+      }
+    },
+    [fetchWithAuth],
+  );
 
   const search = useCallback(() => {
     if (!publicKey) return;
