@@ -1,5 +1,6 @@
 import { getCurrentCluster } from "@/lib/cluster";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
+import { UnsafeOutboundUrlError, assertSafeOutboundUrl } from "@/lib/safe-url";
 import { getMultisigMembers, requireVaultMember } from "@/lib/vault-membership";
 import { verifyWalletAuth } from "@/lib/wallet-auth";
 import { Prisma } from "@prisma/client";
@@ -52,15 +53,12 @@ export async function GET(_request: Request, context: { params: Promise<{ multis
   }
 }
 
-// SECURITY NOTE — webhookUrl + rpcOverride
-// These fields are stored but not yet consumed by any server-side fetch.
-// Before wiring up an outbound dispatcher, add an SSRF allowlist:
-//   - block private/loopback ranges (127.0.0.0/8, 10/8, 172.16/12, 192.168/16)
-//   - block AWS/GCP metadata IPs (169.254.169.254, fd00:ec2::254)
-//   - resolve DNS server-side and re-check the resolved IP
-//   - cap response size and timeout aggressively
-// The Zod .url() check alone does not prevent an attacker member from pointing
-// the webhook at internal services.
+// webhookUrl / rpcOverride are stored here and dereferenced at request time
+// elsewhere. Write-time SSRF gate (assertSafeOutboundUrl) rejects literal
+// private IPs, the cloud metadata addresses, "localhost", dot-less hostnames,
+// userinfo, and non-https schemes. The dispatcher that *fetches* these URLs
+// must add the runtime defences (re-resolve DNS, redirect-disable, response
+// cap, timeout) before SSRF is fully closed.
 const updateSchema = z.object({
   name: z.string().trim().min(1).max(32).optional(),
   description: z.string().trim().max(64).optional(),
@@ -99,6 +97,19 @@ export async function PATCH(request: Request, context: { params: Promise<{ multi
       { error: "Invalid input.", details: parsed.error.flatten() },
       { status: 400 },
     );
+  }
+
+  // SSRF gate — non-null URL fields must point at a public host. The runtime
+  // dispatcher still needs its own re-resolution + redirect block, but this
+  // already closes the obvious "stash 169.254.169.254 in the DB" path.
+  try {
+    if (parsed.data.webhookUrl) assertSafeOutboundUrl(parsed.data.webhookUrl);
+    if (parsed.data.rpcOverride) assertSafeOutboundUrl(parsed.data.rpcOverride);
+  } catch (err) {
+    if (err instanceof UnsafeOutboundUrlError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    throw err;
   }
 
   try {
