@@ -100,3 +100,23 @@ export function getServerEnv() {
 
 export type PublicEnv = typeof publicEnv;
 export type ServerEnv = ReturnType<typeof getServerEnv>;
+
+// Eager fail-loud at module load when running in a production server.
+// env.ts is imported by route modules + the instrumentation hook, so this
+// fires during Next.js startup before traffic reaches the first crypto
+// helper. The Render build/start log surfaces the ZodError with the
+// missing var name(s) instead of letting boot succeed and 500 the first
+// request that touches sessions / field crypto / audit signing.
+//
+// Skipped during `next build` (no runtime env present) and on the Edge
+// runtime (these envs aren't read there).
+if (
+  process.env.NODE_ENV === "production" &&
+  process.env.NEXT_PHASE !== "phase-production-build" &&
+  typeof process !== "undefined" &&
+  // The Edge runtime sets EdgeRuntime; Node leaves it undefined.
+  // biome-ignore lint/suspicious/noExplicitAny: runtime sentinel only on Edge
+  typeof (globalThis as any).EdgeRuntime === "undefined"
+) {
+  getServerEnv();
+}
