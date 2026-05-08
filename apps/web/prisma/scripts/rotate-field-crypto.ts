@@ -24,12 +24,19 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const dotenv = require("dotenv") as { config: (opts: { path: string }) => void };
-dotenv.config({ path: ".env.local" });
-dotenv.config({ path: ".env" });
 
-import { decryptField, encryptField } from "../../lib/field-crypto";
+// `.ts` extension on the relative import is required for the ESM resolver
+// when this script is executed via `pnpm tsx` (the documented runner).
+// Without it Node throws ERR_MODULE_NOT_FOUND before reaching any of the
+// rotation logic — the script has to actually run to migrate rows.
+import { decryptField, encryptField } from "../../lib/field-crypto.ts";
+
+// No dotenv loader: pass env vars explicitly when invoking the script.
+// Local dev:
+//   DATABASE_URL=... FIELD_CRYPTO_KEY=... FIELD_CRYPTO_KEY_PREVIOUS=... \
+//     pnpm tsx apps/web/prisma/scripts/rotate-field-crypto.ts --dry-run
+// Production (Render): envs are already injected via render.yaml +
+// the dashboard, so the script picks them up natively.
 
 const prisma = new PrismaClient();
 const V1_PREFIX = "v1.";
