@@ -18,11 +18,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  *                                same-origin analytics see the path.
  * - Permissions-Policy         — denies camera/mic/geolocation/payment APIs.
  * - Cross-Origin-Opener-Policy — `same-origin` isolates the wallet popup.
- *
- * Deliberately NOT set yet:
- * - Content-Security-Policy. Wallet adapters inject scripts and snarkjs uses
- *   wasm-eval; a strict CSP needs a measured rollout in Report-Only first.
- *   Tracked as an open finding in the review.
+ * - CSP-Report-Only            — see CSP_REPORT_ONLY below.
  */
 const SECURITY_HEADERS = [
   { key: "X-Frame-Options", value: "DENY" },
@@ -35,6 +31,53 @@ const SECURITY_HEADERS = [
   },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
 ];
+
+/**
+ * Content-Security-Policy in *Report-Only* mode.
+ *
+ * Two reasons we ship report-only first instead of an enforcing policy:
+ *   1. Wallet adapters (Phantom, Solflare, etc.) and Next.js dev/runtime both
+ *      inject inline `<script>` tags. A strict policy without `'unsafe-inline'`
+ *      breaks the page silently.
+ *   2. snarkjs / circom-runtime evaluate compiled WASM at runtime, which needs
+ *      `'wasm-unsafe-eval'` in script-src.
+ *
+ * Report-Only logs violations to the browser console without blocking, so we
+ * see what real users hit before flipping to enforce. After ~1 week of clean
+ * production logs, drop the `-Report-Only` suffix.
+ *
+ * Notes on each directive:
+ *   - default-src 'self' is the locked-down baseline; everything else opens
+ *     just what we actually need.
+ *   - script-src includes 'unsafe-inline' (wallet adapters / Next bootstrap)
+ *     and 'wasm-unsafe-eval' (snarkjs). 'unsafe-eval' is intentionally left
+ *     OFF — modern Next + React don't need it; if a violation surfaces, we
+ *     can add it but should investigate first.
+ *   - style-src 'unsafe-inline' is required by Tailwind / shadcn injecting
+ *     style tags.
+ *   - connect-src is the loudest one — every Solana RPC, the Cloak relay,
+ *     CoinGecko, the price feeds, our own API. We allow https:/wss: globally
+ *     because RPC URLs are user-configurable (NEXT_PUBLIC_RPC_URL).
+ *   - frame-ancestors 'none' duplicates X-Frame-Options for browsers that
+ *     respect CSP over the legacy header.
+ *   - form-action 'self' prevents form-based exfiltration to attacker hosts.
+ */
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "connect-src 'self' https: wss:",
+  "worker-src 'self' blob:",
+  "frame-src 'self'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+].join("; ");
+
+SECURITY_HEADERS.push({ key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY });
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
