@@ -1,20 +1,15 @@
 "use client";
 
+import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
 import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ReceiptRow } from "@/components/ui/receipt-row";
 import { useToast } from "@/components/ui/toast-provider";
 import { TokenLogo } from "@/components/ui/token-logo";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
-import {
-  InlineAlert,
-  Panel,
-  PanelBody,
-  PanelHeader,
-  WorkspaceHeader,
-  WorkspacePage,
-} from "@/components/ui/workspace";
+import { InlineAlert, WorkspacePage } from "@/components/ui/workspace";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { useVaultTokens } from "@/lib/hooks/useVaultTokens";
@@ -50,7 +45,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, BookOpen, CheckCircle2, Copy, Link2 } from "lucide-react";
+import { AlertTriangle, BookOpen, CheckCircle2, Copy, Link2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
@@ -484,29 +479,47 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
     const fullClaimUrl = `${typeof window !== "undefined" ? window.location.origin : ""}${result.claimUrl}`;
     return (
       <WorkspacePage>
-        <WorkspaceHeader
-          eyebrow="STEALTH INVOICE"
-          title="Invoice sealed"
-          description="Share the claim link before continuing. The recipient needs it after the proposal is executed."
-        />
+        <div className="space-y-6">
+          {/* ── Hero · Settled crest ── */}
+          <section className="card-hero relative">
+            <HeraldicWatermark size={300} opacity={0.04} />
+            <div className="relative flex flex-col gap-4 p-6 md:flex-row md:items-center md:gap-6 md:p-7">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-accent/40 bg-accent-soft text-accent shadow-raise-1">
+                <CheckCircle2 className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-eyebrow text-accent">Stealth invoice · sealed</p>
+                <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink md:text-3xl">
+                  Invoice sealed
+                </h1>
+                <p className="mt-1.5 text-sm text-ink-muted">
+                  Share the claim link before continuing. The recipient needs it after the proposal
+                  is executed.
+                </p>
+              </div>
+              <span className="self-start rounded-full border border-brass/30 bg-accent-soft px-2.5 py-1 text-[10px] font-semibold uppercase tracking-eyebrow text-accent md:self-auto">
+                Proposal #{result.transactionIndex}
+              </span>
+            </div>
+          </section>
 
-        <div>
-          <Panel>
-            <PanelHeader
-              icon={CheckCircle2}
-              title={`Claim link ready · Proposal #${result.transactionIndex}`}
-            />
-            <PanelBody className="space-y-4">
+          {/* ── Claim link card · QR + URL + actions ── */}
+          <div className="card-panel overflow-hidden">
+            <header className="border-b border-border/60 px-5 py-3.5">
+              <p className="text-eyebrow">Claim link · ready to share</p>
+            </header>
+            <div className="space-y-4 p-5">
               {claimQrDataUrl ? (
                 <div className="flex justify-center">
                   <img
                     src={claimQrDataUrl}
                     alt="Claim link QR code"
-                    className="h-[180px] w-[180px] rounded-md border border-border bg-white p-2"
+                    className="h-[180px] w-[180px] rounded-list border border-border bg-white p-2 shadow-raise-1"
                   />
                 </div>
               ) : null}
-              <div className="rounded-md border border-accent/20 bg-accent-soft px-3 py-2">
+              <div className="rounded-list border border-brass/25 bg-accent-soft px-3 py-2.5">
+                <p className="text-eyebrow mb-1 text-accent">Claim URL</p>
                 <p className="break-all font-mono text-xs leading-relaxed text-accent">
                   {fullClaimUrl}
                 </p>
@@ -526,31 +539,107 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                   Go to proposal #{result.transactionIndex}
                 </Button>
               </div>
-            </PanelBody>
-          </Panel>
+            </div>
+          </div>
         </div>
       </WorkspacePage>
     );
   }
 
+  const previewAmount = amount ? `${amount} ${tokenLabel}` : "—";
+  const previewRecipient =
+    invoiceMode === "bearer"
+      ? "Bearer · anyone with link"
+      : recipientWallet
+        ? recipientWallet.length > 12
+          ? `${recipientWallet.slice(0, 6)}…${recipientWallet.slice(-4)}`
+          : recipientWallet
+        : "—";
+  const previewExpiry =
+    invoiceMode === "bearer"
+      ? bearerExpiryHours >= 24
+        ? `${bearerExpiryHours / 24} day${bearerExpiryHours / 24 !== 1 ? "s" : ""}`
+        : `${bearerExpiryHours} hour${bearerExpiryHours !== 1 ? "s" : ""}`
+      : "7 days";
+  const previewSourceVault =
+    allVaultAccounts.find((a) => a.vaultIndex === selectedVaultIndex)?.name ?? "Primary";
+
   return (
     <WorkspacePage>
-      <div className="space-y-8">
-        <WorkspaceHeader
-          eyebrow="STEALTH INVOICE"
-          title={`Create ${tokenLabel} claim link`}
-          description="Generate a private invoice and open a Squads proposal for signer approval."
-        />
+      <div className="space-y-6">
+        {/* ── Hero · Identity-locked invoice crest ── */}
+        <section className="card-hero relative">
+          <HeraldicWatermark size={300} opacity={0.04} />
+          <div className="relative flex flex-col gap-4 p-6 md:flex-row md:items-center md:gap-6 md:p-7">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-accent/40 bg-accent-soft text-accent shadow-raise-1">
+              <BookOpen className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-eyebrow">Stealth invoice · {tokenLabel} claim link</p>
+              <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink md:text-3xl">
+                Issue a private claim
+              </h1>
+              <p className="mt-1.5 text-sm text-ink-muted">
+                Generate a sealed claim link and open a Squads proposal for signer approval.
+              </p>
+            </div>
+          </div>
+        </section>
 
-        <div>
-          <Panel>
-            <PanelHeader
-              icon={BookOpen}
-              title="New invoice"
-              description="Set recipient, amount, and reference"
-            />
-            <PanelBody>
-              <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="grid gap-4 lg:grid-cols-5">
+          {/* ── Form column ── */}
+          <div className="space-y-4 lg:col-span-3">
+            {/* Mode cards */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setInvoiceMode("bound")}
+                disabled={pending}
+                className={`flex flex-col items-start gap-1 rounded-list border px-3.5 py-3 text-left text-sm transition-aegis disabled:cursor-not-allowed ${
+                  invoiceMode === "bound"
+                    ? "border-brass/40 bg-accent-soft text-ink shadow-raise-1"
+                    : "border-border bg-surface text-ink-muted hover:bg-surface-2"
+                }`}
+              >
+                <span className="font-semibold">Bound to wallet</span>
+                <span className="text-[11px] leading-snug text-ink-subtle">
+                  Recipient locked at create time. 7-day expiry.
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setInvoiceMode("bearer")}
+                disabled={pending}
+                className={`flex flex-col items-start gap-1 rounded-list border px-3.5 py-3 text-left text-sm transition-aegis disabled:cursor-not-allowed ${
+                  invoiceMode === "bearer"
+                    ? "border-accent bg-accent-soft text-ink shadow-raise-1"
+                    : "border-border bg-surface text-ink-muted hover:bg-surface-2"
+                }`}
+              >
+                <span className="font-semibold">Bearer link</span>
+                <span className="text-[11px] leading-snug text-ink-subtle">
+                  Anyone with the link picks the destination at claim time.
+                </span>
+              </button>
+            </div>
+
+            {invoiceMode === "bearer" && (
+              <div className="flex gap-2 rounded-list border border-signal-warn/30 bg-signal-warn/5 px-3 py-2.5 text-[11px] leading-relaxed text-ink-muted">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-signal-warn" />
+                <span>
+                  <span className="font-medium text-ink">Bearer cash.</span> Anyone with the link
+                  can claim. Treat the URL as a private secret. Share over a confidential channel
+                  and use a short expiry.
+                </span>
+              </div>
+            )}
+
+            {/* Form panel */}
+            <div className="card-panel overflow-hidden">
+              <header className="border-b border-border/60 px-5 py-3.5">
+                <p className="text-eyebrow">Invoice details</p>
+              </header>
+              <div className="space-y-5 p-5">
                 {/* Vault source selector */}
                 {subVaultAccounts.length > 0 && (
                   <div>
@@ -572,51 +661,6 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                         </button>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                <div>
-                  <Label>Link mode</Label>
-                  <div className="mt-1.5 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setInvoiceMode("bound")}
-                      className={`rounded-list border px-3 py-2.5 text-left text-sm transition-aegis ${
-                        invoiceMode === "bound"
-                          ? "border-accent bg-accent-soft text-ink"
-                          : "border-border bg-surface text-ink-muted hover:bg-surface-2"
-                      }`}
-                    >
-                      <div className="font-medium">Bound to wallet</div>
-                      <div className="mt-0.5 text-[11px] text-ink-subtle">
-                        Recipient locked at create time. 7-day expiry.
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setInvoiceMode("bearer")}
-                      className={`rounded-list border px-3 py-2.5 text-left text-sm transition-aegis ${
-                        invoiceMode === "bearer"
-                          ? "border-accent bg-accent-soft text-ink"
-                          : "border-border bg-surface text-ink-muted hover:bg-surface-2"
-                      }`}
-                    >
-                      <div className="font-medium">Bearer link</div>
-                      <div className="mt-0.5 text-[11px] text-ink-subtle">
-                        Anyone with the link picks the destination at claim time.
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {invoiceMode === "bearer" && (
-                  <div className="flex gap-2 rounded-lg border border-signal-warn/30 bg-signal-warn/5 px-3 py-2.5 text-[11px] leading-relaxed text-ink-muted">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-signal-warn" />
-                    <span>
-                      <span className="font-medium text-ink">Bearer cash.</span> Anyone with the
-                      link can claim. Treat the URL as a private secret. Share over a confidential
-                      channel and use a short expiry.
-                    </span>
                   </div>
                 )}
 
@@ -721,18 +765,70 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                   </div>
                 )}
 
-                <label className="flex items-start gap-2 text-sm text-ink-muted">
-                  <input
-                    type="checkbox"
-                    checked={confirmChecked}
-                    onChange={(e) => setConfirmChecked(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-border accent-accent"
-                  />
+                {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Receipt sidebar · sticky ──
+              Live "what you'll seal" preview, mirroring send page pattern. */}
+          <aside className="space-y-4 lg:col-span-2 lg:sticky lg:top-6 lg:self-start">
+            <div className="card-panel relative overflow-hidden p-5">
+              <HeraldicWatermark size={140} opacity={0.05} />
+              <div className="relative">
+                <p className="text-eyebrow">Receipt · what you'll seal</p>
+                <div className="mt-3 space-y-1">
+                  <ReceiptRow label="Amount">{previewAmount}</ReceiptRow>
+                  <ReceiptRow label="To" mono={false}>
+                    <span className={invoiceMode === "bearer" ? "" : "font-mono"}>
+                      {previewRecipient}
+                    </span>
+                  </ReceiptRow>
+                  <ReceiptRow label="Mode" mono={false}>
+                    {invoiceMode === "bound" ? "Bound to wallet" : "Bearer link"}
+                  </ReceiptRow>
+                  <ReceiptRow label="Expires" mono={false}>
+                    {previewExpiry}
+                  </ReceiptRow>
+                  {invoiceRef && (
+                    <ReceiptRow label="Reference" mono={false}>
+                      {invoiceRef}
+                    </ReceiptRow>
+                  )}
+                  {memo && (
+                    <ReceiptRow label="Memo" mono={false}>
+                      {memo}
+                    </ReceiptRow>
+                  )}
+                  <ReceiptRow label="From" mono={false}>
+                    {previewSourceVault}
+                  </ReceiptRow>
+                  <ReceiptRow label="Privacy" mono={false} tone="accent">
+                    <span className="inline-flex items-center gap-1">
+                      <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+                      Shielded via Cloak
+                    </span>
+                  </ReceiptRow>
+                </div>
+              </div>
+            </div>
+
+            <div className="card-panel p-5">
+              <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink-muted">
+                <input
+                  type="checkbox"
+                  checked={confirmChecked}
+                  onChange={(e) => setConfirmChecked(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-accent"
+                />
+                <span className="flex-1">
                   {invoiceMode === "bound"
                     ? "I confirm the recipient and amount are correct before creating this invoice."
                     : "I understand anyone with this link can claim. I'll share it over a private channel."}
-                </label>
+                </span>
+              </label>
 
+              <div className="mt-4 space-y-2">
                 {!pending && (
                   <Button
                     type="submit"
@@ -748,18 +844,16 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
                     Create invoice + proposal
                   </Button>
                 )}
+              </div>
 
-                {!wallet.publicKey ? (
-                  <p className="text-xs text-signal-warn">
-                    Connect a multisig member wallet first.
-                  </p>
-                ) : null}
-
-                {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
-              </form>
-            </PanelBody>
-          </Panel>
-        </div>
+              {!wallet.publicKey ? (
+                <p className="mt-3 text-xs text-signal-warn">
+                  Connect a multisig member wallet first.
+                </p>
+              ) : null}
+            </div>
+          </aside>
+        </form>
 
         <ConfirmModal
           open={showConfirm}
