@@ -372,10 +372,19 @@ pnpm install
 # 2. Configure environment
 cp .env.example apps/web/.env.local
 # Edit apps/web/.env.local — the defaults work for devnet
-# Required: DATABASE_URL, JWT_SIGNING_SECRET, NEXT_PUBLIC_RPC_URL
+# Required: DATABASE_URL, JWT_SIGNING_SECRET, NEXT_PUBLIC_RPC_URL,
+#   NEXT_PUBLIC_CLOAK_PROGRAM_ID, NEXT_PUBLIC_CLOAK_RELAY_URL,
+#   NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID, NEXT_PUBLIC_SQUADS_PROGRAM_ID
+#   (pda.ts now fails loud if these env vars are set but malformed —
+#   see commit 4ddd7be — so don't leave them empty in production)
 # Optional but recommended: AUDIT_EXPORT_SIGN_KEY (base64 of 32 bytes;
-# falls back to a JWT-derived seed when missing), REDIS_URL + REDIS_TOKEN
-# for distributed rate limiting
+# falls back to a JWT-derived seed when missing), SESSION_HMAC_KEY and
+# FIELD_CRYPTO_KEY for per-purpose key isolation (each falls back to
+# JWT_SIGNING_SECRET — set explicitly in production so one leak does not
+# compromise sessions, encrypted PII, and audit signatures together),
+# REDIS_URL + REDIS_TOKEN for distributed rate limiting, FALLBACK_RPC_URL
+# for Helius failover, NEXT_PUBLIC_RPC_WS_URL when the WS endpoint differs
+# from the HTTP URL
 
 # 3. Start database
 docker compose up -d postgres
@@ -481,7 +490,25 @@ This is the cleanest possible design given the program-owned vault constraint, w
 - [x] Scoped audit links (Ed25519-signed, time-limited, revocable)
 - [x] Audit access log: every view and export captured with IP + timestamp, surfaced in the admin
 - [x] Server-signed audit exports: CSV and JSON downloads carry an Ed25519 signature header for offline verification
-- [x] Token swap proposals (SOL ↔ USDC via Raydium / Orca)
+- [x] Token swap proposals (SOL ↔ USDC via Jupiter / Raydium)
+- [x] Time locks via Squads native — Settings UI + execute gate
+- [x] Sub-vaults first-class — `vault_index` parametrized in gatekeeper runtime, SDK, schema, and navigation
+- [x] Treasury KPI strip + DB-backed income indexer (excludes intra-treasury moves)
+- [x] Heraldic theme system (light + dark) applied across every page
+- [x] Operator console redesign — master/detail, history sheet, queue collapse
+- [x] WalletMenu with identity, balance, network, vault role, theme toggle
+- [x] Address book with modal CRUD
+- [x] Deposit-address UX disambiguated via Deposit button + receive modal
+- [x] Auto-reload on `ChunkLoadError` after deploys
+- [x] DB rows scoped per Solana cluster (mainnet vs devnet isolation)
+- [x] Default-deny v1 wallet auth (`ALLOW_LEGACY_AUTH=false` by default)
+- [x] Audit export signature hardened — domain separator, length-prefixed fields, SHA-256 of payload (signatures generated before commit `8b4dc7d` no longer verify and must be re-signed)
+- [x] Helius RPC wired (HTTP + WS, batched proposal reads, public devnet fallback removed)
+- [x] Per-purpose key isolation — `JWT_SIGNING_SECRET` split into `SESSION_HMAC_KEY`, `FIELD_CRYPTO_KEY`, `AUDIT_EXPORT_SIGN_KEY`. Each subsystem can rotate independently; existing deploys keep working via fallback to `JWT_SIGNING_SECRET` until the operator explicitly sets the new vars (commit `e8e0349`)
+- [x] Server-side fallback for the operator's Cloak deposit cache — `OperatorDepositCache` table backed by `field-crypto`, so closing the operator tab between deposit and finalize no longer drains operator funds on retry (commit `5856867`, requires `prisma migrate deploy`)
+- [x] Content-Security-Policy in Report-Only mode (commit `1b6be33`) — wallet adapters, snarkjs `wasm-unsafe-eval`, and `connect-src https: wss:` allowed; `unsafe-eval` intentionally off
+- [x] SSRF write-time gate on `webhookUrl` and `rpcOverride` in vault settings (commit `b1f67f1`)
+- [x] Legal pages `/terms` and `/privacy`
 - [x] Vault import from existing Squads multisigs
 - [x] Member management (add/remove, change threshold)
 - [x] Address book, webhook settings, per-vault RPC override
@@ -494,19 +521,28 @@ This is the cleanest possible design given the program-owned vault constraint, w
 - [x] Operator on-curve guard (rejects vault PDA destinations before deposit, except in invoice mode)
 
 ### Next — Tier 2 (paridade Squads + privacy depth)
-- [ ] **Time locks** — UI in Settings + `createSetTimeLockProposal`; Squads v4 supports it natively, no on-chain change needed
 - [ ] **Custom roles** — DB-overlay permission model (admin / proposer / executor / viewer)
-- [ ] **Sub-vault gatekeeper parametrization** — `vault_index` parameter on the gatekeeper handlers; unlocks private ops in sub-vaults and recurring auto-cron (Anchor change + redeploy)
-- [ ] **Privacy bridge for spending limits** — limit-use deposits into Cloak instead of public transfer (depends on the gatekeeper change above)
-- [ ] **Recurring auto-cron** — background runner to fire schedules without a manual click (depends on gatekeeper change)
+- [ ] **Privacy bridge for spending limits** — limit-use deposits into Cloak instead of public transfer; the gatekeeper-side dependency (`vault_index` parametrization) is already shipped, the surface that consumes it isn't
+- [ ] **Recurring auto-cron** — background runner to fire schedules without a manual click; same status as privacy bridge — gatekeeper-side unblocked, runner pending
 - [ ] **Multi-operator failover** — backup operator + heartbeat so an offline primary doesn't freeze the queue
 - [ ] **Proof-of-payment exports** — Groth16 witness export so an auditor can cryptographically verify a single payment
 
+### Removed from scope
+The features below were specified or partially built but pulled before reaching a public surface. Documented here so contributors don't redo dead work:
+
+- **Privacy meter UI** (anonymity-set badge) — removed in `dd0556b`. Backend calculation kept for internal use.
+- **Spending limits UI** — removed in `98ff19c`. `lib/spending-limits.ts` stays dormant pending the privacy-bridge follow-up.
+- **Proposal simulator** — removed in `069b79a`.
+- **Three-step ZK proof state UI** — removed in `954b8d5`; replaced with a plain spinner.
+
 ### Mainnet readiness
-- [ ] Dedicated RPC (Helius / QuickNode) + managed PostgreSQL with backups
-- [ ] Mainnet Cloak API parity validation
-- [ ] Gatekeeper program security audit (Neodyme / OtterSec class)
-- [ ] 2-of-N hardening — co-signer verification of `commitmentClaim` payloads
+- [x] Dedicated devnet RPC wired (Helius HTTP + WS, batched reads, no public fallback)
+- [x] Managed PostgreSQL (Render) with cluster-scoped rows
+- [ ] Mainnet RPC endpoint + monitoring (RPC failures, relay timeouts, proof latency)
+- [ ] Mainnet Cloak API parity validation (`transact()` + `fullWithdraw()` against the mainnet program)
+- [ ] Dual-connection — `mainnetConnection` for vault/proposal reads, `devnetConnection` for Cloak until mainnet validated
+- [ ] Gatekeeper program security audit (Neodyme / OtterSec class) — covering license replay, TTL edge cases, `vault_index` parametrization invariants
+- [ ] 2-of-N hardening — regression tests with 2-of-3 (proposal by A, approval by B, execution by operator)
 - [ ] `AUDIT_EXPORT_SIGN_KEY` rotation story + per-vault signing keys
 
 ### Later — Ecosystem
@@ -524,4 +560,4 @@ This is the cleanest possible design given the program-owned vault constraint, w
 
 **Devnet, feature-complete on Tier 1.** Private send, payroll, stealth invoices (bound + bearer), recurring payments (public + private), scoped audit links with signed exports and access log are all functional end-to-end on [aegisz.xyz](https://aegisz.xyz). Authentication uses session cookies with one wallet signature per 30 minutes; sensitive UTXO fields are encrypted at rest in PostgreSQL; rate limits are backed by Upstash Redis.
 
-Tier 2 work (time locks, custom roles, sub-vault gatekeeper parametrization, multi-operator failover) is specced in [`docs/specs/2026-05-06-feature-roadmap-improvements.md`](docs/specs/2026-05-06-feature-roadmap-improvements.md). Mainnet deployment is gated on the gatekeeper security audit and Cloak mainnet API parity, both tracked in the roadmap below.
+Time locks (Squads native) and the sub-vault `vault_index` gatekeeper parametrization landed after that initial Tier 1 ship (commits `e8f4ed3`, `2319fd7`, `b8308cf`, `fc2081f`). Remaining Tier 2 work — custom roles, privacy bridge for spending limits, recurring auto-cron, multi-operator failover, proof-of-payment exports — is tracked in [`ROADMAP.md`](ROADMAP.md). Mainnet deployment is gated on the gatekeeper security audit and Cloak mainnet API parity.
