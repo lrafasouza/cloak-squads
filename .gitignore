@@ -20,6 +20,7 @@ scripts/.demo-cofre-2ofn.json
 .demo-data.json
 claude-session.jsonl
 .superstack/
+.playwright-mcp/
 .codex
 .claude/
 handoff/

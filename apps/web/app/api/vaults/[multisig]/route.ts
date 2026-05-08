@@ -52,6 +52,15 @@ export async function GET(_request: Request, context: { params: Promise<{ multis
   }
 }
 
+// SECURITY NOTE — webhookUrl + rpcOverride
+// These fields are stored but not yet consumed by any server-side fetch.
+// Before wiring up an outbound dispatcher, add an SSRF allowlist:
+//   - block private/loopback ranges (127.0.0.0/8, 10/8, 172.16/12, 192.168/16)
+//   - block AWS/GCP metadata IPs (169.254.169.254, fd00:ec2::254)
+//   - resolve DNS server-side and re-check the resolved IP
+//   - cap response size and timeout aggressively
+// The Zod .url() check alone does not prevent an attacker member from pointing
+// the webhook at internal services.
 const updateSchema = z.object({
   name: z.string().trim().min(1).max(32).optional(),
   description: z.string().trim().max(64).optional(),
