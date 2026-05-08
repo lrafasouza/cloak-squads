@@ -1069,7 +1069,16 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
           await new Promise<void>((resolve) => {
             setTimeout(resolve, 2000);
           });
-          return executeSingle(draft, doCloakDeposit, depositCacheKey, invoiceId, _attempt + 1);
+          // Forward suppressProgress so a payroll batch retry doesn't pop a
+          // second progress modal mid-batch.
+          return executeSingle(
+            draft,
+            doCloakDeposit,
+            depositCacheKey,
+            invoiceId,
+            _attempt + 1,
+            suppressProgress,
+          );
         }
         // Translate cryptic SDK PDA errors into actionable messages.
         const humanMsg = msg.includes("Merkle tree account not found")
