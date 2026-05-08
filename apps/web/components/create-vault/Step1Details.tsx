@@ -24,105 +24,119 @@ export function Step1Details({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Card */}
-      <div className="rounded-xl border border-border bg-surface p-8 shadow-raise-1">
-        <h2 className="mb-6 text-sm font-semibold text-ink-muted uppercase tracking-wider">
-          Vault identity
-        </h2>
+      <section className="card-hero relative">
+        {/* Brass top rail */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
 
-        {/* Avatar + Name row */}
-        <div className="flex items-center gap-5">
-          <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border border-border-strong bg-surface-2">
-            <VaultIdenticon seed={name} size={64} className="h-16 w-16" />
-          </div>
+        <div className="px-7 py-8 md:px-9 md:py-10">
+          <p className="text-eyebrow">Vault identity</p>
 
-          {/* Name input */}
-          <div className="flex-1">
-            <label htmlFor="vault-name" className="mb-2 block text-sm font-medium text-ink">
-              Vault name <span className="text-signal-danger">*</span>
-            </label>
-            <input
-              ref={nameRef}
-              id="vault-name"
-              type="text"
-              autoComplete="off"
-              spellCheck={false}
-              maxLength={32}
-              value={name}
-              onChange={(e) => onName(e.target.value)}
-              placeholder="My Treasury"
-              className={cn(
-                "w-full rounded-lg border bg-surface-2 px-4 py-3 text-base text-ink placeholder:text-ink-subtle",
-                "focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-border-strong",
-                "transition-colors",
-                name.length === 32
-                  ? "border-signal-warn/60"
-                  : "border-border hover:border-border-strong",
-              )}
-            />
-            <div className="mt-1.5 flex justify-between">
-              <span className="text-sm text-ink-subtle">
-                Your identicon is generated from the name
-              </span>
-              <span
-                className={cn(
-                  "text-sm tabular-nums",
-                  name.length > 28 ? "text-signal-warn" : "text-ink-subtle",
-                )}
+          {/* Identicon + name */}
+          <div className="mt-6 flex items-start gap-6">
+            <div className="relative shrink-0">
+              <div className="overflow-hidden rounded-panel border border-border-strong bg-surface-2 shadow-raise-1">
+                <VaultIdenticon seed={name} size={88} className="h-[88px] w-[88px]" />
+              </div>
+              {/* Brass corner mark */}
+              <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface-2 font-display text-[10px] font-semibold text-accent">
+                Æ
+              </div>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <label
+                htmlFor="vault-name"
+                className="mb-1.5 block text-sm font-medium text-ink"
               >
-                {name.length}/32
-              </span>
+                Vault name <span className="text-signal-danger">*</span>
+              </label>
+              <input
+                ref={nameRef}
+                id="vault-name"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                maxLength={32}
+                value={name}
+                onChange={(e) => onName(e.target.value)}
+                placeholder="Treasury"
+                className={cn(
+                  "w-full rounded-md border bg-surface-2 px-3.5 py-2.5 font-display text-lg text-ink placeholder:text-ink-subtle/70",
+                  "focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-border-strong",
+                  "transition-aegis",
+                  name.length === 32
+                    ? "border-signal-warn/60"
+                    : "border-border hover:border-border-strong",
+                )}
+              />
+              <div className="mt-2 flex items-baseline justify-between gap-3">
+                <span className="text-[11px] italic text-ink-subtle/80">
+                  The crest is forged from the name
+                </span>
+                <span
+                  className={cn(
+                    "font-mono text-[11px] tabular-nums",
+                    name.length > 28 ? "text-signal-warn" : "text-ink-subtle",
+                  )}
+                >
+                  {name.length}/32
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Description */}
-        <div className="mt-6">
-          <label htmlFor="vault-desc" className="mb-2 block text-sm font-medium text-ink">
-            Description <span className="text-ink-subtle font-normal">(optional)</span>
-          </label>
-          <input
-            id="vault-desc"
-            type="text"
-            autoComplete="off"
-            maxLength={64}
-            value={description}
-            onChange={(e) => onDescription(e.target.value)}
-            placeholder="e.g. Protocol team treasury"
-            className={cn(
-              "w-full rounded-lg border border-border bg-surface-2 px-4 py-3 text-base text-ink placeholder:text-ink-subtle",
-              "focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-border-strong",
-              "hover:border-border-strong transition-colors",
-            )}
-          />
-          <div className="mt-1.5 flex justify-end">
-            <span
+          {/* Brass divider */}
+          <div className="mt-7 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
+          {/* Description */}
+          <div className="mt-6">
+            <div className="mb-1.5 flex items-baseline justify-between gap-3">
+              <label htmlFor="vault-desc" className="text-sm font-medium text-ink">
+                Description <span className="text-ink-subtle font-normal">(optional)</span>
+              </label>
+              <span
+                className={cn(
+                  "font-mono text-[11px] tabular-nums",
+                  description.length > 56 ? "text-signal-warn" : "text-ink-subtle",
+                )}
+              >
+                {description.length}/64
+              </span>
+            </div>
+            <input
+              id="vault-desc"
+              type="text"
+              autoComplete="off"
+              maxLength={64}
+              value={description}
+              onChange={(e) => onDescription(e.target.value)}
+              placeholder="e.g. Protocol team treasury"
               className={cn(
-                "text-sm tabular-nums",
-                description.length > 56 ? "text-signal-warn" : "text-ink-subtle",
+                "w-full rounded-md border border-border bg-surface-2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-subtle/70",
+                "focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-border-strong",
+                "hover:border-border-strong transition-aegis",
               )}
-            >
-              {description.length}/64
-            </span>
+            />
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Footer actions */}
+      {/* Footer */}
       <div className="flex justify-end">
         <button
           type="button"
           disabled={!isValid}
           onClick={onNext}
           className={cn(
-            "inline-flex min-h-11 items-center gap-2 rounded-lg px-8 py-3 text-base font-semibold transition-all",
+            "inline-flex min-h-11 items-center gap-2 rounded-md px-7 py-2.5 text-sm font-semibold transition-aegis",
             "shadow-raise-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
             isValid
               ? "bg-accent text-accent-ink hover:bg-accent-hover cursor-pointer"
               : "bg-surface-2 text-ink-subtle cursor-not-allowed",
           )}
         >
-          Continue →
+          Continue
+          <span aria-hidden="true">→</span>
         </button>
       </div>
     </div>

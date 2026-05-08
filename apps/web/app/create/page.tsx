@@ -6,20 +6,19 @@ import { Step3Review } from "@/components/create-vault/Step3Review";
 import { WizardLayout } from "@/components/create-vault/WizardLayout";
 import { useWizardStore } from "@/lib/use-wizard-store";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useEffect } from "react";
 
 const STEP_META = [
   {
-    title: "Name your vault",
-    subtitle: "Give your shared treasury an identity. You can update this later.",
+    title: "Name your treasury",
+    subtitle: "A crest is forged from the name. You can update this later.",
   },
   {
-    title: "Add members",
-    subtitle: "Add co-signers and set how many approvals are required to execute transactions.",
+    title: "Form your council",
+    subtitle: "Add co-signers and set how many approvals are required to execute.",
   },
   {
-    title: "Review & deploy",
-    subtitle: "Confirm the setup before signing and deploying on-chain.",
+    title: "Review & forge",
+    subtitle: "Confirm the configuration before signing and deploying on-chain.",
   },
 ];
 const FALLBACK_STEP_META = {
@@ -50,34 +49,31 @@ export default function CreateVaultPage() {
     back,
   } = useWizardStore(myPubkey);
 
-  useEffect(() => {
-    if (myPubkey && !state.operator) {
-      setOperator(myPubkey);
-    }
-  }, [myPubkey, state.operator, setOperator]);
-
   const meta = STEP_META[state.step] ?? FALLBACK_STEP_META;
 
   return (
     <WizardLayout step={state.step} title={meta.title} subtitle={meta.subtitle}>
       {hasDraftToResume && draft ? (
-        <div className="mb-5 rounded-xl border border-accent/30 bg-accent-soft/40 p-4">
-          <p className="text-sm font-semibold text-ink">Resume previous draft?</p>
-          <p className="mt-1 text-xs text-ink-muted">
-            {draft.name || "Untitled vault"} has saved setup progress on this browser.
+        <div className="mb-5 rounded-md border border-accent/25 bg-accent-soft/40 px-4 py-3.5">
+          <p className="text-eyebrow">Unfinished forge</p>
+          <p className="mt-1 text-sm font-semibold text-ink">
+            Resume “{draft.name || "Untitled vault"}”?
+          </p>
+          <p className="mt-0.5 text-xs text-ink-muted">
+            Saved setup progress was found on this browser.
           </p>
           <div className="mt-3 flex gap-2">
             <button
               type="button"
               onClick={resumeDraft}
-              className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
+              className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink transition-aegis hover:bg-accent-hover"
             >
               Resume
             </button>
             <button
               type="button"
               onClick={discardDraft}
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-ink-muted transition-colors hover:border-border-strong hover:text-ink"
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-ink-muted transition-aegis hover:border-border-strong hover:text-ink"
             >
               Start fresh
             </button>

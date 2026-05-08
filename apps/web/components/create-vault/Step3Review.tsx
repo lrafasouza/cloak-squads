@@ -21,9 +21,10 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import * as multisigSdk from "@sqds/multisig";
 import {
-  CheckCircle2,
+  Check,
   ChevronDown,
   ChevronUp,
+  Copy,
   ExternalLink,
   Key,
   Loader2,
@@ -121,6 +122,7 @@ export function Step3Review({
   const [deployFee, setDeployFee] = useState<DeployFeeBreakdownValue | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [prefetchedTreasury, setPrefetchedTreasury] = useState<PublicKey | null>(null);
+  const [copied, setCopied] = useState(false);
   const submittingRef = useRef(false);
 
   const myPubkey = wallet.publicKey?.toBase58() ?? "";
@@ -168,6 +170,15 @@ export function Step3Review({
   const updateLocalStep = useCallback((id: string, update: Partial<CreationStep>) => {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...update } : s)));
   }, []);
+
+  const handleCopyAddress = useCallback(async () => {
+    if (!createdPda) return;
+    try {
+      await navigator.clipboard.writeText(createdPda);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {}
+  }, [createdPda]);
 
   const handleCreate = useCallback(async () => {
     if (submittingRef.current || !wallet.publicKey || !wallet.sendTransaction) return;
@@ -465,184 +476,269 @@ export function Step3Review({
 
   const isPending = status === "pending";
 
+  // ─────────────────────── Success state ───────────────────────
   if (status === "success" && createdPda) {
     return (
       <div className="flex flex-col gap-5">
-        <div className="rounded-xl border border-signal-positive/30 bg-signal-positive/8 p-6 text-center">
-          <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-signal-positive" />
-          <h2 className="text-lg font-semibold text-ink">Vault created!</h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            {bootstrapIndex && threshold > 1
-              ? `Privacy activation (proposal #${bootstrapIndex}) needs member approvals before you can send privately.`
-              : "Your vault is ready. Private transactions are active."}
-          </p>
-          <div className="mt-4 rounded-lg border border-border bg-surface-2 px-4 py-2.5">
-            <p className="text-[10px] font-medium uppercase tracking-wider text-ink-subtle">
-              Vault address
+        <section className="card-hero relative">
+          {/* Brass top rail */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
+
+          <div className="px-7 py-9 text-center md:px-10 md:py-12">
+            {/* Identicon with brass halo */}
+            <div className="relative mx-auto inline-block">
+              <div className="absolute inset-0 -m-3 rounded-panel border border-accent/25" />
+              <div className="absolute inset-0 -m-6 rounded-panel border border-accent/10" />
+              <div className="relative overflow-hidden rounded-panel border border-border-strong bg-surface-2 shadow-raise-1">
+                <VaultIdenticon seed={name} size={88} className="h-[88px] w-[88px]" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border border-accent/40 bg-bg shadow-raise-1">
+                <Check className="h-3.5 w-3.5 text-accent" />
+              </div>
+            </div>
+
+            <p className="mt-7 text-eyebrow">The vault is forged</p>
+            <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-ink md:text-3xl">
+              Welcome to {name}
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-ink-muted">
+              {bootstrapIndex && threshold > 1
+                ? `Privacy activation (proposal #${bootstrapIndex}) needs member approvals before private sends become available.`
+                : "Your treasury is ready. Private transactions are active."}
             </p>
-            <p className="mt-1 break-all font-mono text-xs text-ink">{createdPda}</p>
+
+            {/* Brass divider */}
+            <div className="mx-auto mt-7 h-px w-3/4 bg-gradient-to-r from-transparent via-border to-transparent" />
+
+            {/* Vault address */}
+            <div className="mt-6">
+              <p className="text-eyebrow">Vault address</p>
+              <button
+                type="button"
+                onClick={handleCopyAddress}
+                className="group mt-2 inline-flex items-center gap-2 rounded-md border border-border bg-surface-2 px-3.5 py-2 transition-aegis hover:border-border-strong"
+              >
+                <span className="break-all font-mono text-xs text-ink">{createdPda}</span>
+                {copied ? (
+                  <Check className="h-3.5 w-3.5 shrink-0 text-signal-positive" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5 shrink-0 text-ink-subtle group-hover:text-ink" />
+                )}
+              </button>
+            </div>
           </div>
-        </div>
+        </section>
+
         <Link
           href={`/vault/${createdPda}`}
-          className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-accent-ink shadow-raise-1 transition-colors hover:bg-accent-hover"
+          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-accent px-6 py-3 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:bg-accent-hover"
         >
-          Open Vault →
+          Enter your vault
+          <span aria-hidden="true">→</span>
         </Link>
       </div>
     );
   }
 
+  // ─────────────────────── Pending state ───────────────────────
   if (isPending) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="rounded-xl border border-border bg-surface p-6 shadow-raise-1 md:p-8">
-          <h2 className="mb-5 text-sm font-semibold text-ink">Creating vault…</h2>
-          <div className="flex flex-col gap-3">
-            {steps.map((s) => (
-              <div key={s.id} className="flex items-center gap-3">
-                <div
-                  className={cn(
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10px]",
-                    s.status === "success"
-                      ? "border-signal-positive bg-signal-positive/15 text-signal-positive"
-                      : s.status === "running"
-                        ? "border-accent text-accent"
-                        : s.status === "error"
-                          ? "border-signal-danger text-signal-danger"
-                          : "border-border text-ink-subtle",
-                  )}
-                >
-                  {s.status === "running" ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : s.status === "success" ? (
-                    "✓"
-                  ) : s.status === "error" ? (
-                    "✗"
-                  ) : (
-                    "·"
+        <section className="card-panel relative">
+          <div className="px-6 py-7 md:px-8 md:py-8">
+            <p className="text-eyebrow">Forging</p>
+            <h2 className="mt-1 font-display text-lg font-semibold tracking-tight text-ink">
+              Creating your vault…
+            </h2>
+
+            <div className="mt-5 flex flex-col gap-3.5">
+              {steps.map((s) => (
+                <div key={s.id} className="flex items-center gap-3">
+                  <div
+                    className={cn(
+                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[11px] transition-aegis",
+                      s.status === "success"
+                        ? "border-signal-positive bg-signal-positive/15 text-signal-positive"
+                        : s.status === "running"
+                          ? "border-accent text-accent"
+                          : s.status === "error"
+                            ? "border-signal-danger text-signal-danger"
+                            : "border-border text-ink-subtle",
+                    )}
+                  >
+                    {s.status === "running" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : s.status === "success" ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : s.status === "error" ? (
+                      "✗"
+                    ) : (
+                      <span className="opacity-50">·</span>
+                    )}
+                  </div>
+                  <span
+                    className={cn(
+                      "flex-1 text-sm transition-aegis",
+                      s.status === "running"
+                        ? "text-ink"
+                        : s.status === "success"
+                          ? "text-ink-muted"
+                          : "text-ink-subtle",
+                    )}
+                  >
+                    {s.label}
+                  </span>
+                  {s.signature && (
+                    <a
+                      href={`https://solscan.io/tx/${s.signature}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-ink-subtle transition-aegis hover:text-accent"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
                   )}
                 </div>
-                <span
-                  className={cn(
-                    "flex-1 text-sm",
-                    s.status === "running" ? "text-ink" : "text-ink-muted",
-                  )}
-                >
-                  {s.label}
-                </span>
-                {s.signature && (
-                  <a
-                    href={`https://solscan.io/tx/${s.signature}?cluster=devnet`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-ink-subtle hover:text-accent"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        </section>
       </div>
     );
   }
 
+  // ─────────────────────── Review (idle / error) ───────────────────────
   return (
     <div className="flex flex-col gap-4">
-      {/* Vault identity header */}
-      <div className="rounded-xl border border-border bg-surface p-6 shadow-raise-1 md:p-8">
-        <div className="flex items-center gap-3">
-          <VaultIdenticon seed={name} size={44} className="rounded-lg" />
-          <div>
-            <h2 className="text-base font-semibold text-ink">{name}</h2>
-            {description && <p className="mt-0.5 text-xs text-ink-muted">{description}</p>}
-          </div>
-        </div>
+      {/* Hero card — vault identity + stat trio + fee breakdown */}
+      <section className="card-hero relative">
+        {/* Brass top rail */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
 
-        {/* Stat row */}
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          {[
-            { label: "Members", value: String(allMembers.length), icon: Users },
-            { label: "Threshold", value: `${threshold}/${allMembers.length}`, icon: Shield },
-            {
-              label: "Deploy fee",
-              value: `~${totalFeeSOL} SOL`,
-              icon: Key,
-            },
-          ].map(({ label, value, icon: Icon }) => (
-            <div
-              key={label}
-              className="rounded-lg border border-border bg-surface-2 p-3 text-center"
-            >
-              <Icon className="mx-auto mb-1.5 h-4 w-4 text-ink-subtle" />
-              <p className="text-sm font-semibold tabular-nums text-ink">{value}</p>
-              <p className="text-[10px] text-ink-subtle">{label}</p>
+        <div className="px-6 py-7 md:px-8 md:py-8">
+          <p className="text-eyebrow">Ready to forge</p>
+
+          {/* Identity */}
+          <div className="mt-4 flex items-center gap-4">
+            <div className="overflow-hidden rounded-md border border-border-strong bg-surface-2 shadow-raise-1">
+              <VaultIdenticon seed={name} size={56} className="h-14 w-14" />
             </div>
-          ))}
+            <div className="min-w-0">
+              <h2 className="truncate font-display text-xl font-semibold tracking-tight text-ink">
+                {name}
+              </h2>
+              {description && (
+                <p className="mt-0.5 truncate text-xs text-ink-muted">{description}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Stat trio with brass dividers */}
+          <div className="mt-6 grid grid-cols-3 overflow-hidden rounded-md border border-border bg-surface-2/60">
+            {[
+              { label: "Members", value: String(allMembers.length), icon: Users },
+              { label: "Threshold", value: `${threshold}/${allMembers.length}`, icon: Shield },
+              { label: "Deploy fee", value: `~${totalFeeSOL} SOL`, icon: Key },
+            ].map(({ label, value, icon: Icon }, i) => (
+              <div
+                key={label}
+                className={cn(
+                  "px-3 py-3.5 text-center",
+                  i > 0 && "border-l border-border/60",
+                )}
+              >
+                <Icon className="mx-auto mb-1.5 h-3.5 w-3.5 text-accent/70" />
+                <p className="font-mono text-sm font-semibold tabular-nums text-ink">
+                  {value}
+                </p>
+                <p className="mt-0.5 text-[10px] uppercase tracking-eyebrow text-ink-subtle">
+                  {label}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <DeployFeeBreakdown fee={deployFee} />
         </div>
+      </section>
 
-        <DeployFeeBreakdown fee={deployFee} />
-      </div>
-
-      {/* What will be created */}
-      <div className="rounded-xl border border-border bg-surface overflow-hidden">
+      {/* What will be created — collapsible */}
+      <section className="card-panel relative overflow-hidden">
         <button
           type="button"
           onClick={() => setDetailsOpen((v) => !v)}
-          className="flex w-full items-center justify-between px-5 py-3.5 text-sm font-medium text-ink-muted hover:text-ink transition-colors"
+          className="flex w-full items-center justify-between px-6 py-4 text-left transition-aegis hover:bg-surface-2/40"
         >
-          <span>What will be created</span>
-          {detailsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          <span>
+            <p className="text-eyebrow">Manifest</p>
+            <span className="mt-0.5 block text-sm font-medium text-ink">
+              What will be created
+            </span>
+          </span>
+          {detailsOpen ? (
+            <ChevronUp className="h-4 w-4 text-ink-subtle" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-ink-subtle" />
+          )}
         </button>
         {detailsOpen && (
-          <div className="border-t border-border px-5 py-4">
+          <div className="border-t border-border/60 px-6 py-4">
             <ul className="flex flex-col gap-2 text-xs text-ink-muted">
               {[
-                `Squads multisig - ${allMembers.length} members, ${threshold}-of-${allMembers.length} threshold`,
+                `Squads multisig — ${allMembers.length} members, ${threshold}-of-${allMembers.length} threshold`,
                 "Squads vault PDA (index 0)",
                 "Privacy layer account",
                 `Activation proposal${threshold > 1 ? ` (needs ${threshold} approvals)` : " (auto-approved)"}`,
               ].map((item) => (
-                <li key={item} className="flex items-start gap-2">
-                  <span className="mt-0.5 text-accent">·</span>
-                  {item}
+                <li key={item} className="flex items-start gap-2.5">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-accent/60" />
+                  <span>{item}</span>
                 </li>
               ))}
             </ul>
           </div>
         )}
-      </div>
+      </section>
 
       {/* Members preview */}
-      <div className="rounded-xl border border-border bg-surface p-6 md:p-8">
-        <p className="mb-3 text-xs font-medium text-ink-subtle uppercase tracking-wider">
-          Members ({allMembers.length})
-        </p>
-        <div className="flex flex-col gap-1.5">
-          {allMembers.map((addr) => (
-            <div key={addr} className="flex items-center gap-2">
-              <span
-                className={cn(
-                  "font-mono text-xs text-ink-muted",
-                  addr === myPubkey && "text-accent",
-                )}
+      <section className="card-panel relative">
+        <div className="px-6 py-6">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <p className="text-eyebrow">Council</p>
+            <span className="font-mono text-[11px] tabular-nums text-ink-subtle">
+              {allMembers.length}
+            </span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {allMembers.map((addr) => (
+              <div
+                key={addr}
+                className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 transition-aegis hover:bg-surface-2/40"
               >
-                {shortAddr(addr)}
-              </span>
-              {addr === myPubkey && (
-                <span className="rounded-full border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
-                  you
+                <span
+                  className={cn(
+                    "font-mono text-xs",
+                    addr === myPubkey ? "text-accent" : "text-ink-muted",
+                  )}
+                >
+                  {shortAddr(addr)}
                 </span>
-              )}
-            </div>
-          ))}
+                {addr === myPubkey && (
+                  <span className="rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-accent">
+                    you
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex items-baseline gap-2 border-t border-border/60 pt-3">
+            <span className="text-[11px] uppercase tracking-eyebrow text-ink-subtle">
+              Operator
+            </span>
+            <span className="font-mono text-xs text-ink-muted">{shortAddr(operator)}</span>
+          </div>
         </div>
-        <p className="mt-3 text-xs text-ink-subtle">
-          Operator: <span className="font-mono text-ink-muted">{shortAddr(operator)}</span>
-        </p>
-      </div>
+      </section>
 
       {hasInsufficientBalance && (
         <WarningCallout variant="warning">
@@ -663,16 +759,17 @@ export function Step3Review({
           type="button"
           onClick={onBack}
           disabled={isPending}
-          className="inline-flex min-h-10 items-center rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-ink-muted transition-colors hover:border-border-strong hover:text-ink disabled:opacity-40"
+          className="inline-flex min-h-10 items-center rounded-md border border-border px-5 py-2.5 text-sm font-medium text-ink-muted transition-aegis hover:border-border-strong hover:text-ink disabled:opacity-40"
         >
-          ← Back
+          <span aria-hidden="true">←</span>
+          <span className="ml-1.5">Back</span>
         </button>
         <button
           type="button"
           onClick={handleCreate}
           disabled={isPending || !wallet.connected || hasInsufficientBalance}
           className={cn(
-            "inline-flex min-h-10 items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold transition-all",
+            "inline-flex min-h-10 items-center gap-2 rounded-md px-7 py-2.5 text-sm font-semibold transition-aegis",
             "shadow-raise-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
             !isPending && wallet.connected && !hasInsufficientBalance
               ? "bg-accent text-accent-ink hover:bg-accent-hover"
@@ -680,7 +777,7 @@ export function Step3Review({
           )}
         >
           {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-          {isPending ? "Creating…" : "Confirm & Deploy"}
+          {isPending ? "Forging…" : "Confirm & forge"}
         </button>
       </div>
     </div>

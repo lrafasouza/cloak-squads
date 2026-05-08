@@ -39,7 +39,7 @@ function createInitialState(initialOperator = ""): WizardState {
     step: 0,
     name: "",
     description: "",
-    members: [""],
+    members: [],
     threshold: 1,
     operator: initialOperator,
     createKeySecret: Array.from(Keypair.generate().secretKey),
@@ -135,12 +135,6 @@ export function useWizardStore(initialOperator = "") {
       setDraft(stored);
     }
   }, []);
-
-  useEffect(() => {
-    if (initialOperator && !state.operator) {
-      dispatch({ type: "SET_OPERATOR", value: initialOperator });
-    }
-  }, [initialOperator, state.operator]);
 
   useEffect(() => {
     if (!state.name && !state.members.some(Boolean) && !state.operator) return;
