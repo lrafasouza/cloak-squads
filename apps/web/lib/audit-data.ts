@@ -18,8 +18,11 @@ import type { FilteredAuditTransaction } from "@cloak-squads/core/audit";
  * Filtering rules:
  *   - Cluster is enforced at every query so devnet rows can never leak into
  *     a mainnet export.
- *   - Time-range scope is applied AFTER aggregation since each source has a
- *     different timestamp column.
+ *   - Time-range scope pushes the filter into SQL (using each table's
+ *     timestamp column — `createdAt` for drafts, `blockTime` for income).
+ *     Filtering after `findMany take: N` would silently truncate audits of
+ *     historical windows because the latest 200 rows could all be outside
+ *     the requested range.
  *   - "amounts_only" scope redacts the nullifier client-facing string but
  *     keeps amounts intact (matches the existing scope semantic).
  */
@@ -31,34 +34,51 @@ export async function loadAuditTransactions(args: {
 }): Promise<FilteredAuditTransaction[]> {
   const limit = args.limit ?? 200;
   const cluster = getCurrentCluster();
-  const where = { cofreAddress: args.cofreAddress, cluster };
+  const baseWhere = { cofreAddress: args.cofreAddress, cluster };
 
   const redact = args.scope === "amounts_only";
 
+  // Push the date window into SQL so each `findMany` returns rows actually
+  // inside the audit scope, not "the latest 200 then maybe filter to zero".
+  // PayrollDraft, ProposalDraft, SwapDraft, StealthInvoice all key off
+  // `createdAt`. VaultIncome uses `blockTime` (chain timestamp). When the
+  // window is open-ended on either side, omit that bound.
+  const startDate = args.scopeParams?.startDate;
+  const endDate = args.scopeParams?.endDate;
+  const wantsRange =
+    args.scope === "time_ranged" && startDate !== undefined && endDate !== undefined;
+
+  const createdAtFilter = wantsRange
+    ? { createdAt: { gte: new Date(startDate), lte: new Date(endDate) } }
+    : {};
+  const blockTimeFilter = wantsRange
+    ? { blockTime: { gte: new Date(startDate), lte: new Date(endDate) } }
+    : {};
+
   const [proposals, payrolls, swaps, invoices, incomes] = await Promise.all([
     prisma.proposalDraft.findMany({
-      where,
+      where: { ...baseWhere, ...createdAtFilter },
       orderBy: { createdAt: "desc" },
       take: limit,
     }),
     prisma.payrollDraft.findMany({
-      where,
+      where: { ...baseWhere, ...createdAtFilter },
       orderBy: { createdAt: "desc" },
       take: limit,
       include: { recipients: true },
     }),
     prisma.swapDraft.findMany({
-      where,
+      where: { ...baseWhere, ...createdAtFilter },
       orderBy: { createdAt: "desc" },
       take: limit,
     }),
     prisma.stealthInvoice.findMany({
-      where,
+      where: { ...baseWhere, ...createdAtFilter },
       orderBy: { createdAt: "desc" },
       take: limit,
     }),
     prisma.vaultIncome.findMany({
-      where,
+      where: { ...baseWhere, ...blockTimeFilter },
       orderBy: { blockTime: "desc" },
       take: limit,
     }),
@@ -158,15 +178,6 @@ export async function loadAuditTransactions(args: {
       timestamp: income.blockTime.getTime(),
       vaultIndex: income.vaultIndex,
     });
-  }
-
-  // Time-range filter — applied uniformly across all sources.
-  const startDate = args.scopeParams?.startDate;
-  const endDate = args.scopeParams?.endDate;
-  if (args.scope === "time_ranged" && startDate !== undefined && endDate !== undefined) {
-    return out
-      .filter((tx) => tx.timestamp >= startDate && tx.timestamp <= endDate)
-      .sort((a, b) => b.timestamp - a.timestamp);
   }
 
   return out.sort((a, b) => b.timestamp - a.timestamp);

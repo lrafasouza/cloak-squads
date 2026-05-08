@@ -3,7 +3,27 @@
     "security_score": "B+",
     "quality_score": "B+",
     "ready_for_mainnet": false,
-    "lastReviewedAt": "2026-05-07",
+    "ready_for_devnet": true,
+    "lastReviewedAt": "2026-05-08",
+    "audit_feature_review_2026_05_08": {
+      "scope": "Audit feature post-Sprint A (commits 176aaad + 461a1b9). Reviewed 49 files spanning frontend viewer/admin, 7 API routes, 3 libs, core crypto, on-chain revoke handler, schema, seed, tests, docs.",
+      "scores": {
+        "security": "B",
+        "correctness": "B+",
+        "error_handling": "B",
+        "testing": "B-",
+        "code_organization": "A-",
+        "documentation": "A"
+      },
+      "verdict": "Solid for devnet. Mainnet gated on Sprint B (replay-proof create signature, kid rotation, viewer signature verification, rate limits on public endpoints).",
+      "high_severity_remaining": [
+        "Replay on /api/audit-links POST: signed message lacks scopeParams + nonce + signature TTL",
+        "/api/audit/[linkId]/transactions and /export public endpoints have no rate limit",
+        "validateAuditFragment ignores linkId — any 32-byte string passes",
+        "Revoke flow deletes DB row before on-chain proposal lands; crash leaves on-chain link valid",
+        "audit-sign Ed25519 seed still falls back to JWT_SIGNING_SECRET (planned Sprint 2.1)"
+      ]
+    },
     "verification": {
       "typecheck": "pass",
       "next_build": "pass",

@@ -173,11 +173,18 @@ export default function PublicAuditPage({ params }: { params: Promise<{ linkId: 
     // verification (proving each row is in a Merkle commitment); today the
     // fragment is just an access gate, but keeping the derivation here keeps
     // the call-site stable for when the cryptographic side lands.
+    //
+    // For an open-ended endDate, anchor to the link's `expiresAt` rather than
+    // `Date.now()`. Using the wall-clock would make the derived view key
+    // change on every reload, so the same audit URL would produce different
+    // keys at 10:00 vs 10:01 — auditors complaining "yesterday's view looked
+    // different" is a real-world bug we want to avoid.
+    const fallbackEnd = new Date(metadata.expiresAt).getTime();
     const viewKey = deriveViewKeyFromSecret(secretKey, {
       linkId: metadata.id,
       scope: metadata.scope,
       startDate: BigInt((scopeParams.startDate as number | undefined) ?? 0),
-      endDate: BigInt((scopeParams.endDate as number | undefined) ?? Date.now()),
+      endDate: BigInt((scopeParams.endDate as number | undefined) ?? fallbackEnd),
     });
     void viewKey;
 
