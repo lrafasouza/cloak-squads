@@ -177,3 +177,37 @@ export async function checkRateLimitAsync(
   }
   return checkRateLimitRedis(bucket, limit, Math.ceil(window / 1000));
 }
+
+/**
+ * Apply two independent rate-limits — one per-IP, one per-wallet — and return
+ * true only when both pass.
+ *
+ * Why two buckets? A single composite `(ip, pubkey, scope)` bucket means an
+ * attacker rotating wallets behind one IP gets `N × budget`, defeating the
+ * IP cap. A pure per-IP bucket alone penalises legitimate users behind NAT.
+ * Splitting the concerns gives DoS protection (per-IP, tight) while still
+ * allowing a single wallet's legitimate retry burst (per-wallet, looser).
+ *
+ * The IP bucket is checked first so a saturated IP rejects without consuming
+ * the wallet's budget. Both buckets share a 60s fixed window.
+ */
+export async function enforceIpAndWalletLimits(args: {
+  ip: string;
+  pubkey: string;
+  scope: string;
+  ipLimit: number;
+  walletLimit: number;
+}): Promise<boolean> {
+  const ipOk = await checkRateLimitAsync(
+    rateLimitBucket(args.ip, `${args.scope}-ip`),
+    args.ipLimit,
+    60_000,
+  );
+  if (!ipOk) return false;
+
+  return await checkRateLimitAsync(
+    rateLimitBucket(args.pubkey, `${args.scope}-wallet`),
+    args.walletLimit,
+    60_000,
+  );
+}

@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import nacl from "tweetnacl";
 import bs58 from "bs58";
-import { verifyWalletAuthHeaders } from "../../apps/web/lib/wallet-auth";
+import { consumeWalletNonce, verifyWalletAuthHeaders } from "../../apps/web/lib/wallet-auth";
 
 function makeKeypair() {
   return nacl.sign.keyPair();
@@ -257,7 +257,10 @@ describe("v1 legacy signature", () => {
     if (!result.ok) expect(result.status).toBe(401);
   });
 
-  test("default (no env var) allows v1", () => {
+  test("default (no env var) rejects v1 — must opt in explicitly", () => {
+    // ALLOW_LEGACY_AUTH defaults to false because v1 is not endpoint-bound
+    // and a captured signature replays on any route within the timestamp
+    // window. Operators that still need v1 must set the env var to "true".
     const kp = makeKeypair();
     const pubkey = bs58.encode(kp.publicKey);
     const ts = String(nowSecs());
@@ -272,7 +275,8 @@ describe("v1 legacy signature", () => {
       "x-solana-timestamp": ts,
       "x-solana-nonce": nonce,
     }));
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(401);
   });
 });
 
@@ -308,5 +312,40 @@ describe("malformed requests", () => {
       "x-solana-nonce": "some-nonce",
     }));
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("nonce replay defence", () => {
+  // The rate-limit store is per-process; isolate buckets per test by using a
+  // fresh nonce + pubkey combination so prior tests can't interfere.
+  function rand() {
+    return crypto.randomUUID();
+  }
+
+  test("first presentation of a nonce is accepted", async () => {
+    const pubkey = `pk-${rand()}`;
+    const nonce = rand();
+    expect(await consumeWalletNonce(pubkey, nonce)).toBe(true);
+  });
+
+  test("re-presenting the same (pubkey, nonce) pair is rejected", async () => {
+    const pubkey = `pk-${rand()}`;
+    const nonce = rand();
+    expect(await consumeWalletNonce(pubkey, nonce)).toBe(true);
+    expect(await consumeWalletNonce(pubkey, nonce)).toBe(false);
+    // Third attempt also rejected — store stays consumed for the TTL.
+    expect(await consumeWalletNonce(pubkey, nonce)).toBe(false);
+  });
+
+  test("the same nonce is accepted from a different pubkey (per-wallet namespace)", async () => {
+    const nonce = rand();
+    expect(await consumeWalletNonce(`pk-${rand()}`, nonce)).toBe(true);
+    expect(await consumeWalletNonce(`pk-${rand()}`, nonce)).toBe(true);
+  });
+
+  test("different nonces from the same pubkey are independent", async () => {
+    const pubkey = `pk-${rand()}`;
+    expect(await consumeWalletNonce(pubkey, rand())).toBe(true);
+    expect(await consumeWalletNonce(pubkey, rand())).toBe(true);
   });
 });

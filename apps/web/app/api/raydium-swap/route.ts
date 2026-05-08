@@ -1,4 +1,4 @@
-import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
+import { enforceIpAndWalletLimits } from "@/lib/rate-limit";
 import { requireWalletAuth } from "@/lib/wallet-auth";
 import {
   setNativeMintWrappingStrategy,
@@ -117,7 +117,15 @@ export async function POST(request: NextRequest) {
   const hdrs = await headers();
   const rawIp = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
   const ip = (rawIp.split(",")[0] ?? rawIp).trim();
-  if (!(await checkRateLimitAsync(rateLimitBucket(ip, "swap-build", auth.publicKey), "write"))) {
+  if (
+    !(await enforceIpAndWalletLimits({
+      ip,
+      pubkey: auth.publicKey,
+      scope: "swap-build",
+      ipLimit: 10,
+      walletLimit: 30,
+    }))
+  ) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 

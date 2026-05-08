@@ -14,11 +14,14 @@
  *             x-solana-nonce, x-solana-method, x-solana-path, x-solana-body-hash
  *    Used by clients that haven't (yet) upgraded to session cookies.
  *
- * 3. v1 legacy signature:
+ * 3. v1 legacy signature (DISABLED by default):
  *    Message: aegis:{pubkey}:{ts}:{nonce}
- *    Accepted only when ALLOW_LEGACY_AUTH=true.
+ *    NOT endpoint-bound — a captured signature replays on any route within
+ *    the 5min timestamp window. Only accepted when ALLOW_LEGACY_AUTH=true,
+ *    which should remain set only while migrating an old client.
  */
 import { SESSION_COOKIE_NAME, verifySessionToken } from "./auth-session";
+import { checkRateLimitAsync, rateLimitBucket } from "./rate-limit";
 import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { cookies, headers } from "next/headers";
@@ -26,14 +29,19 @@ import { NextResponse } from "next/server";
 import nacl from "tweetnacl";
 
 const AUTH_WINDOW_SECS = 5 * 60; // 5 minutes
+// Outlive the timestamp window by a small margin so a nonce we just accepted
+// at second 299 cannot be re-presented at second 301 from a different request.
+const NONCE_RESERVATION_TTL_MS = (AUTH_WINDOW_SECS + 30) * 1000;
 
 export type WalletAuthResult =
   | { ok: true; publicKey: string }
   | { ok: false; error: string; status: number };
 
 function allowLegacyAuth(): boolean {
-  // Read directly from process.env to avoid circular import with env.ts
-  return (process.env.ALLOW_LEGACY_AUTH ?? "true") !== "false";
+  // Read directly from process.env to avoid circular import with env.ts.
+  // Default OFF — v1 is not endpoint-bound and is replay-able within the
+  // 5-min timestamp window. Operators must opt in explicitly.
+  return process.env.ALLOW_LEGACY_AUTH === "true";
 }
 
 /**
@@ -126,11 +134,34 @@ export function verifyWalletAuthHeaders(hdrs: {
 }
 
 /**
+ * Reserve a wallet auth nonce so a captured signature cannot be replayed
+ * within the timestamp window. Backed by the rate-limit store (Redis in
+ * prod, in-memory dev fallback) — `count=1` over the reservation TTL means
+ * the second presentation of the same (pubkey, nonce) tuple fails the gate.
+ *
+ * Returns true when the nonce was unused (first time seen), false when it
+ * was already consumed by an earlier request. Exported so the v2 nonce
+ * consumption test can exercise it without a Next request context.
+ *
+ * NOTE: in-memory fallback is per-process — multi-instance deploys must
+ * have REDIS_URL set or replays are still possible across replicas.
+ */
+export async function consumeWalletNonce(pubkey: string, nonce: string): Promise<boolean> {
+  const key = rateLimitBucket(pubkey, `wallet-nonce:${nonce}`);
+  return await checkRateLimitAsync(key, 1, NONCE_RESERVATION_TTL_MS);
+}
+
+/**
  * Verify wallet authentication from incoming request headers.
  * Call this at the top of any API route handler.
  *
- * Checks the session cookie first (set by /api/auth/login). Falls back to
- * per-request v1/v2 signature headers if no valid session cookie is present.
+ * Order of preference:
+ * 1. Session cookie (set by /api/auth/login). The cookie is HMAC-signed
+ *    server-side — no replay risk.
+ * 2. Per-request v1/v2 signature headers. Signature verification proves
+ *    the pubkey owns the message, but a *captured* signature is valid for
+ *    the timestamp window. After signature passes we therefore reserve the
+ *    nonce so the same signature cannot be presented twice.
  */
 export async function verifyWalletAuth(): Promise<WalletAuthResult> {
   try {
@@ -144,7 +175,21 @@ export async function verifyWalletAuth(): Promise<WalletAuthResult> {
     // fall through to header-based auth
   }
   const hdrs = await headers();
-  return verifyWalletAuthHeaders(hdrs);
+  const result = verifyWalletAuthHeaders(hdrs);
+  if (!result.ok) return result;
+
+  // Replay defence — reserve the nonce so the same (pubkey, nonce) tuple
+  // cannot be re-presented within the timestamp window. v2 always carries
+  // a nonce (verifyWalletAuthHeaders enforces it). v1 *may* carry one and
+  // we still consume it when present.
+  const nonce = hdrs.get("x-solana-nonce");
+  if (nonce && nonce.length > 0) {
+    const firstUse = await consumeWalletNonce(result.publicKey, nonce);
+    if (!firstUse) {
+      return { ok: false, error: "Wallet auth nonce already used.", status: 401 };
+    }
+  }
+  return result;
 }
 
 /**

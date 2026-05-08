@@ -20,9 +20,11 @@ const serverEnvSchema = z.object({
   FALLBACK_RPC_URL: z.string().url().optional(),
   REDIS_URL: z.string().url().optional(),
   REDIS_TOKEN: z.string().optional(),
-  // S6: accept v1 (legacy) wallet signatures during rollout transition.
-  // Set to "false" after 7 days in production to enforce v2-only.
-  ALLOW_LEGACY_AUTH: z.enum(["true", "false"]).default("true"),
+  // v1 wallet signatures are NOT endpoint-bound (no method/path/bodyHash).
+  // A captured v1 signature replays for the timestamp window on any route,
+  // which neuters the v2 hardening. Default OFF; set to "true" only as a
+  // temporary escape hatch while a stale client is still in the wild.
+  ALLOW_LEGACY_AUTH: z.enum(["true", "false"]).default("false"),
 });
 
 export const publicEnv = publicEnvSchema.parse({
