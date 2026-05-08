@@ -1,5 +1,6 @@
 "use client";
 
+import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/skeleton";
@@ -10,7 +11,6 @@ import { useMyVaults } from "@/lib/use-my-vaults";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { motion } from "framer-motion";
-import { Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -42,49 +42,76 @@ export default function VaultPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col bg-bg text-ink">
-      {/* Background */}
+      {/* Background — radial fade + faint grid + page-level watermark */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-radial-fade" />
         <div className="absolute inset-0 bg-grid-faint bg-grid-md opacity-[0.18]" />
+        <HeraldicWatermark
+          size={520}
+          opacity={0.025}
+          className="-right-24 -top-24 bottom-auto"
+        />
       </div>
 
-      {/* Minimal header — logo + wallet only */}
-      <header className="relative z-10 flex items-center justify-between px-4 py-5 md:px-6">
-        <Logo size="sm" />
-        <WalletMenu />
+      {/* Header — logo + wallet, with brass rule below */}
+      <header className="relative z-10 border-b border-border/60">
+        <div className="flex items-center justify-between px-4 py-4 md:px-6">
+          <Logo size="sm" />
+          <WalletMenu />
+        </div>
+        {/* Brass rule */}
+        <div className="h-px bg-gradient-to-r from-transparent via-accent/15 to-transparent" />
       </header>
 
-      <main className="relative z-10 flex flex-1 flex-col mx-auto w-full max-w-6xl px-4 pt-6 pb-20 md:px-6 md:pt-10 md:pb-28">
+      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-20 pt-8 md:px-6 md:pb-28 md:pt-14">
         {/* ── Wallet not connected ── */}
         {!connected && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="flex flex-1 flex-col items-center justify-center text-center"
+            className="flex flex-1 flex-col items-center justify-center"
           >
-            <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-2xl border border-border bg-surface shadow-raise-1">
-              <Wallet className="h-9 w-9 text-accent" strokeWidth={1.5} />
-            </div>
-            <h1 className="font-display text-display font-bold text-ink">
-              Connect your <span className="text-accent">wallet</span>
-            </h1>
-            <p className="mt-3 max-w-md text-lg leading-relaxed text-ink-muted">
-              Link your Solana wallet to discover vaults you have access to.
-            </p>
-            <div className="mt-8">
-              <ClientWalletButton />
-            </div>
+            <section className="card-hero relative mx-auto w-full max-w-md">
+              {/* Brass top rail */}
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
+
+              <div className="px-7 py-10 text-center md:px-10 md:py-12">
+                {/* Æ crest */}
+                <div className="relative mx-auto inline-block">
+                  <div className="absolute inset-0 -m-3 rounded-panel border border-accent/20" />
+                  <div className="absolute inset-0 -m-6 rounded-panel border border-accent/10" />
+                  <div className="relative flex h-16 w-16 items-center justify-center rounded-panel border border-border-strong bg-surface-2 shadow-raise-1">
+                    <span className="font-display text-3xl font-semibold text-accent leading-none">
+                      Æ
+                    </span>
+                  </div>
+                </div>
+
+                <p className="mt-7 text-eyebrow">Aegis · Privacy multisig</p>
+                <h1 className="mt-2 font-display text-2xl font-semibold tracking-tight text-ink md:text-3xl">
+                  Connect your wallet
+                </h1>
+                <p className="mx-auto mt-2 max-w-sm text-sm text-ink-muted">
+                  Link your Solana wallet to discover the vaults you can govern.
+                </p>
+
+                <div className="mx-auto mt-7 h-px w-3/4 bg-gradient-to-r from-transparent via-border to-transparent" />
+
+                <div className="mt-7 flex justify-center">
+                  <ClientWalletButton />
+                </div>
+              </div>
+            </section>
           </motion.div>
         )}
 
         {/* ── Loading ── */}
         {connected && loading && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-5 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+            <p className="text-eyebrow">Reading the ledger</p>
             <Spinner size="lg" />
-            <div>
-              <p className="text-sm font-medium text-ink">Scanning for vaults</p>
-            </div>
+            <p className="text-sm text-ink-muted">Scanning for vaults you govern…</p>
           </div>
         )}
 
@@ -95,6 +122,7 @@ export default function VaultPage() {
             animate={{ opacity: 1 }}
             className="flex flex-1 flex-col items-center justify-center gap-4 text-center"
           >
+            <p className="text-eyebrow">Ledger unreachable</p>
             <p className="text-sm text-signal-danger">{error}</p>
             <Button variant="secondary" size="sm" onClick={() => search()}>
               Retry
@@ -109,12 +137,20 @@ export default function VaultPage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4 }}
           >
-            <div className="mb-12 text-center md:mb-16">
+            <div className="mb-10 text-center md:mb-14">
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, delay: 0.05 }}
+                className="text-eyebrow"
+              >
+                Your treasury archive
+              </motion.p>
               <motion.h1
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-                className="font-display text-display font-bold text-ink"
+                className="mt-3 font-display text-display font-semibold tracking-tight text-ink"
               >
                 Select your <span className="text-accent">vault</span>
               </motion.h1>
@@ -124,20 +160,11 @@ export default function VaultPage() {
                 transition={{ duration: 0.5, delay: 0.2 }}
                 className="mx-auto mt-3 max-w-lg text-ink-muted"
               >
-                Choose a vault to manage private payments, payroll, and treasury operations.
+                {hasVaults
+                  ? "Choose a treasury to govern private payments, payroll, and audit."
+                  : "No vaults yet — forge your first one to begin."}
               </motion.p>
             </div>
-
-            {!hasVaults && (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="mb-8 text-center text-sm text-ink-subtle"
-              >
-                No vaults found yet, create your first one below.
-              </motion.p>
-            )}
 
             <VaultSelectionGrid vaults={vaults} />
           </motion.div>
