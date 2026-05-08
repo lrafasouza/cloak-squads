@@ -79,8 +79,6 @@ export default function VaultPage() {
               <div className="px-7 py-10 text-center md:px-10 md:py-12">
                 {/* Æ crest */}
                 <div className="relative mx-auto inline-block">
-                  <div className="absolute inset-0 -m-3 rounded-panel border border-accent/20" />
-                  <div className="absolute inset-0 -m-6 rounded-panel border border-accent/10" />
                   <div className="relative flex h-16 w-16 items-center justify-center rounded-panel border border-border-strong bg-surface-2 shadow-raise-1">
                     <span className="font-display text-3xl font-semibold text-accent leading-none">
                       Æ
