@@ -1,11 +1,13 @@
 "use client";
 
+import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
+import { Address, type AegisStatus, StatusBadge } from "@/components/ui/aegis";
 import { Button } from "@/components/ui/button";
+import { ReceiptRow } from "@/components/ui/receipt-row";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { ensureCircuitsProxy, prefetchCircuits } from "@/lib/cloak-circuits-proxy";
 import { translateCloakProgress } from "@/lib/cloak-progress";
 import { lamportsToSol } from "@/lib/sol";
-import { statusBadge } from "@/lib/status-labels";
 import { useUnloadGuard } from "@/lib/use-unload-guard";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cloakDirectTransactOptions } from "@cloak-squads/core/cloak-direct-mode";
@@ -19,6 +21,7 @@ import {
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
+import { CheckCircle2, Loader2, ShieldOff } from "lucide-react";
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 
@@ -51,7 +54,7 @@ type ClaimUtxoData = {
 type ClaimState = "loading" | "invalid" | "expired" | "claimed" | "voided" | "ready";
 
 function truncateAddress(address: string) {
-  return `${address.slice(0, 4)}...${address.slice(-4)}`;
+  return `${address.slice(0, 4)}…${address.slice(-4)}`;
 }
 
 function base64urlDecode(str: string): Uint8Array {
@@ -71,6 +74,42 @@ function base64urlEncode(bytes: Uint8Array): string {
     .join("");
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
+
+const STATE_TO_BADGE: Record<Exclude<ClaimState, "loading" | "invalid">, AegisStatus> = {
+  ready: "sealed",
+  claimed: "executed",
+  expired: "expired",
+  voided: "revoked",
+};
+
+const STATE_LABEL: Record<ClaimState, string> = {
+  loading: "Loading",
+  invalid: "Invalid",
+  ready: "Ready",
+  claimed: "Claimed",
+  expired: "Expired",
+  voided: "Voided",
+};
+
+/* Resolved-state copy is intentionally generic — no amount, no vault, no
+ * timestamps, no IDs. The whole point of a private invoice is that someone
+ * landing on a stale link (browser history, leaked URL, shared device) sees
+ * nothing about who paid whom or how much. The fragment validates ownership
+ * for the *active* claim flow, not for retroactive viewing. */
+const RESOLVED_COPY: Record<"claimed" | "expired" | "voided", { title: string; body: string }> = {
+  claimed: {
+    title: "Invoice already claimed",
+    body: "This private payment link is no longer active.",
+  },
+  expired: {
+    title: "Invoice expired",
+    body: "This private payment link is no longer active. Ask the sender to issue a new one.",
+  },
+  voided: {
+    title: "Invoice voided",
+    body: "The sender cancelled this private payment before it was claimed. Reach out to them for a new link.",
+  },
+};
 
 export default function ClaimPage({ params }: { params: Promise<{ stealthId: string }> }) {
   const { stealthId } = use(params);
@@ -347,60 +386,20 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
     }
   };
 
-  const getStateMessage = () => {
-    switch (claimState) {
-      case "loading":
-        return "Loading invoice data...";
-      case "invalid":
-        return "Invalid or corrupted link";
-      case "expired":
-        return "This invoice has expired";
-      case "claimed":
-        return "This invoice has already been claimed";
-      case "voided":
-        return "This invoice has been voided";
-      case "ready":
-        return "Ready to claim";
-    }
-  };
-
-  const getStateLabel = () => {
-    switch (claimState) {
-      case "loading":
-        return "Loading";
-      case "invalid":
-        return "Invalid";
-      case "expired":
-        return "Expired";
-      case "claimed":
-        return "Claimed";
-      case "voided":
-        return "Voided";
-      case "ready":
-        return "Ready";
-    }
-  };
-
-  const getStateColor = () => {
-    switch (claimState) {
-      case "loading":
-        return "text-ink-muted";
-      case "invalid":
-      case "expired":
-      case "voided":
-        return "text-red-200";
-      case "claimed":
-        return "text-accent";
-      case "ready":
-        return "text-accent";
-    }
-  };
+  /* ────────────────────────────────────────────────────────── States ── */
 
   if (claimState === "loading") {
     return (
       <main className="min-h-screen bg-bg">
-        <section className="mx-auto max-w-6xl px-4 py-10">
-          <p className="text-ink-muted">Loading invoice data...</p>
+        <section className="mx-auto w-full max-w-3xl px-4 py-10 md:py-14">
+          <div className="card-hero relative p-8 md:p-10">
+            <HeraldicWatermark size={320} />
+            <div className="relative">
+              <div className="text-eyebrow">Aegis · Private payment</div>
+              <div className="mt-3 h-10 w-56 rounded-md shimmer-bg" />
+              <div className="mt-3 h-4 w-72 rounded shimmer-bg" />
+            </div>
+          </div>
         </section>
       </main>
     );
@@ -409,15 +408,20 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
   if (claimState === "invalid") {
     return (
       <main className="min-h-screen bg-bg">
-        <section className="mx-auto max-w-3xl px-4 py-16 text-center">
-          <div className="rounded-lg border border-red-800 bg-red-900/20 p-8">
-            <h1 className="text-xl font-semibold text-red-200">Access Error</h1>
-            <p className="mt-4 text-neutral-300">{error ?? "Invalid or corrupted link."}</p>
+        <section className="mx-auto w-full max-w-2xl px-4 py-16 md:py-20">
+          <div className="card-panel p-8 md:p-10 text-center">
+            <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-signal-danger/10 text-signal-danger">
+              <ShieldOff className="h-6 w-6" />
+            </span>
+            <h1 className="mt-5 font-display text-2xl font-semibold text-ink">Access error</h1>
+            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-ink-muted">
+              {error ?? "Invalid or corrupted link."}
+            </p>
             <Link
               href="/"
-              className="mt-6 inline-block rounded-md bg-surface-2 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:bg-surface-3"
+              className="mt-6 inline-flex items-center justify-center rounded-md border border-border-strong bg-surface-2 px-4 py-2 text-sm font-medium text-ink transition-aegis hover:bg-surface-3"
             >
-              Return Home
+              Return home
             </Link>
           </div>
         </section>
@@ -425,144 +429,218 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
     );
   }
 
+  if (!invoice) {
+    return null;
+  }
+
+  /* ── Privacy guard · resolved states render only amount + memo ──────────
+   *
+   * If the invoice is no longer claimable (already claimed, expired, or
+   * voided) we keep the SOL amount and the sender's memo as a
+   * personal-record breadcrumb — they're meaningful to the recipient
+   * who originally landed here. Everything else is suppressed: no vault
+   * address, no recipient key, no bound wallet, no invoice ID, no
+   * invoice reference, no timestamps. The fragment authorises the
+   * active claim flow; it is not a retroactive view key, so anyone
+   * else who happens onto the URL after the fact sees no addresses or
+   * identifiers tying the payment to a counterparty. */
+  if (claimState !== "ready") {
+    const copy = RESOLVED_COPY[claimState];
+    const isClaimed = claimState === "claimed";
+    const resolvedAmount = invoice.amountHint ? lamportsToSol(invoice.amountHint) : null;
+    return (
+      <main className="min-h-screen bg-bg">
+        <section className="mx-auto w-full max-w-2xl px-4 py-16 md:py-20">
+          <div className="card-panel relative overflow-hidden p-8 md:p-10 text-center">
+            <HeraldicWatermark size={280} />
+            <div className="relative">
+              <span
+                className={`mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full ${
+                  isClaimed
+                    ? "bg-signal-positive/15 text-signal-positive"
+                    : "bg-signal-danger/10 text-signal-danger"
+                }`}
+              >
+                {isClaimed ? <CheckCircle2 className="h-6 w-6" /> : <ShieldOff className="h-6 w-6" />}
+              </span>
+              <div className="text-eyebrow mt-5">Aegis · Private payment</div>
+              <h1 className="mt-2 font-display text-2xl font-semibold text-ink">{copy.title}</h1>
+
+              {resolvedAmount ? (
+                <p className="mt-4 font-display text-3xl font-semibold tabular-nums tracking-tight text-ink md:text-4xl">
+                  {resolvedAmount}
+                  <span className="ml-1.5 font-sans text-sm font-medium text-ink-subtle">SOL</span>
+                </p>
+              ) : null}
+
+              <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-ink-muted">{copy.body}</p>
+
+              {invoice.memo ? (
+                <p className="mx-auto mt-5 max-w-sm rounded-md border border-border/60 bg-surface-2 p-3 text-left text-sm leading-6 text-ink">
+                  {invoice.memo}
+                </p>
+              ) : null}
+
+              <Link
+                href="/"
+                className="mt-6 inline-flex items-center justify-center rounded-md border border-border-strong bg-surface-2 px-4 py-2 text-sm font-medium text-ink transition-aegis hover:bg-surface-3"
+              >
+                Return home
+              </Link>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  /* ────────────────────────────────────────────────────────── Hero card ── */
+
+  const heroAmount = invoice.amountHint ? `${lamportsToSol(invoice.amountHint)}` : null;
+  const badgeStatus = STATE_TO_BADGE[claimState];
+
   return (
     <main className="min-h-screen bg-bg">
-      <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <p className="text-sm font-medium text-accent">Payment Claim</p>
-              <span
-                className={`rounded px-2 py-0.5 text-xs font-medium ${statusBadge(claimState).bg} ${statusBadge(claimState).text}`}
-              >
-                {getStateLabel()}
-              </span>
+      <section className="mx-auto w-full max-w-3xl px-4 py-10 md:py-14">
+        {/* Hero — leads with the amount, the recipient's anchor */}
+        <div className="card-hero relative overflow-hidden p-8 md:p-10">
+          <HeraldicWatermark size={360} />
+          <div className="relative">
+            <div className="flex items-start justify-between gap-4">
+              <div className="text-eyebrow text-accent">Aegis · Private payment</div>
+              <StatusBadge status={badgeStatus}>{STATE_LABEL[claimState]}</StatusBadge>
             </div>
-            <h1 className="mt-2 text-3xl font-semibold text-ink">Claim Invoice</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-300">{getStateMessage()}</p>
-          </div>
 
-          {invoice ? (
-            <div className="flex flex-col gap-2 text-right">
-              <p className="text-sm text-ink-subtle">
-                Vault: {truncateAddress(invoice.cofreAddress)}
+            {heroAmount ? (
+              <p className="mt-4 font-display text-4xl font-semibold leading-none tracking-tight text-ink md:text-6xl">
+                {heroAmount}
+                <span className="ml-2 font-sans text-base font-medium text-ink-subtle md:text-xl">
+                  SOL
+                </span>
               </p>
-              <p className="text-sm text-ink-subtle">
-                Created: {new Date(invoice.createdAt).toLocaleDateString()}
+            ) : (
+              <p className="mt-4 font-display text-4xl font-semibold italic leading-none tracking-tight text-ink-muted md:text-5xl">
+                Hidden amount
               </p>
-              <p className="text-sm text-ink-subtle">
-                Expires: {new Date(invoice.expiresAt).toLocaleDateString()}
-              </p>
-            </div>
-          ) : null}
+            )}
+
+            <p className="mt-4 max-w-xl text-sm leading-6 text-ink-muted md:text-[15px]">
+              Settle this private payment by claiming the funds to your connected wallet.
+            </p>
+          </div>
         </div>
 
-        {invoice ? (
-          <>
-            <section className="mt-8 rounded-lg border border-border bg-surface p-6">
-              <h3 className="font-semibold text-ink">Invoice Details</h3>
-              <dl className="mt-4 grid gap-4 md:grid-cols-2">
-                <div>
-                  <dt className="text-xs text-ink-subtle">Invoice ID</dt>
-                  <dd className="mt-1 font-mono text-sm text-neutral-300">{invoice.id}</dd>
-                </div>
-                {invoice.invoiceRef ? (
-                  <div>
-                    <dt className="text-xs text-ink-subtle">Reference</dt>
-                    <dd className="mt-1 text-sm text-neutral-300">{invoice.invoiceRef}</dd>
-                  </div>
-                ) : null}
-                <div>
-                  <dt className="text-xs text-ink-subtle">Amount</dt>
-                  <dd className="mt-1 font-mono text-sm text-neutral-300">
-                    {invoice.amountHint ? `${lamportsToSol(invoice.amountHint)} SOL` : "Hidden"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-ink-subtle">Recipient Key</dt>
-                  <dd className="mt-1 break-all font-mono text-xs text-neutral-300">
-                    {invoice.stealthPubkey}
-                  </dd>
-                </div>
-                {invoice.memo ? (
-                  <div className="md:col-span-2">
-                    <dt className="text-xs text-ink-subtle">Message</dt>
-                    <dd className="mt-1 text-sm text-neutral-300">{invoice.memo}</dd>
-                  </div>
-                ) : null}
-              </dl>
-            </section>
-
-            {claimState === "ready" ? (
-              <section className="mt-8 rounded-lg border border-border bg-surface p-6">
-                <h3 className="font-semibold text-ink">Claim Funds</h3>
-                <p className="mt-2 text-sm text-neutral-300">
-                  Connect your wallet and use the button below to claim the funds.
+        {/* Optional context · only what the sender chose to attach.
+         * No invoice IDs, no vault addresses, no recipient keys, no
+         * bound-to wallet — those are technical metadata and would
+         * leave a privacy trace on a screen anyone could glance at. */}
+        {invoice.invoiceRef || invoice.memo ? (
+          <div className="card-panel relative mt-6 overflow-hidden p-6 md:p-7">
+            <div className="text-eyebrow">From the sender</div>
+            <div className="mt-3 space-y-3">
+              {invoice.invoiceRef ? (
+                <ReceiptRow label="Reference" mono={false}>
+                  {invoice.invoiceRef}
+                </ReceiptRow>
+              ) : null}
+              {invoice.memo ? (
+                <p className="rounded-md border border-border/60 bg-surface-2 p-3 text-sm leading-6 text-ink">
+                  {invoice.memo}
                 </p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
-                {!wallet.publicKey ? (
-                  <p className="mt-4 text-sm text-amber-300">Connect your wallet to continue.</p>
-                ) : invoice.mode === "bound" &&
-                  invoice.recipientWallet !== wallet.publicKey.toBase58() ? (
-                  <div className="mt-4 rounded-md border border-red-900 bg-red-950 p-3 text-sm text-red-200">
-                    <p className="font-medium">Wrong wallet</p>
-                    <p className="mt-1 text-xs text-signal-danger">
-                      This invoice was created for wallet{" "}
-                      <span className="font-mono">
-                        {invoice.recipientWallet
-                          ? truncateAddress(invoice.recipientWallet)
-                          : "(unknown)"}
-                      </span>
-                      . Connect that wallet to claim.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="mt-4">
-                    {invoice.mode === "bearer" ? (
-                      <div className="mb-4 rounded-md border border-amber-700/40 bg-amber-900/10 p-3 text-xs text-amber-200">
-                        <p className="font-medium">Bearer invoice</p>
-                        <p className="mt-1">
-                          Anyone holding this link can claim. Funds will withdraw to{" "}
-                          <span className="font-mono">
-                            {truncateAddress(wallet.publicKey.toBase58())}
-                          </span>{" "}
-                          . That is the wallet you're connected with right now. Switch wallets before
-                          clicking Claim if you want a different destination.
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="mb-3 text-sm text-accent">Correct wallet connected</p>
-                    )}
-                    <Button onClick={handleClaim} disabled={claiming}>
-                      {claiming ? "Claiming funds..." : "Claim funds"}
+        {/* Action zone — claimState is guaranteed `ready` here (resolved
+         * states are intercepted by the privacy guard above). */}
+        <div className="card-panel relative mt-6 overflow-hidden p-6 md:p-7">
+            <div className="flex items-baseline justify-between gap-4">
+              <div>
+                <div className="text-eyebrow">Claim funds</div>
+                <h2 className="mt-1 font-display text-xl font-semibold text-ink">
+                  Withdraw to your wallet
+                </h2>
+              </div>
+            </div>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-ink-muted">
+              The proof and withdrawal happen in your browser. Keep this tab open until the receipt
+              confirms execution.
+            </p>
+
+            <div className="mt-5 space-y-4">
+              {!wallet.publicKey ? (
+                <div className="rounded-md border border-border-strong bg-surface-2 p-4 text-sm text-ink-muted">
+                  <p className="font-medium text-ink">Connect your wallet to continue.</p>
+                  <p className="mt-1 text-xs text-ink-subtle">
+                    Use the wallet menu in the page header to connect a Solana wallet.
+                  </p>
+                </div>
+              ) : invoice.mode === "bound" &&
+                invoice.recipientWallet !== wallet.publicKey.toBase58() ? (
+                <div className="rounded-md border border-signal-danger/30 bg-signal-danger/10 p-4 text-sm">
+                  <p className="font-medium text-signal-danger">Wrong wallet connected</p>
+                  <p className="mt-1 text-xs text-signal-danger/90">
+                    This invoice is bound to{" "}
+                    <span className="font-mono">
+                      {invoice.recipientWallet
+                        ? truncateAddress(invoice.recipientWallet)
+                        : "(unknown)"}
+                    </span>
+                    . Switch wallets and reconnect to claim.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {invoice.mode === "bearer" ? (
+                    <div className="rounded-md border border-signal-warn/30 bg-signal-warn/10 p-4 text-xs leading-5 text-signal-warn">
+                      <p className="font-medium">Bearer invoice</p>
+                      <p className="mt-1 text-signal-warn/90">
+                        Anyone holding this link can claim. Funds will withdraw to{" "}
+                        <span className="font-mono">
+                          {truncateAddress(wallet.publicKey.toBase58())}
+                        </span>
+                        — the wallet you have connected right now. Switch wallets first if you want a
+                        different destination.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 rounded-md border border-accent/30 bg-accent-soft px-3 py-2 text-xs font-medium text-accent">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Correct wallet connected · proceed when ready
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-xs text-ink-subtle">
+                      Destination:&nbsp;
+                      <Address value={wallet.publicKey.toBase58()} chars={6} />
+                    </div>
+                    <Button
+                      onClick={handleClaim}
+                      disabled={claiming}
+                      className="w-full sm:w-auto"
+                    >
+                      {claiming ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Claiming…
+                        </>
+                      ) : (
+                        "Claim funds"
+                      )}
                     </Button>
                   </div>
-                )}
+                </>
+              )}
 
-                {error ? (
-                  <p className="mt-4 rounded-md border border-red-900 bg-red-950 p-3 text-sm text-red-200">
-                    {error}
-                  </p>
-                ) : null}
-              </section>
-            ) : (
-              <section className="mt-8 rounded-lg border border-border bg-surface p-6 text-center">
-                <p className={`text-lg font-medium ${getStateColor()}`}>{getStateMessage()}</p>
-                {claimState === "expired" ? (
-                  <p className="mt-2 text-sm text-ink-muted">
-                    This invoice expired on {new Date(invoice.expiresAt).toLocaleString()}.
-                  </p>
-                ) : null}
-                <Link
-                  href="/"
-                  className="mt-4 inline-block rounded-md bg-surface-2 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:bg-surface-3"
-                >
-                  Return Home
-                </Link>
-              </section>
-            )}
-          </>
-        ) : null}
+              {error ? (
+                <div className="rounded-md border border-signal-danger/30 bg-signal-danger/10 p-3 text-sm text-signal-danger">
+                  {error}
+                </div>
+              ) : null}
+            </div>
+        </div>
       </section>
     </main>
   );
