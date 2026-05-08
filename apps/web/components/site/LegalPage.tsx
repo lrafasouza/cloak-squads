@@ -17,7 +17,7 @@ export function LegalPage({
 }) {
   return (
     <main className="relative min-h-screen bg-bg text-ink">
-      <SiteHeader />
+      <SiteHeader showWallet={false} />
 
       <article className="mx-auto max-w-3xl px-4 pt-16 pb-24 md:px-6 md:pt-28 md:pb-32">
         <header className="mb-14 md:mb-20">
