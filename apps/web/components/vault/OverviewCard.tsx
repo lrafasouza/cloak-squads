@@ -1,19 +1,14 @@
 "use client";
 
 import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TokenLogo } from "@/components/ui/token-logo";
 import { WarningCallout } from "@/components/ui/warning-callout";
 import { useSolPrice } from "@/lib/hooks/useSolPrice";
 import type { SubVaultBalance } from "@/lib/use-vault-data";
 import { cn } from "@/lib/utils";
 import NumberFlow from "@number-flow/react";
-import {
-  ArrowDownToLine,
-  ArrowLeftRight,
-  ChevronDown,
-  Lock,
-  RefreshCw,
-} from "lucide-react";
+import { ArrowDownToLine, ArrowLeftRight, ChevronDown, Lock, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 interface OverviewCardProps {
@@ -62,13 +57,17 @@ export function OverviewCard({
   onSend,
   onSwap,
 }: OverviewCardProps) {
-  const { data: solPrice } = useSolPrice();
+  const { data: solPrice, isLoading: solPriceLoading } = useSolPrice();
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   const solTotal = Number.parseFloat(balanceSol) || 0;
   const usdcTotal = Number.parseFloat(usdcUi) || 0;
   const solUsd = solPrice != null ? solTotal * solPrice : null;
   const totalUsd = solUsd != null ? solUsd + usdcTotal : null;
+  // Distinguish "price is in flight" (render skeleton, avoid flashing the
+  // SOL-only fallback) from "price API returned null" (keep the SOL fallback
+  // as a graceful permanent state).
+  const totalUsdPending = solPriceLoading && solPrice === undefined;
 
   const primarySol = Number.parseFloat(primaryBalanceSol) || 0;
   const subUsdcTotal = subVaultBreakdown.reduce(
@@ -117,7 +116,12 @@ export function OverviewCard({
           {/* Hero number — Fraunces optical-size axis at 64px reads as
               private-banking, not as a wallet. */}
           <div className="mt-3">
-            {totalUsd != null ? (
+            {totalUsdPending ? (
+              <Skeleton
+                className="h-10 w-56 rounded-lg md:h-[60px] md:w-80"
+                aria-label="Loading total balance"
+              />
+            ) : totalUsd != null ? (
               <NumberFlow
                 value={totalUsd}
                 className="font-display text-4xl font-semibold tabular-nums tracking-tight text-ink md:text-6xl"
@@ -233,7 +237,13 @@ export function OverviewCard({
                             </span>
                           )}
                           <span className="text-right font-mono text-[13px] tabular-nums text-ink">
-                            {solPrice != null ? usd(vUsd) : "—"}
+                            {totalUsdPending ? (
+                              <Skeleton className="ml-auto h-3 w-16 rounded" />
+                            ) : solPrice != null ? (
+                              usd(vUsd)
+                            ) : (
+                              "—"
+                            )}
                           </span>
                         </div>
                       );
@@ -263,7 +273,13 @@ export function OverviewCard({
                         </span>
                       )}
                       <span className="text-right font-mono text-sm font-medium tabular-nums text-ink">
-                        {totalUsd != null ? usd(totalUsd) : "—"}
+                        {totalUsdPending ? (
+                          <Skeleton className="ml-auto h-3.5 w-20 rounded" />
+                        ) : totalUsd != null ? (
+                          usd(totalUsd)
+                        ) : (
+                          "—"
+                        )}
                       </span>
                     </div>
                   </div>
@@ -291,7 +307,13 @@ export function OverviewCard({
                         {formatSol(balanceSol, 6)}
                       </span>
                       <span className="text-right font-mono text-sm tabular-nums text-ink">
-                        {solUsd != null ? usd(solUsd) : "—"}
+                        {totalUsdPending ? (
+                          <Skeleton className="ml-auto h-3.5 w-16 rounded" />
+                        ) : solUsd != null ? (
+                          usd(solUsd)
+                        ) : (
+                          "—"
+                        )}
                       </span>
                     </div>
 
@@ -313,13 +335,17 @@ export function OverviewCard({
                       </div>
                     )}
 
-                    {totalUsd != null && (
+                    {(totalUsd != null || totalUsdPending) && (
                       <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-4 border-t border-border/60 bg-surface-2/30 px-4 py-3">
                         <span className="font-display text-[13px] tracking-tight text-ink-muted">
                           Total
                         </span>
                         <span className="font-mono text-sm font-medium tabular-nums text-ink">
-                          {usd(totalUsd)}
+                          {totalUsdPending ? (
+                            <Skeleton className="ml-auto h-3.5 w-20 rounded" />
+                          ) : totalUsd != null ? (
+                            usd(totalUsd)
+                          ) : null}
                         </span>
                       </div>
                     )}

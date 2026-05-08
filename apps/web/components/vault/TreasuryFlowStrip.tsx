@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSolPrice } from "@/lib/hooks/useSolPrice";
 import { lamportsToSolDisplay, useTreasuryFlow } from "@/lib/hooks/useTreasuryFlow";
@@ -36,7 +37,8 @@ export function TreasuryFlowStrip({
   onPrivacyHelpClick?: () => void;
 }) {
   const flow = useTreasuryFlow(multisig, 30, internalAddresses);
-  const { data: solPrice } = useSolPrice();
+  const { data: solPrice, isLoading: solPriceLoading } = useSolPrice();
+  const usdPending = solPriceLoading && solPrice === undefined;
 
   if (flow.loading) {
     // Skeleton mirrors the asymmetric ribbon: 3-col / 3-col / 6-col.
@@ -74,6 +76,7 @@ export function TreasuryFlowStrip({
           value={`+${lamportsToSolDisplay(flow.inflowLamports)}`}
           unit="SOL"
           usd={solPrice ? inflowSol * solPrice : null}
+          usdPending={usdPending}
           delta={flow.inflowDelta}
           deltaTone={(d) => (d > 0 ? "positive" : d < 0 ? "danger" : "neutral")}
           sparkValues={inflowSparkValues}
@@ -92,6 +95,7 @@ export function TreasuryFlowStrip({
           value={lamportsToSolDisplay(flow.outflowLamports)}
           unit="SOL"
           usd={solPrice ? outflowSol * solPrice : null}
+          usdPending={usdPending}
           delta={flow.outflowDelta}
           // For outflow, growth is the unwelcome direction; tone inverts.
           deltaTone={(d) => (d > 0 ? "danger" : d < 0 ? "positive" : "neutral")}
@@ -146,6 +150,7 @@ function FlowCard({
   value,
   unit,
   usd,
+  usdPending,
   delta,
   deltaTone,
   sparkValues,
@@ -161,6 +166,7 @@ function FlowCard({
   value: string;
   unit: string;
   usd: number | null;
+  usdPending: boolean;
   delta: number | null;
   deltaTone: (d: number) => DeltaTone;
   sparkValues: number[];
@@ -197,8 +203,13 @@ function FlowCard({
                 <span className="text-sm font-medium text-ink-subtle">{unit}</span>
               </div>
               <div className="mt-1 flex items-center gap-2 text-xs">
-                {usd !== null && usd > 0 && (
-                  <span className="tabular-nums text-ink-muted">≈ ${formatUsd(usd)}</span>
+                {usdPending ? (
+                  <Skeleton className="h-3 w-16 rounded" aria-label="Loading USD value" />
+                ) : (
+                  usd !== null &&
+                  usd > 0 && (
+                    <span className="tabular-nums text-ink-muted">≈ ${formatUsd(usd)}</span>
+                  )
                 )}
                 {delta !== null ? <DeltaPill delta={delta} tone={deltaTone(delta)} /> : null}
               </div>

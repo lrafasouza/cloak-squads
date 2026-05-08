@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ProposalSummary } from "@/lib/proposals";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -7,11 +8,15 @@ import { useEffect, useState } from "react";
 export function PendingProposalsCard({
   multisig,
   proposals,
+  isLoading = false,
 }: {
   multisig: string;
   proposals: ProposalSummary[];
+  isLoading?: boolean;
 }) {
-  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
+  const [subVaultAccounts, setSubVaultAccounts] = useState<
+    Array<{ vaultIndex: number; name: string }>
+  >([]);
   useEffect(() => {
     fetch(`/api/vaults/${multisig}/sub-vaults`)
       .then((r) => (r.ok ? r.json() : []))
@@ -26,6 +31,40 @@ export function PendingProposalsCard({
   const pending = proposals.filter(
     (p) => p.status === "active" || p.status === "approved" || p.status === "draft",
   );
+
+  // Loading state — render skeleton rows that mirror the live row layout so
+  // the queue doesn't collapse into an empty-state pitch (which would flash
+  // back to populated rows once data lands).
+  if (isLoading && pending.length === 0) {
+    return (
+      <div className="card-panel">
+        <div className="flex items-end justify-between px-5 pt-5 pb-4">
+          <div className="flex items-baseline gap-2.5">
+            <Skeleton className="h-8 w-8 rounded-md" />
+            <Skeleton className="h-3 w-32 rounded" />
+          </div>
+          <Skeleton className="h-3 w-12 rounded" />
+        </div>
+        <div className="h-px bg-border/50 mx-5" />
+        <div className="flex flex-col gap-1 p-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center justify-between rounded-xl px-3 py-3">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-3/4 rounded" />
+                <Skeleton className="h-3 w-1/2 rounded" />
+              </div>
+              <div className="ml-4 flex shrink-0 items-center gap-1">
+                <Skeleton className="h-1.5 w-1.5 rounded-full" />
+                <Skeleton className="h-1.5 w-1.5 rounded-full" />
+                <Skeleton className="h-1.5 w-1.5 rounded-full" />
+                <Skeleton className="ml-1.5 h-3 w-8 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   // Empty state — keep the card present so the dashboard layout stays
   // stable and to surface a clear "next action" CTA. Eliminates the dead
@@ -101,9 +140,7 @@ export function PendingProposalsCard({
                     ) : null;
                   })()}
                 </p>
-                {p.memo && (
-                  <p className="mt-0.5 truncate text-xs text-ink-subtle">{p.memo}</p>
-                )}
+                {p.memo && <p className="mt-0.5 truncate text-xs text-ink-subtle">{p.memo}</p>}
               </div>
 
               {/* Approval dots */}

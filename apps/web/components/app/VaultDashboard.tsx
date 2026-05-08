@@ -22,7 +22,7 @@ import { useMemo, useState } from "react";
 export function VaultDashboard({ multisig }: { multisig: string }) {
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useVaultData(multisig);
-  const { data: proposals = [] } = useProposalSummaries(multisig);
+  const { data: proposals = [], isLoading: proposalsLoading } = useProposalSummaries(multisig);
   // Build the multisig's own address set once and share it with every consumer
   // that needs to distinguish "value entering the treasury" from "shuffle
   // between our own vaults". Keeping this in the dashboard avoids each child
@@ -145,7 +145,11 @@ export function VaultDashboard({ multisig }: { multisig: string }) {
       />
 
       {/* Pending proposals — below the main grid */}
-      <PendingProposalsCard multisig={multisig} proposals={proposals} />
+      <PendingProposalsCard
+        multisig={multisig}
+        proposals={proposals}
+        isLoading={proposalsLoading}
+      />
 
       {/* Activity — full width */}
       <RecentActivityCard multisig={multisig} activity={activity} isLoading={activityLoading} />
