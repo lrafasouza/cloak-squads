@@ -199,7 +199,7 @@ function PayrollMockup() {
                   {r.role}
                 </span>
                 <span className="text-right text-ink num whitespace-nowrap">
-                  {r.amount.toLocaleString()}{" "}
+                  {r.amount.toLocaleString("en-US")}{" "}
                   <span className="text-ink-subtle text-[10px]">USDC</span>
                 </span>
               </motion.div>
@@ -231,7 +231,7 @@ function PayrollMockup() {
               </span>
               <span>
                 <span className="font-display text-base font-semibold text-ink num">
-                  <NumberFlow value={total} format={{ maximumFractionDigits: 0 }} />
+                  <NumberFlow value={total} locales="en-US" format={{ maximumFractionDigits: 0 }} />
                 </span>
                 <span className="text-ink-subtle ml-1 text-[10px]">USDC</span>
               </span>
@@ -435,7 +435,7 @@ function AuditMockup() {
                 Transactions
               </p>
               <p className="font-display text-xl font-semibold text-ink num mt-0.5">
-                <NumberFlow value={36} />
+                <NumberFlow value={36} locales="en-US" />
               </p>
             </div>
             <div>

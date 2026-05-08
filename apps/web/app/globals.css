@@ -121,11 +121,13 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    position: relative;
   }
 
   body {
     @apply bg-bg text-ink font-sans;
     font-feature-settings: "ss01", "cv11";
+    position: relative;
   }
 
   ::selection {
