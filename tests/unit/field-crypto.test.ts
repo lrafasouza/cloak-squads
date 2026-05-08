@@ -143,3 +143,58 @@ describe("key derivation precedence", () => {
     process.env.JWT_SIGNING_SECRET = "test-secret-at-least-16-chars-long";
   });
 });
+
+describe("dual-read rotation (FIELD_CRYPTO_KEY_PREVIOUS)", () => {
+  test("ciphertext encrypted under PREVIOUS decrypts when CURRENT is rotated", async () => {
+    // Phase 1: encrypt under the "old" key
+    vi.resetModules();
+    delete process.env.FIELD_CRYPTO_KEY_PREVIOUS;
+    process.env.FIELD_CRYPTO_KEY = "old-rotation-key-1234567890abcde";
+    const { encryptField: encOld } = await import("../../apps/web/lib/field-crypto");
+    const ciphertext = encOld("rotation-payload");
+
+    // Phase 2: rotate — set the new key as CURRENT, old as PREVIOUS
+    vi.resetModules();
+    process.env.FIELD_CRYPTO_KEY = "new-rotation-key-9876543210xyzab";
+    process.env.FIELD_CRYPTO_KEY_PREVIOUS = "old-rotation-key-1234567890abcde";
+    const { decryptField: decRotated, encryptField: encNew } = await import(
+      "../../apps/web/lib/field-crypto"
+    );
+    // Reads still work — current key fails, previous succeeds.
+    expect(decRotated(ciphertext)).toBe("rotation-payload");
+
+    // New writes go under CURRENT; reading those without PREVIOUS works fine.
+    const fresh = encNew("post-rotation");
+    vi.resetModules();
+    process.env.FIELD_CRYPTO_KEY = "new-rotation-key-9876543210xyzab";
+    delete process.env.FIELD_CRYPTO_KEY_PREVIOUS;
+    const { decryptField: decAfter } = await import("../../apps/web/lib/field-crypto");
+    expect(decAfter(fresh)).toBe("post-rotation");
+  });
+
+  test("dropping PREVIOUS after rotation makes old ciphertext unreadable", async () => {
+    vi.resetModules();
+    delete process.env.FIELD_CRYPTO_KEY_PREVIOUS;
+    process.env.FIELD_CRYPTO_KEY = "old-rotation-key-1234567890abcde";
+    const { encryptField: encOld } = await import("../../apps/web/lib/field-crypto");
+    const oldCiphertext = encOld("orphaned");
+
+    vi.resetModules();
+    process.env.FIELD_CRYPTO_KEY = "new-rotation-key-9876543210xyzab";
+    delete process.env.FIELD_CRYPTO_KEY_PREVIOUS; // operator forgot to back-fill
+    const { decryptField: decOrphan } = await import("../../apps/web/lib/field-crypto");
+    expect(() => decOrphan(oldCiphertext)).toThrow();
+  });
+
+  test("PREVIOUS shorter than 16 chars is ignored (treated as unset)", async () => {
+    vi.resetModules();
+    process.env.FIELD_CRYPTO_KEY = "current-key-at-least-16-chars-x";
+    process.env.FIELD_CRYPTO_KEY_PREVIOUS = "tiny";
+    const { encryptField: enc, decryptField: dec } = await import(
+      "../../apps/web/lib/field-crypto"
+    );
+    // Round-trip works because PREVIOUS is silently ignored (under-length).
+    expect(dec(enc("payload"))).toBe("payload");
+    delete process.env.FIELD_CRYPTO_KEY_PREVIOUS;
+  });
+});
