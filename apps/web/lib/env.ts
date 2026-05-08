@@ -13,36 +13,63 @@ const publicEnvSchema = z.object({
   NEXT_PUBLIC_SQUADS_PROGRAM_ID: z.string().min(32),
 });
 
-const serverEnvSchema = z.object({
-  DATABASE_URL: z.string().min(1),
-  // Shared fallback for SESSION_HMAC_KEY / FIELD_CRYPTO_KEY / AUDIT_EXPORT_SIGN_KEY
-  // when those purpose-specific vars are not set. New deployments should set
-  // each of the three explicitly so a single leak does not compromise all
-  // three subsystems (sessions, encrypted PII, audit signatures) at once.
-  JWT_SIGNING_SECRET: z.string().min(16),
-  // HMAC key for session cookies (auth-session). Falls back to
-  // JWT_SIGNING_SECRET. Rotating invalidates all live session cookies.
-  SESSION_HMAC_KEY: z.string().min(16).optional(),
-  // AES-256-GCM key for field-crypto (stealth memos, UTXO secrets). Falls
-  // back to JWT_SIGNING_SECRET. Rotating without a re-encrypt script makes
-  // every `v1.` ciphertext row undecryptable.
-  FIELD_CRYPTO_KEY: z.string().min(16).optional(),
-  // Ed25519 signing seed (32 bytes, base64-encoded) for audit export
-  // signatures. Falls back to JWT_SIGNING_SECRET in audit-sign.ts. Rotating
-  // means previously-issued export signatures stop verifying with the
-  // current public key — embed the publicKey in the export envelope so old
-  // exports are still verifiable offline against the snapshot pubkey.
-  AUDIT_EXPORT_SIGN_KEY: z.string().min(1).optional(),
-  LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
-  FALLBACK_RPC_URL: z.string().url().optional(),
-  REDIS_URL: z.string().url().optional(),
-  REDIS_TOKEN: z.string().optional(),
-  // v1 wallet signatures are NOT endpoint-bound (no method/path/bodyHash).
-  // A captured v1 signature replays for the timestamp window on any route,
-  // which neuters the v2 hardening. Default OFF; set to "true" only as a
-  // temporary escape hatch while a stale client is still in the wild.
-  ALLOW_LEGACY_AUTH: z.enum(["true", "false"]).default("false"),
-});
+const serverEnvSchema = z
+  .object({
+    DATABASE_URL: z.string().min(1),
+    // Legacy single-secret. Acts as a backward-compat fallback for the
+    // four purpose-specific keys below when they're not set explicitly.
+    // New deployments should set each purpose-specific var so a leak in
+    // one subsystem doesn't compromise all four (sessions, claim
+    // challenges, field-encrypted PII, audit signatures). Production
+    // boot fails-loud below if any purpose-specific key is missing.
+    JWT_SIGNING_SECRET: z.string().min(16),
+    // HMAC key for stateless tokens — session cookies (`auth-session`)
+    // and stealth-claim challenges (`claim-challenge`). Each call site
+    // domain-separates further (`session-hmac-v1:`, `challenge-hmac-v1:`)
+    // so the two derived keys are cryptographically distinct. Rotating
+    // invalidates live sessions + open challenges (≤30 min and ≤60 s).
+    SESSION_HMAC_KEY: z.string().min(16).optional(),
+    // AES-256-GCM key for field-crypto (stealth memos, UTXO secrets,
+    // operator deposit cache). Rotating mid-flight without the
+    // rotate-field-crypto script makes every `v1.` row undecryptable —
+    // see FIELD_CRYPTO_KEY_PREVIOUS for the dual-read window.
+    FIELD_CRYPTO_KEY: z.string().min(16).optional(),
+    // Optional dual-read fallback during a FIELD_CRYPTO_KEY rotation.
+    // Decrypt path tries FIELD_CRYPTO_KEY first, falls back to
+    // FIELD_CRYPTO_KEY_PREVIOUS. Unset under steady state.
+    FIELD_CRYPTO_KEY_PREVIOUS: z.string().min(16).optional(),
+    // Ed25519 signing seed (32 bytes, base64-encoded) for audit export
+    // signatures. Each export embeds the verifying `publicKey` in its
+    // envelope, so rotating only impacts new exports — historical
+    // exports remain verifiable offline against their bundled pubkey.
+    AUDIT_EXPORT_SIGN_KEY: z.string().min(1).optional(),
+    LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
+    FALLBACK_RPC_URL: z.string().url().optional(),
+    REDIS_URL: z.string().url().optional(),
+    REDIS_TOKEN: z.string().optional(),
+    // v1 wallet signatures are NOT endpoint-bound (no method/path/bodyHash).
+    // A captured v1 signature replays for the timestamp window on any route,
+    // which neuters the v2 hardening. Default OFF; set to "true" only as a
+    // temporary escape hatch while a stale client is still in the wild.
+    ALLOW_LEGACY_AUTH: z.enum(["true", "false"]).default("false"),
+  })
+  .superRefine((env, ctx) => {
+    // Production must set every purpose-specific key explicitly. The
+    // JWT_SIGNING_SECRET fallback is a migration aid only — leaving it
+    // active in production means one leak still compromises all four
+    // subsystems, which defeats the whole point of the split.
+    if (process.env.NODE_ENV !== "production") return;
+    const required = ["SESSION_HMAC_KEY", "FIELD_CRYPTO_KEY", "AUDIT_EXPORT_SIGN_KEY"] as const;
+    for (const key of required) {
+      if (!env[key]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required in production. Falling back to JWT_SIGNING_SECRET keeps the four crypto subsystems sharing one secret — set this explicitly in the deploy env.`,
+        });
+      }
+    }
+  });
 
 export const publicEnv = publicEnvSchema.parse({
   NEXT_PUBLIC_SOLANA_CLUSTER: process.env.NEXT_PUBLIC_SOLANA_CLUSTER,
@@ -60,6 +87,7 @@ export function getServerEnv() {
     JWT_SIGNING_SECRET: process.env.JWT_SIGNING_SECRET,
     SESSION_HMAC_KEY: process.env.SESSION_HMAC_KEY,
     FIELD_CRYPTO_KEY: process.env.FIELD_CRYPTO_KEY,
+    FIELD_CRYPTO_KEY_PREVIOUS: process.env.FIELD_CRYPTO_KEY_PREVIOUS,
     AUDIT_EXPORT_SIGN_KEY: process.env.AUDIT_EXPORT_SIGN_KEY,
     LOG_LEVEL: process.env.LOG_LEVEL,
     FALLBACK_RPC_URL: process.env.FALLBACK_RPC_URL,

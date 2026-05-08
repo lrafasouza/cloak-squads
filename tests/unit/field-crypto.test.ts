@@ -9,7 +9,12 @@ import { beforeAll, describe, expect, test, vi } from "vitest";
 import { decryptField, encryptField, isEncrypted } from "../../apps/web/lib/field-crypto";
 
 beforeAll(() => {
+  // Mirror production env: every purpose-specific key set explicitly.
+  // Tests that exercise the JWT fallback path override locally.
   process.env.JWT_SIGNING_SECRET = "test-secret-at-least-16-chars-long";
+  process.env.SESSION_HMAC_KEY = "test-session-hmac-key-32-chars!!";
+  process.env.FIELD_CRYPTO_KEY = "test-field-crypto-key-32-chars!!";
+  process.env.AUDIT_EXPORT_SIGN_KEY = "test-audit-sign-key-32-chars!!aa";
 });
 
 describe("encryptField / decryptField", () => {

@@ -20,10 +20,29 @@ import { createHash, createHmac, timingSafeEqual } from "crypto";
 const CHALLENGE_TTL_MS = 60_000;
 const CONSUME_TTL_SECS = 120; // 2× TTL — covers full challenge validity window
 
-function getSecret(): string {
-  const s = process.env.JWT_SIGNING_SECRET;
-  if (!s) throw new Error("JWT_SIGNING_SECRET is not set");
-  return s;
+/**
+ * HMAC secret for the challenge token. Shares `SESSION_HMAC_KEY` with
+ * `auth-session` because both are stateless HMAC subsystems, but
+ * domain-separates with `challenge-hmac-v1:` so the derived bytes are
+ * distinct from the session-cookie key. Falls back to the legacy
+ * `JWT_SIGNING_SECRET` so existing deploys keep working until the operator
+ * sets `SESSION_HMAC_KEY` explicitly (production boot already requires it
+ * via env.ts superRefine — see the comment there).
+ */
+function getSecret(): Buffer {
+  const explicit = process.env.SESSION_HMAC_KEY;
+  if (explicit && explicit.length >= 16) {
+    return createHash("sha256").update(`challenge-hmac-v1:${explicit}`).digest();
+  }
+  const fallback = process.env.JWT_SIGNING_SECRET;
+  if (!fallback || fallback.length < 16) {
+    throw new Error(
+      "SESSION_HMAC_KEY (or JWT_SIGNING_SECRET fallback) must be set (>=16 chars).",
+    );
+  }
+  // Legacy derivation kept exactly as-is so existing in-flight challenges
+  // (≤60 s TTL) still verify after the rollout.
+  return Buffer.from(fallback);
 }
 
 function base64urlEncode(bytes: Uint8Array): string {

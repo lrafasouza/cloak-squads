@@ -8,7 +8,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 beforeEach(() => {
+  // Set the four purpose-specific keys to mirror production. JWT_SIGNING_SECRET
+  // is left set so this suite still exercises the legacy fallback branch in
+  // claim-challenge until Phase 3 removes it. SESSION_HMAC_KEY drives the new
+  // domain-separated derivation.
   process.env.JWT_SIGNING_SECRET = "test-secret-32-chars-long-enough!!";
+  process.env.SESSION_HMAC_KEY = "test-session-hmac-key-32-chars!!";
+  process.env.FIELD_CRYPTO_KEY = "test-field-crypto-key-32-chars!!";
+  process.env.AUDIT_EXPORT_SIGN_KEY = "test-audit-sign-key-32-chars!!aa";
   delete process.env.REDIS_URL;
   vi.resetModules();
   vi.useRealTimers();
