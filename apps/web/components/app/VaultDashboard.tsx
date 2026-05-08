@@ -12,7 +12,11 @@ import { SendModal } from "@/components/vault/SendModal";
 import { SwapModal } from "@/components/vault/SwapModal";
 import { TreasuryFlowStrip } from "@/components/vault/TreasuryFlowStrip";
 import { useRecentActivity } from "@/lib/hooks/useRecentActivity";
-import { useVaultIncomeSync, vaultIncomeQueryKey } from "@/lib/hooks/useVaultIncome";
+import {
+  useVaultIncome,
+  useVaultIncomeSync,
+  vaultIncomeQueryKey,
+} from "@/lib/hooks/useVaultIncome";
 import { proposalSummariesQueryKey, useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useVaultData } from "@/lib/use-vault-data";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,8 +25,24 @@ import { useMemo, useState } from "react";
 
 export function VaultDashboard({ multisig }: { multisig: string }) {
   const queryClient = useQueryClient();
-  const { data, isLoading, error } = useVaultData(multisig);
+  const { data, isLoading: vaultLoading, error } = useVaultData(multisig);
   const { data: proposals = [], isLoading: proposalsLoading } = useProposalSummaries(multisig);
+  // Pull the income query up to the dashboard so we can gate the page-level
+  // skeleton on its loading state too. The hook is identity-stable across
+  // consumers (shared React-Query cache), so calling it here in addition to
+  // inside `useTreasuryFlow` doesn't cost a second fetch — it just exposes the
+  // loading flag we need to keep the KPI strip in lockstep with the rest of
+  // the dashboard. Without this, the strip lands several hundred ms after
+  // the OverviewCard, producing an asynchronous "card pop-in" the user finds
+  // jarring.
+  const { isLoading: incomeLoading } = useVaultIncome(multisig, 200);
+  // Page-level skeleton stays up until the three datasets that fill the
+  // primary cards (vault data, proposals, income) are all settled. SolPrice
+  // is intentionally NOT in this gate: it's an external API with its own
+  // 5s timeout and inline skeletons in OverviewCard / TreasuryFlowStrip
+  // already cover the pending state. Blocking the whole dashboard on a
+  // third-party price feed would punish all users for a slow vendor.
+  const isLoading = vaultLoading || proposalsLoading || incomeLoading;
   // Build the multisig's own address set once and share it with every consumer
   // that needs to distinguish "value entering the treasury" from "shuffle
   // between our own vaults". Keeping this in the dashboard avoids each child
