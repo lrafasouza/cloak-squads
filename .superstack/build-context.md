@@ -6,23 +6,49 @@
     "ready_for_devnet": true,
     "lastReviewedAt": "2026-05-08",
     "audit_feature_review_2026_05_08": {
-      "scope": "Audit feature post-Sprint A (commits 176aaad + 461a1b9). Reviewed 49 files spanning frontend viewer/admin, 7 API routes, 3 libs, core crypto, on-chain revoke handler, schema, seed, tests, docs.",
+      "status": "DEVNET SEALED",
+      "scope": "Final review post 3 commits (176aaad Sprint A, 461a1b9 follow-up, 2ec76d7 devnet gaps). 49 files across frontend, 7 API routes, 3 libs, core crypto, on-chain revoke handler, schema, seed, tests, docs.",
+      "report_artifact": ".superstack/reviews/audit-feature-2026-05-08.html",
       "scores": {
         "security": "B",
-        "correctness": "B+",
-        "error_handling": "B",
-        "testing": "B-",
+        "correctness": "A-",
+        "error_handling": "B+",
+        "testing": "B+",
         "code_organization": "A-",
         "documentation": "A"
       },
-      "verdict": "Solid for devnet. Mainnet gated on Sprint B (replay-proof create signature, kid rotation, viewer signature verification, rate limits on public endpoints).",
-      "high_severity_remaining": [
+      "ready_for_devnet": true,
+      "ready_for_mainnet": false,
+      "verification": {
+        "web_typecheck": "pass",
+        "core_typecheck": "pass",
+        "vitest_unit": "pass (18 files, 167 tests, +9 audit-data regression cases)",
+        "f3_audit_integration": "pass (6/6, header drift sentinel active)",
+        "git_status": "clean, 3 commits ahead of origin/master"
+      },
+      "what_sealed": [
+        "Mock-data fallback removed from public viewer",
+        "Payroll batches expand to one row per recipient (no 'payroll:N' aggregation)",
+        "Cluster filter applied at every loadAuditTransactions query",
+        "VaultIncome + StealthInvoice + SwapDraft surfaced (proof-of-reserves reconcilable)",
+        "Canonical /api/audit/[linkId]/transactions endpoint replaces ad-hoc client merge",
+        "expiresAt validated server-side: must be future + <= 365 days",
+        "time_ranged scope server-side requires both startDate and endDate",
+        "SQL date filter (no in-memory truncation of historical windows)",
+        "Viewer endDate fallback anchors to expiresAt (no Date.now() drift)",
+        "On-chain Cofre.MAX_REVOKED surfaced in admin UI with warn at >=80%, danger at >=95%",
+        "Seed script writes correct cluster + amountHint (was Prisma-rejecting at runtime)",
+        "9 vitest cases pin Sprint A behaviours: cluster, payroll fan-out, multi-source agg, scope filters",
+        "CSV header drift sentinel in f3-audit.test.ts"
+      ],
+      "high_severity_remaining_for_mainnet": [
         "Replay on /api/audit-links POST: signed message lacks scopeParams + nonce + signature TTL",
         "/api/audit/[linkId]/transactions and /export public endpoints have no rate limit",
-        "validateAuditFragment ignores linkId — any 32-byte string passes",
-        "Revoke flow deletes DB row before on-chain proposal lands; crash leaves on-chain link valid",
+        "validateAuditFragment ignores linkId arg — any 32-byte string passes",
+        "Revoke flow deletes DB row before on-chain proposal lands; crash window leaves on-chain link valid",
         "audit-sign Ed25519 seed still falls back to JWT_SIGNING_SECRET (planned Sprint 2.1)"
-      ]
+      ],
+      "next_sprint": "Sprint B — close 5 HIGH items above. Estimated 3-4 dev days. Mainnet gate."
     },
     "verification": {
       "typecheck": "pass",
