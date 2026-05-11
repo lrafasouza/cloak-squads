@@ -36,7 +36,9 @@
     "test:f4": "tsx scripts/test-f4-stealth-invoice.ts",
     "demo:setup-2ofn": "tsx scripts/setup-demo-cofre-2ofn.ts",
     "deploy:gk": "tsx scripts/deploy-gatekeeper.ts",
-    "db:up": "docker compose up -d postgres"
+    "db:up": "docker compose up -d postgres",
+    "security:scan": "gitleaks detect --no-banner --redact --verbose",
+    "security:scan-staged": "gitleaks protect --staged --no-banner --redact --verbose"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

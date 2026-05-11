@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Pre-commit hook — gitleaks secret scan
+# Enable with: git config core.hooksPath .githooks
+
+set -e
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "⚠️  gitleaks not installed — skipping secret scan."
+  echo "    Install on macOS:  brew install gitleaks"
+  echo "    Install elsewhere: https://github.com/gitleaks/gitleaks#installation"
+  echo "    Then re-run this hook."
+  exit 0
+fi
+
+echo "🔍 gitleaks: scanning staged changes..."
+gitleaks protect --staged --no-banner --redact --verbose
+
+echo "✅ gitleaks: no secrets detected in staged changes."

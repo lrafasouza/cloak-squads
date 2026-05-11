@@ -1,0 +1,35 @@
+# gitleaks config for cloak-squads
+# Extends the default ruleset; adds project-specific allowlists.
+# Docs: https://github.com/gitleaks/gitleaks/blob/master/README.md#configuration
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Project-wide allowlist for known non-secrets"
+
+# Paths that contain reference material or third-party content, never project secrets.
+paths = [
+  '''^\.auditor/''',                       # cloned solanabr/Auditor corpus (reference checklists)
+  '''^docs/security/reports/''',           # local-only audit reports (gitignored anyway, belt+suspenders)
+  '''^docs/superpowers/specs/''',          # historical design docs with pseudocode (e.g. token_mint_32 || ... identifiers)
+  '''^tests/.*\.test\.ts$''',              # vitest tests use clearly-labeled "test-*-32-chars" env fixtures
+  '''^tests/.*\.spec\.ts$''',              # same for spec files
+  '''^pnpm-lock\.yaml$''',
+  '''^Cargo\.lock$''',
+  '''^target/''',
+  '''^node_modules/''',
+  '''^\.next/''',
+  '''^apps/web/\.next/''',
+]
+
+# Strings that look secret-y but are deliberately public identifiers.
+regexes = [
+  '''AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq''',  # Anchor declare_id! for cloak-gatekeeper
+]
+
+# Commits that have been triaged and accepted (e.g., known leaks already handled).
+# IMPORTANT: if you list a leak here, it must be fully decommissioned (keys rotated, multisig burned).
+commits = [
+  "a8bff681a70004d9b328e8790492180c4c5df3dc",  # 2026-04-29 demo-cofre-2ofn keypair leak — see docs/security/reports/2026-05-11-secrets.md; multisig 2b7mF6Q... decommissioned
+]
