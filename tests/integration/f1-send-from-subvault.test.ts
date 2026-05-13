@@ -173,7 +173,7 @@ async function main() {
     nonce: repeated(16, 21),
   };
   const payloadHash = computePayloadHash(params);
-  const [license] = licensePda(cofre, payloadHash);
+  const [license] = licensePda(cofre, 1, payloadHash);
 
   await processTx(context, [
     invokeIssueLicenseIx({

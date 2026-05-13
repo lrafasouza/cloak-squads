@@ -309,7 +309,7 @@ async function main() {
     nonce,
   });
   const [licensePda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("license"), cofrePda.toBuffer(), Buffer.from(payloadHash)],
+    [Buffer.from("license"), cofrePda.toBuffer(), Buffer.from([0]), Buffer.from(payloadHash)],
     GATEKEEPER_PROGRAM_ID,
   );
 

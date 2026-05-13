@@ -50,6 +50,7 @@ impl ViewKeyDistribution {
 #[account]
 pub struct License {
     pub cofre: Pubkey,
+    pub vault_index: u8,
     pub payload_hash: [u8; 32],
     pub nonce: [u8; 16],
     pub issued_at: i64,
@@ -66,5 +67,5 @@ pub enum LicenseStatus {
 }
 
 impl License {
-    pub const INIT_SPACE: usize = 8 + 32 + 32 + 16 + 8 + 8 + 1 + 32 + 1;
+    pub const INIT_SPACE: usize = 8 + 32 + 1 + 32 + 16 + 8 + 8 + 1 + 32 + 1;
 }

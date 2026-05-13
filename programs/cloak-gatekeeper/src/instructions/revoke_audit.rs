@@ -4,14 +4,14 @@ use crate::errors::CloakSquadsError;
 use crate::state::*;
 use crate::utils::verify_squads_vault_signer;
 
-pub fn handler(
-    ctx: Context<RevokeAudit>,
-    diversifier_trunc: [u8; 16],
-    vault_index: u8,
-) -> Result<()> {
+pub fn handler(ctx: Context<RevokeAudit>, diversifier_trunc: [u8; 16]) -> Result<()> {
+    // F-003 (audit Pass 1): `revoke_audit` mutates Cofre.revoked_audit, which
+    // is cofre-wide state shared across every vault under the multisig.
+    // Hardcoding to vault[0] (Primary) prevents a sub-vault threshold from
+    // revoking audit credentials that affect other vaults' operations.
     verify_squads_vault_signer(
         &ctx.accounts.cofre.multisig,
-        vault_index,
+        0,
         &ctx.accounts.squads_vault,
     )?;
 

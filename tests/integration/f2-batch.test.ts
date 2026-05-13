@@ -188,7 +188,7 @@ async function main() {
   for (let i = 0; i < recipientCount; i++) {
     const params = recipients[i];
     const payloadHash = computePayloadHash(params);
-    const [license] = licensePda(cofre, payloadHash);
+    const [license] = licensePda(cofre, 0, payloadHash);
 
     licenses.push(license);
 

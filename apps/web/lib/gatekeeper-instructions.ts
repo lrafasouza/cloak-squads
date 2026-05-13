@@ -46,15 +46,16 @@ export async function buildIssueLicenseIxBrowser(params: {
   const gatekeeperProgram = new PublicKey(gatekeeperProgramId);
   const squadsProgram = new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID);
   const cofre = cofrePda(params.multisig, gatekeeperProgram)[0];
-  const vault = squadsVaultPda(params.multisig, squadsProgram, params.vaultIndex)[0];
-  const license = licensePda(cofre, params.payloadHash, gatekeeperProgram)[0];
+  const vaultIndex = params.vaultIndex ?? 0;
+  const vault = squadsVaultPda(params.multisig, squadsProgram, vaultIndex)[0];
+  const license = licensePda(cofre, vaultIndex, params.payloadHash, gatekeeperProgram)[0];
   const discriminator = await anchorDiscriminator("issue_license");
   const data = concatBytes(
     discriminator,
     params.payloadHash,
     params.nonce,
     writeI64Le(BigInt(params.ttlSecs ?? 900)),
-    new Uint8Array([params.vaultIndex ?? 0]),
+    new Uint8Array([vaultIndex]),
   );
 
   return {
@@ -117,6 +118,7 @@ export async function buildExecuteWithLicenseIxBrowser(params: {
   multisig: PublicKey;
   operator: PublicKey;
   invariants: PayloadInvariants;
+  vaultIndex?: number;
 }) {
   const gatekeeperProgram = new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID);
   const cofre = cofrePda(params.multisig, gatekeeperProgram)[0];
@@ -132,7 +134,7 @@ export async function buildExecuteWithLicenseIxBrowser(params: {
       params.invariants.nonce,
     ),
   );
-  const license = licensePda(cofre, new Uint8Array(payloadHash), gatekeeperProgram)[0];
+  const license = licensePda(cofre, params.vaultIndex ?? 0, new Uint8Array(payloadHash), gatekeeperProgram)[0];
   const discriminator = await anchorDiscriminator("execute_with_license");
   const data = concatBytes(
     discriminator,
@@ -159,18 +161,20 @@ export async function buildExecuteWithLicenseIxBrowser(params: {
 export async function buildRevokeAuditIxBrowser(params: {
   multisig: PublicKey;
   diversifier: Uint8Array;
-  vaultIndex?: number;
 }) {
+  // F-003 (audit Pass 1): revoke_audit is hardcoded to vault[0] (Primary)
+  // because it mutates Cofre.revoked_audit — cofre-wide state shared across
+  // every vault under the multisig. Sub-vaults cannot revoke audits.
   const gatekeeperProgram = new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID);
   const cofre = cofrePda(params.multisig, gatekeeperProgram)[0];
   const squadsProgram = new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID);
-  const vault = squadsVaultPda(params.multisig, squadsProgram, params.vaultIndex)[0];
+  const vault = squadsVaultPda(params.multisig, squadsProgram, 0)[0];
 
   // Take first 16 bytes of diversifier as diversifier_trunc
   const diversifierTrunc = params.diversifier.slice(0, 16);
 
   const discriminator = await anchorDiscriminator("revoke_audit");
-  const data = concatBytes(discriminator, diversifierTrunc, new Uint8Array([params.vaultIndex ?? 0]));
+  const data = concatBytes(discriminator, diversifierTrunc);
 
   return {
     cofre,

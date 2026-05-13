@@ -139,6 +139,7 @@ type SingleDraft = {
   memoNonce?: number[];
   memoEphemeralPk?: number[];
   payloadHash: number[];
+  vaultIndex?: number;
   invariants: {
     nullifier: number[];
     commitment: number[];
@@ -173,6 +174,7 @@ type PayrollDraft = {
   totalAmount: string;
   recipientCount: number;
   mode: string;
+  vaultIndex?: number;
   recipients: PayrollRecipient[];
 };
 
@@ -811,6 +813,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
     const cofre = cofrePda(multisigAddress, gatekeeperProgram)[0];
     const coder = new BorshAccountsCoder(IDL as Idl);
     const now = Math.floor(Date.now() / 1000);
+    const vaultIndex = draft.vaultIndex ?? 0;
     const invariants =
       "recipients" in draft
         ? draft.recipients.map((recipient) => recipient.invariants)
@@ -822,7 +825,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
 
     for (const invariant of invariants) {
       const payloadHash = computePayloadHash(draftInvariantsToPayload(invariant));
-      const license = licensePda(cofre, payloadHash, gatekeeperProgram)[0];
+      const license = licensePda(cofre, vaultIndex, payloadHash, gatekeeperProgram)[0];
       const accountInfo = await connection.getAccountInfo(license);
       if (!accountInfo) {
         setLicenseStatus("missing");
@@ -1180,6 +1183,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       multisig: multisigAddress,
       operator: wallet.publicKey,
       invariants: { nullifier, commitment, amount, tokenMint, recipientVkPub, nonce },
+      vaultIndex: draft.vaultIndex ?? 0,
     });
 
     const {

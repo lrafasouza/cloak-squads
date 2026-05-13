@@ -200,9 +200,10 @@ pub mod cloak_squads_test_harness {
         ctx: Context<InvokeRevokeAudit>,
         cofre_multisig: Pubkey,
         diversifier_trunc: [u8; 16],
-        vault_index: u8,
     ) -> Result<()> {
-        let data = ix_data("revoke_audit", &(diversifier_trunc, vault_index))?;
+        // F-003 (audit Pass 1): revoke_audit is hardcoded to vault[0] in the
+        // gatekeeper since it mutates Cofre.revoked_audit (cofre-wide state).
+        let data = ix_data("revoke_audit", &(diversifier_trunc,))?;
         invoke_with_squads_vault_at(
             &ctx.accounts.gatekeeper_program,
             &[
@@ -220,7 +221,7 @@ pub mod cloak_squads_test_harness {
                 ctx.accounts.gatekeeper_program.to_account_info(),
             ],
             &cofre_multisig,
-            vault_index,
+            0,
             ctx.bumps.squads_vault,
         )
     }
@@ -430,15 +431,15 @@ pub struct InvokeEmergencyCloseLicense<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(cofre_multisig: Pubkey, diversifier_trunc: [u8; 16], vault_index: u8)]
+#[instruction(cofre_multisig: Pubkey)]
 pub struct InvokeRevokeAudit<'info> {
     /// CHECK: checked by address in invoke_with_squads_vault_at.
     pub gatekeeper_program: UncheckedAccount<'info>,
     /// CHECK: typed and reallocated by cloak-gatekeeper.
     #[account(mut)]
     pub cofre: UncheckedAccount<'info>,
-    /// CHECK: PDA signer for CPI only.
-    #[account(seeds = [b"multisig", cofre_multisig.as_ref(), b"vault", &[vault_index]], bump)]
+    /// CHECK: PDA signer for CPI only — revoke_audit hardcoded to vault[0] (F-003).
+    #[account(seeds = [b"multisig", cofre_multisig.as_ref(), b"vault", &[0]], bump)]
     pub squads_vault: UncheckedAccount<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,

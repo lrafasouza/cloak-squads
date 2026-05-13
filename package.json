@@ -11,7 +11,7 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "test:unit": "vitest run -c tests/unit/vitest.config.ts",
-    "test:int": "node --experimental-strip-types tests/integration/gatekeeper-instructions.test.ts && node --experimental-strip-types tests/integration/f1-send.test.ts && node --experimental-strip-types tests/integration/f1-send-from-subvault.test.ts && node --experimental-strip-types tests/integration/f2-batch.test.ts && node --experimental-strip-types tests/integration/f3-audit.test.ts && node --experimental-strip-types tests/integration/e2e-full-flow.test.ts",
+    "test:int": "node --experimental-strip-types tests/integration/gatekeeper-instructions.test.ts && node --experimental-strip-types tests/integration/f1-send.test.ts && node --experimental-strip-types tests/integration/f1-send-from-subvault.test.ts && node --experimental-strip-types tests/integration/f1-cross-vault-replay.test.ts && node --experimental-strip-types tests/integration/f2-batch.test.ts && node --experimental-strip-types tests/integration/f3-audit.test.ts && node --experimental-strip-types tests/integration/e2e-full-flow.test.ts",
     "test:devnet": "RUN_DEVNET_TESTS=1 node --experimental-strip-types tests/devnet/cloak-deposit.devnet.test.ts",
     "test:all": "pnpm test:unit && pnpm test:int",
     "lint": "biome check .",

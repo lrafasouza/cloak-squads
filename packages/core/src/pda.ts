@@ -46,9 +46,14 @@ export function cofrePda(multisig: PublicKey, programId?: PublicKey): [PublicKey
   );
 }
 
-export function licensePda(cofre: PublicKey, payloadHash: Uint8Array, programId?: PublicKey): [PublicKey, number] {
+export function licensePda(
+  cofre: PublicKey,
+  vaultIndex: number,
+  payloadHash: Uint8Array,
+  programId?: PublicKey,
+): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("license"), cofre.toBuffer(), Buffer.from(payloadHash)],
+    [Buffer.from("license"), cofre.toBuffer(), Buffer.from([vaultIndex]), Buffer.from(payloadHash)],
     gatekeeperProgramId(programId),
   );
 }

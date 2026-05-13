@@ -68,7 +68,7 @@ test("e2e full flow: 1 single + 3 batch licenses all consumed", async () => {
       nonce: new Uint8Array(16).fill(diversifierByte + 3),
     };
     const payloadHash = computePayloadHash(invariants);
-    const license = licensePda(cofre, payloadHash)[0];
+    const license = licensePda(cofre, 0, payloadHash)[0];
 
     // Issue + execute would normally take many ixs. For brevity and because the
     // exact end-to-end builder lives in apps/web/lib, this test asserts the

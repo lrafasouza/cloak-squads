@@ -56,6 +56,7 @@ export function serializeDraft(draft: ProposalDraftRow, options: SerializeDraftO
     id: draft.id,
     cofreAddress: draft.cofreAddress,
     transactionIndex: draft.transactionIndex,
+    vaultIndex: draft.vaultIndex,
     kind: draft.kind,
     amount: draft.amount,
     recipient: draft.recipient,

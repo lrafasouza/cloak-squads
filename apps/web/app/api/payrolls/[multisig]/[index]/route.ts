@@ -64,6 +64,7 @@ export async function GET(
       id: draft.id,
       cofreAddress: draft.cofreAddress,
       transactionIndex: draft.transactionIndex,
+      vaultIndex: draft.vaultIndex,
       memo: draft.memo ?? undefined,
       totalAmount: draft.totalAmount,
       recipientCount: draft.recipientCount,
