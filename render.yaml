@@ -39,12 +39,10 @@ services:
           name: aegis-db
           property: connectionString
       # ── Crypto keys ─────────────────────────────────────────────────
-      # JWT_SIGNING_SECRET is DEPRECATED — the runtime crypto helpers no
-      # longer read it. Kept only so deployments mid-migration don't fail
-      # the env-schema parse. Remove from the dashboard once you've
-      # confirmed the four purpose-specific keys below are all set.
-      - key: JWT_SIGNING_SECRET
-        generateValue: true
+      # JWT_SIGNING_SECRET removed 2026-05-13 (audit Pass 3 F-010). The
+      # runtime crypto helpers no longer read it; auto-generating a value
+      # for a deprecated env was hardening drift. If a mid-migration
+      # rollback ever needs it, set the value manually in the dashboard.
       # HMAC key for stateless tokens (session cookie + claim challenge).
       # Each call site domain-separates further (`session-hmac-v1:`,
       # `challenge-hmac-v1:`) so they're cryptographically distinct.

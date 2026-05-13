@@ -4,7 +4,13 @@ export const revalidate = 300;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const days = searchParams.get("days") ?? "7";
+  // F-104 (audit Pass 2): validate `days` strictly before passing to the
+  // upstream URL. Today CoinGecko ignores unknown params, but templating
+  // a user-influenced value into a URL string is the same idiom as the
+  // ones that turn into SSRF / header-injection bugs later. Whitelist
+  // digits, cap to 4 chars (max useful = "365"), default to "7".
+  const daysParam = searchParams.get("days") ?? "7";
+  const days = /^[0-9]{1,4}$/.test(daysParam) ? daysParam : "7";
 
   try {
     const headers: Record<string, string> = { Accept: "application/json" };
@@ -12,14 +18,15 @@ export async function GET(request: Request) {
       headers["x-cg-demo-api-key"] = process.env.COINGECKO_API_KEY;
     }
 
-    const res = await fetch(
-      `https://api.coingecko.com/api/v3/coins/solana/market_chart?vs_currency=usd&days=${days}`,
-      {
-        headers,
-        signal: AbortSignal.timeout(8000),
-        next: { revalidate: 300 },
-      },
-    );
+    const upstream = new URL("https://api.coingecko.com/api/v3/coins/solana/market_chart");
+    upstream.searchParams.set("vs_currency", "usd");
+    upstream.searchParams.set("days", days);
+
+    const res = await fetch(upstream, {
+      headers,
+      signal: AbortSignal.timeout(8000),
+      next: { revalidate: 300 },
+    });
 
     if (!res.ok) {
       return NextResponse.json({ prices: [] }, { status: 200 });

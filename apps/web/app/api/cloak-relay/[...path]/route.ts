@@ -29,11 +29,22 @@ async function proxyRelayRequest(
   const upstream = new URL(`${relayBaseUrl()}/${path.join("/")}`);
   upstream.search = req.nextUrl.search;
 
+  // F-107 (audit Pass 2): build outbound headers from a strict allowlist.
+  // Today Node's fetch does not forward Cookie / Authorization cross-origin,
+  // but a future runtime change could leak session-cookie / wallet-auth
+  // tokens to the relay. Build outbound Headers only from the allowlist
+  // (Content-Type, Accept) — anything else from inbound is intentionally
+  // discarded.
   const headers = new Headers();
   const contentType = req.headers.get("content-type");
   if (contentType) headers.set("Content-Type", contentType);
   const accept = req.headers.get("accept");
   if (accept) headers.set("Accept", accept);
+  // Defensive: explicitly clear any sensitive header in case a future
+  // refactor accidentally copies inbound headers wholesale into `headers`.
+  for (const h of ["cookie", "authorization", "x-solana-auth", "x-solana-auth-v2"]) {
+    headers.delete(h);
+  }
 
   const init: RequestInit = {
     method: req.method,

@@ -9,12 +9,13 @@ useDefault = true
 description = "Project-wide allowlist for known non-secrets"
 
 # Paths that contain reference material or third-party content, never project secrets.
+# F-014 (audit Pass 3): the previous version allow-listed all `tests/**/*.test.ts`,
+# which would have masked a real future leak in a test file. Removed.
+# Test fixtures are kept allowlisted via regex below instead.
 paths = [
   '''^\.auditor/''',                       # cloned solanabr/Auditor corpus (reference checklists)
   '''^docs/security/reports/''',           # local-only audit reports (gitignored anyway, belt+suspenders)
   '''^docs/superpowers/specs/''',          # historical design docs with pseudocode (e.g. token_mint_32 || ... identifiers)
-  '''^tests/.*\.test\.ts$''',              # vitest tests use clearly-labeled "test-*-32-chars" env fixtures
-  '''^tests/.*\.spec\.ts$''',              # same for spec files
   '''^pnpm-lock\.yaml$''',
   '''^Cargo\.lock$''',
   '''^target/''',
@@ -23,9 +24,15 @@ paths = [
   '''^apps/web/\.next/''',
 ]
 
-# Strings that look secret-y but are deliberately public identifiers.
+# Strings that look secret-y but are deliberately public identifiers or
+# clearly-labelled test fixtures. Anything matching these patterns is
+# considered NOT a secret — keep this list short and explicit.
+# F-014 (audit Pass 3): regex-scoped rather than path-allowlisted so a
+# REAL leak in any test file (e.g., a pasted live key) is still caught.
 regexes = [
   '''AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq''',  # Anchor declare_id! for cloak-gatekeeper
+  '''test-[a-z0-9-]*(secret|key|hmac|hash|chars|crypto|session|field|audit)[a-z0-9!-]*''',  # tests/*.test.ts env fixtures
+  '''passphrase:test-[a-z0-9-]+''',                                  # AUDIT_EXPORT_SIGN_KEY test prefix (Pass 2 F-103)
 ]
 
 # Commits that have been triaged and accepted (e.g., known leaks already handled).
