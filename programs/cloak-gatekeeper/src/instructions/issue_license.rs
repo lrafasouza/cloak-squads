@@ -26,6 +26,7 @@ pub fn handler(
 
     let license = &mut ctx.accounts.license;
     license.cofre = ctx.accounts.cofre.key();
+    license.vault_index = vault_index;
     license.payload_hash = payload_hash;
     license.nonce = nonce;
     license.issued_at = now;
@@ -44,7 +45,7 @@ pub fn handler(
 }
 
 #[derive(Accounts)]
-#[instruction(payload_hash: [u8; 32])]
+#[instruction(payload_hash: [u8; 32], nonce: [u8; 16], ttl_secs: i64, vault_index: u8)]
 pub struct IssueLicense<'info> {
     #[account(seeds = [b"cofre", cofre.multisig.as_ref()], bump = cofre.bump)]
     pub cofre: Account<'info, Cofre>,
@@ -53,7 +54,7 @@ pub struct IssueLicense<'info> {
         init,
         payer = payer,
         space = License::INIT_SPACE,
-        seeds = [b"license", cofre.key().as_ref(), payload_hash.as_ref()],
+        seeds = [b"license", cofre.key().as_ref(), &[vault_index], payload_hash.as_ref()],
         bump,
     )]
     pub license: Account<'info, License>,

@@ -41,7 +41,7 @@ export const PAYLOAD_DOMAIN_SEP = Buffer.from("cloak-squads-payload-v1\0", "utf-
 export const COFRE_SPACE = (revokedCount: number) =>
   8 + 32 + 32 + 32 + 8 + 1 + 4 + 16 * revokedCount + 1;
 export const VIEW_DIST_SPACE = (entries: number) => 8 + 32 + 4 + entries * 144 + 1;
-export const LICENSE_SPACE = 8 + 32 + 32 + 16 + 8 + 8 + 1 + 32 + 1;
+export const LICENSE_SPACE = 8 + 32 + 1 + 32 + 16 + 8 + 8 + 1 + 32 + 1;
 export const MAX_REVOKED = 256;
 
 export type PayloadInvariants = {
@@ -120,6 +120,7 @@ export function encodeCofre(input: {
 
 export function encodeLicense(input: {
   cofre: PublicKey;
+  vaultIndex: number;
   payloadHash: Uint8Array;
   nonce: Uint8Array;
   issuedAt: bigint;
@@ -131,6 +132,7 @@ export function encodeLicense(input: {
   return Buffer.concat([
     accountDiscriminator("License"),
     encodePubkey(input.cofre),
+    Buffer.from([input.vaultIndex]),
     encodeArray(input.payloadHash, 32, "payloadHash"),
     encodeArray(input.nonce, 16, "nonce"),
     encodeI64(input.issuedAt),
@@ -190,13 +192,14 @@ export function decodeLicense(account: AccountInfoBytes) {
   assert.equal(account.data.length, LICENSE_SPACE);
   return {
     cofre: readPubkey(account.data, 8),
-    payloadHash: account.data.slice(40, 72),
-    nonce: account.data.slice(72, 88),
-    issuedAt: readI64(account.data, 88),
-    expiresAt: readI64(account.data, 96),
-    status: account.data[104],
-    closeAuthority: readPubkey(account.data, 105),
-    bump: account.data[137],
+    vaultIndex: account.data[40],
+    payloadHash: account.data.slice(41, 73),
+    nonce: account.data.slice(73, 89),
+    issuedAt: readI64(account.data, 89),
+    expiresAt: readI64(account.data, 97),
+    status: account.data[105],
+    closeAuthority: readPubkey(account.data, 106),
+    bump: account.data[138],
   };
 }
 
@@ -229,9 +232,9 @@ export function cofrePda(multisig: PublicKey) {
   );
 }
 
-export function licensePda(cofre: PublicKey, payloadHash: Uint8Array) {
+export function licensePda(cofre: PublicKey, vaultIndex: number, payloadHash: Uint8Array) {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("license"), cofre.toBuffer(), Buffer.from(payloadHash)],
+    [Buffer.from("license"), cofre.toBuffer(), Buffer.from([vaultIndex]), Buffer.from(payloadHash)],
     GATEKEEPER_PROGRAM_ID,
   );
 }

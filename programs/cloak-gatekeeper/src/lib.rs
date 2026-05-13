@@ -87,9 +87,8 @@ pub mod cloak_gatekeeper {
     pub fn revoke_audit(
         ctx: Context<RevokeAudit>,
         diversifier_trunc: [u8; 16],
-        vault_index: u8,
     ) -> Result<()> {
-        instructions::revoke_audit::handler(ctx, diversifier_trunc, vault_index)
+        instructions::revoke_audit::handler(ctx, diversifier_trunc)
     }
 
     pub fn set_operator(ctx: Context<SetOperator>, new_operator: Pubkey) -> Result<()> {

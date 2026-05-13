@@ -156,32 +156,7 @@
         },
         {
           "name": "license",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  105,
-                  99,
-                  101,
-                  110,
-                  115,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "cofre"
-              },
-              {
-                "kind": "account",
-                "path": "license.payload_hash",
-                "account": "License"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "operator",
@@ -242,32 +217,7 @@
         },
         {
           "name": "license",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  105,
-                  99,
-                  101,
-                  110,
-                  115,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "cofre"
-              },
-              {
-                "kind": "account",
-                "path": "license.payload_hash",
-                "account": "License"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "operator",
@@ -329,32 +279,7 @@
         },
         {
           "name": "license",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  105,
-                  99,
-                  101,
-                  110,
-                  115,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "cofre"
-              },
-              {
-                "kind": "account",
-                "path": "license.payload_hash",
-                "account": "License"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "operator",
@@ -563,31 +488,7 @@
         },
         {
           "name": "license",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  105,
-                  99,
-                  101,
-                  110,
-                  115,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "cofre"
-              },
-              {
-                "kind": "arg",
-                "path": "payload_hash"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "payer",
@@ -769,10 +670,6 @@
               16
             ]
           }
-        },
-        {
-          "name": "vault_index",
-          "type": "u8"
         }
       ]
     },
@@ -1099,6 +996,10 @@
           {
             "name": "cofre",
             "type": "pubkey"
+          },
+          {
+            "name": "vault_index",
+            "type": "u8"
           },
           {
             "name": "payload_hash",

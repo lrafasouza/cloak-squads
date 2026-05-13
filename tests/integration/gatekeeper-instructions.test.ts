@@ -213,7 +213,6 @@ function invokeRevokeAuditIx(input: {
   squadsVault: PublicKey;
   payer: PublicKey;
   diversifierTrunc: Uint8Array;
-  vaultIndex?: number;
 }) {
   return harnessIx(
     "invoke_revoke_audit",
@@ -224,11 +223,7 @@ function invokeRevokeAuditIx(input: {
       { pubkey: input.payer, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    [
-      encodePubkey(input.multisig),
-      encodeArray(input.diversifierTrunc, 16, "diversifierTrunc"),
-      encodeU8(input.vaultIndex ?? 0),
-    ],
+    [encodePubkey(input.multisig), encodeArray(input.diversifierTrunc, 16, "diversifierTrunc")],
   );
 }
 
@@ -321,7 +316,7 @@ function createFixture() {
   const payloadHash = computePayloadHash(params);
   const [cofre] = cofrePda(multisig);
   const [squadsVault] = squadsVaultPda(multisig);
-  const [license] = licensePda(cofre, payloadHash);
+  const [license] = licensePda(cofre, 0, payloadHash);
   const [viewDistribution] = viewDistributionPda(cofre);
   return {
     operator,
@@ -754,13 +749,14 @@ async function main() {
         GATEKEEPER_PROGRAM_ID,
         encodeLicense({
           cofre: fixture.cofre,
+          vaultIndex: 0,
           payloadHash: fixture.payloadHash,
           nonce: fixture.nonce,
           issuedAt: 0n,
           expiresAt: 1n,
           status: 0,
           closeAuthority: fixture.operator.publicKey,
-          bump: licensePda(fixture.cofre, fixture.payloadHash)[1],
+          bump: licensePda(fixture.cofre, 0, fixture.payloadHash)[1],
         }),
       ),
     );
@@ -836,13 +832,14 @@ async function main() {
         GATEKEEPER_PROGRAM_ID,
         encodeLicense({
           cofre: fixture.cofre,
+          vaultIndex: 0,
           payloadHash: fixture.payloadHash,
           nonce: fixture.nonce,
           issuedAt: 0n,
           expiresAt: 1n,
           status: 0,
           closeAuthority: fixture.operator.publicKey,
-          bump: licensePda(fixture.cofre, fixture.payloadHash)[1],
+          bump: licensePda(fixture.cofre, 0, fixture.payloadHash)[1],
         }),
       ),
     );

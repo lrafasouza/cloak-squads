@@ -20,7 +20,7 @@ pub struct CloseExpiredLicense<'info> {
     #[account(
         mut,
         close = operator,
-        seeds = [b"license", cofre.key().as_ref(), license.payload_hash.as_ref()],
+        seeds = [b"license", cofre.key().as_ref(), &[license.vault_index], license.payload_hash.as_ref()],
         bump = license.bump,
         has_one = cofre,
     )]
