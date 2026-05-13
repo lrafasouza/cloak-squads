@@ -50,7 +50,7 @@ export async function GET(_request: Request, context: { params: Promise<{ linkId
     const rawIp = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? null;
     const ip = rawIp ? (rawIp.split(",")[0] ?? rawIp).trim() : null;
     const userAgent = hdrs.get("user-agent");
-    void recordAuditAccess(linkId, "view", { ip, userAgent });
+    void recordAuditAccess(linkId, "view_transactions", { ip, userAgent });
 
     return NextResponse.json({
       linkId: link.id,

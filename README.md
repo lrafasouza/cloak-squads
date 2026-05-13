@@ -377,8 +377,9 @@ cp .env.example apps/web/.env.local
 #   NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID, NEXT_PUBLIC_SQUADS_PROGRAM_ID
 #   (pda.ts now fails loud if these env vars are set but malformed —
 #   see commit 4ddd7be — so don't leave them empty in production)
-# Optional but recommended: AUDIT_EXPORT_SIGN_KEY (base64 of 32 bytes;
-# falls back to a JWT-derived seed when missing), SESSION_HMAC_KEY and
+# Optional but recommended: AUDIT_EXPORT_SIGN_KEY (must start with
+# `base64:` + 44-char seed OR `passphrase:` + ≥16 chars — audit Pass 2
+# F-103; bare values rejected at boot), SESSION_HMAC_KEY and
 # FIELD_CRYPTO_KEY for per-purpose key isolation (each falls back to
 # JWT_SIGNING_SECRET — set explicitly in production so one leak does not
 # compromise sessions, encrypted PII, and audit signatures together),

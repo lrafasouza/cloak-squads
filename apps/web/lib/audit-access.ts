@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
 
-export type AuditAction = "view" | "export_csv" | "export_json";
+// Distinct actions for each endpoint so the 60s dedupe doesn't collapse
+// metadata + transactions fetches into one row (audit Pass 2 F-101).
+// "view" stays for backward compatibility with historical rows. New
+// transaction-data fetches log as "view_transactions".
+export type AuditAction = "view" | "view_transactions" | "export_csv" | "export_json";
 
 /**
  * Record an access to a public audit link.

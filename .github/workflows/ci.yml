@@ -6,29 +6,59 @@ on:
   pull_request:
     branches: [master, main]
 
+# F-006 (audit Pass 3): minimum-privilege default. Jobs override per-step
+# if they need anything beyond reading the source tree.
+permissions:
+  contents: read
+
 jobs:
   gitleaks:
     name: Secret Scan (gitleaks)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read   # gitleaks-action posts a check status; no comments
     steps:
-      - uses: actions/checkout@v4
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0   # full history so PR scans can diff
-      - uses: gitleaks/gitleaks-action@v2
+      # gitleaks/gitleaks-action@v2.3.7
+      - uses: gitleaks/gitleaks-action@83373cf2f8c4db6e24b41c1a9b086bb9619e9cd3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  rust-audit:
+    name: Rust Supply-Chain (cargo-audit)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # rustsec/audit-check@v2.0.0 — scans Cargo.lock against the
+      # RustSec Advisory Database. Fails on known vulns. F-002 (Pass 3).
+      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - uses: pnpm/action-setup@v3
+      # pnpm/action-setup@v3.0.0
+      - uses: pnpm/action-setup@e9540b3eafaf84907c087a645d3258bfaa861427
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      # actions/setup-node@v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: pnpm
@@ -45,14 +75,19 @@ jobs:
   integration-tests:
     name: Integration Tests (Anchor)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - uses: pnpm/action-setup@v3
+      # pnpm/action-setup@v3.0.0
+      - uses: pnpm/action-setup@e9540b3eafaf84907c087a645d3258bfaa861427
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      # actions/setup-node@v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: pnpm
@@ -63,8 +98,9 @@ jobs:
           rustup default stable
           rustup component add rustfmt clippy
 
+      # Swatinem/rust-cache@v2.7.7
       - name: Cache Rust/Cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@400e7407cfd7a091e5fbb6afec01ec146c432b7c
         with:
           workspaces: . -> target
 

@@ -112,7 +112,7 @@ function downloadText(filename: string, body: string, type: string) {
 
 type AuditAccessEntry = {
   id: string;
-  action: "view" | "export_csv" | "export_json";
+  action: "view" | "view_transactions" | "export_csv" | "export_json";
   ip: string | null;
   userAgent: string | null;
   accessedAt: string;
@@ -1049,9 +1049,11 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
                           <span className="font-medium text-ink">
                             {entry.action === "view"
                               ? "View"
-                              : entry.action === "export_csv"
-                                ? "CSV export"
-                                : "JSON export"}
+                              : entry.action === "view_transactions"
+                                ? "View transactions"
+                                : entry.action === "export_csv"
+                                  ? "CSV export"
+                                  : "JSON export"}
                           </span>
                           <span className="truncate font-mono text-ink-subtle">
                             {entry.ip ?? "—"} · {new Date(entry.accessedAt).toLocaleString()}

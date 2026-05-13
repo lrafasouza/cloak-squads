@@ -14,7 +14,7 @@ beforeAll(() => {
   process.env.JWT_SIGNING_SECRET = "test-secret-at-least-16-chars-long";
   process.env.SESSION_HMAC_KEY = "test-session-hmac-key-32-chars!!";
   process.env.FIELD_CRYPTO_KEY = "test-field-crypto-key-32-chars!!";
-  process.env.AUDIT_EXPORT_SIGN_KEY = "test-audit-sign-key-32-chars!!aa";
+  process.env.AUDIT_EXPORT_SIGN_KEY = "passphrase:test-audit-sign-key-32-chars!!aa";
 });
 
 describe("encryptField / decryptField", () => {
