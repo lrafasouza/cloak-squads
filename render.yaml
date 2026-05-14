@@ -73,6 +73,22 @@ services:
       #   node -e "console.log('passphrase:' + process.env.OLD)"  # where OLD is the bare value
       - key: AUDIT_EXPORT_SIGN_KEY
         sync: false
+      # F-503 (audit Pass 5): REDIS_URL is mandatory in production.
+      # `apps/web/lib/env.ts` rejects the env on missing REDIS_URL and
+      # `instrumentation.ts` `process.exit(1)`s — without this entry the
+      # first deploy boots into a restart loop. The actual value must be
+      # set in the Render dashboard (Upstash Redis is the typical choice).
+      # If REDIS_URL is a TLS endpoint with token-in-URL, REDIS_TOKEN may
+      # be unused but is declared for parity with the env schema.
+      - key: REDIS_URL
+        sync: false
+      - key: REDIS_TOKEN
+        sync: false
+      # F-504 (audit Pass 5): absolute origin used to build the Report-To
+      # CSP endpoint URL. Set to the production host (custom domain when
+      # configured, render.com hostname otherwise).
+      - key: APP_ORIGIN
+        sync: false
       - key: COINGECKO_API_KEY
         sync: false
 

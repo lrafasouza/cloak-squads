@@ -89,13 +89,18 @@ const CSP_REPORT_ONLY = [
   "report-to csp-endpoint",
 ].join("; ");
 
-// F-405 (audit Pass 4): Report-To header pairs with `report-to` directive
-// above. Required by the modern Reporting API spec; legacy browsers fall
-// back to `report-uri`.
+// F-405 (audit Pass 4) + F-504 (audit Pass 5): Report-To header pairs
+// with the `report-to` directive above. The W3C Reporting API requires
+// ABSOLUTE URLs in `endpoints[].url` — Chrome and Firefox silently drop
+// the config when the URL is relative. Pulled from APP_ORIGIN so the
+// same code works for prod and preview without re-templating the file.
+// Legacy `report-uri /api/csp-report` (relative) still works on older
+// browsers that bypass the Reporting API.
+const APP_ORIGIN = process.env.APP_ORIGIN ?? "https://aegis-web.onrender.com";
 const REPORT_TO_HEADER = JSON.stringify({
   group: "csp-endpoint",
   max_age: 10886400, // 126 days
-  endpoints: [{ url: "/api/csp-report" }],
+  endpoints: [{ url: `${APP_ORIGIN}/api/csp-report` }],
   include_subdomains: true,
 });
 

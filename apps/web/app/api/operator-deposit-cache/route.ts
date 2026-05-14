@@ -1,18 +1,18 @@
 /**
- * Cross-tab / cross-session backup of the operator's per-proposal Cloak
- * deposit cache.
+ * Sole durable store for the operator's per-proposal Cloak deposit cache.
  *
- * Why this exists: the operator page persists `{ leafIndex, spendKey,
- * blinding, withdrawn, … }` to sessionStorage so a retry inside the same
- * tab skips the on-chain deposit. sessionStorage is per-tab — closing the
- * tab between Deposit success and the Finalize step loses the cache, and
- * the next attempt re-deposits, draining operator funds.
+ * Holds `{ leafIndex, spendKey, blinding, withdrawn, … }` so that a retry
+ * after a tab close or a different session skips the on-chain deposit
+ * (re-depositing would drain operator funds).
  *
- * This endpoint is the durable backup. The fast path stays in
- * sessionStorage (zero round-trip); the operator page falls back to GET
- * here when sessionStorage misses, and POSTs here after every successful
- * deposit/withdraw step so the next session/tab picks up where this one
- * left off.
+ * Audit history:
+ *   - Originally a sessionStorage fast-path with this endpoint as the
+ *     backup. Pass 4 F-402 (commit e30f55f, 2026-05-13) removed the
+ *     sessionStorage path entirely — UTXO secrets (`keypairPrivateKey`,
+ *     `blinding`) in browser storage were XSS-exfiltratable. The
+ *     `readCloakDepositCacheLocal` / `writeCloakDepositCacheLocal`
+ *     helpers in `operator/page.tsx` are now intentionally no-ops; every
+ *     read/write hits this endpoint.
  *
  * Auth: requireVaultOperator — only the registered operator for the
  * multisig can read or write. The plaintext payload contains the one-time
