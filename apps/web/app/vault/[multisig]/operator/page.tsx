@@ -47,7 +47,6 @@ import {
 import {
   type CloakDepositCache,
   type SerializedCloakDepositCache,
-  cloakDepositCacheKey,
   deserializeCacheEntry,
   serializeCacheEntry,
 } from "@/lib/operator-deposit-cache";
@@ -199,31 +198,41 @@ type DecodedLicense = {
 
 type CacheFetcher = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
+// F-402 (audit Pass 4): the per-tab sessionStorage cache used to hold the
+// full `SerializedCloakDepositCache` — including `keypairPrivateKey` +
+// `blinding` for each output UTXO, which together grant spending authority.
+// Combined with F-401 (CSP report-only), a single XSS bug exfiltrated the
+// secrets. Replaced by an always-server-fetch model. Local fast path is
+// disabled; the server mirror at /api/operator-deposit-cache is the only
+// source of truth, encrypted at rest via FIELD_CRYPTO_KEY (Pass 2 verified).
+//
+// Trade-off: one extra round-trip per retry. Acceptable for an operator
+// flow that already makes multiple network calls per step.
 function readCloakDepositCacheLocal(
-  multisig: string,
-  transactionIndex: string,
+  _multisig: string,
+  _transactionIndex: string,
 ): CloakDepositCache | null {
-  try {
-    const raw = sessionStorage.getItem(cloakDepositCacheKey(multisig, transactionIndex));
-    if (!raw) return null;
-    return deserializeCacheEntry(JSON.parse(raw));
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 function writeCloakDepositCacheLocal(
-  multisig: string,
-  transactionIndex: string,
-  value: CloakDepositCache,
+  _multisig: string,
+  _transactionIndex: string,
+  _value: CloakDepositCache,
 ) {
+  // intentionally no-op — see F-402 comment above.
+}
+
+// Best-effort cleanup of any pre-F-402 cache entries left behind in a
+// long-lived tab. Runs once on module import. Failures swallow silently.
+if (typeof sessionStorage !== "undefined") {
   try {
-    sessionStorage.setItem(
-      cloakDepositCacheKey(multisig, transactionIndex),
-      JSON.stringify(serializeCacheEntry(value)),
-    );
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i);
+      if (k?.startsWith("cloak-deposit:")) sessionStorage.removeItem(k);
+    }
   } catch {
-    // Best effort cache only; execution can continue without it.
+    /* sessionStorage unavailable */
   }
 }
 
@@ -2360,7 +2369,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                               <a
                                 href={transactionExplorerUrl(s.signature!)}
                                 target="_blank"
-                                rel="noreferrer"
+                                rel="noopener noreferrer"
                                 className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-aegis hover:bg-accent-soft"
                               >
                                 Explorer
@@ -2407,7 +2416,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                             <a
                               href={transactionExplorerUrl(item.value)}
                               target="_blank"
-                              rel="noreferrer"
+                              rel="noopener noreferrer"
                               className="rounded-md px-2 py-1 text-[11px] font-semibold text-accent transition-aegis hover:bg-surface-2"
                             >
                               Explorer
@@ -2487,7 +2496,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                         <a
                           href={transactionExplorerUrl(item.signature)}
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                           className="rounded-md px-2 py-1 text-[11px] font-semibold text-accent transition-aegis hover:bg-accent-soft"
                         >
                           Explorer
@@ -2620,7 +2629,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             <a
               href={transactionExplorerUrl(refundSignature)}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="text-accent hover:underline"
             >
               View transaction

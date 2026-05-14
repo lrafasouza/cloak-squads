@@ -462,14 +462,10 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
         token_mint: cloakMint.toBase58(),
       };
 
-      try {
-        sessionStorage.setItem(
-          `send-claim:${multisig}:${transactionIndex}`,
-          JSON.stringify(commitmentClaim),
-        );
-      } catch {
-        /* sessionStorage unavailable */
-      }
+      // F-402 (audit Pass 4): `commitmentClaim` carries `keypairPrivateKey`
+      // + `blinding` — spending authority. Removed sessionStorage write.
+      // Operator-grade GET on /api/proposals/[multisig]/[index] returns
+      // the full claim via serialize-proposal-draft.ts (includeSensitive=true).
 
       const draftResponse = await fetchWithAuth("/api/proposals", {
         method: "POST",

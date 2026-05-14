@@ -725,18 +725,11 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
 
-      for (let i = 0; i < parsedNotes.length; i++) {
-        const n = parsedNotes[i];
-        if (!n) continue;
-        try {
-          sessionStorage.setItem(
-            `claim:${multisigAddress.toBase58()}:${transactionIndex}:${i}`,
-            JSON.stringify(n.claim),
-          );
-        } catch {
-          /* sessionStorage full or unavailable */
-        }
-      }
+      // F-402 (audit Pass 4): the per-recipient `claim:` entries used to
+      // carry `keypairPrivateKey` + `blinding` for each note — spending
+      // authority over private UTXOs. Removed. Operator-grade GET on
+      // /api/payrolls/[multisig]/[index] now returns commitmentClaim
+      // with secrets via serialize-proposal-draft.ts (includeSensitive=true).
 
       if (mode === "invoice") {
         try {

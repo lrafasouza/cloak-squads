@@ -64,10 +64,18 @@ const SECURITY_HEADERS = [
  */
 const CSP_REPORT_ONLY = [
   "default-src 'self'",
+  // F-407 (audit Pass 4): when flipping to enforce, replace `'unsafe-inline'`
+  // with a per-request nonce (proxy.ts approach) and drop the open `https:`
+  // source — explicitly enumerate wallet adapter origins instead.
   "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https://fonts.gstatic.com",
+  // F-407 (audit Pass 4): on enforce flip, narrow `connect-src` to:
+  //   'self', NEXT_PUBLIC_CLOAK_RELAY_URL, NEXT_PUBLIC_RPC_URL (+ wss),
+  //   FALLBACK_RPC_URL, api.coingecko.com, helius if applicable.
+  //   The user-configurable RPC must be allowlisted at config-render time
+  //   rather than left open as `https:`.
   "connect-src 'self' https: wss:",
   "worker-src 'self' blob:",
   "frame-src 'self'",
@@ -75,9 +83,24 @@ const CSP_REPORT_ONLY = [
   "form-action 'self'",
   "base-uri 'self'",
   "object-src 'none'",
+  // F-405 (audit Pass 4): give the browser a place to deliver violations
+  // so the enforce-flip plan is data-driven, not console-spelunk.
+  "report-uri /api/csp-report",
+  "report-to csp-endpoint",
 ].join("; ");
 
+// F-405 (audit Pass 4): Report-To header pairs with `report-to` directive
+// above. Required by the modern Reporting API spec; legacy browsers fall
+// back to `report-uri`.
+const REPORT_TO_HEADER = JSON.stringify({
+  group: "csp-endpoint",
+  max_age: 10886400, // 126 days
+  endpoints: [{ url: "/api/csp-report" }],
+  include_subdomains: true,
+});
+
 SECURITY_HEADERS.push({ key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY });
+SECURITY_HEADERS.push({ key: "Report-To", value: REPORT_TO_HEADER });
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

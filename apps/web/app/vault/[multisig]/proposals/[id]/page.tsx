@@ -291,24 +291,28 @@ export default function ProposalApprovalPage({
   const { data: vaultData } = useVaultData(multisigParam);
   const timeLockSeconds = vaultData?.timeLock ?? 0;
 
+  // F-402 (audit Pass 4): the sessionStorage `claim:*` cache was removed
+  // — it used to carry `keypairPrivateKey` + `blinding`, which an XSS
+  // bug could exfiltrate. The `draft.commitmentClaim` / `payrollDraft`
+  // path below is now the sole source of truth. Operator-grade callers
+  // get full secrets via serialize-proposal-draft.ts; co-signers get the
+  // public claim only (sensitive fields stripped). Defensive cleanup of
+  // any pre-fix entries left behind in a long-lived tab.
   useEffect(() => {
+    if (typeof sessionStorage === "undefined") return;
     try {
-      const raw = sessionStorage.getItem(`claim:${multisigParam}:${id}`);
-      if (raw) setCommitmentClaim(JSON.parse(raw) as CommitmentClaim);
-      const payrollClaims = new Map<string, CommitmentClaim>();
+      sessionStorage.removeItem(`claim:${multisigParam}:${id}`);
+      sessionStorage.removeItem(`send-claim:${multisigParam}:${id}`);
       for (let i = 0; i < 10; i++) {
-        const rawPayroll = sessionStorage.getItem(`claim:${multisigParam}:${id}:${i}`);
-        if (rawPayroll) payrollClaims.set(i.toString(), JSON.parse(rawPayroll) as CommitmentClaim);
+        sessionStorage.removeItem(`claim:${multisigParam}:${id}:${i}`);
       }
-      if (payrollClaims.size > 0) setCommitmentClaims(payrollClaims);
     } catch {
-      /* ignore */
+      /* sessionStorage unavailable */
     }
   }, [multisigParam, id]);
 
-  // Co-signer fallback: if sessionStorage doesn't have the proposer's local cache
-  // (e.g. a different signer opening this proposal in another browser), use the
-  // public claim returned by the API (no secrets, just verifiable invariants).
+  // Source of truth: the proposal/payroll draft API. Operator gets full
+  // secrets; co-signers get the public claim (sensitive fields stripped).
   useEffect(() => {
     if (commitmentClaim) return;
     if (draft?.commitmentClaim) {

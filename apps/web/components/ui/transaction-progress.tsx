@@ -179,7 +179,7 @@ function SignatureLink({ signature }: { signature: string }) {
         <a
           href={explorerUrl(signature)}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-semibold text-accent transition-aegis hover:bg-accent-soft"
         >
           Explorer
