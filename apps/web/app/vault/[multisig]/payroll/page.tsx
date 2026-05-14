@@ -732,14 +732,11 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
       // with secrets via serialize-proposal-draft.ts (includeSensitive=true).
 
       if (mode === "invoice") {
-        try {
-          sessionStorage.setItem(
-            `payroll-claim-links:${multisigAddress.toBase58()}:${transactionIndex}`,
-            JSON.stringify(claimLinks),
-          );
-        } catch {
-          /* sessionStorage full or unavailable */
-        }
+        // F-402 (audit Pass 4, follow-up self-review): the
+        // `payroll-claim-links:` sessionStorage entry was dead code (no
+        // reader anywhere) that held the secret-bearing claim URL
+        // fragments (`#sk=...`). React state `createdPayroll` is the
+        // only display surface and is cleared when the tab closes.
         setCreatedPayroll({ transactionIndex, claimLinks });
         setPending(false);
       } else {
