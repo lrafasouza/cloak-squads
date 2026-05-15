@@ -30,4 +30,6 @@ pub enum CloakSquadsError {
     SignerAlreadyExists,
     #[msg("Signer not found in the view-key distribution")]
     SignerNotFound,
+    #[msg("Cofre-wide admin operations must be authorised by the primary vault (vault_index = 0)")]
+    AdminMustUsePrimaryVault,
 }

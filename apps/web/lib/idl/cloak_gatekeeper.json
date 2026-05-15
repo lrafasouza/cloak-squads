@@ -874,6 +874,11 @@
       "code": 6013,
       "name": "SignerNotFound",
       "msg": "Signer not found in the view-key distribution"
+    },
+    {
+      "code": 6014,
+      "name": "AdminMustUsePrimaryVault",
+      "msg": "Cofre-wide admin operations must be authorised by the primary vault (vault_index = 0)"
     }
   ],
   "types": [

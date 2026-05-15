@@ -35,4 +35,20 @@ export async function register() {
     // server (the process stays alive, healthcheck passes, runtime 500s).
     process.exit(1);
   }
+
+  // Optional Sentry init — no-op when SENTRY_DSN is unset or
+  // @sentry/nextjs isn't installed. See apps/web/lib/sentry.ts for the
+  // activation recipe. Deliberately runs AFTER env validation so a
+  // missing crypto key still wins the boot-fail race.
+  try {
+    const { initSentry } = await import("./lib/sentry");
+    await initSentry();
+  } catch (err) {
+    // initSentry is wrapped in its own try/catch already. Any leak past
+    // that is suspicious — log but never crash the boot for monitoring.
+    console.warn(
+      "[boot] sentry init unexpectedly threw — continuing without it:",
+      err instanceof Error ? err.message : err,
+    );
+  }
 }

@@ -897,6 +897,34 @@ async function main() {
     assert.equal(await context.banksClient.getAccount(fixture.license), null);
   }
 
+  // Defense-in-depth (B10): passing a non-zero vault_index to
+  // emergency_close_license must be rejected by the Rust handler, even
+  // if a valid signer were available. The product convention is that
+  // admin operations are vault[0]-only; this `require!` enforces it on-
+  // chain so a buggy client can't drift the invariant.
+  {
+    const fixture = await initializeCofre(context);
+    await issueLicense(context, fixture, 10_000n);
+    await expectTxFailure(
+      context,
+      [
+        invokeEmergencyCloseLicenseIx({
+          multisig: fixture.multisig,
+          cofre: fixture.cofre,
+          squadsVault: fixture.squadsVault,
+          license: fixture.license,
+          operator: fixture.operator.publicKey,
+          payer: fixture.payer.publicKey,
+          vaultIndex: 1,
+        }),
+      ],
+      "AdminMustUsePrimaryVault",
+      [fixture.payer],
+    );
+    // License still exists — the failed tx did not close it.
+    assert.ok(await context.banksClient.getAccount(fixture.license));
+  }
+
   {
     const fixture = await initializeCofre(context);
     await processTx(context, [

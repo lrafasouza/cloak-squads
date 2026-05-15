@@ -2,6 +2,7 @@ import { recordAuditAccess } from "@/lib/audit-access";
 import { loadAuditTransactions } from "@/lib/audit-data";
 import { signAuditExport } from "@/lib/audit-sign";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { exportAuditToCSV } from "@cloak-squads/core/audit";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
@@ -29,6 +30,22 @@ const exportSchema = z.object({
 
 export async function POST(request: Request, context: { params: Promise<{ linkId: string }> }) {
   const { linkId } = await context.params;
+
+  const hdrs = await headers();
+  const rawIp = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? null;
+  const ip = rawIp ? (rawIp.split(",")[0] ?? rawIp).trim() : null;
+  const userAgent = hdrs.get("user-agent");
+
+  // Fail-fast BEFORE the CPU-heavy path (canonicalJson + signAuditExport).
+  // Tighter than /transactions because each export does an Ed25519 sign and
+  // a full canonical-JSON re-serialization.
+  const rlKey = `audit:export:${linkId}:${ip ?? "unknown"}`;
+  if (!(await checkRateLimitAsync(rlKey, "write"))) {
+    return NextResponse.json(
+      { error: "Too many exports. Try again in a minute." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
 
   let body: unknown;
   try {
@@ -85,10 +102,6 @@ export async function POST(request: Request, context: { params: Promise<{ linkId
       data,
     });
 
-    const hdrs = await headers();
-    const rawIp = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? null;
-    const ip = rawIp ? (rawIp.split(",")[0] ?? rawIp).trim() : null;
-    const userAgent = hdrs.get("user-agent");
     void recordAuditAccess(linkId, parsed.data.format === "csv" ? "export_csv" : "export_json", {
       ip,
       userAgent,

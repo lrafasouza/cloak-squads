@@ -3,6 +3,10 @@ services:
     name: aegis-web
     runtime: node
     plan: starter
+    # Liveness + readiness probe. Returns 200 when DB is reachable; 503
+    # when DB is hard-failing. Redis is degraded-tolerant (a transient
+    # blip won't restart the pod). See apps/web/app/api/health/route.ts.
+    healthCheckPath: /api/health
     buildCommand: |
       npm install -g pnpm@9.12.0
       pnpm install --frozen-lockfile
@@ -90,6 +94,13 @@ services:
       - key: APP_ORIGIN
         sync: false
       - key: COINGECKO_API_KEY
+        sync: false
+      # Optional Sentry (audit-recommended observability). Leave unset until
+      # `@sentry/nextjs` is installed and the operator has a project DSN.
+      # apps/web/lib/sentry.ts gracefully degrades to a no-op without either.
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_TRACES_SAMPLE_RATE
         sync: false
 
 databases:

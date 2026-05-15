@@ -1,11 +1,25 @@
 /**
  * Server-side vault membership verification.
  *
- * Reads the on-chain Squads Multisig account and checks whether
- * the authenticated wallet is a member. Results are cached in-memory
- * for 60 seconds to avoid hammering the RPC on every request.
+ * Reads the on-chain Squads Multisig account and checks whether the
+ * authenticated wallet is a member. Results are cached for ~15 seconds.
  *
- * Replace the in-memory cache with Redis (Upstash) before mainnet.
+ * Caching strategy (audit Pass 2 + road-to-mainnet B1):
+ *   1. Redis (Upstash REST) is the canonical layer when REDIS_URL is set.
+ *      All pods see the same view; explicit `invalidateMembershipCache`
+ *      reaches every pod through a single DEL.
+ *   2. In-memory `Map` is a per-process write-through. Same pod doesn't
+ *      re-hit Redis on every call inside the 15s window. Falls back to
+ *      sole cache when REDIS_URL is unset (dev) or Redis transiently
+ *      errors (rate-limit.ts uses the same fallback shape).
+ *
+ * Why not lock-and-fetch on a miss: two pods racing the same miss both
+ * hit RPC and both write Redis. The work is idempotent and bounded by
+ * the 15s TTL — not worth a distributed lock.
+ *
+ * Failure mode: Redis unreachable → log once, fall through to in-memory
+ * + RPC. Membership is gating, not paying; we prefer "serve from a
+ * possibly-stale view" over "lock out every member because Redis blipped".
  */
 import { publicEnv } from "@/lib/env";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
@@ -14,11 +28,8 @@ import * as multisigSdk from "@sqds/multisig";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
-// 15s — short enough that a removed member loses access quickly even when
-// the explicit POST /api/vaults/[multisig]/refresh-membership invalidation
-// is not called. Replace with Redis-backed cache before mainnet so
-// multi-instance deploys agree on the same view.
 const CACHE_TTL_MS = 15_000;
+const CACHE_TTL_SECS = 15;
 
 type MemberCacheEntry = {
   members: string[];
@@ -28,30 +39,87 @@ type MemberCacheEntry = {
 
 const memberCache = new Map<string, MemberCacheEntry>();
 
+function memberCacheKey(multisigAddress: string): string {
+  return `vm:${multisigAddress}`;
+}
+
+// ─── Redis (Upstash REST) ──────────────────────────────────────────────
+//
+// TODO: this duplicates the inline Upstash REST shape from rate-limit.ts.
+// A future refactor should extract a shared `apps/web/lib/redis.ts`
+// module that both consumers import. For now, inlined to keep B1 scoped.
+
+async function redisGet(key: string): Promise<string | null> {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) return null;
+  try {
+    const res = await fetch(`${redisUrl}/get/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${process.env.REDIS_TOKEN ?? ""}` },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result: string | null };
+    return data.result;
+  } catch (err) {
+    warnRedisOnce(err);
+    return null;
+  }
+}
+
+async function redisSetEx(key: string, value: string, ttlSecs: number): Promise<void> {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) return;
+  try {
+    const url = `${redisUrl}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}?EX=${ttlSecs}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${process.env.REDIS_TOKEN ?? ""}` },
+    });
+    if (!res.ok) warnRedisOnce(new Error(`SET HTTP ${res.status}`));
+  } catch (err) {
+    warnRedisOnce(err);
+  }
+}
+
+async function redisDel(key: string): Promise<void> {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) return;
+  try {
+    const res = await fetch(`${redisUrl}/del/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${process.env.REDIS_TOKEN ?? ""}` },
+    });
+    if (!res.ok) warnRedisOnce(new Error(`DEL HTTP ${res.status}`));
+  } catch (err) {
+    warnRedisOnce(err);
+  }
+}
+
+function warnRedisOnce(err: unknown) {
+  if (!(globalThis as Record<string, unknown>).__vmWarnedOnce) {
+    (globalThis as Record<string, unknown>).__vmWarnedOnce = true;
+    console.warn(
+      "[vault-membership] Redis unreachable — falling back to in-memory cache. Error:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
+// ─── RPC + connection ──────────────────────────────────────────────────
+
 function getConnection() {
   const url = publicEnv.NEXT_PUBLIC_RPC_URL;
   const { Connection } = require("@solana/web3.js") as typeof import("@solana/web3.js");
   return new Connection(url, "confirmed");
 }
 
-/**
- * Fetch the members array for a multisig, using a 60s in-memory cache.
- */
-export async function getMultisigMembers(
+async function fetchMembersFromRpc(
   multisigAddress: string,
 ): Promise<{ members: string[]; operator: string | null }> {
-  const cached = memberCache.get(multisigAddress);
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-    return { members: cached.members, operator: cached.operator };
-  }
-
   const connection = getConnection();
   const multisigPk = new PublicKey(multisigAddress);
 
   const ms = await multisigSdk.accounts.Multisig.fromAccountAddress(connection, multisigPk);
   const members = ms.members.map((m: { key: PublicKey }) => m.key.toBase58());
 
-  // Try to read operator from Cofre account (may not exist yet)
+  // Try to read operator from Cofre account (may not exist yet).
   let operator: string | null = null;
   try {
     const gatekeeperProgramId = new PublicKey(publicEnv.NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID);
@@ -62,17 +130,61 @@ export async function getMultisigMembers(
     const cofreAccount = await connection.getAccountInfo(cofreAddr);
     if (cofreAccount) {
       // Cofre layout (from IDL): discriminator(8) + multisig(32) + operator(32) + ...
-      // multisig: bytes 8-39, operator: bytes 40-71
       const operatorBytes = cofreAccount.data.slice(40, 72);
       operator = new PublicKey(operatorBytes).toBase58();
     }
   } catch {
-    // Cofre may not exist — operator stays null
+    // Cofre may not exist — operator stays null.
   }
 
-  const entry: MemberCacheEntry = { members, operator, fetchedAt: Date.now() };
-  memberCache.set(multisigAddress, entry);
   return { members, operator };
+}
+
+// ─── Public API ────────────────────────────────────────────────────────
+
+/**
+ * Fetch the members array for a multisig.
+ *
+ * Order of operations:
+ *   1. In-memory hit (fresh) → return.
+ *   2. Redis hit → seed in-memory, return.
+ *   3. RPC fetch → write Redis (best-effort) + in-memory, return.
+ */
+export async function getMultisigMembers(
+  multisigAddress: string,
+): Promise<{ members: string[]; operator: string | null }> {
+  // 1. In-memory fast path
+  const cached = memberCache.get(multisigAddress);
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+    return { members: cached.members, operator: cached.operator };
+  }
+
+  // 2. Redis read
+  const redisKey = memberCacheKey(multisigAddress);
+  const fromRedis = await redisGet(redisKey);
+  if (fromRedis) {
+    try {
+      const parsed = JSON.parse(fromRedis) as {
+        members: string[];
+        operator: string | null;
+      };
+      memberCache.set(multisigAddress, {
+        members: parsed.members,
+        operator: parsed.operator,
+        fetchedAt: Date.now(),
+      });
+      return { members: parsed.members, operator: parsed.operator };
+    } catch {
+      // Corrupt entry — fall through to RPC.
+    }
+  }
+
+  // 3. RPC fallback
+  const fresh = await fetchMembersFromRpc(multisigAddress);
+  memberCache.set(multisigAddress, { ...fresh, fetchedAt: Date.now() });
+  // Best-effort write-through. Fire-and-forget; failures already log via warnRedisOnce.
+  void redisSetEx(redisKey, JSON.stringify(fresh), CACHE_TTL_SECS);
+  return fresh;
 }
 
 /**
@@ -162,11 +274,19 @@ export async function verifyAuditLinkAccess(
 
 /**
  * Clear the membership cache for a specific multisig (or all if no arg).
- * Useful after membership changes.
+ *
+ * Targeted (multisigAddress provided): deletes both Redis and in-memory
+ * entries for that key. The Redis DEL is broadcast — every pod that reads
+ * after the DEL will miss and re-fetch.
+ *
+ * Untargeted (no arg): clears only the local in-memory map. Redis-wide
+ * SCAN+DEL would be expensive and ambiguous (which keys?); we let the
+ * 15s TTL expire those.
  */
-export function invalidateMembershipCache(multisigAddress?: string) {
+export async function invalidateMembershipCache(multisigAddress?: string) {
   if (multisigAddress) {
     memberCache.delete(multisigAddress);
+    await redisDel(memberCacheKey(multisigAddress));
   } else {
     memberCache.clear();
   }

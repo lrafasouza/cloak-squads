@@ -63,6 +63,11 @@ const serverEnvSchema = z
     // which neuters the v2 hardening. Default OFF; set to "true" only as a
     // temporary escape hatch while a stale client is still in the wild.
     ALLOW_LEGACY_AUTH: z.enum(["true", "false"]).default("false"),
+    // Optional Sentry integration. When SENTRY_DSN is set AND
+    // `@sentry/nextjs` is installed, instrumentation.ts initialises the
+    // reporter at boot. Both gates must pass — see apps/web/lib/sentry.ts.
+    SENTRY_DSN: z.string().url().optional(),
+    SENTRY_TRACES_SAMPLE_RATE: z.string().optional(),
   })
   .superRefine((env, ctx) => {
     // Production must set every purpose-specific key explicitly. The
@@ -117,6 +122,8 @@ export function getServerEnv() {
     REDIS_URL: process.env.REDIS_URL,
     REDIS_TOKEN: process.env.REDIS_TOKEN,
     ALLOW_LEGACY_AUTH: process.env.ALLOW_LEGACY_AUTH,
+    SENTRY_DSN: process.env.SENTRY_DSN,
+    SENTRY_TRACES_SAMPLE_RATE: process.env.SENTRY_TRACES_SAMPLE_RATE,
   });
 }
 

@@ -31,7 +31,10 @@ export async function POST(
   const auth = await requireVaultMember(multisig);
   if (auth instanceof NextResponse) return auth;
 
-  invalidateMembershipCache(multisig);
+  // Await so the client sees a consistent state: the Redis DEL has
+  // propagated before the response returns. Other pods reading after
+  // this point will miss the cache and re-fetch from RPC.
+  await invalidateMembershipCache(multisig);
 
   return NextResponse.json({ ok: true });
 }

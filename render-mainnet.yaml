@@ -1,0 +1,165 @@
+# ════════════════════════════════════════════════════════════════════════════
+#  render-mainnet.yaml — Aegis production service blueprint (mainnet-beta)
+#
+#  This file is the canonical Render blueprint for the **mainnet** service.
+#  The devnet/staging service lives in `render.yaml`. Render's auto-deploy
+#  by default consumes `render.yaml`; the mainnet service must be created
+#  manually from this file (Render dashboard → New Blueprint → point at
+#  `render-mainnet.yaml`).
+#
+#  ── Differences vs render.yaml ───────────────────────────────────────────
+#  1. Service name + DB name suffixed `-mainnet` to live alongside devnet.
+#  2. `plan: standard` (not `starter`) — required for `numInstances > 1`,
+#     rolling deploy, and the disk + CPU footprint of indexed mainnet
+#     traffic.
+#  3. `numInstances: 2` — multi-instance is the whole point of the B1
+#     Redis membership cache. Without B1 shipped, two pods will diverge
+#     on member lists for up to 15s.
+#  4. `NEXT_PUBLIC_SOLANA_CLUSTER=mainnet-beta`.
+#  5. `NEXT_PUBLIC_CLOAK_RELAY_URL=https://api.cloak.ag` (no `devnet.` host).
+#  6. Program IDs are **placeholders** today. They get filled the day we
+#     run `anchor deploy --provider.cluster mainnet-beta` (Fase C5) and
+#     transfer the upgrade authority to the 2-of-3 hardware-wallet vault
+#     (Fase C2). Editing this file BEFORE that deploy is not enough — the
+#     program IDs must be live on mainnet first or the service boot-loops
+#     trying to resolve them.
+#
+#  ── Pre-deploy checklist (mirrors ROAD_TO_MAINNET.md Fase C) ─────────────
+#  Before `render blueprint create render-mainnet.yaml`:
+#    [ ] Hardware Ledger provisioned, AEGIS_LEDGER_PUBKEY captured (C1)
+#    [ ] 2-of-3 governance multisig live on mainnet (C2)
+#    [ ] Cold key backed up to Bitwarden + paper (C3)
+#    [ ] Verifiable build run, sha256 published (C4)
+#    [ ] `anchor deploy --provider.cluster mainnet-beta` succeeded (C5)
+#    [ ] Upgrade authority transferred to the 2-of-3 vault PDA (C6)
+#    [ ] `solana program show <id> --url mainnet-beta` confirms authority (C7)
+#    [ ] Program IDs below filled with the real values (C8 — this file)
+#
+#  Then on the Render dashboard:
+#    [ ] Set all `sync: false` env vars (RPC keys, REDIS_URL/TOKEN, AUDIT
+#        EXPORT KEY with passphrase:/base64: prefix, APP_ORIGIN)
+#    [ ] Trigger initial deploy
+#    [ ] Confirm /api/health returns 200
+#    [ ] Confirm cluster query returns mainnet-beta in logs
+#
+#  ── DO NOT ────────────────────────────────────────────────────────────────
+#  - Don't merge this file into `render.yaml`. They serve different services.
+#  - Don't auto-deploy from this file on every push to master. Mainnet
+#    deploys are gated on the verifiable-build flow (release tags only).
+#  - Don't share the database between the devnet and mainnet services.
+#    Cluster-scoping inside the code is defense-in-depth, not isolation.
+# ════════════════════════════════════════════════════════════════════════════
+
+services:
+  - type: web
+    name: aegis-web-mainnet
+    runtime: node
+    # Standard (not Starter): required for numInstances > 1 and the
+    # CPU/memory footprint of mainnet traffic + the indexer.
+    plan: standard
+    # Two pods for rolling deploy + redundancy. B1 (Redis membership
+    # cache) is a HARD prerequisite — without it, two pods diverge.
+    numInstances: 2
+    healthCheckPath: /api/health
+    # Manual deploys only. Production should NOT auto-deploy on every
+    # commit to master; the verifiable-build flow gates this.
+    autoDeploy: false
+    buildCommand: |
+      npm install -g pnpm@9.12.0
+      pnpm install --frozen-lockfile
+      pnpm -F @cloak-squads/core build
+      cd apps/web && pnpm prisma generate && pnpm next build
+    startCommand: cd apps/web && npx prisma migrate deploy && pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_SOLANA_CLUSTER
+        value: mainnet-beta
+
+      # ── RPC ────────────────────────────────────────────────────────
+      # Helius mainnet RPC (paid tier). Set in Render dashboard (sync:
+      # false keeps api-key out of git). Format:
+      #   https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
+      #   wss://mainnet.helius-rpc.com/?api-key=YOUR_KEY
+      - key: NEXT_PUBLIC_RPC_URL
+        sync: false
+      - key: NEXT_PUBLIC_RPC_WS_URL
+        sync: false
+      # Server-only fallback RPC. Used by income-sync and other server
+      # RPC fan-outs that don't go through the public client URL.
+      - key: FALLBACK_RPC_URL
+        sync: false
+
+      # ── Program IDs (PLACEHOLDERS — fill at C5 deploy time) ─────────
+      # The Cloak shield-pool program ID on mainnet. Check
+      # `https://api.cloak.ag/` for the canonical value at deploy time.
+      - key: NEXT_PUBLIC_CLOAK_PROGRAM_ID
+        value: REPLACE_WITH_MAINNET_CLOAK_PROGRAM_ID
+      - key: NEXT_PUBLIC_CLOAK_RELAY_URL
+        value: https://api.cloak.ag
+      # Set this to the program ID printed by `anchor deploy` on mainnet
+      # (NOT the devnet one in render.yaml). After the deploy, double-
+      # check it matches `Anchor.toml [programs.mainnet]` if you keep
+      # that table.
+      - key: NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID
+        value: REPLACE_WITH_MAINNET_GATEKEEPER_PROGRAM_ID
+      # Squads V4 program ID is the same on devnet + mainnet at time of
+      # writing (2026-05). Verify before deploy via `solana program show
+      # SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf --url mainnet-beta`.
+      - key: NEXT_PUBLIC_SQUADS_PROGRAM_ID
+        value: SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf
+
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aegis-db-mainnet
+          property: connectionString
+
+      # ── Crypto keys ─────────────────────────────────────────────────
+      # Same crypto key strategy as devnet — keys are environment-bound,
+      # not shared between devnet and mainnet.
+      - key: SESSION_HMAC_KEY
+        generateValue: true
+      - key: FIELD_CRYPTO_KEY
+        generateValue: true
+      - key: FIELD_CRYPTO_KEY_PREVIOUS
+        sync: false
+      # Must carry "passphrase:" or "base64:" prefix (audit Pass 2 F-103).
+      # See render.yaml header comment for migration recipe.
+      - key: AUDIT_EXPORT_SIGN_KEY
+        sync: false
+
+      # ── Redis (mandatory in production) ─────────────────────────────
+      # env.ts:superRefine rejects boot without REDIS_URL. Use a SEPARATE
+      # Upstash database from devnet — sharing keys across clusters has
+      # the same risk profile as sharing the relational DB.
+      - key: REDIS_URL
+        sync: false
+      - key: REDIS_TOKEN
+        sync: false
+
+      # ── Origin + misc ───────────────────────────────────────────────
+      # APP_ORIGIN is the absolute production hostname. Used by Report-To
+      # CSP header (audit Pass 5 F-504). Custom domain if configured,
+      # render.com hostname otherwise.
+      - key: APP_ORIGIN
+        sync: false
+      - key: COINGECKO_API_KEY
+        sync: false
+      # Optional Sentry (audit-recommended observability for mainnet). Set
+      # SENTRY_DSN once the operator has a Sentry project + the package is
+      # installed (`pnpm -F web add @sentry/nextjs`). Lower the sample rate
+      # on mainnet (e.g. 0.05) if event quota becomes a concern.
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        sync: false
+
+databases:
+  - name: aegis-db-mainnet
+    # Standard plan: backups, longer retention, better availability.
+    # Free tier is fine for devnet but NOT for mainnet traffic.
+    plan: standard
+    databaseName: aegis_mainnet
+    user: aegis_mainnet
