@@ -1,17 +1,23 @@
+# Local-dev only. Production Postgres is on Render (see render.yaml).
+# F-008 (audit Pass 3): credentials read from .env so the committed file
+# can't be mistaken for a production config and so an accidentally-
+# exposed port doesn't run with `postgres/postgres`. Set in .env or
+# export to your shell before `docker compose up`.
 services:
   postgres:
     image: postgres:16-alpine
     container_name: aegis-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: aegis_dev
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env or shell}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env or shell}
+      POSTGRES_DB: ${POSTGRES_DB:-aegis_dev}
     ports:
-      - "5432:5432"
+      # Bind to localhost only — refuse to expose the dev DB on 0.0.0.0.
+      - "127.0.0.1:5432:5432"
     volumes:
       - aegis-postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d aegis_dev"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 5

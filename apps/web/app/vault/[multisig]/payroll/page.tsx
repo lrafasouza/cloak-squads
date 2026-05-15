@@ -725,28 +725,18 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
 
       void queryClient.invalidateQueries({ queryKey: proposalSummariesQueryKey(multisig) });
 
-      for (let i = 0; i < parsedNotes.length; i++) {
-        const n = parsedNotes[i];
-        if (!n) continue;
-        try {
-          sessionStorage.setItem(
-            `claim:${multisigAddress.toBase58()}:${transactionIndex}:${i}`,
-            JSON.stringify(n.claim),
-          );
-        } catch {
-          /* sessionStorage full or unavailable */
-        }
-      }
+      // F-402 (audit Pass 4): the per-recipient `claim:` entries used to
+      // carry `keypairPrivateKey` + `blinding` for each note — spending
+      // authority over private UTXOs. Removed. Operator-grade GET on
+      // /api/payrolls/[multisig]/[index] now returns commitmentClaim
+      // with secrets via serialize-proposal-draft.ts (includeSensitive=true).
 
       if (mode === "invoice") {
-        try {
-          sessionStorage.setItem(
-            `payroll-claim-links:${multisigAddress.toBase58()}:${transactionIndex}`,
-            JSON.stringify(claimLinks),
-          );
-        } catch {
-          /* sessionStorage full or unavailable */
-        }
+        // F-402 (audit Pass 4, follow-up self-review): the
+        // `payroll-claim-links:` sessionStorage entry was dead code (no
+        // reader anywhere) that held the secret-bearing claim URL
+        // fragments (`#sk=...`). React state `createdPayroll` is the
+        // only display surface and is cleared when the tab closes.
         setCreatedPayroll({ transactionIndex, claimLinks });
         setPending(false);
       } else {

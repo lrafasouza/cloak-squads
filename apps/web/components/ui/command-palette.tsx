@@ -84,7 +84,9 @@ export function CommandPalette() {
     (href: string, external?: boolean) => {
       setOpen(false);
       if (external) {
-        window.open(href, "_blank");
+        // F-403 (audit Pass 4): defence-in-depth for older Safari/WebView
+        // where _blank doesn't imply noopener.
+        window.open(href, "_blank", "noopener,noreferrer");
       } else {
         router.push(href);
       }

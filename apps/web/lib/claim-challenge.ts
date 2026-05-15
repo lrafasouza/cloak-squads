@@ -155,11 +155,29 @@ export function checkChallenge(invoiceId: string, challengeId: string): Uint8Arr
  * Atomically mark a challenge as consumed (one-time use).
  * Returns true if this is the first use, false if already consumed.
  *
- * Without Redis: always returns true (no-op, acceptable for dev/test).
+ * Failure modes (audit Pass 2 F-102):
+ *   - Production (`NODE_ENV === "production"`) without REDIS_URL: throws.
+ *     One-time-use is a security invariant of the claim flow; silently
+ *     downgrading it to "valid for the 60s HMAC TTL" is fail-open and
+ *     was the original Sev 5 bug. The caller's catch should surface a
+ *     5xx to the client.
+ *   - Non-production without REDIS_URL: returns true (no-op). Dev/test
+ *     setups don't need a Redis instance just to exercise the happy path.
+ *   - REDIS_URL set but unreachable / SET command throws: error bubbles
+ *     up. The caller treats this as a transient failure — the user can
+ *     retry; the challenge stays unclaimed. Better than fail-open.
  */
 export async function consumeChallenge(invoiceId: string, challengeId: string): Promise<boolean> {
   const redis = await getRedis();
-  if (!redis) return true; // no Redis — degrade gracefully
+  if (!redis) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "consumeChallenge: REDIS_URL is required in production. One-time-use " +
+          "challenge enforcement cannot be downgraded to the HMAC TTL (audit Pass 2 F-102).",
+      );
+    }
+    return true; // non-production fall-through
+  }
 
   const key = `chal-used:${invoiceId}:${challengeHash(challengeId)}`;
   const result = await redis.set(key, "1", { ex: CONSUME_TTL_SECS, nx: true });

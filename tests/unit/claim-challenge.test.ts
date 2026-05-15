@@ -15,7 +15,7 @@ beforeEach(() => {
   process.env.JWT_SIGNING_SECRET = "test-secret-32-chars-long-enough!!";
   process.env.SESSION_HMAC_KEY = "test-session-hmac-key-32-chars!!";
   process.env.FIELD_CRYPTO_KEY = "test-field-crypto-key-32-chars!!";
-  process.env.AUDIT_EXPORT_SIGN_KEY = "test-audit-sign-key-32-chars!!aa";
+  process.env.AUDIT_EXPORT_SIGN_KEY = "passphrase:test-audit-sign-key-32-chars!!aa";
   delete process.env.REDIS_URL;
   vi.resetModules();
   vi.useRealTimers();

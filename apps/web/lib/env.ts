@@ -37,13 +37,23 @@ const serverEnvSchema = z
     // Decrypt path tries FIELD_CRYPTO_KEY first, falls back to
     // FIELD_CRYPTO_KEY_PREVIOUS. Unset under steady state.
     FIELD_CRYPTO_KEY_PREVIOUS: z.string().min(16).optional(),
-    // Ed25519 signing seed for audit export signatures. Either base64 of
-    // 32 bytes (preferred) or any non-empty string (audit-sign.ts derives
-    // the seed via SHA-256 in that case). Each export embeds the verifying
-    // `publicKey` in its envelope, so rotating only impacts new exports —
-    // historical exports remain verifiable offline against their bundled
-    // pubkey.
-    AUDIT_EXPORT_SIGN_KEY: z.string().min(1).optional(),
+    // Ed25519 signing seed for audit export signatures. Must carry an
+    // explicit scheme prefix to rule out ambiguous parsing (audit Pass 2
+    // F-103):
+    //   - "base64:<44 chars>" — strict 32-byte base64 seed (preferred)
+    //   - "passphrase:<>=16 chars>" — SHA-256 hashed deterministic seed
+    // See apps/web/lib/audit-sign.ts for the canonical parser.
+    // Each export embeds the verifying `publicKey` in its envelope, so
+    // rotating only impacts new exports — historical exports remain
+    // verifiable offline against their bundled pubkey.
+    AUDIT_EXPORT_SIGN_KEY: z
+      .string()
+      .min(1)
+      .refine(
+        (v) => v.startsWith("base64:") || v.startsWith("passphrase:"),
+        "AUDIT_EXPORT_SIGN_KEY must start with 'base64:' or 'passphrase:' (audit Pass 2 F-103)",
+      )
+      .optional(),
     LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
     FALLBACK_RPC_URL: z.string().url().optional(),
     REDIS_URL: z.string().url().optional(),
@@ -69,6 +79,18 @@ const serverEnvSchema = z
           message: `${key} is required in production. Falling back to JWT_SIGNING_SECRET keeps the four crypto subsystems sharing one secret — set this explicitly in the deploy env.`,
         });
       }
+    }
+    // REDIS_URL is required in production: consumeChallenge fails closed
+    // without it (audit Pass 2 F-102), and rate-limit.ts depends on it
+    // for distributed counters. Dev/test can still run REDIS-less.
+    if (!env.REDIS_URL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["REDIS_URL"],
+        message:
+          "REDIS_URL is required in production: one-time-use challenge enforcement " +
+          "fails closed without it (audit Pass 2 F-102).",
+      });
     }
   });
 

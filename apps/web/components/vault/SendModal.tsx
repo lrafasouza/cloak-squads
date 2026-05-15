@@ -574,14 +574,9 @@ export function SendModal({
         ...(memoBoxSkHex ? { memoBoxSk: memoBoxSkHex } : {}),
       };
 
-      try {
-        sessionStorage.setItem(
-          `send-claim:${multisig}:${transactionIndex}`,
-          JSON.stringify(commitmentClaim),
-        );
-      } catch {
-        /* sessionStorage unavailable */
-      }
+      // F-402 (audit Pass 4): `commitmentClaim` here carries
+      // `keypairPrivateKey` + `blinding`. Operator path refetches from
+      // /api/proposals/[multisig]/[index] (includeSensitive=true).
 
       const draftResponse = await fetchWithAuth("/api/proposals", {
         method: "POST",

@@ -39,12 +39,10 @@ services:
           name: aegis-db
           property: connectionString
       # ── Crypto keys ─────────────────────────────────────────────────
-      # JWT_SIGNING_SECRET is DEPRECATED — the runtime crypto helpers no
-      # longer read it. Kept only so deployments mid-migration don't fail
-      # the env-schema parse. Remove from the dashboard once you've
-      # confirmed the four purpose-specific keys below are all set.
-      - key: JWT_SIGNING_SECRET
-        generateValue: true
+      # JWT_SIGNING_SECRET removed 2026-05-13 (audit Pass 3 F-010). The
+      # runtime crypto helpers no longer read it; auto-generating a value
+      # for a deprecated env was hardening drift. If a mid-migration
+      # rollback ever needs it, set the value manually in the dashboard.
       # HMAC key for stateless tokens (session cookie + claim challenge).
       # Each call site domain-separates further (`session-hmac-v1:`,
       # `challenge-hmac-v1:`) so they're cryptographically distinct.
@@ -61,14 +59,36 @@ services:
       - key: FIELD_CRYPTO_KEY_PREVIOUS
         sync: false
       # Ed25519 signing seed for audit-export signatures. audit-sign.ts
-      # accepts either a base64-of-32-byte seed (preferred) or any non-empty
-      # string (SHA-256-hashed to derive the seed). Render's generateValue
-      # produces a 256-bit random hex string — falls into the hash path,
-      # which is cryptographically equivalent. Each export envelope embeds
-      # its verifying publicKey so historical exports remain offline-
-      # verifiable across rotations.
+      # requires an explicit scheme prefix (audit Pass 2 F-103 — bare
+      # values caused ambiguous parsing):
+      #   - "base64:<44-char seed>" — strict 32-byte base64 (preferred)
+      #   - "passphrase:<>=16 chars>" — SHA-256-hashed deterministic seed
+      # Render's generateValue produces an unprefixed string. After first
+      # deploy following the F-103 fix, the operator MUST edit this env in
+      # the Render dashboard to prepend `passphrase:` to the existing
+      # value (preserves the signing keypair so historical exports stay
+      # verifiable) OR replace with a freshly generated `base64:<seed>`
+      # (rotates — old exports remain verifiable via embedded publicKey).
+      # Migration one-liner that keeps the existing keypair:
+      #   node -e "console.log('passphrase:' + process.env.OLD)"  # where OLD is the bare value
       - key: AUDIT_EXPORT_SIGN_KEY
-        generateValue: true
+        sync: false
+      # F-503 (audit Pass 5): REDIS_URL is mandatory in production.
+      # `apps/web/lib/env.ts` rejects the env on missing REDIS_URL and
+      # `instrumentation.ts` `process.exit(1)`s — without this entry the
+      # first deploy boots into a restart loop. The actual value must be
+      # set in the Render dashboard (Upstash Redis is the typical choice).
+      # If REDIS_URL is a TLS endpoint with token-in-URL, REDIS_TOKEN may
+      # be unused but is declared for parity with the env schema.
+      - key: REDIS_URL
+        sync: false
+      - key: REDIS_TOKEN
+        sync: false
+      # F-504 (audit Pass 5): absolute origin used to build the Report-To
+      # CSP endpoint URL. Set to the production host (custom domain when
+      # configured, render.com hostname otherwise).
+      - key: APP_ORIGIN
+        sync: false
       - key: COINGECKO_API_KEY
         sync: false
 

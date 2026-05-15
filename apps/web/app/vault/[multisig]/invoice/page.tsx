@@ -406,15 +406,13 @@ export default function InvoicePage({ params }: { params: Promise<{ multisig: st
         throw new Error(body?.error ?? "Could not persist proposal draft.");
       }
 
-      // Step 5: Cache claim secrets in sessionStorage
-      try {
-        sessionStorage.setItem(
-          `claim:${multisigAddress.toBase58()}:${transactionIndex}`,
-          JSON.stringify(claim),
-        );
-      } catch {
-        /* sessionStorage full or unavailable */
-      }
+      // F-402 (audit Pass 4): claim secrets used to be cached in
+      // sessionStorage for the proposer's same-tab navigation to
+      // /proposals/[id]. That copy carried `keypairPrivateKey` +
+      // `blinding`, which is spending authority. The draft API already
+      // returns `commitmentClaim` to authenticated operators via
+      // serialize-proposal-draft.ts (includeSensitive=true), so the
+      // proposals page refetches from the server instead.
 
       updateStep("persist", { status: "success" });
       completeTransaction({

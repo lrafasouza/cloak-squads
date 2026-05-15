@@ -110,9 +110,15 @@ export async function PATCH(
       data: { archivedAt: parsed.data.action === "archive" ? new Date() : null },
     });
 
+    // F-502 (audit Pass 5): this PATCH handler authenticates with
+    // `requireVaultMember`, not `requireVaultOperator`. Echoing the
+    // sensitive `commitmentClaim` back here leaks the operator's
+    // `keypairPrivateKey` + `blinding` to any co-signer who PATCHes
+    // an archive on a proposal they didn't create. Archive doesn't
+    // need the sensitive payload — strip it.
     return NextResponse.json({
       ok: true,
-      draft: serializeDraft(draft, { includeSensitive: true }),
+      draft: serializeDraft(draft, { includeSensitive: false }),
     });
   } catch (error) {
     console.error("[api/proposals] archive failed:", error);

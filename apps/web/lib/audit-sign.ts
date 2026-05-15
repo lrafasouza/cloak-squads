@@ -4,12 +4,21 @@ import nacl from "tweetnacl";
 /**
  * Resolve the Ed25519 keypair used to sign audit exports.
  *
- * Reads `AUDIT_EXPORT_SIGN_KEY` from the environment. The value is either
- * a base64-encoded 32-byte seed (preferred — generate with
- * `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`)
- * or any string ≥1 char which is hashed with SHA-256 to derive a deterministic
- * 32-byte seed (acceptable for devnet so a Render-generated random string
- * works without manual processing).
+ * Reads `AUDIT_EXPORT_SIGN_KEY` from the environment. To avoid the
+ * ambiguous-parse class of bug (Pass 2 audit F-103), the value MUST carry
+ * an explicit scheme prefix:
+ *
+ *   - `base64:<44 chars>` — strict 32-byte base64 seed (preferred).
+ *     Generate with:
+ *       node -e "console.log('base64:' + require('crypto').randomBytes(32).toString('base64'))"
+ *
+ *   - `passphrase:<any string ≥16 chars>` — SHA-256 hashed into a
+ *     deterministic 32-byte seed. Devnet-friendly fallback; cryptographic
+ *     entropy is whatever the passphrase carries, so production should
+ *     prefer `base64:`.
+ *
+ * No prefix → boot fails with a clear message. This rules out the
+ * 43-/44-char passphrase that accidentally decodes as base64.
  *
  * Each export envelope embeds the verifying `publicKey`, so rotating only
  * impacts NEW exports — historical exports remain offline-verifiable
@@ -17,8 +26,25 @@ import nacl from "tweetnacl";
  */
 let cached: nacl.SignKeyPair | null = null;
 
-function decodeBase64(value: string): Uint8Array {
-  return Uint8Array.from(Buffer.from(value, "base64"));
+// Strict base64: only valid base64 alphabet chars, optional 0-2 `=` padding.
+// 32-byte seed encodes to exactly 44 chars (43 + 1 `=`).
+const STRICT_BASE64_32B = /^[A-Za-z0-9+/]{43}=$/;
+
+function decodeStrictBase64Seed(value: string): Uint8Array {
+  if (!STRICT_BASE64_32B.test(value)) {
+    throw new Error(
+      "AUDIT_EXPORT_SIGN_KEY: 'base64:' prefix requires exactly 44 base64 chars " +
+        "(32-byte seed). Generate: " +
+        `node -e "console.log('base64:' + require('crypto').randomBytes(32).toString('base64'))"`,
+    );
+  }
+  const decoded = Uint8Array.from(Buffer.from(value, "base64"));
+  if (decoded.length !== 32) {
+    // Should be unreachable given the regex above; defensive guard for
+    // future-proofing if the regex is relaxed.
+    throw new Error("AUDIT_EXPORT_SIGN_KEY: base64 seed must decode to 32 bytes.");
+  }
+  return decoded;
 }
 
 export function getAuditSigningKeypair(): nacl.SignKeyPair {
@@ -29,23 +55,40 @@ export function getAuditSigningKeypair(): nacl.SignKeyPair {
     throw new Error("AUDIT_EXPORT_SIGN_KEY must be set.");
   }
 
-  // Preferred path: literal 32-byte base64 seed.
-  const decoded = decodeBase64(explicit);
-  if (decoded.length === 32) {
-    cached = nacl.sign.keyPair.fromSeed(decoded);
+  // Strict prefix dispatch — see header comment.
+  if (explicit.startsWith("base64:")) {
+    const seed = decodeStrictBase64Seed(explicit.slice("base64:".length));
+    cached = nacl.sign.keyPair.fromSeed(seed);
     return cached;
   }
 
-  // Fallback path: hash any non-empty string into a deterministic seed so
-  // a Render-generated random hex/string still works without manual
-  // base64 encoding. Devnet-friendly; production should set a real
-  // 32-byte seed for cryptographic hygiene.
-  if (explicit.length < 1) {
-    throw new Error("AUDIT_EXPORT_SIGN_KEY must be non-empty.");
+  if (explicit.startsWith("passphrase:")) {
+    const passphrase = explicit.slice("passphrase:".length);
+    if (passphrase.length < 16) {
+      throw new Error(
+        "AUDIT_EXPORT_SIGN_KEY: 'passphrase:' requires at least 16 chars of entropy.",
+      );
+    }
+    const seed = createHash("sha256").update(`audit-export-v1:${passphrase}`).digest();
+    cached = nacl.sign.keyPair.fromSeed(Uint8Array.from(seed));
+    return cached;
   }
-  const seed = createHash("sha256").update(`audit-export-v1:${explicit}`).digest();
-  cached = nacl.sign.keyPair.fromSeed(Uint8Array.from(seed));
-  return cached;
+
+  throw new Error(
+    "AUDIT_EXPORT_SIGN_KEY must carry an explicit scheme prefix " +
+      "('base64:<44-char seed>' or 'passphrase:<>=16 chars>'). " +
+      "Bare values are rejected to prevent ambiguous parsing (audit Pass 2 F-103). " +
+      "Generate a fresh base64 seed: " +
+      `node -e "console.log('base64:' + require('crypto').randomBytes(32).toString('base64'))"`,
+  );
+}
+
+/**
+ * Test-only: reset the cached keypair so a test can swap
+ * AUDIT_EXPORT_SIGN_KEY between cases. Production must not call this.
+ */
+export function __resetAuditSigningKeypairForTests(): void {
+  cached = null;
 }
 
 export type SignedAuditExport = {

@@ -1,0 +1,60 @@
+# Dependabot config — audit Pass 3 F-004.
+# Surfaces drift on weekly cadence so the security tab is not the only signal.
+#
+# Three ecosystems matter to this repo:
+#   - npm (pnpm-lock.yaml at root + apps/web + packages/core)
+#   - cargo (root workspace including programs/cloak-gatekeeper + harness)
+#   - github-actions (CI workflows under .github/workflows)
+#
+# Group strategy: high-volume noise (devDependencies, minor/patch bumps)
+# rolls up into a single PR per ecosystem; security advisories ship
+# individually so they're not buried.
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    labels: ["deps", "npm"]
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    labels: ["deps", "rust"]
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    # Anchor 0.31.1 is pinned across the workspace by deliberate choice;
+    # major bumps need a coordinated update of the IDL builder + test
+    # harness. Dependabot will still surface advisories that target it.
+    ignore:
+      - dependency-name: "anchor-lang"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "anchor-spl"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels: ["deps", "ci"]
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"

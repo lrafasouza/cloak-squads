@@ -21,7 +21,7 @@ import nacl from "tweetnacl";
 const SESSION_KEY = randomBytes(32).toString("hex");
 const FIELD_KEY = randomBytes(32).toString("hex");
 const FIELD_KEY_NEXT = randomBytes(32).toString("hex");
-const AUDIT_SEED = randomBytes(32).toString("base64");
+const AUDIT_SEED = `base64:${randomBytes(32).toString("base64")}`;
 
 process.env.SESSION_HMAC_KEY = SESSION_KEY;
 process.env.FIELD_CRYPTO_KEY = FIELD_KEY;
