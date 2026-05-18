@@ -114,7 +114,7 @@
   - Ambos retornam 429 + `Retry-After: 60`.
   - Redis-backed em prod (env.ts força REDIS_URL); in-memory fallback em dev.
 
-- [x] **B9. Sentry skeleton** ✅ 2026-05-15 (zero-overhead até DSN setado)
+- [x] **B9. Sentry installed + wired** ✅ 2026-05-18 (`@sentry/nextjs` no `apps/web/package.json`; ativa automaticamente quando `SENTRY_DSN` for setado no Render)
   - `apps/web/lib/sentry.ts` — wrapper com dynamic import de `@sentry/nextjs` + local type stub. No-op se `SENTRY_DSN` unset OU package não instalado.
   - `instrumentation.ts:register()` chama `initSentry()` após validação de env.
   - Schema env (`apps/web/lib/env.ts`) ganhou `SENTRY_DSN` (opcional URL) + `SENTRY_TRACES_SAMPLE_RATE`.
@@ -122,11 +122,11 @@
   - Helpers exportados: `initSentry()`, `captureException(err)`, `captureMessage(msg, level)`.
   - **Para ativar:** (1) criar conta Sentry, copiar DSN; (2) `pnpm -F web add @sentry/nextjs`; (3) setar `SENTRY_DSN` no Render. Próximo deploy loga `[sentry] initialized`.
 
-- [x] **B10. Defense-in-depth no Rust: `vault_index == 0`** ✅ 2026-05-15
+- [x] **B10. Defense-in-depth no Rust: `vault_index == 0`** ✅ 2026-05-15 (source) + 2026-05-18 (on-chain devnet)
   - `revoke_audit` JÁ estava hardcoded em vault[0] (linha 14). Sem mudança necessária.
   - `emergency_close_license`: adicionado `require!(vault_index == 0, AdminMustUsePrimaryVault)` antes do `verify_squads_vault_signer`. Novo error variant `AdminMustUsePrimaryVault` (code 6014) em `errors.rs`. IDL JSON atualizado manualmente.
   - Regression test em `gatekeeper-instructions.test.ts`: tx com `vaultIndex: 1` → falha com `AdminMustUsePrimaryVault`; license preservada.
-  - **Pendente:** `anchor build --verifiable` (precisa `cargo-build-sbf` na máquina) + redeploy devnet via Squads 2-of-2 → fica para Fase C5 (junto do deploy mainnet).
+  - **Devnet on-chain:** redeployed 2026-05-18 (slot 463280380, tx `daubq3FdqF2gqQvEm4PY4fxz5z6kqNnXumFv2TzJCNrpj3ZiGGVVGo4H5oumTzaQyUd2btvh8uwY6cD9MstxVvB`). Mesmo ciclo deployou F-001 + F-003 que estavam apenas no código desde 2026-05-13. Scripts em `scripts/{redeploy-gatekeeper-via-squads,extend-program-data,approve-and-execute-gov-tx,execute-gov-tx-raw}.ts`.
 
 - [ ] **B11. CSP enforce flip** (P4-F-401 deferred — aguardar telemetria de 1 semana pós-A1)
   - Substituir `'unsafe-inline'` por nonce per-request em `next.config.mjs`.
