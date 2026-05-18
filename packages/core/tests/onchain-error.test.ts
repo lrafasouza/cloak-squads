@@ -8,14 +8,14 @@ describe("translateOnchainError", () => {
       "Program log: AnchorError caused by account: license. " +
       "Error Code: ConstraintSeeds. Error Number: 2006. " +
       "Error Message: A seeds constraint was violated.";
-    expect(translateOnchainError(raw)).toMatch(/created before a recent program upgrade/i);
+    expect(translateOnchainError(raw)).toMatch(/License account derivation does not match/i);
   });
 
   it("does NOT misfire on ConstraintSeeds for a non-license account", () => {
     const raw =
       "Program log: AnchorError caused by account: cofre. " +
       "Error Code: ConstraintSeeds. Error Number: 2006.";
-    expect(translateOnchainError(raw)).not.toMatch(/created before a recent program upgrade/i);
+    expect(translateOnchainError(raw)).not.toMatch(/License account derivation/i);
   });
 
   it("recognizes Squads NotAMember (6005)", () => {

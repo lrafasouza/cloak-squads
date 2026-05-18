@@ -70,17 +70,29 @@ export function translateOnchainError(error: unknown): string {
     return "Your app is out of date and was unable to talk to the on-chain program. Hard-refresh this page (Cmd/Ctrl+Shift+R) and try again.";
   }
 
-  // Anchor ConstraintSeeds (2006) on the gatekeeper `license` account means the
-  // proposal was created against an older seed schema than the deployed program.
-  // License PDA seeds gained `vault_index` on 2026-05-13 (F-001 audit fix), so
-  // proposals queued before that date have an encoded license account that no
-  // longer derives from the current seeds. The encoded account is immutable;
-  // the proposal must be cancelled in Squads and recreated.
+  // Anchor ConstraintSeeds (2006) on the gatekeeper `license` account means
+  // the deployed program and the client disagree on how to derive the license
+  // PDA. Two directions are possible:
+  //   (a) client newer than program — proposal was built with new seeds
+  //       (post F-001 vault_index binding), deployed program still uses old
+  //       seeds → on-chain `anchor build` + governance redeploy required
+  //   (b) client older than program — stale browser bundle built with old
+  //       seeds against the upgraded program → hard-refresh + recreate
+  // The mismatch is invisible from a single error line; both possibilities
+  // are surfaced so the operator can disambiguate. Use
+  // `scripts/diag-proposal-66.ts` to confirm direction (compares the
+  // encoded license against both seed schemas).
   if (
     (message.includes("ConstraintSeeds") || matchesCode(message, 2006)) &&
     message.includes("account: license")
   ) {
-    return "This proposal was created before a recent program upgrade and can no longer be executed (the license account encoded inside no longer matches on-chain derivation). Cancel it in Squads and recreate the send / payroll / invoice — new proposals will work normally.";
+    return (
+      "License account derivation does not match on-chain. " +
+      "Most likely cause: the deployed gatekeeper program is on a different version than the client. " +
+      "Check (1) Did you hard-refresh the browser (Cmd/Ctrl+Shift+R) since the last code change? " +
+      "(2) Has the gatekeeper program been redeployed since the last F-001 audit fix? " +
+      "Run `pnpm tsx scripts/diag-proposal-66.ts --multisig <PDA> --tx <index>` to see which side is stale."
+    );
   }
 
   if (message.includes("insufficient lamports")) {
