@@ -8,16 +8,7 @@ import { useMyVaults } from "@/lib/use-my-vaults";
 import { cn } from "@/lib/utils";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import {
-  ChevronsUpDown,
-  Download,
-  Loader2,
-  LogOut,
-  Plus,
-  Search,
-  Settings,
-  X,
-} from "lucide-react";
+import { ChevronsUpDown, Download, Loader2, LogOut, Plus, Search, Settings, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -133,17 +124,13 @@ function VaultSelectorContent({
         {connected && myVaultsLoading && (
           <div className="flex items-center justify-center gap-2 px-2.5 py-4">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-subtle" />
-            <p className="text-eyebrow">
-              Loading your vaults…
-            </p>
+            <p className="text-eyebrow">Loading your vaults…</p>
           </div>
         )}
 
         {connected && filteredMyVaults.length > 0 && (
           <div className="mb-1">
-            <p className="text-eyebrow px-2.5 py-1.5">
-              Your Vaults
-            </p>
+            <p className="text-eyebrow px-2.5 py-1.5">Your Vaults</p>
             <div className="space-y-0.5">
               {filteredMyVaults
                 .filter((v) => v.cofreAddress !== multisig)
@@ -327,9 +314,7 @@ export function VaultSelector({ multisig, name, className }: VaultSelectorProps)
           <span className="font-mono text-[13px] font-semibold tabular-nums text-ink">
             {usdLabel ?? "—"}
           </span>
-          <span className="font-mono text-[10px] tabular-nums text-ink-subtle">
-            {solLabel} SOL
-          </span>
+          <span className="font-mono text-[10px] tabular-nums text-ink-subtle">{solLabel} SOL</span>
         </div>
       </button>
 

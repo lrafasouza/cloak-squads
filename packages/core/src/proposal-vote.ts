@@ -8,7 +8,10 @@ type VoteList = {
 
 export type MemberVote = VoteListKey | null;
 
-export function getMemberVote(proposal: VoteList, memberAddress: string | null | undefined): MemberVote {
+export function getMemberVote(
+  proposal: VoteList,
+  memberAddress: string | null | undefined,
+): MemberVote {
   if (!memberAddress) return null;
 
   for (const key of ["approved", "rejected", "cancelled"] as const) {

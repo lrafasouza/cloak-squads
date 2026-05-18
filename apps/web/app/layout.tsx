@@ -25,17 +25,20 @@ export const metadata: Metadata = {
       "Private multisig payments on Solana. Single-use execution licenses for Squads vaults, settled privately through Cloak Protocol.",
     siteName: "Aegis",
     locale: "en_US",
-    images: [{
-      url: "/og.jpg?v=3",
-      width: 1200,
-      height: 630,
-      alt: "Aegis - Private execution for shared treasuries",
-    }],
+    images: [
+      {
+        url: "/og.jpg?v=3",
+        width: 1200,
+        height: 630,
+        alt: "Aegis - Private execution for shared treasuries",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Aegis - Private execution for shared treasuries",
-    description: "Private multisig payments on Solana. Single-use execution licenses for Squads vaults, settled privately through Cloak Protocol.",
+    description:
+      "Private multisig payments on Solana. Single-use execution licenses for Squads vaults, settled privately through Cloak Protocol.",
     images: ["/og.jpg?v=3"],
   },
   manifest: "/site.webmanifest",
@@ -50,7 +53,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${fontDisplay.variable} ${fontGaramond.variable} ${fontSans.variable} ${fontMono.variable}`}
     >
       <head>
-        {/* Apply persisted theme before any paint — prevents FOUC on every nav */}
+        {/* Apply persisted theme before any paint — prevents FOUC on every nav.
+            Source is a static string in lib/theme-no-flash-script.ts; no user
+            input flows in. */}
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static inline theme bootstrap */}
         <script dangerouslySetInnerHTML={{ __html: themeNoFlashScript }} />
       </head>
       <body className="min-h-screen bg-bg text-ink font-sans antialiased">

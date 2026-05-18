@@ -1,9 +1,9 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Key, Minus, Plus, Trash2, UserRound } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
+import { CheckCircle2, Key, Minus, Plus, Trash2, UserRound } from "lucide-react";
 import { useMemo } from "react";
 
 const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -75,8 +75,7 @@ export function Step2Members({
     return dups;
   }, [members, myPubkey]);
 
-  const allValid =
-    members.every((m) => !m.trim() || isValidWallet(m)) && duplicates.size === 0;
+  const allValid = members.every((m) => !m.trim() || isValidWallet(m)) && duplicates.size === 0;
   const operatorStatus = getWalletStatus(operator);
   const canProceed = allValid && operatorStatus === "valid";
 
@@ -107,9 +106,7 @@ export function Step2Members({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="truncate font-mono text-xs text-accent">{myPubkey}</p>
-                <p className="text-[10px] italic text-accent/70">
-                  Crest holder · connected wallet
-                </p>
+                <p className="text-[10px] italic text-accent/70">Crest holder · connected wallet</p>
               </div>
             </div>
           )}
@@ -148,9 +145,7 @@ export function Step2Members({
                       {valid && (
                         <CheckCircle2 className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-signal-positive" />
                       )}
-                      {isDup && (
-                        <p className="mt-1 text-[10px] text-signal-warn">Already added</p>
-                      )}
+                      {isDup && <p className="mt-1 text-[10px] text-signal-warn">Already added</p>}
                       {invalid && !isDup && (
                         <p className="mt-1 text-[10px] text-signal-danger">
                           Invalid Solana address
@@ -219,9 +214,7 @@ export function Step2Members({
                 <span className="font-display text-5xl font-semibold tabular-nums tracking-tight text-ink">
                   {threshold}
                 </span>
-                <span className="font-display text-2xl text-ink-subtle/60">
-                  / {totalCount}
-                </span>
+                <span className="font-display text-2xl text-ink-subtle/60">/ {totalCount}</span>
               </div>
               <p className="mt-1 text-[11px] italic text-ink-subtle/80">
                 {thresholdPercent}% approval required
@@ -251,8 +244,8 @@ export function Step2Members({
             Privacy operator wallet
           </h2>
           <p className="mt-1 text-xs text-ink-muted">
-            Executes approved private transactions on your behalf. Can be a member or a
-            separate hot wallet.
+            Executes approved private transactions on your behalf. Can be a member or a separate hot
+            wallet.
           </p>
 
           <div className="relative mt-4">
@@ -279,9 +272,7 @@ export function Step2Members({
           </div>
 
           {operatorStatus === "format" && (
-            <p className="mt-1.5 text-[11px] text-signal-danger">
-              Invalid Solana address
-            </p>
+            <p className="mt-1.5 text-[11px] text-signal-danger">Invalid Solana address</p>
           )}
           {operatorStatus === "off-curve" && (
             <p className="mt-1.5 text-[11px] text-signal-danger">

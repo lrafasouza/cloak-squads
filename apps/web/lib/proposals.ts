@@ -1,8 +1,8 @@
 "use client";
 
+import { lamportsToSol } from "@/lib/sol";
 import type { Connection, PublicKey } from "@solana/web3.js";
 import * as squadsMultisig from "@sqds/multisig";
-import { lamportsToSol } from "@/lib/sol";
 
 export type ProposalStatusKind =
   | "draft"
@@ -118,8 +118,7 @@ export async function loadPersistedProposalSummaries(
         // raw lamports (e.g. "100000000 SOL") instead of the expected
         // "0.1 SOL".
         title:
-          draft.memo ||
-          `${lamportsToSol(draft.amount)} SOL → ${truncateAddress(draft.recipient)}`,
+          draft.memo || `${lamportsToSol(draft.amount)} SOL → ${truncateAddress(draft.recipient)}`,
         hasDraft: true,
       }))
     : [];

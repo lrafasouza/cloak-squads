@@ -11,7 +11,9 @@ function CloakLogo({ className }: { className?: string }) {
       xmlns="http://www.w3.org/2000/svg"
       className={cn("h-5 w-auto", className)}
       aria-label="Cloak"
+      role="img"
     >
+      <title>Cloak</title>
       <defs>
         <style>{`
           .cloak-logo-1 { fill: #ede6ff; }
@@ -43,10 +45,7 @@ function CloakLogo({ className }: { className?: string }) {
         className="cloak-logo-2"
         d="M806.083,149.051V0l-90.595,64.494-95.584-60.34,6.338,123.869-11.67,8.309-40.919,243.541,15.824,9.057,142.626,81.58,5.182,2.955-5.075-3.897-106.525-82.244-12.034-9.272,12.076-102.692,180.354-126.31ZM704.033,72.652l18.714,11.82-80.381,51.496-1.627-18.264-7.965-90.08,71.26,45.029Z"
       />
-      <polyline
-        className="cloak-logo-3"
-        points="619.905 4.154 746.371 50.442 735.016 76.829"
-      />
+      <polyline className="cloak-logo-3" points="619.905 4.154 746.371 50.442 735.016 76.829" />
       <path
         className="cloak-logo-1"
         d="M921.366,267.186c-1.162,29.882-28.823,53.601-59.274,50.077-10.876-1.265-22.021-5.992-29.747-14.351,4.941-8.964,10.764-17.599,17.551-24.48,18.338-19.432,47.13-20.853,71.469-11.246h0Z"
@@ -55,10 +54,7 @@ function CloakLogo({ className }: { className?: string }) {
         className="cloak-logo-3"
         d="M997.593,136.332l-11.67-8.309,6.338-123.869-95.584,60.34L806.083,0v149.051l180.354,126.31,12.077,102.692-12.034,9.272-106.525,82.244-5.075,3.897,5.182-2.955,142.626-81.58,15.824-9.057-40.919-243.541ZM971.427,117.703l-1.627,18.264-80.381-51.496,18.714-11.82,71.259-45.029-7.965,90.08Z"
       />
-      <polyline
-        className="cloak-logo-2"
-        points="992.261 4.154 865.808 50.46 877.163 76.847"
-      />
+      <polyline className="cloak-logo-2" points="992.261 4.154 865.808 50.46 877.163 76.847" />
     </svg>
   );
 }
@@ -83,7 +79,7 @@ export function CloakBanner() {
     >
       {/* Background glow effect */}
       <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[#8b5aef]/25 blur-2xl transition-all duration-500 group-hover:bg-[#8b5aef]/40" />
-      
+
       {/* Top row: Logo + badge */}
       <div className="relative flex items-center justify-between">
         <CloakLogo />

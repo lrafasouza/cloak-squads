@@ -9,11 +9,7 @@ import { TokenLogo } from "@/components/ui/token-logo";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { VaultIdenticon } from "@/components/ui/vault-identicon";
-import {
-  InlineAlert,
-  Panel,
-  WorkspacePage,
-} from "@/components/ui/workspace";
+import { InlineAlert, Panel, WorkspacePage } from "@/components/ui/workspace";
 import { publicEnv } from "@/lib/env";
 import { buildIssueLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import { useSolPrice } from "@/lib/hooks/useSolPrice";
@@ -701,10 +697,7 @@ export default function RecurringPage({
           </div>
 
           <div
-            className={cn(
-              "card-panel relative p-5",
-              stats.dueCount > 0 && "border-signal-warn/30",
-            )}
+            className={cn("card-panel relative p-5", stats.dueCount > 0 && "border-signal-warn/30")}
           >
             <div className="flex items-center gap-1.5 text-eyebrow">
               <CalendarClock className="h-3 w-3" aria-hidden="true" />
@@ -807,8 +800,8 @@ export default function RecurringPage({
           <div className="card-panel px-5 py-8 text-center">
             <p className="text-eyebrow">No matches</p>
             <p className="mt-1 text-sm text-ink-muted">
-              Nothing fits this filter. Switch to <span className="font-semibold text-ink">All</span>{" "}
-              to see every scheduled payment.
+              Nothing fits this filter. Switch to{" "}
+              <span className="font-semibold text-ink">All</span> to see every scheduled payment.
             </p>
           </div>
         ) : (
@@ -949,33 +942,20 @@ function SectionList({
   connectedWallet: boolean;
 }) {
   const headerColor =
-    tone === "danger"
-      ? "text-signal-danger"
-      : tone === "muted"
-        ? "text-ink-subtle"
-        : "text-accent";
+    tone === "danger" ? "text-signal-danger" : tone === "muted" ? "text-ink-subtle" : "text-accent";
   const dotColor =
-    tone === "danger"
-      ? "bg-signal-danger"
-      : tone === "muted"
-        ? "bg-ink-subtle"
-        : "bg-accent";
+    tone === "danger" ? "bg-signal-danger" : tone === "muted" ? "bg-ink-subtle" : "bg-accent";
   const anyRunning = runningId !== null;
 
   return (
     <section>
       <header className="mb-2.5 flex items-center gap-2">
-        <span
-          aria-hidden="true"
-          className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotColor)}
-        />
+        <span aria-hidden="true" className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotColor)} />
         <p className={cn("text-eyebrow inline-flex items-center gap-1.5", headerColor)}>
           <Icon className="h-3 w-3" aria-hidden="true" />
           {title}
         </p>
-        <span className="font-mono text-[10px] tabular-nums text-ink-subtle">
-          {items.length}
-        </span>
+        <span className="font-mono text-[10px] tabular-nums text-ink-subtle">{items.length}</span>
       </header>
       <Panel className="divide-y divide-border/40">
         {items.map((item) => (

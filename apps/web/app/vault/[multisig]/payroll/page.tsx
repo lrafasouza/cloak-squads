@@ -790,81 +790,81 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
           </section>
 
           <Panel>
-          <PanelHeader
-            icon={CheckCircle2}
-            title={`Claim links created · Proposal #${createdPayroll.transactionIndex}`}
-          />
-          <PanelBody>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => {
-                  const lines = createdPayroll.claimLinks.map((link) => {
-                    const fullUrl =
-                      typeof window === "undefined"
-                        ? link.claimUrl
-                        : `${window.location.origin}${link.claimUrl}`;
-                    return `${link.name},${link.wallet},${fullUrl}`;
-                  });
-                  navigator.clipboard.writeText(["name,wallet,claim_url", ...lines].join("\n"));
-                }}
-                className="inline-flex min-h-9 items-center rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink"
-              >
-                Copy all links
-              </button>
-            </div>
-            <div className="mt-4 grid gap-3">
-              {createdPayroll.claimLinks.map((link) => {
-                const fullUrl =
-                  typeof window === "undefined"
-                    ? link.claimUrl
-                    : `${window.location.origin}${link.claimUrl}`;
-                return (
-                  <div key={link.wallet} className="rounded-md border border-border bg-bg p-3">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-ink">{link.name}</p>
-                        <p className="font-mono text-xs text-ink-muted">
-                          {link.wallet.slice(0, 8)}...{link.wallet.slice(-8)}
-                        </p>
+            <PanelHeader
+              icon={CheckCircle2}
+              title={`Claim links created · Proposal #${createdPayroll.transactionIndex}`}
+            />
+            <PanelBody>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const lines = createdPayroll.claimLinks.map((link) => {
+                      const fullUrl =
+                        typeof window === "undefined"
+                          ? link.claimUrl
+                          : `${window.location.origin}${link.claimUrl}`;
+                      return `${link.name},${link.wallet},${fullUrl}`;
+                    });
+                    navigator.clipboard.writeText(["name,wallet,claim_url", ...lines].join("\n"));
+                  }}
+                  className="inline-flex min-h-9 items-center rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+                >
+                  Copy all links
+                </button>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {createdPayroll.claimLinks.map((link) => {
+                  const fullUrl =
+                    typeof window === "undefined"
+                      ? link.claimUrl
+                      : `${window.location.origin}${link.claimUrl}`;
+                  return (
+                    <div key={link.wallet} className="rounded-md border border-border bg-bg p-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-ink">{link.name}</p>
+                          <p className="font-mono text-xs text-ink-muted">
+                            {link.wallet.slice(0, 8)}...{link.wallet.slice(-8)}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(fullUrl)}
+                          className="inline-flex min-h-9 items-center rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+                        >
+                          Copy link
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => navigator.clipboard.writeText(fullUrl)}
-                        className="inline-flex min-h-9 items-center rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink-muted transition hover:bg-surface-2 hover:text-ink"
-                      >
-                        Copy link
-                      </button>
+                      <p className="mt-2 break-all font-mono text-xs text-ink-muted">{fullUrl}</p>
                     </div>
-                    <p className="mt-2 break-all font-mono text-xs text-ink-muted">{fullUrl}</p>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href={`/vault/${multisig}/proposals/${createdPayroll.transactionIndex}`}
-                className="inline-flex min-h-11 items-center justify-center rounded-md bg-gradient-to-r from-accent to-accent-hover px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:scale-[0.98]"
-              >
-                View proposal
-              </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  setCreatedPayroll(null);
-                  setParsedNotes([]);
-                  setRecipients([]);
-                  setCsvText("");
-                  setActiveTab("recipients");
-                  setDryRunStatus("idle");
-                }}
-                className="inline-flex min-h-11 items-center justify-center rounded-md border border-border-strong px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-2"
-              >
-                Create another payroll
-              </button>
-            </div>
-          </PanelBody>
-        </Panel>
+                  );
+                })}
+              </div>
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href={`/vault/${multisig}/proposals/${createdPayroll.transactionIndex}`}
+                  className="inline-flex min-h-11 items-center justify-center rounded-md bg-gradient-to-r from-accent to-accent-hover px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-raise-1 transition-aegis hover:shadow-accent-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:scale-[0.98]"
+                >
+                  View proposal
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatedPayroll(null);
+                    setParsedNotes([]);
+                    setRecipients([]);
+                    setCsvText("");
+                    setActiveTab("recipients");
+                    setDryRunStatus("idle");
+                  }}
+                  className="inline-flex min-h-11 items-center justify-center rounded-md border border-border-strong px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-2"
+                >
+                  Create another payroll
+                </button>
+              </div>
+            </PanelBody>
+          </Panel>
         </div>
       </WorkspacePage>
     );
@@ -885,8 +885,8 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                 Pay the table privately
               </h1>
               <p className="mt-1.5 text-sm text-ink-muted">
-                Add recipients manually or import a CSV. Aegis builds the private notes; you sign one
-                vault proposal.
+                Add recipients manually or import a CSV. Aegis builds the private notes; you sign
+                one vault proposal.
               </p>
             </div>
             <span className="self-start rounded-full border border-brass/30 bg-accent-soft px-2.5 py-1 text-[10px] font-semibold uppercase tracking-eyebrow text-accent md:self-auto">
@@ -1298,21 +1298,13 @@ export default function PayrollPage({ params }: { params: Promise<{ multisig: st
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border bg-surface-2/40 text-left">
-                              <th className="px-4 py-2.5 text-eyebrow">
-                                #
-                              </th>
-                              <th className="px-4 py-2.5 text-eyebrow">
-                                Recipient
-                              </th>
+                              <th className="px-4 py-2.5 text-eyebrow">#</th>
+                              <th className="px-4 py-2.5 text-eyebrow">Recipient</th>
                               <th className="hidden px-4 py-2.5 text-eyebrow sm:table-cell">
                                 Wallet
                               </th>
-                              <th className="px-4 py-2.5 text-right text-eyebrow">
-                                Amount
-                              </th>
-                              <th className="px-4 py-2.5 text-eyebrow">
-                                Note
-                              </th>
+                              <th className="px-4 py-2.5 text-right text-eyebrow">Amount</th>
+                              <th className="px-4 py-2.5 text-eyebrow">Note</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border/60">

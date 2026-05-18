@@ -73,6 +73,44 @@ jobs:
       - name: pnpm audit (production deps, level=high)
         run: pnpm audit --audit-level=high --prod
 
+  lint-and-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # pnpm/action-setup@v3.0.0
+      - uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d
+        with:
+          version: 9
+
+      # actions/setup-node@v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Biome enforces formatting + lint across the monorepo. Both gates are
+      # hard — PRs must run clean. Residual `useExhaustiveDependencies` cases
+      # are downgraded to "warn" in biome.json (need per-component review)
+      # so they show up in PR output without blocking merges.
+      - name: Biome format check
+        run: pnpm exec biome format .
+
+      - name: Biome lint
+        run: pnpm exec biome lint .
+
+      # Recursive tsc across every workspace package. Catches type drift in
+      # packages/core, scripts/, and anywhere `pnpm prebuild:web` doesn't reach.
+      - name: Typecheck (all workspaces)
+        run: pnpm typecheck:all
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -101,6 +139,86 @@ jobs:
 
       - name: Unit tests
         run: pnpm test:unit
+
+  smoke-boot:
+    # The sentinel for next-build crashes that typecheck + vitest cannot catch.
+    # 2026-05-08 post-mortem: prod boot-looped for 3 commits in a row because
+    # env validation only runs at runtime (instrumentation.ts:process.exit(1))
+    # — typecheck passed but the standalone server failed on every probe.
+    # This job reproduces the Render boot path against a real Postgres.
+    name: Smoke Boot (prod-like)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aegis
+          POSTGRES_PASSWORD: aegis
+          POSTGRES_DB: aegis_smoke
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aegis"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 6
+    steps:
+      # actions/checkout@v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # pnpm/action-setup@v3.0.0
+      - uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d
+        with:
+          version: 9
+
+      # actions/setup-node@v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Generate a throwaway .env.prod-like with random keys + service DB.
+      # Schema requires NODE_ENV=production gates, so we set all the
+      # superRefine-mandatory keys (see apps/web/lib/env.ts).
+      - name: Synthesize .env.prod-like
+        run: |
+          set -euo pipefail
+          SESSION_HMAC_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+          FIELD_CRYPTO_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+          AUDIT_SEED=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")
+          cat > apps/web/.env.prod-like <<EOF
+          NEXT_PUBLIC_SOLANA_CLUSTER=devnet
+          NEXT_PUBLIC_RPC_URL=https://api.devnet.solana.com
+          NEXT_PUBLIC_CLOAK_PROGRAM_ID=Zc1kHfp4rajSMeASFDwFFgkHRjv7dFQuLheJoQus27h
+          NEXT_PUBLIC_CLOAK_RELAY_URL=https://api.devnet.cloak.ag
+          NEXT_PUBLIC_GATEKEEPER_PROGRAM_ID=AgFx8yS8bQnXSCSGfN3f8oz3HJGeF5rwLoWtfHTEEaAq
+          NEXT_PUBLIC_SQUADS_PROGRAM_ID=SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf
+          DATABASE_URL=postgresql://aegis:aegis@localhost:5432/aegis_smoke
+          SESSION_HMAC_KEY=$SESSION_HMAC_KEY
+          FIELD_CRYPTO_KEY=$FIELD_CRYPTO_KEY
+          AUDIT_EXPORT_SIGN_KEY=base64:$AUDIT_SEED
+          REDIS_URL=https://example-test.upstash.io
+          REDIS_TOKEN=ci-smoke-token-not-used-at-boot
+          APP_ORIGIN=http://127.0.0.1:3500
+          LOG_LEVEL=info
+          ALLOW_LEGACY_AUTH=false
+          EOF
+
+      - name: Apply Prisma migrations to smoke DB
+        env:
+          DATABASE_URL: postgresql://aegis:aegis@localhost:5432/aegis_smoke
+        run: pnpm -F web exec prisma migrate deploy
+
+      - name: Build web (standalone)
+        run: pnpm build:web
+
+      - name: Run smoke-boot-prod.sh (positive + negative)
+        run: bash scripts/smoke-boot-prod.sh --skip-build --negative
 
   integration-tests:
     name: Integration Tests (Anchor)

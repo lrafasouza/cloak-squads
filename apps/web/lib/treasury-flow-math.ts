@@ -160,7 +160,7 @@ export function aggregateTreasuryFlow({
   let prevInflow = 0n;
   const inflowEvents: FlowEvent[] = [];
   for (const inc of income) {
-    if (internal && internal.has(inc.from)) continue;
+    if (internal?.has(inc.from)) continue;
 
     const ts = inc.blockTime * 1000;
     let lamports: bigint;

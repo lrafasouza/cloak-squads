@@ -66,9 +66,7 @@ const ACCOUNTS_NAV: NavItem[] = [
   { label: "Address Book", href: "/address-book", icon: BookUser },
 ];
 
-const BOTTOM_NAV: NavItem[] = [
-  { label: "Settings", href: "/settings", icon: Settings },
-];
+const BOTTOM_NAV: NavItem[] = [{ label: "Settings", href: "/settings", icon: Settings }];
 
 /* ── Shared NavLink ── */
 function NavLink({
@@ -159,7 +157,9 @@ function CollapsibleSection({
   const toggle = () => {
     setOpen((prev) => {
       const next = !prev;
-      try { localStorage.setItem(storageKey, String(next)); } catch {}
+      try {
+        localStorage.setItem(storageKey, String(next));
+      } catch {}
       return next;
     });
   };
@@ -410,9 +410,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (previous > 0 && executedCount > previous) {
       const delta = executedCount - previous;
       // eslint-disable-next-line no-console
-      console.info(
-        `${delta} signed proposal${delta === 1 ? "" : "s"} executed.`,
-      );
+      console.info(`${delta} signed proposal${delta === 1 ? "" : "s"} executed.`);
     }
     localStorage.setItem(key, String(executedCount));
   }, [multisig, executedCount]);
@@ -583,7 +581,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </aside>
         </div>
       )}
-
 
       {/* Inbox sheet (shared) */}
       <OperatorInboxSheet

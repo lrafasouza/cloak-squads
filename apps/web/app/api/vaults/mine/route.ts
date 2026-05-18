@@ -76,10 +76,7 @@ export async function GET(request: Request) {
     // Don't let an authenticated user enumerate vaults for arbitrary other
     // wallets. The on-chain data is technically public (anyone with an RPC
     // can run getProgramAccounts), but we don't accelerate targeted recon.
-    return NextResponse.json(
-      { error: "owner must match authenticated wallet" },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: "owner must match authenticated wallet" }, { status: 403 });
   }
 
   const hdrs = await headers();
@@ -125,9 +122,7 @@ export async function GET(request: Request) {
   const seen = new Set<string>();
   const vaults: string[] = [];
 
-  const promises = offsets.map((offset) =>
-    fetchOffset(connection, programId, offset, ownerBase58),
-  );
+  const promises = offsets.map((offset) => fetchOffset(connection, programId, offset, ownerBase58));
 
   const results = await Promise.all(promises);
 

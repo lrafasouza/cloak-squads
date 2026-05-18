@@ -83,10 +83,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       data: { status: "claimed", claimedAt: new Date(), claimedBy },
     });
     if (updateResult.count !== 1) {
-      return NextResponse.json(
-        { error: "Invoice already claimed." },
-        { status: 409 },
-      );
+      return NextResponse.json({ error: "Invoice already claimed." }, { status: 409 });
     }
 
     const invoice = await prisma.stealthInvoice.findUnique({
@@ -96,7 +93,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     return NextResponse.json(invoice);
   } catch (caught) {
-    const message = caught instanceof Error ? caught.message : "Could not claim invoice";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[api/stealth/claim] failed:", caught);
+    return NextResponse.json({ error: "Could not claim invoice." }, { status: 500 });
   }
 }

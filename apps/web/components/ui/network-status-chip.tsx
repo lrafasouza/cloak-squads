@@ -16,8 +16,7 @@ export function NetworkStatusChip({ className }: { className?: string }) {
           ? "yellow"
           : "green";
 
-  const label =
-    status === "red" ? "Degraded" : status === "yellow" ? "Slow" : "Network";
+  const label = status === "red" ? "Degraded" : status === "yellow" ? "Slow" : "Network";
 
   return (
     <div

@@ -24,8 +24,8 @@
 import { publicEnv } from "@/lib/env";
 import { isPrismaAvailable, prisma } from "@/lib/prisma";
 import { requireWalletAuth } from "@/lib/wallet-auth";
-import * as multisigSdk from "@sqds/multisig";
 import { PublicKey } from "@solana/web3.js";
+import * as multisigSdk from "@sqds/multisig";
 import { NextResponse } from "next/server";
 
 const CACHE_TTL_MS = 15_000;
@@ -201,19 +201,13 @@ export async function requireVaultMember(
     const { members } = await getMultisigMembers(multisigAddress);
 
     if (!members.includes(auth.publicKey)) {
-      return NextResponse.json(
-        { error: "You are not a member of this vault." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "You are not a member of this vault." }, { status: 403 });
     }
 
     return auth;
   } catch (error) {
     console.error("[vault-membership] failed to read multisig:", error);
-    return NextResponse.json(
-      { error: "Could not verify vault membership." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Could not verify vault membership." }, { status: 500 });
   }
 }
 
@@ -247,10 +241,7 @@ export async function requireVaultOperator(
     return auth;
   } catch (error) {
     console.error("[vault-membership] failed to read operator:", error);
-    return NextResponse.json(
-      { error: "Could not verify operator status." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Could not verify operator status." }, { status: 500 });
   }
 }
 

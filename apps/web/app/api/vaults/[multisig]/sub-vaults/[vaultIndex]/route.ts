@@ -6,7 +6,10 @@ import { z } from "zod";
 
 const updateSchema = z.object({
   name: z.string().min(1).max(64).optional(),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional(),
   icon: z.string().max(8).optional(),
 });
 

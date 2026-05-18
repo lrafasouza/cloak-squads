@@ -129,10 +129,7 @@ export function assertSafeOutboundUrl(input: string, opts: SafeOutboundUrlOption
   }
 
   if (url.username || url.password) {
-    throw new UnsafeOutboundUrlError(
-      "URL contains credentials",
-      "Strip user:pass@ from the URL.",
-    );
+    throw new UnsafeOutboundUrlError("URL contains credentials", "Strip user:pass@ from the URL.");
   }
 
   // URL.port is "" when default for the scheme
@@ -141,7 +138,7 @@ export function assertSafeOutboundUrl(input: string, opts: SafeOutboundUrlOption
     if (!Number.isInteger(portNum) || !allowedPorts.includes(portNum)) {
       throw new UnsafeOutboundUrlError(
         `port ${url.port} not allowed`,
-        `Use the default port for the scheme.`,
+        "Use the default port for the scheme.",
       );
     }
   }
@@ -154,20 +151,14 @@ export function assertSafeOutboundUrl(input: string, opts: SafeOutboundUrlOption
 
   // "localhost" + variants
   if (host === "localhost" || host.endsWith(".localhost")) {
-    throw new UnsafeOutboundUrlError(
-      "loopback hostname",
-      "URL cannot point at localhost.",
-    );
+    throw new UnsafeOutboundUrlError("loopback hostname", "URL cannot point at localhost.");
   }
 
   // Dot-less names usually resolve to internal services on a search-domain
   // (e.g. "metadata", "kubernetes"). Refuse them outright.
   const ipKind = isIpAddress(host);
   if (ipKind === null && !host.includes(".")) {
-    throw new UnsafeOutboundUrlError(
-      "single-label hostname",
-      "Use a fully-qualified domain name.",
-    );
+    throw new UnsafeOutboundUrlError("single-label hostname", "Use a fully-qualified domain name.");
   }
 
   if (ipKind === "v4" && isPrivateIPv4(host)) {

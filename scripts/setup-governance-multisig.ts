@@ -35,7 +35,7 @@ import {
   Connection,
   Keypair,
   LAMPORTS_PER_SOL,
-  PublicKey,
+  type PublicKey,
   SystemProgram,
   Transaction,
   TransactionMessage,
@@ -109,7 +109,11 @@ async function main() {
   console.log("Hot member (A): ", hotKey.publicKey.toBase58(), "  (current upgrade authority)");
   console.log("Cold member (B):", coldKey.publicKey.toBase58(), "  (move offline after this run)");
   console.log("Multisig PDA:   ", multisigPda.toBase58());
-  console.log("Vault[0] PDA:   ", vaultPda.toBase58(), "  <-- this becomes the new upgrade authority");
+  console.log(
+    "Vault[0] PDA:   ",
+    vaultPda.toBase58(),
+    "  <-- this becomes the new upgrade authority",
+  );
 
   // Fund members so they can sign approvals if they ever pay their own fees
   console.log("\n[0] Funding members if needed...");
@@ -248,25 +252,21 @@ async function main() {
   console.log(`       # then: shred -u ${COLD_KEY_PATH}  (after the migration below)`);
   console.log("");
   console.log("  2. Migrate the gatekeeper upgrade authority to vault[0]:");
-  console.log(
-    `       solana program set-upgrade-authority ${GATEKEEPER_PROGRAM_ID} \\`,
-  );
+  console.log(`       solana program set-upgrade-authority ${GATEKEEPER_PROGRAM_ID} \\`);
   console.log(`         --new-upgrade-authority ${vaultPda.toBase58()} \\`);
   console.log(`         --keypair ${HOT_KEY_PATH} \\`);
   console.log("         --url https://api.devnet.solana.com");
   console.log("");
   console.log("  3. Verify:");
-  console.log(
-    `       solana program show ${GATEKEEPER_PROGRAM_ID} \\`,
-  );
-  console.log(`         --url https://api.devnet.solana.com \\`);
+  console.log(`       solana program show ${GATEKEEPER_PROGRAM_ID} \\`);
+  console.log("         --url https://api.devnet.solana.com \\");
   console.log(`         -k ${HOT_KEY_PATH}`);
   console.log(`       # Authority: ${vaultPda.toBase58()} ✅`);
   console.log("");
   console.log("  4. Record the new authority in docs/security/governance.md");
   console.log("");
-  console.log("MULTISIG_ADDRESS=" + multisigPda.toBase58());
-  console.log("VAULT_ADDRESS=" + vaultPda.toBase58());
+  console.log(`MULTISIG_ADDRESS=${multisigPda.toBase58()}`);
+  console.log(`VAULT_ADDRESS=${vaultPda.toBase58()}`);
 }
 
 main().catch((err) => {

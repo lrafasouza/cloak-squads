@@ -133,12 +133,7 @@ export function deriveViewKeyFromSecret(
   return blake3(input).slice(0, 32);
 }
 
-export type AuditTransactionSubtype =
-  | "send"
-  | "payroll"
-  | "swap"
-  | "income"
-  | "invoice";
+export type AuditTransactionSubtype = "send" | "payroll" | "swap" | "income" | "invoice";
 
 export type FilteredAuditTransaction = {
   timestamp: number;

@@ -65,21 +65,16 @@ export async function initSentry(): Promise<void> {
 
   const Sentry = await loadSentry();
   if (!Sentry) {
-    console.warn(
-      "[sentry] SENTRY_DSN is set but @sentry/nextjs is not installed — skipping.",
-    );
+    console.warn("[sentry] SENTRY_DSN is set but @sentry/nextjs is not installed — skipping.");
     return;
   }
 
   try {
     const release =
-      process.env.RENDER_GIT_COMMIT ??
-      process.env.GIT_COMMIT ??
-      process.env.VERCEL_GIT_COMMIT_SHA;
+      process.env.RENDER_GIT_COMMIT ?? process.env.GIT_COMMIT ?? process.env.VERCEL_GIT_COMMIT_SHA;
     const options: Parameters<SentryModule["init"]>[0] = {
       dsn,
-      environment:
-        process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? process.env.NODE_ENV ?? "unknown",
+      environment: process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? process.env.NODE_ENV ?? "unknown",
       tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? "0.1"),
       // Don't ship PII by default. Operators can opt in later if they
       // need it for debugging a specific class of issue.

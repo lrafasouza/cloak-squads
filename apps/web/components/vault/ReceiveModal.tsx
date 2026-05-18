@@ -31,10 +31,7 @@ export function ReceiveModal({
     Array<{ vaultIndex: number; name: string }>
   >([]);
 
-  const squadsProgram = useMemo(
-    () => new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID),
-    [],
-  );
+  const squadsProgram = useMemo(() => new PublicKey(publicEnv.NEXT_PUBLIC_SQUADS_PROGRAM_ID), []);
 
   // Fetch sub-vaults whenever modal opens
   useEffect(() => {
@@ -87,9 +84,8 @@ export function ReceiveModal({
           <p className="text-eyebrow">Receive · Public</p>
           <DialogTitle className="mt-0.5">Deposit SOL</DialogTitle>
           <DialogDescription>
-            Send SOL directly to this address. Deposits land on-chain in the open — for
-            unlinkable payments use{" "}
-            <span className="font-medium text-ink">Invoices</span>.
+            Send SOL directly to this address. Deposits land on-chain in the open — for unlinkable
+            payments use <span className="font-medium text-ink">Invoices</span>.
           </DialogDescription>
         </DialogHeader>
 

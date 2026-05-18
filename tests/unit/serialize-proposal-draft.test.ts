@@ -64,10 +64,7 @@ describe("serializeDraft — F-502 PATCH response shape", () => {
   });
 
   test("includePublicClaim=true exposes invariants but NOT secrets", () => {
-    const out = serializeDraft(fixture(), { includePublicClaim: true }) as Record<
-      string,
-      unknown
-    >;
+    const out = serializeDraft(fixture(), { includePublicClaim: true }) as Record<string, unknown>;
     const claim = out.commitmentClaim as Record<string, unknown> | undefined;
     expect(claim).toBeDefined();
     expect(claim).not.toHaveProperty("keypairPrivateKey");
@@ -81,10 +78,7 @@ describe("serializeDraft — F-502 PATCH response shape", () => {
   });
 
   test("includeSensitive=true is the only mode that emits UTXO secrets", () => {
-    const out = serializeDraft(fixture(), { includeSensitive: true }) as Record<
-      string,
-      unknown
-    >;
+    const out = serializeDraft(fixture(), { includeSensitive: true }) as Record<string, unknown>;
     const claim = out.commitmentClaim as Record<string, unknown>;
     expect(claim.keypairPrivateKey).toBe("0011223344556677");
     expect(claim.blinding).toBe("ffffffffffffffff");

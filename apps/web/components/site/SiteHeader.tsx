@@ -1,8 +1,8 @@
 "use client";
 
 import { Logo } from "@/components/brand/Logo";
-import { cn } from "@/lib/utils";
 import { WalletMenu } from "@/components/wallet/WalletMenu";
+import { cn } from "@/lib/utils";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -15,7 +15,11 @@ const nav = [
   { label: "FAQ", href: "/#faq" },
 ];
 
-export function SiteHeader({ className, showWallet = true, minimal = false }: { className?: string; showWallet?: boolean; minimal?: boolean }) {
+export function SiteHeader({
+  className,
+  showWallet = true,
+  minimal = false,
+}: { className?: string; showWallet?: boolean; minimal?: boolean }) {
   const pathname = usePathname();
   const isVaultPage = pathname?.startsWith("/vault");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -65,11 +69,7 @@ export function SiteHeader({ className, showWallet = true, minimal = false }: { 
             </div>
           </>
         )}
-        {minimal && (
-          <div className="flex items-center gap-3">
-            {showWallet && <WalletMenu />}
-          </div>
-        )}
+        {minimal && <div className="flex items-center gap-3">{showWallet && <WalletMenu />}</div>}
 
         {!minimal && (
           /* Mobile toggle */

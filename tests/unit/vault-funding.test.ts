@@ -1,5 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { minimumVaultTopUpLamports, vaultTopUpLamportsNeeded } from "../../packages/core/src/vault-funding";
+import {
+  minimumVaultTopUpLamports,
+  vaultTopUpLamportsNeeded,
+} from "../../packages/core/src/vault-funding";
 
 describe("vaultTopUpLamportsNeeded", () => {
   test("requests the full bootstrap minimum when the vault is empty", () => {

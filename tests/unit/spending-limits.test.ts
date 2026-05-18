@@ -1,6 +1,6 @@
+import { buildSpendingLimitUseIx } from "@/lib/spending-limits";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { describe, expect, test } from "vitest";
-import { buildSpendingLimitUseIx } from "@/lib/spending-limits";
 
 // `spending-limits.ts` is a thin builder over `@sqds/multisig`. The async
 // proposal-creation paths require a live Connection + Wallet and are

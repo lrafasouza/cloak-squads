@@ -30,10 +30,7 @@ function isSafeSegment(segment: string): boolean {
   return !/[\x00-\x1f]/.test(segment);
 }
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> },
-) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
   if (!path.every(isSafeSegment)) {
     return new NextResponse("Invalid path", { status: 400 });
@@ -61,10 +58,7 @@ export async function GET(
   return new NextResponse(upstreamRes.body, { status: 200, headers });
 }
 
-export async function HEAD(
-  _req: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> },
-) {
+export async function HEAD(_req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
   if (!path.every(isSafeSegment)) {
     return new NextResponse(null, { status: 400 });

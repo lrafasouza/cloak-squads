@@ -4,10 +4,7 @@ import { requireVaultMember } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
-export async function GET(
-  _request: Request,
-  context: { params: Promise<{ multisig: string }> },
-) {
+export async function GET(_request: Request, context: { params: Promise<{ multisig: string }> }) {
   const { multisig } = await context.params;
 
   try {

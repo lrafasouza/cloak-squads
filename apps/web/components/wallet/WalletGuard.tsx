@@ -2,7 +2,7 @@
 
 import { Spinner } from "@/components/ui/skeleton";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 const CHECK_DELAY_MS = 600;
 

@@ -74,7 +74,12 @@ async function getRedisClient() {
         return data.result;
       },
       async set(key: string, value: string, opts?: { ex?: number; nx?: boolean }) {
-        const parts: string[] = [redisUrl, "set", encodeURIComponent(key), encodeURIComponent(value)];
+        const parts: string[] = [
+          redisUrl,
+          "set",
+          encodeURIComponent(key),
+          encodeURIComponent(value),
+        ];
         const query: string[] = [];
         if (opts?.ex) query.push(`EX=${opts.ex}`);
         if (opts?.nx) query.push("NX");
@@ -104,7 +109,11 @@ async function getRedisClient() {
   }
 }
 
-async function checkRateLimitRedis(bucket: string, limit: number, windowSecs: number): Promise<boolean> {
+async function checkRateLimitRedis(
+  bucket: string,
+  limit: number,
+  windowSecs: number,
+): Promise<boolean> {
   const redis = await getRedisClient();
   if (!redis) return checkRateLimitMemory(bucket, limit, windowSecs * 1000);
 
@@ -168,7 +177,9 @@ export async function checkRateLimitAsync(
     // Warn once per process that in-memory rate limiting is active in prod
     if (!(globalThis as Record<string, unknown>).__rlWarnedOnce) {
       (globalThis as Record<string, unknown>).__rlWarnedOnce = true;
-      console.warn("[rate-limit] REDIS_URL not set in production — using in-memory fallback (not suitable for multi-instance)");
+      console.warn(
+        "[rate-limit] REDIS_URL not set in production — using in-memory fallback (not suitable for multi-instance)",
+      );
     }
   }
 

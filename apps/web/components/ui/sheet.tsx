@@ -2,7 +2,14 @@
 
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
-import { type HTMLAttributes, type ReactNode, createContext, useContext, useEffect, useState } from "react";
+import {
+  type HTMLAttributes,
+  type ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { Drawer } from "vaul";
 import { AutoCloseIndicator } from "./auto-close-indicator";
 
@@ -41,7 +48,12 @@ export function Sheet({
 
   return (
     <SheetContext.Provider value={value}>
-      <Drawer.Root open={value.open} onOpenChange={value.setOpen} direction="right" shouldScaleBackground={false}>
+      <Drawer.Root
+        open={value.open}
+        onOpenChange={value.setOpen}
+        direction="right"
+        shouldScaleBackground={false}
+      >
         {children}
       </Drawer.Root>
     </SheetContext.Provider>
@@ -49,12 +61,23 @@ export function Sheet({
 }
 
 /* ── Trigger ── */
-export function SheetTrigger({ children, asChild, ...props }: HTMLAttributes<HTMLButtonElement> & { asChild?: boolean; children: ReactNode }) {
+export function SheetTrigger({
+  children,
+  asChild,
+  ...props
+}: HTMLAttributes<HTMLButtonElement> & { asChild?: boolean; children: ReactNode }) {
   const { setOpen } = useSheet();
   if (asChild) return <>{children}</>;
   return (
     <Drawer.Trigger asChild>
-      <button type="button" {...props} onClick={(e) => { setOpen(true); props.onClick?.(e); }}>
+      <button
+        type="button"
+        {...props}
+        onClick={(e) => {
+          setOpen(true);
+          props.onClick?.(e);
+        }}
+      >
         {children}
       </button>
     </Drawer.Trigger>
@@ -104,7 +127,9 @@ export function SheetContent({
           className,
         )}
       >
-        {side === "bottom" && <div className="mx-auto mt-4 h-1.5 w-12 rounded-full bg-border-strong" />}
+        {side === "bottom" && (
+          <div className="mx-auto mt-4 h-1.5 w-12 rounded-full bg-border-strong" />
+        )}
         <div className="flex items-center justify-between p-5">
           <div />
           <div className="flex items-center gap-2">
@@ -126,9 +151,7 @@ export function SheetContent({
             </button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 pb-5">
-          {children}
-        </div>
+        <div className="flex-1 overflow-y-auto px-5 pb-5">{children}</div>
       </Drawer.Content>
     </Drawer.Portal>
   );
@@ -148,21 +171,38 @@ export function SheetTitle({ className, ...props }: HTMLAttributes<HTMLHeadingEl
 }
 
 export function SheetDescription({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={cn("mt-1.5 text-sm text-ink-muted leading-relaxed", className)} {...props} />;
+  return (
+    <p className={cn("mt-1.5 text-sm text-ink-muted leading-relaxed", className)} {...props} />
+  );
 }
 
 export function SheetFooter({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col-reverse gap-3 p-5 pt-4 sm:flex-row sm:justify-end", className)} {...props} />;
+  return (
+    <div
+      className={cn("flex flex-col-reverse gap-3 p-5 pt-4 sm:flex-row sm:justify-end", className)}
+      {...props}
+    />
+  );
 }
 
-export function SheetClose({ className, children, ...props }: HTMLAttributes<HTMLButtonElement> & { children?: ReactNode }) {
+export function SheetClose({
+  className,
+  children,
+  ...props
+}: HTMLAttributes<HTMLButtonElement> & { children?: ReactNode }) {
   const { setOpen } = useSheet();
   return (
     <button
       type="button"
-      className={cn("inline-flex items-center justify-center rounded-md text-sm font-semibold transition-colors", className)}
+      className={cn(
+        "inline-flex items-center justify-center rounded-md text-sm font-semibold transition-colors",
+        className,
+      )}
       {...props}
-      onClick={(e) => { setOpen(false); props.onClick?.(e); }}
+      onClick={(e) => {
+        setOpen(false);
+        props.onClick?.(e);
+      }}
     >
       {children ?? "Close"}
     </button>

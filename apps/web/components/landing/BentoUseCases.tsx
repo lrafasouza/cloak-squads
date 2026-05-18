@@ -59,10 +59,7 @@ function CaseText({
       <ul className="mt-6 space-y-3">
         {bullets.map((b) => (
           <li key={b} className="flex items-start gap-3 text-sm text-ink-muted">
-            <CheckCircle2
-              className="mt-0.5 h-4 w-4 shrink-0 text-accent"
-              strokeWidth={1.7}
-            />
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={1.7} />
             <span>{b}</span>
           </li>
         ))}
@@ -191,13 +188,9 @@ function PayrollMockup() {
                 transition={{ delay: i * 0.05, duration: 0.3 }}
                 className="grid grid-cols-[auto,1fr,auto] sm:grid-cols-[auto,1fr,auto,auto] gap-3 px-3 sm:px-4 py-2 items-center"
               >
-                <span className="text-ink-subtle">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
+                <span className="text-ink-subtle">{String(i + 1).padStart(2, "0")}</span>
                 <span className="text-ink truncate">{r.name}</span>
-                <span className="hidden sm:inline text-right text-ink-subtle">
-                  {r.role}
-                </span>
+                <span className="hidden sm:inline text-right text-ink-subtle">{r.role}</span>
                 <span className="text-right text-ink num whitespace-nowrap">
                   {r.amount.toLocaleString("en-US")}{" "}
                   <span className="text-ink-subtle text-[10px]">USDC</span>
@@ -282,16 +275,13 @@ function InvoicingMockup() {
             <h4 className="mt-2 font-display text-2xl font-semibold text-ink leading-tight">
               Acme Studio
             </h4>
-            <p className="mt-1 text-sm text-ink-muted">
-              Branding work · May
-            </p>
+            <p className="mt-1 text-sm text-ink-muted">Branding work · May</p>
             <div className="mt-5">
               <p className="text-[11px] font-mono uppercase tracking-eyebrow text-ink-subtle">
                 Amount due
               </p>
               <p className="font-display text-3xl font-semibold text-ink num leading-tight mt-1">
-                $2,400{" "}
-                <span className="text-base font-medium text-ink-muted">USDC</span>
+                $2,400 <span className="text-base font-medium text-ink-muted">USDC</span>
               </p>
             </div>
           </div>
@@ -316,6 +306,9 @@ function InvoicingMockup() {
             {qrSvg ? (
               <div
                 className="h-full w-full [&>svg]:h-full [&>svg]:w-full"
+                // Safe: qrSvg is generated client-side by the qrcode lib from
+                // the bound claimUrl. No untrusted input flows into __html.
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: locally-generated QR SVG
                 dangerouslySetInnerHTML={{ __html: qrSvg }}
               />
             ) : (
@@ -337,7 +330,9 @@ function InvoicingMockup() {
 
 function Sparkline() {
   const points = useMemo(
-    () => [4, 6, 5, 7, 9, 8, 11, 14, 12, 13, 17, 15, 19, 18, 22, 24, 21, 26, 28, 25, 30, 33, 31, 36],
+    () => [
+      4, 6, 5, 7, 9, 8, 11, 14, 12, 13, 17, 15, 19, 18, 22, 24, 21, 26, 28, 25, 30, 33, 31, 36,
+    ],
     [],
   );
   const w = 600;
@@ -355,7 +350,14 @@ function Sparkline() {
   const fill = `${path} L ${w} ${h} L 0 ${h} Z`;
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full" preserveAspectRatio="none">
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className="w-full h-full"
+      preserveAspectRatio="none"
+      role="img"
+      aria-label="Activity sparkline"
+    >
+      <title>Activity sparkline</title>
       <defs>
         <linearGradient id="sparkfill" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity="0.35" />
@@ -442,17 +444,13 @@ function AuditMockup() {
               <p className="text-[10px] font-mono uppercase tracking-eyebrow text-ink-subtle">
                 Approvers
               </p>
-              <p className="font-display text-xl font-semibold text-ink num mt-0.5">
-                4
-              </p>
+              <p className="font-display text-xl font-semibold text-ink num mt-0.5">4</p>
             </div>
             <div>
               <p className="text-[10px] font-mono uppercase tracking-eyebrow text-ink-subtle">
                 Categories
               </p>
-              <p className="font-display text-xl font-semibold text-ink num mt-0.5">
-                3
-              </p>
+              <p className="font-display text-xl font-semibold text-ink num mt-0.5">3</p>
             </div>
           </div>
 
@@ -504,25 +502,13 @@ function CaseRow({
   reverse?: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        "grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center",
-      )}
-    >
-      <ScrollReveal
-        className={cn(
-          "lg:col-span-5",
-          reverse ? "lg:order-2" : "lg:order-1",
-        )}
-      >
+    <div className={cn("grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center")}>
+      <ScrollReveal className={cn("lg:col-span-5", reverse ? "lg:order-2" : "lg:order-1")}>
         {text}
       </ScrollReveal>
       <ScrollReveal
         delay={0.08}
-        className={cn(
-          "lg:col-span-7",
-          reverse ? "lg:order-1" : "lg:order-2",
-        )}
+        className={cn("lg:col-span-7", reverse ? "lg:order-1" : "lg:order-2")}
       >
         {visual}
       </ScrollReveal>
@@ -536,18 +522,16 @@ function CaseRow({
 
 export function BentoUseCases() {
   return (
-    <section
-      id="usecases"
-      className="relative z-10 border-y border-border bg-surface/[0.06]"
-    >
+    <section id="usecases" className="relative z-10 border-y border-border bg-surface/[0.06]">
       <div className="mx-auto max-w-7xl px-4 py-24 md:px-6 md:py-32">
         {/* Header */}
         <ScrollReveal>
           <div className="mb-16 md:mb-24 max-w-2xl mx-auto text-center">
-            <Eyebrow as="div" className="mb-3">Use cases</Eyebrow>
+            <Eyebrow as="div" className="mb-3">
+              Use cases
+            </Eyebrow>
             <h2 className="font-display text-display-sm font-bold text-ink leading-[1.05]">
-              Things every treasury does.{" "}
-              <span className="text-accent">Done without leaking.</span>
+              Things every treasury does. <span className="text-accent">Done without leaking.</span>
             </h2>
             <p className="mt-5 text-ink-muted leading-relaxed">
               One of these only Aegis does. The other two we just do better.

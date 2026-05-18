@@ -95,10 +95,7 @@ export function encryptField(plaintext: string): string {
   const iv = randomBytes(IV_LENGTH);
 
   const cipher = createCipheriv(ALGO, key, iv);
-  const encrypted = Buffer.concat([
-    cipher.update(plaintext, "utf8"),
-    cipher.final(),
-  ]);
+  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
   return V1_PREFIX + Buffer.concat([iv, encrypted, authTag]).toString("base64");
@@ -121,9 +118,7 @@ function tryDecrypt(key: Buffer, iv: Buffer, encrypted: Buffer, authTag: Buffer)
  * back-fills rows so subsequent reads succeed under the current key.
  */
 export function decryptField(ciphertext: string): string {
-  const raw = ciphertext.startsWith(V1_PREFIX)
-    ? ciphertext.slice(V1_PREFIX.length)
-    : ciphertext;
+  const raw = ciphertext.startsWith(V1_PREFIX) ? ciphertext.slice(V1_PREFIX.length) : ciphertext;
 
   const data = Buffer.from(raw, "base64");
   const iv = data.subarray(0, IV_LENGTH);

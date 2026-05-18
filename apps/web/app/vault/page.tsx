@@ -46,11 +46,7 @@ export default function VaultPage() {
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-radial-fade" />
         <div className="absolute inset-0 bg-grid-faint bg-grid-md opacity-[0.18]" />
-        <HeraldicWatermark
-          size={520}
-          opacity={0.025}
-          className="-right-24 -top-24 bottom-auto"
-        />
+        <HeraldicWatermark size={520} opacity={0.025} className="-right-24 -top-24 bottom-auto" />
       </div>
 
       {/* Header — logo + wallet, with brass rule below */}

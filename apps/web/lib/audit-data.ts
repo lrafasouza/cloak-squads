@@ -136,9 +136,7 @@ export async function loadAuditTransactions(args: {
       type: "transfer",
       subtype: "swap",
       amount: swap.inputAmount,
-      nullifier: redact
-        ? "REDACTED"
-        : `${swap.inputSymbol}→${swap.outputSymbol}`,
+      nullifier: redact ? "REDACTED" : `${swap.inputSymbol}→${swap.outputSymbol}`,
       status: "confirmed",
       timestamp: swap.createdAt.getTime(),
       vaultIndex: swap.vaultIndex,
@@ -159,9 +157,7 @@ export async function loadAuditTransactions(args: {
       type: "deposit",
       subtype: "invoice",
       amount: invoice.utxoAmount ?? undefined,
-      nullifier: redact
-        ? "REDACTED"
-        : `invoice:${invoice.id.slice(0, 8)}`,
+      nullifier: redact ? "REDACTED" : `invoice:${invoice.id.slice(0, 8)}`,
       status,
       timestamp: (invoice.claimedAt ?? invoice.createdAt).getTime(),
       vaultIndex: invoice.vaultIndex,

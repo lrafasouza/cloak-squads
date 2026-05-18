@@ -19,11 +19,10 @@ import {
 } from "@/components/ui/workspace";
 import { publicEnv } from "@/lib/env";
 import { buildRevokeAuditIxBrowser } from "@/lib/gatekeeper-instructions";
+import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import { createIssueLicenseProposal } from "@/lib/squads-sdk";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
 import { cn } from "@/lib/utils";
-import IDL from "@/lib/idl/cloak_gatekeeper.json";
-import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import {
   type AuditScope,
   MAX_REVOKED_AUDIT,
@@ -31,6 +30,7 @@ import {
   generateAuditLinkSecret,
 } from "@cloak-squads/core/audit";
 import { cofrePda } from "@cloak-squads/core/pda";
+import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import {
@@ -215,10 +215,7 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
           return;
         }
         const coder = new BorshAccountsCoder(IDL as Idl);
-        const decoded = coder.decode<{ revokedAudit?: Array<unknown> }>(
-          "Cofre",
-          accountInfo.data,
-        );
+        const decoded = coder.decode<{ revokedAudit?: Array<unknown> }>("Cofre", accountInfo.data);
         setRevokedOnChain(Array.isArray(decoded?.revokedAudit) ? decoded.revokedAudit.length : 0);
       } catch (err) {
         console.error("[audit] cofre revocation count fetch failed:", err);
@@ -624,32 +621,32 @@ export default function AuditAdminPage({ params }: { params: Promise<{ multisig:
               revocations as a Vec<[u8; 16]> with a hard ceiling of 256
               entries (no GC). Surfacing this lets the admin notice well
               before a revoke proposal reverts with RevocationCapacity. */}
-          {revokedOnChain !== null && revokedOnChain >= 0 ? (
-            (() => {
-              const pct = (revokedOnChain / MAX_REVOKED_AUDIT) * 100;
-              const tone =
-                pct >= 95
-                  ? "text-signal-danger"
-                  : pct >= 80
-                    ? "text-signal-warn"
-                    : "text-ink-subtle";
-              return (
-                <p
-                  className={cn(
-                    "mt-4 inline-flex items-center gap-1.5 text-[11px] font-medium",
-                    tone,
-                  )}
-                >
-                  <Shield className="h-3 w-3" aria-hidden="true" />
-                  On-chain revocations:{" "}
-                  <span className="font-mono tabular-nums">
-                    {revokedOnChain} / {MAX_REVOKED_AUDIT}
-                  </span>
-                  {pct >= 80 ? <span>· approaching cap</span> : null}
-                </p>
-              );
-            })()
-          ) : null}
+          {revokedOnChain !== null && revokedOnChain >= 0
+            ? (() => {
+                const pct = (revokedOnChain / MAX_REVOKED_AUDIT) * 100;
+                const tone =
+                  pct >= 95
+                    ? "text-signal-danger"
+                    : pct >= 80
+                      ? "text-signal-warn"
+                      : "text-ink-subtle";
+                return (
+                  <p
+                    className={cn(
+                      "mt-4 inline-flex items-center gap-1.5 text-[11px] font-medium",
+                      tone,
+                    )}
+                  >
+                    <Shield className="h-3 w-3" aria-hidden="true" />
+                    On-chain revocations:{" "}
+                    <span className="font-mono tabular-nums">
+                      {revokedOnChain} / {MAX_REVOKED_AUDIT}
+                    </span>
+                    {pct >= 80 ? <span>· approaching cap</span> : null}
+                  </p>
+                );
+              })()
+            : null}
         </div>
       </div>
 

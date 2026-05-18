@@ -2,10 +2,7 @@
   "name": "cloak-squads",
   "version": "0.0.1",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "workspaces": ["apps/*", "packages/*"],
   "packageManager": "pnpm@9.12.0",
   "scripts": {
     "build": "turbo run build",
@@ -38,7 +35,8 @@
     "deploy:gk": "tsx scripts/deploy-gatekeeper.ts",
     "db:up": "docker compose up -d postgres",
     "security:scan": "gitleaks detect --no-banner --redact --verbose",
-    "security:scan-staged": "gitleaks protect --staged --no-banner --redact --verbose"
+    "security:scan-staged": "gitleaks protect --staged --no-banner --redact --verbose",
+    "postinstall": "node scripts/setup-git-hooks.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

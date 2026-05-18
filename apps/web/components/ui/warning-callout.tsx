@@ -36,19 +36,29 @@ interface WarningCalloutProps {
   className?: string;
 }
 
-export function InfoCallout({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <WarningCallout variant="info" {...(className ? { className } : {})}>{children}</WarningCallout>;
-}
-
-export function ErrorCallout({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <WarningCallout variant="error" {...(className ? { className } : {})}>{children}</WarningCallout>;
-}
-
-export function WarningCallout({
-  variant = "warning",
+export function InfoCallout({
   children,
   className,
-}: WarningCalloutProps) {
+}: { children: React.ReactNode; className?: string }) {
+  return (
+    <WarningCallout variant="info" {...(className ? { className } : {})}>
+      {children}
+    </WarningCallout>
+  );
+}
+
+export function ErrorCallout({
+  children,
+  className,
+}: { children: React.ReactNode; className?: string }) {
+  return (
+    <WarningCallout variant="error" {...(className ? { className } : {})}>
+      {children}
+    </WarningCallout>
+  );
+}
+
+export function WarningCallout({ variant = "warning", children, className }: WarningCalloutProps) {
   const v = variants[variant];
   const Icon = v.Icon;
 

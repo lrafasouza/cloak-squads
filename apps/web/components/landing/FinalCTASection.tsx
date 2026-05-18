@@ -5,11 +5,7 @@ import { ArrowRight, Check } from "lucide-react";
 import Link from "next/link";
 import { Eyebrow } from "../ui/aegis";
 
-const PERKS = [
-  "Free on Solana devnet",
-  "No new wallet, no new chain",
-  "Multisig from day one",
-];
+const PERKS = ["Free on Solana devnet", "No new wallet, no new chain", "Multisig from day one"];
 
 export function FinalCTASection() {
   return (
@@ -45,15 +41,9 @@ export function FinalCTASection() {
           transition={{ duration: 0.5 }}
           className="flex items-center justify-center gap-3 mb-12 md:mb-20"
         >
-          <span
-            aria-hidden
-            className="h-px w-10 bg-gradient-to-r from-transparent to-accent/50"
-          />
+          <span aria-hidden className="h-px w-10 bg-gradient-to-r from-transparent to-accent/50" />
           <Eyebrow as="div">Ready when you are</Eyebrow>
-          <span
-            aria-hidden
-            className="h-px w-10 bg-gradient-to-l from-transparent to-accent/50"
-          />
+          <span aria-hidden className="h-px w-10 bg-gradient-to-l from-transparent to-accent/50" />
         </motion.div>
 
         {/* Asymmetric grid */}
@@ -92,8 +82,8 @@ export function FinalCTASection() {
             className="lg:col-span-5 space-y-7"
           >
             <p className="text-base md:text-lg text-ink-muted leading-relaxed max-w-md">
-              Connect a wallet and create your Aegis vault on Solana devnet.
-              Squads multisig is built in. It takes about a minute.
+              Connect a wallet and create your Aegis vault on Solana devnet. Squads multisig is
+              built in. It takes about a minute.
             </p>
 
             {/* Perks */}
@@ -108,10 +98,7 @@ export function FinalCTASection() {
                   className="flex items-center gap-2.5 text-sm text-ink-muted"
                 >
                   <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent/15">
-                    <Check
-                      className="h-2.5 w-2.5 text-accent"
-                      strokeWidth={3}
-                    />
+                    <Check className="h-2.5 w-2.5 text-accent" strokeWidth={3} />
                   </span>
                   {p}
                 </motion.li>

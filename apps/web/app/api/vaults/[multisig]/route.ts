@@ -117,60 +117,59 @@ export async function PATCH(request: Request, context: { params: Promise<{ multi
 
     const hasSettings = data.webhookUrl !== undefined || data.rpcOverride !== undefined;
 
-    const existing = await prisma.vault.findUnique({ where: { cofreAddress: multisig } });
-
-    let result: Record<string, unknown>;
-    if (existing) {
-      result = await prisma.vault.update({
-        where: { cofreAddress: multisig },
-        data: {
-          ...(data.name !== undefined ? { name: data.name } : {}),
-          ...(data.description !== undefined ? { description: data.description || null } : {}),
-          ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl || null } : {}),
-          ...(data.emailNotifications !== undefined ? { emailNotifications: data.emailNotifications } : {}),
-          ...(hasSettings
-            ? {
-                settings: {
-                  upsert: {
-                    create: {
-                      webhookUrl: data.webhookUrl ?? null,
-                      rpcOverride: data.rpcOverride ?? null,
-                    },
-                    update: {
-                      ...(data.webhookUrl !== undefined ? { webhookUrl: data.webhookUrl } : {}),
-                      ...(data.rpcOverride !== undefined ? { rpcOverride: data.rpcOverride } : {}),
-                    },
-                  },
+    // Single atomic upsert eliminates the find-then-write race between two
+    // concurrent PATCHes (one would have hit the unique-constraint catch and
+    // returned a misleading 500). Nested `settings.upsert` inside the parent
+    // upsert runs in the same statement at the Prisma layer.
+    const result = await prisma.vault.upsert({
+      where: { cofreAddress: multisig },
+      create: {
+        cofreAddress: multisig,
+        cluster: getCurrentCluster(),
+        name: data.name ?? "Untitled",
+        description: data.description ?? null,
+        avatarUrl: data.avatarUrl ?? null,
+        createdBy: auth.publicKey,
+        ...(data.emailNotifications !== undefined
+          ? { emailNotifications: data.emailNotifications }
+          : {}),
+        ...(hasSettings
+          ? {
+              settings: {
+                create: {
+                  webhookUrl: data.webhookUrl ?? null,
+                  rpcOverride: data.rpcOverride ?? null,
                 },
-              }
-            : {}),
-        },
-        include: { settings: true },
-      });
-    } else {
-      result = await prisma.vault.create({
-        data: {
-          cofreAddress: multisig,
-          cluster: getCurrentCluster(),
-          name: data.name ?? "Untitled",
-          description: data.description ?? null,
-          avatarUrl: data.avatarUrl ?? null,
-          createdBy: auth.publicKey,
-          ...(data.emailNotifications !== undefined ? { emailNotifications: data.emailNotifications } : {}),
-          ...(hasSettings
-            ? {
-                settings: {
+              },
+            }
+          : {}),
+      },
+      update: {
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.description !== undefined ? { description: data.description || null } : {}),
+        ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl || null } : {}),
+        ...(data.emailNotifications !== undefined
+          ? { emailNotifications: data.emailNotifications }
+          : {}),
+        ...(hasSettings
+          ? {
+              settings: {
+                upsert: {
                   create: {
                     webhookUrl: data.webhookUrl ?? null,
                     rpcOverride: data.rpcOverride ?? null,
                   },
+                  update: {
+                    ...(data.webhookUrl !== undefined ? { webhookUrl: data.webhookUrl } : {}),
+                    ...(data.rpcOverride !== undefined ? { rpcOverride: data.rpcOverride } : {}),
+                  },
                 },
-              }
-            : {}),
-        },
-        include: { settings: true },
-      });
-    }
+              },
+            }
+          : {}),
+      },
+      include: { settings: true },
+    });
 
     return NextResponse.json(result);
   } catch (error) {

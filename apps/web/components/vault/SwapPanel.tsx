@@ -7,8 +7,8 @@ import { TokenDropdown } from "@/components/vault/TokenDropdown";
 import { useVaultTokens } from "@/lib/hooks/useVaultTokens";
 import { PROPOSAL_RENT_THRESHOLD_SOL, useWalletSolBalance } from "@/lib/hooks/useWalletSolBalance";
 import {
-  SWAP_PROVIDER,
   type RaydiumQuote,
+  SWAP_PROVIDER,
   formatSwapPreview,
   getRaydiumQuote,
   getRaydiumSwapInstructions,
@@ -49,7 +49,9 @@ export function SwapPanel({ multisig }: SwapPanelProps) {
     useTransactionProgress();
 
   const [selectedVaultIndex, setSelectedVaultIndex] = useState(0);
-  const [subVaultAccounts, setSubVaultAccounts] = useState<Array<{ vaultIndex: number; name: string }>>([]);
+  const [subVaultAccounts, setSubVaultAccounts] = useState<
+    Array<{ vaultIndex: number; name: string }>
+  >([]);
 
   useEffect(() => {
     fetch(`/api/vaults/${multisig}/sub-vaults`)
@@ -63,7 +65,10 @@ export function SwapPanel({ multisig }: SwapPanelProps) {
     [subVaultAccounts],
   );
 
-  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(multisig, selectedVaultIndex);
+  const { data: tokens = [], isLoading: tokensLoading } = useVaultTokens(
+    multisig,
+    selectedVaultIndex,
+  );
   const { sol: walletSol, insufficientForProposal } = useWalletSolBalance();
 
   const [amount, setAmount] = useState("");
@@ -294,7 +299,9 @@ export function SwapPanel({ multisig }: SwapPanelProps) {
           memo: `Swap ${amount} ${selectedInputToken?.symbol} → ${selectedOutputToken?.symbol}`,
           vaultIndex: selectedVaultIndex,
         }),
-      }).catch(() => {/* non-fatal */});
+      }).catch(() => {
+        /* non-fatal */
+      });
 
       completeTransaction({
         title: "Swap proposal ready",

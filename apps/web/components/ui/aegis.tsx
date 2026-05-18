@@ -29,11 +29,7 @@ export function Eyebrow({
 }
 
 /* ────────────────────────────────────────────── Mono ── */
-export function Mono({
-  children,
-  className,
-  ...rest
-}: HTMLAttributes<HTMLSpanElement>) {
+export function Mono({ children, className, ...rest }: HTMLAttributes<HTMLSpanElement>) {
   return (
     <span className={cn("font-mono num text-[0.95em]", className)} {...rest}>
       {children}
@@ -58,9 +54,7 @@ export function Stat({
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       <Eyebrow>{label}</Eyebrow>
-      <div className="font-display text-3xl font-semibold tracking-tight text-ink num">
-        {value}
-      </div>
+      <div className="font-display text-3xl font-semibold tracking-tight text-ink num">{value}</div>
       {hint && (
         <div
           className={cn(
@@ -91,9 +85,7 @@ export function Address({
 }) {
   const [copied, setCopied] = useState(false);
   const short =
-    value.length > chars * 2 + 1
-      ? `${value.slice(0, chars)}…${value.slice(-chars)}`
-      : value;
+    value.length > chars * 2 + 1 ? `${value.slice(0, chars)}…${value.slice(-chars)}` : value;
 
   async function copy() {
     if (!copyable) return;
@@ -163,7 +155,11 @@ export function TtlPill({
       <span
         className={cn(
           "inline-block h-1.5 w-1.5 rounded-full",
-          expired ? "bg-signal-danger" : minutes < 2 ? "bg-signal-warn animate-pulse" : "bg-ink-subtle",
+          expired
+            ? "bg-signal-danger"
+            : minutes < 2
+              ? "bg-signal-warn animate-pulse"
+              : "bg-ink-subtle",
         )}
       />
       ttl {label}

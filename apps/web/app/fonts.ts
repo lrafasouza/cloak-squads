@@ -1,4 +1,4 @@
-import { EB_Garamond, Fraunces, Inter, Geist_Mono } from "next/font/google";
+import { EB_Garamond, Fraunces, Geist_Mono, Inter } from "next/font/google";
 
 /**
  * Aegis typography system.

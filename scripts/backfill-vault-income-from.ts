@@ -109,10 +109,7 @@ async function main() {
   });
 
   console.log(
-    `Found ${rows.length} candidate rows (fromAddress="Unknown")` +
-      (args.cluster ? ` on ${args.cluster}` : "") +
-      (args.multisig ? ` for ${args.multisig}` : "") +
-      (args.dryRun ? " — dry run, no writes" : ""),
+    `Found ${rows.length} candidate rows (fromAddress="Unknown")${args.cluster ? ` on ${args.cluster}` : ""}${args.multisig ? ` for ${args.multisig}` : ""}${args.dryRun ? " — dry run, no writes" : ""}`,
   );
 
   // We need the vault PDA per row to know which destination key to look for.
@@ -171,8 +168,7 @@ async function main() {
 
     if (args.dryRun) {
       console.log(
-        `  [dry] ${row.signature.slice(0, 12)}… vault[${row.vaultIndex}] from="Unknown" → "${from.slice(0, 12)}…"` +
-          (amountWillChange ? ` amount ${row.amountLamports} → ${newAmount}` : ""),
+        `  [dry] ${row.signature.slice(0, 12)}… vault[${row.vaultIndex}] from="Unknown" → "${from.slice(0, 12)}…"${amountWillChange ? ` amount ${row.amountLamports} → ${newAmount}` : ""}`,
       );
     } else {
       await prisma.vaultIncome.update({

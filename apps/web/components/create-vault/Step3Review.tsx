@@ -143,18 +143,29 @@ export function Step3Review({
   useEffect(() => {
     let cancelled = false;
     estimateDeployFee(connection)
-      .then((fee) => { if (!cancelled) setDeployFee(fee); })
-      .catch(() => { if (!cancelled) setDeployFee(null); });
-    return () => { cancelled = true; };
+      .then((fee) => {
+        if (!cancelled) setDeployFee(fee);
+      })
+      .catch(() => {
+        if (!cancelled) setDeployFee(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [connection]);
 
   useEffect(() => {
     if (!wallet.publicKey) return;
     let cancelled = false;
-    connection.getBalance(wallet.publicKey)
-      .then((bal) => { if (!cancelled) setWalletBalance(bal); })
+    connection
+      .getBalance(wallet.publicKey)
+      .then((bal) => {
+        if (!cancelled) setWalletBalance(bal);
+      })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [connection, wallet.publicKey]);
 
   // Pre-fetch treasury so sendTransaction fires immediately on click (avoids wallet timeout)
@@ -162,9 +173,13 @@ export function Step3Review({
     let cancelled = false;
     const [programConfigPda] = multisigSdk.getProgramConfigPda({});
     multisigSdk.accounts.ProgramConfig.fromAccountAddress(connection, programConfigPda)
-      .then((cfg) => { if (!cancelled) setPrefetchedTreasury(cfg.treasury); })
+      .then((cfg) => {
+        if (!cancelled) setPrefetchedTreasury(cfg.treasury);
+      })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [connection]);
 
   const updateLocalStep = useCallback((id: string, update: Partial<CreationStep>) => {
@@ -215,7 +230,9 @@ export function Step3Review({
           id: "initialize",
           title: "Activate privacy layer",
           description:
-            threshold === 1 ? "Automatically activating for single-signer vaults." : "Waiting for member approvals.",
+            threshold === 1
+              ? "Automatically activating for single-signer vaults."
+              : "Waiting for member approvals.",
           status: "pending",
         },
       ],
@@ -432,7 +449,9 @@ export function Step3Review({
         throw new Error(body?.error ?? "Vault created, but metadata could not be saved.");
       }
 
-      try { localStorage.removeItem("aegis:my-vaults"); } catch {}
+      try {
+        localStorage.removeItem("aegis:my-vaults");
+      } catch {}
       setCreatedPda(multisigPda.toBase58());
       setStatus("success");
       completeTransaction({
@@ -642,15 +661,10 @@ export function Step3Review({
             ].map(({ label, value, icon: Icon }, i) => (
               <div
                 key={label}
-                className={cn(
-                  "px-3 py-3.5 text-center",
-                  i > 0 && "border-l border-border/60",
-                )}
+                className={cn("px-3 py-3.5 text-center", i > 0 && "border-l border-border/60")}
               >
                 <Icon className="mx-auto mb-1.5 h-3.5 w-3.5 text-accent/70" />
-                <p className="font-mono text-sm font-semibold tabular-nums text-ink">
-                  {value}
-                </p>
+                <p className="font-mono text-sm font-semibold tabular-nums text-ink">{value}</p>
                 <p className="mt-0.5 text-[10px] uppercase tracking-eyebrow text-ink-subtle">
                   {label}
                 </p>
@@ -671,9 +685,7 @@ export function Step3Review({
         >
           <span>
             <p className="text-eyebrow">Manifest</p>
-            <span className="mt-0.5 block text-sm font-medium text-ink">
-              What will be created
-            </span>
+            <span className="mt-0.5 block text-sm font-medium text-ink">What will be created</span>
           </span>
           {detailsOpen ? (
             <ChevronUp className="h-4 w-4 text-ink-subtle" />
@@ -732,9 +744,7 @@ export function Step3Review({
             ))}
           </div>
           <div className="mt-4 flex items-baseline gap-2 border-t border-border/60 pt-3">
-            <span className="text-[11px] uppercase tracking-eyebrow text-ink-subtle">
-              Operator
-            </span>
+            <span className="text-[11px] uppercase tracking-eyebrow text-ink-subtle">Operator</span>
             <span className="font-mono text-xs text-ink-muted">{shortAddr(operator)}</span>
           </div>
         </div>
@@ -743,11 +753,9 @@ export function Step3Review({
       {hasInsufficientBalance && (
         <WarningCallout variant="warning">
           Insufficient SOL balance. You need at least{" "}
-          <span className="font-semibold">{totalFeeSOL} SOL</span> to deploy this vault.
-          Your wallet currently has{" "}
-          <span className="font-semibold">
-            {lamportsToSol(String(walletBalance))} SOL
-          </span>.
+          <span className="font-semibold">{totalFeeSOL} SOL</span> to deploy this vault. Your wallet
+          currently has{" "}
+          <span className="font-semibold">{lamportsToSol(String(walletBalance))} SOL</span>.
         </WarningCallout>
       )}
 

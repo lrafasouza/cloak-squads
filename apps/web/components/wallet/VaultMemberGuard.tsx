@@ -69,7 +69,8 @@ export function VaultMemberGuard({
         <div>
           <h2 className="text-lg font-semibold text-ink">Wallet not authorized</h2>
           <p className="mt-1 max-w-xs text-sm text-ink-muted">
-            The connected wallet is not a member of this vault. Switch to a member wallet to continue.
+            The connected wallet is not a member of this vault. Switch to a member wallet to
+            continue.
           </p>
         </div>
       </div>

@@ -5,9 +5,9 @@
  * request context that headers() requires.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import nacl from "tweetnacl";
 import bs58 from "bs58";
+import nacl from "tweetnacl";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { consumeWalletNonce, verifyWalletAuthHeaders } from "../../apps/web/lib/wallet-auth";
 
 function makeKeypair() {
@@ -49,15 +49,17 @@ describe("v2 signature (endpoint-bound)", () => {
     const message = `aegis:v2:${pubkey}:${ts}:${nonce}:${method}:${path}:${bodyHash}`;
     const sig = signMessage(message, kp.secretKey);
 
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": pubkey,
-      "x-solana-signature": sig,
-      "x-solana-timestamp": ts,
-      "x-solana-nonce": nonce,
-      "x-solana-method": method,
-      "x-solana-path": path,
-      "x-solana-body-hash": bodyHash,
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": pubkey,
+        "x-solana-signature": sig,
+        "x-solana-timestamp": ts,
+        "x-solana-nonce": nonce,
+        "x-solana-method": method,
+        "x-solana-path": path,
+        "x-solana-body-hash": bodyHash,
+      }),
+    );
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.publicKey).toBe(pubkey);
   });
@@ -71,15 +73,17 @@ describe("v2 signature (endpoint-bound)", () => {
     const message = `aegis:v2:${pubkey}:${ts}:${nonce}:POST:/api/proposals:correct-hash`;
     const sig = signMessage(message, kp.secretKey);
 
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": pubkey,
-      "x-solana-signature": sig,
-      "x-solana-timestamp": ts,
-      "x-solana-nonce": nonce,
-      "x-solana-method": "POST",
-      "x-solana-path": "/api/proposals",
-      "x-solana-body-hash": "different-hash",
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": pubkey,
+        "x-solana-signature": sig,
+        "x-solana-timestamp": ts,
+        "x-solana-nonce": nonce,
+        "x-solana-method": "POST",
+        "x-solana-path": "/api/proposals",
+        "x-solana-body-hash": "different-hash",
+      }),
+    );
     expect(result.ok).toBe(false);
   });
 
@@ -92,15 +96,17 @@ describe("v2 signature (endpoint-bound)", () => {
     const message = `aegis:v2:${pubkey}:${ts}:${nonce}:GET:/api/vaults:-`;
     const sig = signMessage(message, kp.secretKey);
 
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": pubkey,
-      "x-solana-signature": sig,
-      "x-solana-timestamp": ts,
-      "x-solana-nonce": nonce,
-      "x-solana-method": "POST", // tampered
-      "x-solana-path": "/api/vaults",
-      "x-solana-body-hash": "-",
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": pubkey,
+        "x-solana-signature": sig,
+        "x-solana-timestamp": ts,
+        "x-solana-nonce": nonce,
+        "x-solana-method": "POST", // tampered
+        "x-solana-path": "/api/vaults",
+        "x-solana-body-hash": "-",
+      }),
+    );
     expect(result.ok).toBe(false);
   });
 
@@ -113,15 +119,17 @@ describe("v2 signature (endpoint-bound)", () => {
     const message = `aegis:v2:${pubkey}:${ts}:${nonce}:POST:/api/proposals:-`;
     const sig = signMessage(message, kp.secretKey);
 
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": pubkey,
-      "x-solana-signature": sig,
-      "x-solana-timestamp": ts,
-      "x-solana-nonce": nonce,
-      "x-solana-method": "POST",
-      "x-solana-path": "/api/stealth", // tampered
-      "x-solana-body-hash": "-",
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": pubkey,
+        "x-solana-signature": sig,
+        "x-solana-timestamp": ts,
+        "x-solana-nonce": nonce,
+        "x-solana-method": "POST",
+        "x-solana-path": "/api/stealth", // tampered
+        "x-solana-body-hash": "-",
+      }),
+    );
     expect(result.ok).toBe(false);
   });
 
@@ -134,15 +142,17 @@ describe("v2 signature (endpoint-bound)", () => {
     const message = `aegis:v2:${pubkey}:${ts}:${nonce}:GET:/api/vaults:-`;
     const sig = signMessage(message, kp.secretKey);
 
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": pubkey,
-      "x-solana-signature": sig,
-      "x-solana-timestamp": ts,
-      "x-solana-nonce": nonce,
-      "x-solana-method": "GET",
-      "x-solana-path": "/api/vaults",
-      "x-solana-body-hash": "-",
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": pubkey,
+        "x-solana-signature": sig,
+        "x-solana-timestamp": ts,
+        "x-solana-nonce": nonce,
+        "x-solana-method": "GET",
+        "x-solana-path": "/api/vaults",
+        "x-solana-body-hash": "-",
+      }),
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(401);
   });
@@ -158,15 +168,17 @@ describe("v2 signature (endpoint-bound)", () => {
     const sig = signMessage(message, kp.secretKey);
 
     // Attacker tries to add ?includeSensitive=true to the path header
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": pubkey,
-      "x-solana-signature": sig,
-      "x-solana-timestamp": ts,
-      "x-solana-nonce": nonce,
-      "x-solana-method": "GET",
-      "x-solana-path": "/api/payrolls/X/Y?includeSensitive=true",
-      "x-solana-body-hash": "-",
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": pubkey,
+        "x-solana-signature": sig,
+        "x-solana-timestamp": ts,
+        "x-solana-nonce": nonce,
+        "x-solana-method": "GET",
+        "x-solana-path": "/api/payrolls/X/Y?includeSensitive=true",
+        "x-solana-body-hash": "-",
+      }),
+    );
     expect(result.ok).toBe(false);
   });
 
@@ -181,15 +193,17 @@ describe("v2 signature (endpoint-bound)", () => {
     const sig = signMessage(message, kp.secretKey);
 
     // Server receives path with trailing slash
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": pubkey,
-      "x-solana-signature": sig,
-      "x-solana-timestamp": ts,
-      "x-solana-nonce": nonce,
-      "x-solana-method": "GET",
-      "x-solana-path": "/api/vaults/", // trailing slash stripped by server
-      "x-solana-body-hash": "-",
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": pubkey,
+        "x-solana-signature": sig,
+        "x-solana-timestamp": ts,
+        "x-solana-nonce": nonce,
+        "x-solana-method": "GET",
+        "x-solana-path": "/api/vaults/", // trailing slash stripped by server
+        "x-solana-body-hash": "-",
+      }),
+    );
     expect(result.ok).toBe(true);
   });
 
@@ -204,15 +218,17 @@ describe("v2 signature (endpoint-bound)", () => {
     const sig = signMessage(message, kp.secretKey);
 
     // Server receives path with trailing slash + same query
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": pubkey,
-      "x-solana-signature": sig,
-      "x-solana-timestamp": ts,
-      "x-solana-nonce": nonce,
-      "x-solana-method": "GET",
-      "x-solana-path": "/api/vaults/?x=1",
-      "x-solana-body-hash": "-",
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": pubkey,
+        "x-solana-signature": sig,
+        "x-solana-timestamp": ts,
+        "x-solana-nonce": nonce,
+        "x-solana-method": "GET",
+        "x-solana-path": "/api/vaults/?x=1",
+        "x-solana-body-hash": "-",
+      }),
+    );
     expect(result.ok).toBe(true);
   });
 });
@@ -228,12 +244,14 @@ describe("v1 legacy signature", () => {
     const message = `aegis:${pubkey}:${ts}:${nonce}`;
     const sig = signMessage(message, kp.secretKey);
 
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": pubkey,
-      "x-solana-signature": sig,
-      "x-solana-timestamp": ts,
-      "x-solana-nonce": nonce,
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": pubkey,
+        "x-solana-signature": sig,
+        "x-solana-timestamp": ts,
+        "x-solana-nonce": nonce,
+      }),
+    );
     expect(result.ok).toBe(true);
   });
 
@@ -247,12 +265,14 @@ describe("v1 legacy signature", () => {
     const message = `aegis:${pubkey}:${ts}:${nonce}`;
     const sig = signMessage(message, kp.secretKey);
 
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": pubkey,
-      "x-solana-signature": sig,
-      "x-solana-timestamp": ts,
-      "x-solana-nonce": nonce,
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": pubkey,
+        "x-solana-signature": sig,
+        "x-solana-timestamp": ts,
+        "x-solana-nonce": nonce,
+      }),
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(401);
   });
@@ -269,12 +289,14 @@ describe("v1 legacy signature", () => {
     const message = `aegis:${pubkey}:${ts}:${nonce}`;
     const sig = signMessage(message, kp.secretKey);
 
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": pubkey,
-      "x-solana-signature": sig,
-      "x-solana-timestamp": ts,
-      "x-solana-nonce": nonce,
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": pubkey,
+        "x-solana-signature": sig,
+        "x-solana-timestamp": ts,
+        "x-solana-nonce": nonce,
+      }),
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(401);
   });
@@ -282,20 +304,24 @@ describe("v1 legacy signature", () => {
 
 describe("malformed requests", () => {
   test("missing required headers → 401", () => {
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": "SomePubkey",
-      // missing signature and timestamp
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": "SomePubkey",
+        // missing signature and timestamp
+      }),
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(401);
   });
 
   test("invalid pubkey → 401", () => {
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": "not-a-valid-pubkey",
-      "x-solana-signature": "somesig",
-      "x-solana-timestamp": String(nowSecs()),
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": "not-a-valid-pubkey",
+        "x-solana-signature": "somesig",
+        "x-solana-timestamp": String(nowSecs()),
+      }),
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(401);
   });
@@ -305,12 +331,14 @@ describe("malformed requests", () => {
     const pubkey = bs58.encode(kp.publicKey);
     const ts = String(nowSecs());
 
-    const result = verifyWalletAuthHeaders(makeHeaders({
-      "x-solana-pubkey": pubkey,
-      "x-solana-signature": "!!!not-valid-base58!!!",
-      "x-solana-timestamp": ts,
-      "x-solana-nonce": "some-nonce",
-    }));
+    const result = verifyWalletAuthHeaders(
+      makeHeaders({
+        "x-solana-pubkey": pubkey,
+        "x-solana-signature": "!!!not-valid-base58!!!",
+        "x-solana-timestamp": ts,
+        "x-solana-nonce": "some-nonce",
+      }),
+    );
     expect(result.ok).toBe(false);
   });
 });

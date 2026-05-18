@@ -30,7 +30,12 @@ export function decryptViewKey(
   entry: EncryptedViewKeyEntry,
   signerDecryptKeyPair: BoxKeyPair,
 ): Uint8Array {
-  const decrypted = nacl.box.open(entry.ciphertext, entry.nonce, entry.ephemeralPk, signerDecryptKeyPair.secretKey);
+  const decrypted = nacl.box.open(
+    entry.ciphertext,
+    entry.nonce,
+    entry.ephemeralPk,
+    signerDecryptKeyPair.secretKey,
+  );
 
   if (!decrypted) {
     throw new Error("failed to decrypt view key (wrong signer or corrupted)");

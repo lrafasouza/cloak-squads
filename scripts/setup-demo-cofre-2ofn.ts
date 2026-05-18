@@ -97,7 +97,9 @@ async function airdropIfNeeded(connection: Connection, pubkey: PublicKey, minSol
       await confirm(connection, sig);
       console.log(`  Airdropped 1 SOL to ${pubkey.toBase58().slice(0, 8)}...`);
     } catch {
-      console.log(`  Airdrop failed for ${pubkey.toBase58().slice(0, 8)}... (may need manual funding)`);
+      console.log(
+        `  Airdrop failed for ${pubkey.toBase58().slice(0, 8)}... (may need manual funding)`,
+      );
     }
   }
 }
@@ -111,13 +113,19 @@ function readArgs(): { threshold: number; numMembers: number; operator: PublicKe
   const numMembers = Number.parseInt(numMembersArg, 10);
 
   if (Number.isNaN(threshold) || threshold < 1) {
-    throw new Error("Invalid threshold. Usage: pnpm tsx scripts/setup-demo-cofre-2ofn.ts <threshold> <num-members> <operator-pubkey>");
+    throw new Error(
+      "Invalid threshold. Usage: pnpm tsx scripts/setup-demo-cofre-2ofn.ts <threshold> <num-members> <operator-pubkey>",
+    );
   }
   if (Number.isNaN(numMembers) || numMembers < threshold) {
-    throw new Error("num-members must be >= threshold. Usage: pnpm tsx scripts/setup-demo-cofre-2ofn.ts <threshold> <num-members> <operator-pubkey>");
+    throw new Error(
+      "num-members must be >= threshold. Usage: pnpm tsx scripts/setup-demo-cofre-2ofn.ts <threshold> <num-members> <operator-pubkey>",
+    );
   }
   if (!operatorArg) {
-    throw new Error("Missing operator pubkey. Usage: pnpm tsx scripts/setup-demo-cofre-2ofn.ts <threshold> <num-members> <operator-pubkey>");
+    throw new Error(
+      "Missing operator pubkey. Usage: pnpm tsx scripts/setup-demo-cofre-2ofn.ts <threshold> <num-members> <operator-pubkey>",
+    );
   }
 
   let operator: PublicKey;
@@ -305,7 +313,9 @@ async function main() {
   const onChainOperator = new PublicKey(cofreAccount.data.subarray(40, 72));
   console.log(`On-chain operator: ${onChainOperator.toBase58()}`);
   if (!onChainOperator.equals(operator)) {
-    throw new Error(`Operator mismatch! Expected ${operator.toBase58()}, got ${onChainOperator.toBase58()}`);
+    throw new Error(
+      `Operator mismatch! Expected ${operator.toBase58()}, got ${onChainOperator.toBase58()}`,
+    );
   }
 
   const summary = {
@@ -327,15 +337,11 @@ async function main() {
 
   console.log(`\n✅ DEMO COFRE READY (${threshold}-of-${numMembers})`);
   console.log(
-    JSON.stringify(
-      { ...summary, createKey: "[redacted]", memberSecrets: "[redacted]" },
-      null,
-      2,
-    ),
+    JSON.stringify({ ...summary, createKey: "[redacted]", memberSecrets: "[redacted]" }, null, 2),
   );
   console.log(`\nFull config saved to: ${OUT_FILE}`);
   console.log(`\nNext: open ${summary.sendUrl} in your browser, or run:`);
-  console.log(`  pnpm tsx scripts/test-f1-private-send-2ofn.ts <recipient> <amount-sol>`);
+  console.log("  pnpm tsx scripts/test-f1-private-send-2ofn.ts <recipient> <amount-sol>");
 }
 
 main().catch((error) => {

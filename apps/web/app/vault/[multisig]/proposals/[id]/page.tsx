@@ -34,8 +34,8 @@ import {
   Key,
   Loader2,
   Lock,
-  Repeat,
   RefreshCw,
+  Repeat,
   Send,
   Settings,
   ShieldCheck,
@@ -169,26 +169,24 @@ function CopyAddress({ address }: { address: string }) {
 
 type MemberRowVote = "approved" | "pending" | "rejected";
 
-const VOTE_CHIP: Record<
-  MemberRowVote,
-  { icon: typeof CheckCircle2; label: string; cls: string }
-> = {
-  approved: {
-    icon: CheckCircle2,
-    label: "Approved",
-    cls: "bg-accent-soft text-accent",
-  },
-  rejected: {
-    icon: XCircle,
-    label: "Rejected",
-    cls: "bg-signal-danger/10 text-signal-danger",
-  },
-  pending: {
-    icon: Circle,
-    label: "Pending",
-    cls: "bg-surface-3 text-ink-subtle",
-  },
-};
+const VOTE_CHIP: Record<MemberRowVote, { icon: typeof CheckCircle2; label: string; cls: string }> =
+  {
+    approved: {
+      icon: CheckCircle2,
+      label: "Approved",
+      cls: "bg-accent-soft text-accent",
+    },
+    rejected: {
+      icon: XCircle,
+      label: "Rejected",
+      cls: "bg-signal-danger/10 text-signal-danger",
+    },
+    pending: {
+      icon: Circle,
+      label: "Pending",
+      cls: "bg-surface-3 text-ink-subtle",
+    },
+  };
 
 function VoteChip({ vote }: { vote: MemberRowVote }) {
   const cfg = VOTE_CHIP[vote];
@@ -619,7 +617,12 @@ export default function ProposalApprovalPage({
   type SafetyTone = "warn" | "lock" | "ready";
   const safetyState: { tone: SafetyTone; eyebrow: string; body: React.ReactNode } | null = (() => {
     if (executeComplete) return null;
-    if (status === "rejected" || status === "cancelled" || status === "missing" || status === "loading") {
+    if (
+      status === "rejected" ||
+      status === "cancelled" ||
+      status === "missing" ||
+      status === "loading"
+    ) {
       return null;
     }
     if (status === "active") {
@@ -954,8 +957,7 @@ export default function ProposalApprovalPage({
                 {
                   label: "Votes collected",
                   done: approvals > 0,
-                  current:
-                    status === "active" && !(threshold !== null && approvals >= threshold),
+                  current: status === "active" && !(threshold !== null && approvals >= threshold),
                   detail: threshold !== null ? `${approvals}/${threshold}` : `${approvals}`,
                 },
                 {
@@ -1090,9 +1092,7 @@ export default function ProposalApprovalPage({
               <header className="mb-4 flex items-baseline justify-between">
                 <p className="text-eyebrow">Quorum · approvals</p>
                 {threshold !== null && (
-                  <span className="text-xs text-ink-subtle">
-                    {quorumPct}% of threshold
-                  </span>
+                  <span className="text-xs text-ink-subtle">{quorumPct}% of threshold</span>
                 )}
               </header>
               {threshold === null ? (
@@ -1119,7 +1119,9 @@ export default function ProposalApprovalPage({
               )}
               {memberRows.length > 0 && (
                 <div className="mt-5 border-t border-border/50 pt-4">
-                  <p className="text-eyebrow mb-3">Ledger · {memberRows.length} member{memberRows.length !== 1 ? "s" : ""}</p>
+                  <p className="text-eyebrow mb-3">
+                    Ledger · {memberRows.length} member{memberRows.length !== 1 ? "s" : ""}
+                  </p>
                   <ul className="space-y-2">
                     {memberRows.map((row) => (
                       <li key={row.addr} className="flex items-center gap-3">
@@ -1155,7 +1157,9 @@ export default function ProposalApprovalPage({
                 return (
                   <div className={`rounded-panel border px-4 py-3.5 ${cls.wrap}`}>
                     <div className="flex items-start gap-3">
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${cls.chip}`}>
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${cls.chip}`}
+                      >
                         <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
                       </span>
                       <div className="min-w-0">

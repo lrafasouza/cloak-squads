@@ -1,8 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  UnsafeOutboundUrlError,
-  assertSafeOutboundUrl,
-} from "../../apps/web/lib/safe-url";
+import { UnsafeOutboundUrlError, assertSafeOutboundUrl } from "../../apps/web/lib/safe-url";
 
 describe("assertSafeOutboundUrl — accepted", () => {
   test("plain https public host", () => {

@@ -10,7 +10,7 @@
  */
 
 import { HeraldicWatermark } from "@/components/brand/HeraldicWatermark";
-import { useTheme, type Theme } from "@/components/providers/ThemeProvider";
+import { type Theme, useTheme } from "@/components/providers/ThemeProvider";
 import { ReceiptRow } from "@/components/ui/receipt-row";
 import { cn } from "@/lib/utils";
 import { Lock, Monitor, Moon, Shield, Sun } from "lucide-react";
@@ -85,9 +85,8 @@ export default function SprintAPreview() {
         <SectionTitle eyebrow="Section 5 · Card system">Card archetypes</SectionTitle>
 
         <p className="mb-6 max-w-2xl text-sm text-ink-muted">
-          Four distinct shells. The dashboard uses one of each — never
-          repeats — so the page reads as a hierarchy, not a stack of
-          identical containers.
+          Four distinct shells. The dashboard uses one of each — never repeats — so the page reads
+          as a hierarchy, not a stack of identical containers.
         </p>
 
         {/* card-hero */}
@@ -101,9 +100,9 @@ export default function SprintAPreview() {
             12.4023 SOL · 12,300.00 USDC
           </p>
           <p className="mt-6 max-w-md text-xs text-ink-subtle">
-            <code className="font-mono">.card-hero</code> — anchor card. One per
-            page. Embossed inset highlight + deep drop shadow + no hover
-            reaction (this card doesn't react to you, you react to it).
+            <code className="font-mono">.card-hero</code> — anchor card. One per page. Embossed
+            inset highlight + deep drop shadow + no hover reaction (this card doesn't react to you,
+            you react to it).
           </p>
         </div>
 
@@ -124,9 +123,9 @@ export default function SprintAPreview() {
           ))}
         </div>
         <p className="mb-8 text-xs text-ink-subtle">
-          <code className="font-mono">.card-panel</code> — workhorse. Borders
-          lift to <code className="font-mono">border-strong</code> on hover, no
-          gold glow. Hover any card to verify.
+          <code className="font-mono">.card-panel</code> — workhorse. Borders lift to{" "}
+          <code className="font-mono">border-strong</code> on hover, no gold glow. Hover any card to
+          verify.
         </p>
 
         {/* card-list */}
@@ -149,16 +148,15 @@ export default function SprintAPreview() {
           ))}
         </div>
         <p className="mb-8 text-xs text-ink-subtle">
-          <code className="font-mono">.card-list</code> — container only. Rows
-          own their padding and hover state. Lists never nest panels.
+          <code className="font-mono">.card-list</code> — container only. Rows own their padding and
+          hover state. Lists never nest panels.
         </p>
 
         {/* ── Privacy halo ─────────────────────────────────────────────── */}
         <SectionTitle eyebrow="Section 5.1 · Decorative motion">Privacy halo</SectionTitle>
         <p className="mb-6 max-w-2xl text-sm text-ink-muted">
-          The only decorative motion in the entire product. Two concentric
-          arcs, 4s pulse, 2s offset. Reserved for the "% shielded" KPI on the
-          dashboard. Honors{" "}
+          The only decorative motion in the entire product. Two concentric arcs, 4s pulse, 2s
+          offset. Reserved for the "% shielded" KPI on the dashboard. Honors{" "}
           <code className="font-mono text-[11px]">prefers-reduced-motion</code>.
         </p>
 
@@ -189,8 +187,8 @@ export default function SprintAPreview() {
         {/* ── Heraldic watermark sizes ────────────────────────────────── */}
         <SectionTitle eyebrow="Section 5.1 · Brand moment">Heraldic watermark</SectionTitle>
         <p className="mb-6 max-w-2xl text-sm text-ink-muted">
-          The Æ glyph, EB Garamond, accent-tinted, 4% opacity by default.
-          Used inside hero cards and modals only — never on KPI panels.
+          The Æ glyph, EB Garamond, accent-tinted, 4% opacity by default. Used inside hero cards and
+          modals only — never on KPI panels.
         </p>
 
         <div className="mb-12 grid gap-3 lg:grid-cols-2">
@@ -213,9 +211,9 @@ export default function SprintAPreview() {
         {/* ── Receipt rows ─────────────────────────────────────────────── */}
         <SectionTitle eyebrow="Section 6 · Modal pattern">Receipt rows</SectionTitle>
         <p className="mb-6 max-w-2xl text-sm text-ink-muted">
-          Dotted-leader pattern for "we are about to sign value" surfaces.
-          Default tone is ink, monospace, tabular. Override per row when you
-          need to draw the eye to a fee or a destination.
+          Dotted-leader pattern for "we are about to sign value" surfaces. Default tone is ink,
+          monospace, tabular. Override per row when you need to draw the eye to a fee or a
+          destination.
         </p>
 
         <div className="card-hero relative mb-12 p-7">
@@ -260,9 +258,9 @@ export default function SprintAPreview() {
         {/* ── Editorial label ──────────────────────────────────────────── */}
         <SectionTitle eyebrow="Section 3 · Editorial moment">label-editorial</SectionTitle>
         <p className="mb-6 max-w-2xl text-sm text-ink-muted">
-          Italic Fraunces section label, replaces the all-caps Inter eyebrow
-          everywhere. Reads like a vintage ledger — nobody else in crypto
-          fintech does this, which is exactly why we should.
+          Italic Fraunces section label, replaces the all-caps Inter eyebrow everywhere. Reads like
+          a vintage ledger — nobody else in crypto fintech does this, which is exactly why we
+          should.
         </p>
 
         <div className="card-panel mb-12 grid gap-6 p-6 md:grid-cols-2">
@@ -310,9 +308,8 @@ export default function SprintAPreview() {
         </div>
 
         <p className="mt-8 text-xs text-ink-subtle">
-          Switch the theme above to see every token re-bind. Light surfaces
-          should read as warm cream paper, not white. Dark surfaces should
-          read as near-black vault, not flat gray.
+          Switch the theme above to see every token re-bind. Light surfaces should read as warm
+          cream paper, not white. Dark surfaces should read as near-black vault, not flat gray.
         </p>
       </main>
     </div>

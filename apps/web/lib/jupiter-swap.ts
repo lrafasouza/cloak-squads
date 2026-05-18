@@ -1,7 +1,7 @@
 "use client";
 
-import { Transaction, TransactionInstruction, VersionedTransaction } from "@solana/web3.js";
 import { SOL_MINT, USDC_MINT } from "@/lib/tokens";
+import { Transaction, TransactionInstruction, VersionedTransaction } from "@solana/web3.js";
 
 const JUPITER_API_BASE = "/api";
 const DEFAULT_DECIMALS = 6;
@@ -38,21 +38,19 @@ export interface JupiterQuote {
   expireAt: string;
 }
 
-function extractInstructionsFromTransaction(
-  transactionBase64: string
-): TransactionInstruction[] {
+function extractInstructionsFromTransaction(transactionBase64: string): TransactionInstruction[] {
   const buffer = Buffer.from(transactionBase64, "base64");
-  
+
   // Try VersionedTransaction first
   try {
     const versionedTx = VersionedTransaction.deserialize(buffer);
     const message = versionedTx.message;
-    
+
     return message.compiledInstructions.map((ix) => {
       const accountKeys = message.staticAccountKeys;
       const programId = accountKeys[ix.programIdIndex];
       if (!programId) throw new Error("Invalid program ID index in transaction");
-      
+
       return new TransactionInstruction({
         programId,
         keys: ix.accountKeyIndexes.map((idx) => {
@@ -121,7 +119,7 @@ export function getSwapInstructions(quoteResponse: JupiterQuote): TransactionIns
 
 export function formatSwapPreview(
   quote: JupiterQuote,
-  outputDecimals: number = DEFAULT_DECIMALS
+  outputDecimals: number = DEFAULT_DECIMALS,
 ): {
   outAmountUi: string;
   priceImpact: string;
@@ -132,9 +130,7 @@ export function formatSwapPreview(
     maximumFractionDigits: 6,
   });
   const priceImpact = Number(quote.priceImpactPct).toFixed(4);
-  const routeLabel = quote.routePlan
-    .map((step) => step.swapInfo.label)
-    .join(" → ");
+  const routeLabel = quote.routePlan.map((step) => step.swapInfo.label).join(" → ");
 
   return { outAmountUi, priceImpact, routeLabel };
 }

@@ -44,10 +44,7 @@ export function Tabs({
 export function TabsList({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn(
-        "inline-flex rounded-md border border-border bg-surface p-1",
-        className,
-      )}
+      className={cn("inline-flex rounded-md border border-border bg-surface p-1", className)}
       {...props}
     />
   );

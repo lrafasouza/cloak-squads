@@ -52,10 +52,7 @@ export function OperatorInboxSheet({
   onDismiss,
   onClearAll,
 }: OperatorInboxSheetProps) {
-  const pendingCount = useMemo(
-    () => items.filter((i) => i.status === "pending").length,
-    [items],
-  );
+  const pendingCount = useMemo(() => items.filter((i) => i.status === "pending").length, [items]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -207,9 +204,7 @@ function OperatorInboxRow({
           {/* Status — quiet dot + label, no border-pill noise */}
           <div className="flex shrink-0 items-center gap-1.5">
             <span className={cn("h-1.5 w-1.5 rounded-full", tone.dot)} aria-hidden="true" />
-            <span className="text-eyebrow">
-              {tone.label}
-            </span>
+            <span className="text-eyebrow">{tone.label}</span>
           </div>
         </div>
 

@@ -206,8 +206,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
   }, []);
 
   const amountStep = isSol ? "0.000000001" : "0.000001";
-  const amountMin =
-    sendMode === "private" && isSol ? "0.01" : isSol ? "0.000000001" : "0.000001";
+  const amountMin = sendMode === "private" && isSol ? "0.01" : isSol ? "0.000000001" : "0.000001";
   const amountPlaceholder = isSol ? "0.0" : "0.00";
 
   const belowPrivateMin = useMemo(() => {
@@ -912,11 +911,7 @@ export default function SendPage({ params }: { params: Promise<{ multisig: strin
                   <ReceiptRow label="From" mono={false}>
                     {previewSourceVault}
                   </ReceiptRow>
-                  <ReceiptRow
-                    label="Privacy"
-                    mono={false}
-                    tone={isPrivate ? "accent" : "muted"}
-                  >
+                  <ReceiptRow label="Privacy" mono={false} tone={isPrivate ? "accent" : "muted"}>
                     {isPrivate ? "Shielded via Cloak" : "Public on-chain"}
                   </ReceiptRow>
                 </div>

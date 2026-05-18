@@ -1,13 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import {
-  Home,
-  List,
-  Send,
-  Settings,
-  Users,
-} from "lucide-react";
+import { Home, List, Send, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 
@@ -46,9 +40,7 @@ export function BottomNav() {
               )}
             >
               <div className="relative flex h-8 w-8 items-center justify-center">
-                {isActive && (
-                  <div className="absolute inset-0 rounded-xl bg-accent/10" />
-                )}
+                {isActive && <div className="absolute inset-0 rounded-xl bg-accent/10" />}
                 <Icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
               </div>
               <span className="text-[10px] font-medium">{item.label}</span>

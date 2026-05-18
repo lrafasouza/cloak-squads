@@ -173,7 +173,11 @@ function SignatureLink({ signature }: { signature: string }) {
           className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-semibold text-ink-subtle transition-aegis hover:bg-surface-2 hover:text-ink"
           aria-label="Copy transaction signature"
         >
-          {copied ? <Check className="h-3 w-3" aria-hidden="true" /> : <Copy className="h-3 w-3" aria-hidden="true" />}
+          {copied ? (
+            <Check className="h-3 w-3" aria-hidden="true" />
+          ) : (
+            <Copy className="h-3 w-3" aria-hidden="true" />
+          )}
           {copied ? "Copied" : "Copy"}
         </button>
         <a
@@ -367,7 +371,11 @@ function TransactionModal({
           <div className="mt-6 pb-5">
             <div className="flex items-center justify-between text-[11px] uppercase tracking-eyebrow text-ink-subtle">
               <span>
-                Step {Math.min(completedSteps + (transaction.status === "running" ? 1 : 0), transaction.steps.length)}{" "}
+                Step{" "}
+                {Math.min(
+                  completedSteps + (transaction.status === "running" ? 1 : 0),
+                  transaction.steps.length,
+                )}{" "}
                 of {transaction.steps.length}
               </span>
               <span className="font-mono normal-case tracking-normal tabular-nums text-ink-muted">
@@ -470,9 +478,7 @@ function TransactionModal({
                       <p
                         className={cn(
                           "mt-1 text-sm leading-5",
-                          step.status === "error"
-                            ? "text-signal-danger/85"
-                            : "text-ink-muted",
+                          step.status === "error" ? "text-signal-danger/85" : "text-ink-muted",
                         )}
                       >
                         {step.description}

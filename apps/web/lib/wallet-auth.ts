@@ -1,3 +1,8 @@
+import { PublicKey } from "@solana/web3.js";
+import bs58 from "bs58";
+import { cookies, headers } from "next/headers";
+import { NextResponse } from "next/server";
+import nacl from "tweetnacl";
 /**
  * Server-side wallet authentication for API routes.
  *
@@ -22,11 +27,6 @@
  */
 import { SESSION_COOKIE_NAME, verifySessionToken } from "./auth-session";
 import { checkRateLimitAsync, rateLimitBucket } from "./rate-limit";
-import { PublicKey } from "@solana/web3.js";
-import bs58 from "bs58";
-import { cookies, headers } from "next/headers";
-import { NextResponse } from "next/server";
-import nacl from "tweetnacl";
 
 const AUTH_WINDOW_SECS = 5 * 60; // 5 minutes
 // Outlive the timestamp window by a small margin so a nonce we just accepted

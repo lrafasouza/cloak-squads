@@ -1,8 +1,8 @@
 "use client";
 
+import { type IncomeEntry, useVaultIncome } from "@/lib/hooks/useVaultIncome";
 import type { ProposalSummary } from "@/lib/proposals";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
-import { type IncomeEntry, useVaultIncome } from "@/lib/hooks/useVaultIncome";
 
 export type ActivityItem =
   | { kind: "proposal"; timestamp: number; data: ProposalSummary }
@@ -27,10 +27,7 @@ export function useRecentActivity(
   const incomeQuery = useVaultIncome(multisig, limit);
 
   const proposals: ActivityItem[] = (proposalQuery.data ?? [])
-    .filter(
-      (p) =>
-        p.status === "executed" || p.status === "rejected" || p.status === "cancelled",
-    )
+    .filter((p) => p.status === "executed" || p.status === "rejected" || p.status === "cancelled")
     .map((p) => ({
       kind: "proposal" as const,
       timestamp: p.createdAt ? new Date(p.createdAt).getTime() : 0,

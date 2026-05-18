@@ -48,19 +48,15 @@ export function FAQ({ className }: { className?: string }) {
       {faqs.map((faq, i) => {
         const isOpen = open === i;
         return (
-          <div
-            key={i}
-            className={cn(
-              "border-b border-border",
-              i === 0 && "border-t",
-            )}
-          >
+          <div key={i} className={cn("border-b border-border", i === 0 && "border-t")}>
             <button
               type="button"
               onClick={() => setOpen(isOpen ? null : i)}
               className="group flex w-full items-center justify-between gap-4 py-5 text-left transition-colors hover:text-ink"
             >
-              <span className="text-sm font-semibold text-ink group-hover:text-accent transition-colors duration-200">{faq.q}</span>
+              <span className="text-sm font-semibold text-ink group-hover:text-accent transition-colors duration-200">
+                {faq.q}
+              </span>
               <ChevronDown
                 className={cn(
                   "h-4 w-4 shrink-0 text-ink-muted transition-transform duration-300",
@@ -77,9 +73,7 @@ export function FAQ({ className }: { className?: string }) {
                   transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                   className="overflow-hidden"
                 >
-                  <div className="pb-5 text-sm leading-relaxed text-ink-muted">
-                    {faq.a}
-                  </div>
+                  <div className="pb-5 text-sm leading-relaxed text-ink-muted">{faq.a}</div>
                 </motion.div>
               )}
             </AnimatePresence>

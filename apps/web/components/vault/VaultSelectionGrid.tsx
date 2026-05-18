@@ -1,8 +1,8 @@
 "use client";
 
-import type { AegisVault } from "@/lib/use-my-vaults";
 import { VaultIdenticon } from "@/components/ui/vault-identicon";
 import { truncateAddress } from "@/lib/proposals";
+import type { AegisVault } from "@/lib/use-my-vaults";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Plus, Upload } from "lucide-react";
 import Link from "next/link";
@@ -108,9 +108,7 @@ function CreateVaultCard({ index }: { index: number }) {
           <p className="mt-1.5 font-display text-base font-semibold tracking-tight text-ink-muted transition-colors duration-300 group-hover:text-accent">
             Forge new vault
           </p>
-          <p className="mt-1 text-[11px] italic text-ink-subtle">
-            New Squads multisig
-          </p>
+          <p className="mt-1 text-[11px] italic text-ink-subtle">New Squads multisig</p>
         </div>
       </Link>
     </motion.div>

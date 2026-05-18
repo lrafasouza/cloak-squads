@@ -25,7 +25,6 @@ function adapterNetworkFromEnv() {
       return WalletAdapterNetwork.Mainnet;
     case "testnet":
       return WalletAdapterNetwork.Testnet;
-    case "devnet":
     default:
       return WalletAdapterNetwork.Devnet;
   }

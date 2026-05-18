@@ -15,9 +15,7 @@ describe("assertCofreInitialized", () => {
         multisig,
         gatekeeperProgram,
       }),
-    ).rejects.toThrow(
-      `Cofre is not initialized for multisig ${multisig.toBase58()}`,
-    );
+    ).rejects.toThrow(`Cofre is not initialized for multisig ${multisig.toBase58()}`);
   });
 
   test("throws when the cofre PDA is owned by another program", async () => {

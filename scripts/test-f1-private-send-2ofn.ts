@@ -165,7 +165,9 @@ function readArgs(): { recipient: PublicKey; amountSol: number } {
   const recipientArg = process.argv[2];
   const amountArg = process.argv[3];
   if (!recipientArg || !amountArg) {
-    throw new Error("Usage: pnpm tsx scripts/test-f1-private-send-2ofn.ts <recipient-pubkey> <amount-in-sol>");
+    throw new Error(
+      "Usage: pnpm tsx scripts/test-f1-private-send-2ofn.ts <recipient-pubkey> <amount-in-sol>",
+    );
   }
   let recipient: PublicKey;
   try {
@@ -241,7 +243,10 @@ async function main() {
   console.log("Vault:    ", vaultPda.toBase58());
   console.log("Cofre:    ", cofrePda.toBase58());
   console.log("Operator: ", operator.publicKey.toBase58());
-  console.log("Members:  ", allMembers.map((m) => m.publicKey.toBase58().slice(0, 8) + "...").join(", "));
+  console.log(
+    "Members:  ",
+    allMembers.map((m) => `${m.publicKey.toBase58().slice(0, 8)}...`).join(", "),
+  );
 
   const connection = new Connection("https://api.devnet.solana.com", "confirmed");
 
@@ -322,7 +327,9 @@ async function main() {
   const multisigAccount = await Multisig.fromAccountAddress(connection, multisigPda);
   const transactionIndex = BigInt(multisigAccount.transactionIndex.toString()) + 1n;
 
-  console.log(`\n[1/${demo.threshold + 4}] vaultTransactionCreate (issue_license) — tx index ${transactionIndex}`);
+  console.log(
+    `\n[1/${demo.threshold + 4}] vaultTransactionCreate (issue_license) — tx index ${transactionIndex}`,
+  );
 
   const innerIx = buildIssueLicenseIx({
     cofre: cofrePda,
@@ -465,9 +472,7 @@ async function main() {
     );
     console.log("  Cloak deposit tx:", depositResult.signature);
     console.log("  Leaf index:", depositResult.commitmentIndices[0]);
-    const depositedCommitment = depositResult.outputCommitments[0]
-      ?.toString(16)
-      .padStart(64, "0");
+    const depositedCommitment = depositResult.outputCommitments[0]?.toString(16).padStart(64, "0");
     console.log(
       "  Commitment match:",
       depositedCommitment === Buffer.from(commitment).toString("hex"),
@@ -498,7 +503,9 @@ async function main() {
   console.log(`  Delivered:       ${delivered / LAMPORTS_PER_SOL} SOL`);
   console.log(`  Expected net:    ${expectedNet / LAMPORTS_PER_SOL} SOL`);
   if (delivered < expectedNet) {
-    throw new Error(`Recipient balance increased by ${delivered}, expected at least ${expectedNet}`);
+    throw new Error(
+      `Recipient balance increased by ${delivered}, expected at least ${expectedNet}`,
+    );
   }
 
   console.log("\n[6] execute_with_license (operator consumes)...");

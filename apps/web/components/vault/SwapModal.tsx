@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { ReceiptRow } from "@/components/ui/receipt-row";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
 import { TokenDropdown } from "@/components/vault/TokenDropdown";
-import { cn } from "@/lib/utils";
 import { useVaultTokens } from "@/lib/hooks/useVaultTokens";
 import { PROPOSAL_RENT_THRESHOLD_SOL, useWalletSolBalance } from "@/lib/hooks/useWalletSolBalance";
 import {
@@ -27,6 +26,7 @@ import {
 import { createVaultProposal } from "@/lib/squads-sdk";
 import { SOL_MINT, USDC_DECIMALS, USDC_MINT, tokenAmountToUnits } from "@/lib/tokens";
 import { useWalletAuth } from "@/lib/use-wallet-auth";
+import { cn } from "@/lib/utils";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { ArrowLeftRight, Info, Loader2 } from "lucide-react";
@@ -519,9 +519,7 @@ export function SwapModal({
           {quoteLoading && (
             <div className="flex items-center gap-2 rounded-list border border-border bg-surface-2 px-4 py-3">
               <Loader2 className="h-4 w-4 animate-spin text-ink-subtle" />
-              <span className="text-sm text-ink-muted">
-                Fetching quote from {SWAP_PROVIDER}…
-              </span>
+              <span className="text-sm text-ink-muted">Fetching quote from {SWAP_PROVIDER}…</span>
             </div>
           )}
 
@@ -568,8 +566,8 @@ export function SwapModal({
                 Your connected wallet has only{" "}
                 <span className="font-mono font-medium">{(walletSol ?? 0).toFixed(6)} SOL</span>.
                 Creating a proposal needs at least{" "}
-                <span className="font-mono font-medium">{PROPOSAL_RENT_THRESHOLD_SOL} SOL</span>{" "}
-                to cover account rent + fees. Top up your wallet and try again.
+                <span className="font-mono font-medium">{PROPOSAL_RENT_THRESHOLD_SOL} SOL</span> to
+                cover account rent + fees. Top up your wallet and try again.
               </p>
             </div>
           )}

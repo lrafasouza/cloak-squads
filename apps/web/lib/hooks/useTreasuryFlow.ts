@@ -1,10 +1,7 @@
 "use client";
 
 import type { ProposalSummary } from "@/lib/proposals";
-import {
-  type FlowBucket,
-  aggregateTreasuryFlow,
-} from "@/lib/treasury-flow-math";
+import { type FlowBucket, aggregateTreasuryFlow } from "@/lib/treasury-flow-math";
 import { useProposalSummaries } from "@/lib/use-proposal-summaries";
 import { useMemo } from "react";
 import { type IncomeEntry, useVaultIncome } from "./useVaultIncome";

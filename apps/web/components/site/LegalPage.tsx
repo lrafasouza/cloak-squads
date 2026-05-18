@@ -30,11 +30,7 @@ export function LegalPage({
           <p className="mt-5 font-mono text-[10px] uppercase tracking-eyebrow text-ink-subtle">
             Last updated · {lastUpdated}
           </p>
-          {intro && (
-            <p className="mt-8 text-[15px] leading-relaxed text-ink-muted">
-              {intro}
-            </p>
-          )}
+          {intro && <p className="mt-8 text-[15px] leading-relaxed text-ink-muted">{intro}</p>}
         </header>
 
         <div className="space-y-14">{children}</div>
@@ -67,8 +63,7 @@ export function Section({
       id={`section-${num}`}
       className={cn(
         "scroll-mt-24",
-        emphasis &&
-          "rounded-xl border border-signal-warn/25 bg-signal-warn/[0.04] p-6 md:p-8",
+        emphasis && "rounded-xl border border-signal-warn/25 bg-signal-warn/[0.04] p-6 md:p-8",
       )}
     >
       <div className="mb-4 flex items-baseline gap-3">

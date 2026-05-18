@@ -1,6 +1,6 @@
 "use client";
 
-// biome-ignore lint/style/useNodejsImportProtocol: Client bundle uses the buffer package polyfill.
+// Client bundle uses the buffer polyfill, not node:buffer.
 import { Buffer } from "buffer";
 import { cofrePda, licensePda, squadsVaultPda } from "@cloak-squads/core/pda";
 import type { PayloadInvariants } from "@cloak-squads/core/types";
@@ -134,7 +134,12 @@ export async function buildExecuteWithLicenseIxBrowser(params: {
       params.invariants.nonce,
     ),
   );
-  const license = licensePda(cofre, params.vaultIndex ?? 0, new Uint8Array(payloadHash), gatekeeperProgram)[0];
+  const license = licensePda(
+    cofre,
+    params.vaultIndex ?? 0,
+    new Uint8Array(payloadHash),
+    gatekeeperProgram,
+  )[0];
   const discriminator = await anchorDiscriminator("execute_with_license");
   const data = concatBytes(
     discriminator,

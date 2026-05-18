@@ -55,12 +55,14 @@ pub fn handler(
         CloakSquadsError::LicensePayloadMismatch
     );
 
+    let vault_index = ctx.accounts.license.vault_index;
     ctx.accounts.license.status = LicenseStatus::Consumed;
 
     emit!(LicenseConsumed {
         cofre: ctx.accounts.cofre.key(),
         payload_hash,
         cloak_tx_signature_hint: invariants.commitment,
+        vault_index,
     });
 
     Ok(())

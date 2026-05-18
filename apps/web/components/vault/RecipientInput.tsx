@@ -1,17 +1,15 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
-import { findEntryByAddress, useAddressBook, type AddressBookEntry } from "@/lib/hooks/useAddressBook";
+import {
+  type AddressBookEntry,
+  findEntryByAddress,
+  useAddressBook,
+} from "@/lib/hooks/useAddressBook";
 import { cn } from "@/lib/utils";
 import { PublicKey } from "@solana/web3.js";
 import { BookUser, Check, Plus, X } from "lucide-react";
-import {
-  type KeyboardEvent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
 function isValidPubkey(value: string): boolean {
   if (!value) return false;
@@ -96,8 +94,7 @@ export function RecipientInput({
 
   const valueIsValid = isValidPubkey(value);
   const showSuggestions = isFocused && filteredEntries.length > 0 && !showSavePrompt;
-  const canPromptSave =
-    valueIsValid && !matchedEntry && !showSavePrompt && entries.length >= 0;
+  const canPromptSave = valueIsValid && !matchedEntry && !showSavePrompt && entries.length >= 0;
 
   function handleSelect(entry: AddressBookEntry) {
     onChange(entry.address);
@@ -193,9 +190,7 @@ export function RecipientInput({
                   {abbrev(entry.address)}
                 </div>
               </div>
-              {entry.address === value ? (
-                <Check className="h-4 w-4 shrink-0 text-accent" />
-              ) : null}
+              {entry.address === value ? <Check className="h-4 w-4 shrink-0 text-accent" /> : null}
             </button>
           ))}
         </div>

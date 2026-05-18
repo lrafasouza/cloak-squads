@@ -15,8 +15,7 @@ export function AppToaster() {
       theme={resolvedTheme}
       toastOptions={{
         classNames: {
-          toast:
-            "border border-signal-positive/30 bg-signal-positive/10 text-ink shadow-raise-1",
+          toast: "border border-signal-positive/30 bg-signal-positive/10 text-ink shadow-raise-1",
           description: "text-ink-muted",
           actionButton: "bg-accent text-accent-ink hover:bg-accent-hover",
           cancelButton: "bg-surface-2 text-ink-muted hover:bg-surface-3",

@@ -13,12 +13,7 @@ interface StatCardProps {
 
 export function StatCard({ label, value, icon: Icon, sub, className }: StatCardProps) {
   return (
-    <div
-      className={cn(
-        "group card-panel p-5 hover:bg-surface-2/50",
-        className,
-      )}
-    >
+    <div className={cn("group card-panel p-5 hover:bg-surface-2/50", className)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink-subtle">

@@ -49,13 +49,7 @@ export function ReceiptRow({
     <div className={cn("receipt-row", className)}>
       <span className="text-[12px] text-ink-subtle">{label}</span>
       <span className="leader" aria-hidden="true" />
-      <span
-        className={cn(
-          "text-[13px]",
-          mono ? "font-mono tabular-nums" : "",
-          TONE_CLASSES[tone],
-        )}
-      >
+      <span className={cn("text-[13px]", mono ? "font-mono tabular-nums" : "", TONE_CLASSES[tone])}>
         {children}
       </span>
     </div>

@@ -146,12 +146,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    const utxoPrivateKey = isEncrypted(invoice.utxoPrivateKey)
-      ? decryptField(invoice.utxoPrivateKey)
-      : invoice.utxoPrivateKey;
-    const utxoBlinding = isEncrypted(invoice.utxoBlinding)
-      ? decryptField(invoice.utxoBlinding)
-      : invoice.utxoBlinding;
+    // Decrypt failures here mean ciphertext + key are out of sync (mid-rotation
+    // without FIELD_CRYPTO_KEY_PREVIOUS, or a corrupted v1. row). Surface as
+    // 410 Gone so the claimer learns the data is unrecoverable instead of
+    // seeing a generic 500 that hides the real reason.
+    let utxoPrivateKey: string;
+    let utxoBlinding: string;
+    try {
+      utxoPrivateKey = isEncrypted(invoice.utxoPrivateKey)
+        ? decryptField(invoice.utxoPrivateKey)
+        : invoice.utxoPrivateKey;
+      utxoBlinding = isEncrypted(invoice.utxoBlinding)
+        ? decryptField(invoice.utxoBlinding)
+        : invoice.utxoBlinding;
+    } catch (err) {
+      console.error("[api/stealth/claim-data] decrypt failed for invoice", id, err);
+      return NextResponse.json(
+        { error: "Invoice data could not be decrypted and is no longer recoverable." },
+        { status: 410 },
+      );
+    }
 
     return NextResponse.json({
       utxoAmount: invoice.utxoAmount,

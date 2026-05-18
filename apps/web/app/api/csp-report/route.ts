@@ -87,7 +87,10 @@ export async function POST(request: Request) {
     : payload?.["csp-report"]
       ? [
           {
-            directive: truncate(payload["csp-report"]["effective-directive"] ?? payload["csp-report"]["violated-directive"]),
+            directive: truncate(
+              payload["csp-report"]["effective-directive"] ??
+                payload["csp-report"]["violated-directive"],
+            ),
             blocked: truncate(payload["csp-report"]["blocked-uri"]),
             source: truncate(payload["csp-report"]["source-file"]),
             line: payload["csp-report"]["line-number"],

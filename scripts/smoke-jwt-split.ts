@@ -71,8 +71,11 @@ async function main() {
     // Domain separation: a session-token signature must NOT verify here.
     // We can't easily prove this without poking internals, but a tampered
     // challengeId fails — covers the same surface.
-    const tampered = challengeId.slice(0, -1) + "x";
-    check("tampered challengeId rejected", mod.checkChallenge("invoice-abc-123", tampered) === null);
+    const tampered = `${challengeId.slice(0, -1)}x`;
+    check(
+      "tampered challengeId rejected",
+      mod.checkChallenge("invoice-abc-123", tampered) === null,
+    );
   }
 
   console.log("\n[3/4] Field crypto AES-256-GCM (FIELD_CRYPTO_KEY)");
@@ -119,12 +122,9 @@ async function main() {
     // Wrong data must reject.
     const tamperedMessage = mod.buildAuditExportMessage({
       ...signed,
-      data: signed.data + "x",
+      data: `${signed.data}x`,
     });
-    check(
-      "tampered data rejected",
-      !nacl.sign.detached.verify(tamperedMessage, sigBytes, pkBytes),
-    );
+    check("tampered data rejected", !nacl.sign.detached.verify(tamperedMessage, sigBytes, pkBytes));
   }
 
   console.log("\n[5] Field-crypto rotation (FIELD_CRYPTO_KEY_PREVIOUS)");
@@ -138,17 +138,25 @@ async function main() {
     process.env.FIELD_CRYPTO_KEY = FIELD_KEY_NEXT;
     process.env.FIELD_CRYPTO_KEY_PREVIOUS = FIELD_KEY;
     // Force a fresh module import to drop the cached keys.
-    delete (require.cache as Record<string, unknown>)[require.resolve("../apps/web/lib/field-crypto")];
+    delete (require.cache as Record<string, unknown>)[
+      require.resolve("../apps/web/lib/field-crypto")
+    ];
     const rotated: typeof original = await import("../apps/web/lib/field-crypto");
     rotated._resetFieldCryptoKeyCache();
 
-    check("dual-read decrypts under PREVIOUS", rotated.decryptField(ciphertextOld) === "rotated-payload");
+    check(
+      "dual-read decrypts under PREVIOUS",
+      rotated.decryptField(ciphertextOld) === "rotated-payload",
+    );
 
     // New writes go under CURRENT.
     const ciphertextNew = rotated.encryptField("post-rotation");
     delete process.env.FIELD_CRYPTO_KEY_PREVIOUS;
     rotated._resetFieldCryptoKeyCache();
-    check("post-rotation reads work without PREVIOUS", rotated.decryptField(ciphertextNew) === "post-rotation");
+    check(
+      "post-rotation reads work without PREVIOUS",
+      rotated.decryptField(ciphertextNew) === "post-rotation",
+    );
 
     // Old ciphertext now orphaned (operator forgot to back-fill).
     let orphaned = false;

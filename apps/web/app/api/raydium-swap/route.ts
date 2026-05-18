@@ -171,9 +171,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data);
   } catch (err) {
     console.error("[api/raydium-swap] failed:", err);
-    return NextResponse.json(
-      { error: "Failed to build swap transaction" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to build swap transaction" }, { status: 500 });
   }
 }

@@ -50,7 +50,7 @@ describe("encryptField / decryptField", () => {
     const buf = Buffer.from(rawBase64, "base64");
     // Flip a bit in the ciphertext portion (skip IV of 12 bytes, flip byte 13)
     buf[13] ^= 0xff;
-    const tampered = "v1." + buf.toString("base64");
+    const tampered = `v1.${buf.toString("base64")}`;
     expect(() => decryptField(tampered)).toThrow();
   });
 
@@ -61,7 +61,7 @@ describe("encryptField / decryptField", () => {
     const rawBase64 = ciphertext.slice("v1.".length);
     const buf = Buffer.from(rawBase64, "base64");
     buf[buf.length - 1] ^= 0x01;
-    const corrupted = "v1." + buf.toString("base64");
+    const corrupted = `v1.${buf.toString("base64")}`;
     expect(() => decryptField(corrupted)).toThrow();
   });
 });
@@ -84,7 +84,9 @@ describe("isEncrypted", () => {
   });
 
   test("returns false for hex key (legacy unencrypted)", () => {
-    expect(isEncrypted("deadbeefcafebabe1234567890abcdef1234567890abcdef1234567890abcdef")).toBe(false);
+    expect(isEncrypted("deadbeefcafebabe1234567890abcdef1234567890abcdef1234567890abcdef")).toBe(
+      false,
+    );
   });
 
   test("returns false for arbitrary base64 without v1. prefix (legacy)", () => {

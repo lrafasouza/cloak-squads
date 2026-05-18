@@ -2,7 +2,6 @@ import { createHash, randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { prisma } from "../apps/web/lib/prisma";
 import {
   CLOAK_PROGRAM_ID,
   NATIVE_SOL_MINT,
@@ -28,6 +27,7 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
+import { prisma } from "../apps/web/lib/prisma";
 
 const { Multisig } = multisig.accounts;
 
@@ -169,7 +169,9 @@ async function main() {
     throw new Error("Set DATABASE_URL to the web Prisma sqlite database.");
   }
   if (!fs.existsSync(DEMO_FILE)) {
-    throw new Error(`Demo cofre not found at ${DEMO_FILE}. Run "pnpm demo:setup <operator-pubkey>" first.`);
+    throw new Error(
+      `Demo cofre not found at ${DEMO_FILE}. Run "pnpm demo:setup <operator-pubkey>" first.`,
+    );
   }
   const operatorKeypairEnv = process.env.OPERATOR_KEYPAIR;
   const creatorKeypairEnv = process.env.SOLANA_KEYPAIR;
@@ -194,7 +196,9 @@ async function main() {
   if (!cofreAccount) throw new Error(`Cofre ${cofrePda.toBase58()} not found on devnet.`);
   const onChainOperator = new PublicKey(cofreAccount.data.subarray(40, 72));
   if (!onChainOperator.equals(operator.publicKey)) {
-    throw new Error(`Cofre operator mismatch: on-chain ${onChainOperator.toBase58()}, script ${operator.publicKey.toBase58()}.`);
+    throw new Error(
+      `Cofre operator mismatch: on-chain ${onChainOperator.toBase58()}, script ${operator.publicKey.toBase58()}.`,
+    );
   }
 
   const creatorBalance = await connection.getBalance(creator.publicKey);
@@ -209,7 +213,9 @@ async function main() {
         lamports: Math.ceil(minOperatorBalance - operatorBalance),
       }),
     );
-    const fundOpSig = await connection.sendTransaction(fundOpTx, [creator], { skipPreflight: false });
+    const fundOpSig = await connection.sendTransaction(fundOpTx, [creator], {
+      skipPreflight: false,
+    });
     await confirm(connection, fundOpSig);
     console.log("Fund operator tx:", fundOpSig);
   }
@@ -421,7 +427,11 @@ async function main() {
   const claimInvoice = await prisma.stealthInvoice.findUniqueOrThrow({ where: { id: invoice.id } });
   const privateKey = BigInt(`0x${claimInvoice.utxoPrivateKey?.padStart(64, "0")}`);
   const publicKey = await derivePublicKey(privateKey);
-  const claimUtxo = await createUtxo(BigInt(claimInvoice.utxoAmount ?? "0"), { privateKey, publicKey }, NATIVE_SOL_MINT);
+  const claimUtxo = await createUtxo(
+    BigInt(claimInvoice.utxoAmount ?? "0"),
+    { privateKey, publicKey },
+    NATIVE_SOL_MINT,
+  );
   claimUtxo.blinding = BigInt(`0x${claimInvoice.utxoBlinding}`);
   claimUtxo.commitment = await computeUtxoCommitment(claimUtxo);
   claimUtxo.index = claimInvoice.utxoLeafIndex ?? undefined;
@@ -444,7 +454,9 @@ async function main() {
   console.log("Delivered:", delivered);
   console.log("Expected net:", expectedNet);
   if (delivered < expectedNet) {
-    throw new Error(`Recipient balance increased by ${delivered}, expected at least ${expectedNet}`);
+    throw new Error(
+      `Recipient balance increased by ${delivered}, expected at least ${expectedNet}`,
+    );
   }
 
   await prisma.stealthInvoice.update({

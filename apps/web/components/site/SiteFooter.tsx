@@ -17,9 +17,7 @@ const cols = [
   },
   {
     title: "Developers",
-    links: [
-      { label: "GitHub", href: "https://github.com/cloak-dev/aegis", external: true },
-    ],
+    links: [{ label: "GitHub", href: "https://github.com/cloak-dev/aegis", external: true }],
   },
   {
     title: "Company",
@@ -39,9 +37,8 @@ export function SiteFooter({ className }: { className?: string }) {
           <div className="lg:col-span-2">
             <Logo href="/" size="md" />
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-ink-muted">
-              Aegis extends Squads Protocol v4 with privacy, payroll, invoicing,
-              and scoped audit. Built on top of the multisig standard $10B+ in
-              Solana treasuries already trust.
+              Aegis extends Squads Protocol v4 with privacy, payroll, invoicing, and scoped audit.
+              Built on top of the multisig standard $10B+ in Solana treasuries already trust.
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1">
@@ -96,16 +93,10 @@ export function SiteFooter({ className }: { className?: string }) {
             &copy; {new Date().getFullYear()} Aegis. Private execution for shared treasuries.
           </p>
           <div className="flex gap-6 text-xs text-ink-subtle">
-            <Link
-              href="/terms"
-              className="hover:text-ink transition-colors"
-            >
+            <Link href="/terms" className="hover:text-ink transition-colors">
               Terms
             </Link>
-            <Link
-              href="/privacy"
-              className="hover:text-ink transition-colors"
-            >
+            <Link href="/privacy" className="hover:text-ink transition-colors">
               Privacy
             </Link>
           </div>

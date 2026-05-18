@@ -8,7 +8,10 @@ import { z } from "zod";
 const createSchema = z.object({
   vaultIndex: z.number().int().min(0).max(255),
   name: z.string().min(1).max(64),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional(),
   icon: z.string().max(8).optional(),
 });
 

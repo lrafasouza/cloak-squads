@@ -53,10 +53,7 @@ export function markProposalExecuted(multisig: string, transactionIndex: string)
   }
 }
 
-export function isProposalExecuted(
-  multisig: string,
-  transactionIndex: string,
-): boolean {
+export function isProposalExecuted(multisig: string, transactionIndex: string): boolean {
   try {
     const key = executedMapKey(multisig);
     const raw = localStorage.getItem(key);

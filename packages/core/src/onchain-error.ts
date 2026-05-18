@@ -70,6 +70,19 @@ export function translateOnchainError(error: unknown): string {
     return "Your app is out of date and was unable to talk to the on-chain program. Hard-refresh this page (Cmd/Ctrl+Shift+R) and try again.";
   }
 
+  // Anchor ConstraintSeeds (2006) on the gatekeeper `license` account means the
+  // proposal was created against an older seed schema than the deployed program.
+  // License PDA seeds gained `vault_index` on 2026-05-13 (F-001 audit fix), so
+  // proposals queued before that date have an encoded license account that no
+  // longer derives from the current seeds. The encoded account is immutable;
+  // the proposal must be cancelled in Squads and recreated.
+  if (
+    (message.includes("ConstraintSeeds") || matchesCode(message, 2006)) &&
+    message.includes("account: license")
+  ) {
+    return "This proposal was created before a recent program upgrade and can no longer be executed (the license account encoded inside no longer matches on-chain derivation). Cancel it in Squads and recreate the send / payroll / invoice — new proposals will work normally.";
+  }
+
   if (message.includes("insufficient lamports")) {
     return "The paying account does not have enough SOL to complete this transaction. Add devnet SOL, then try again.";
   }

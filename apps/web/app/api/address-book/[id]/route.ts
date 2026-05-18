@@ -10,10 +10,7 @@ const updateSchema = z.object({
   notes: z.string().trim().max(280).nullable().optional(),
 });
 
-export async function PATCH(
-  req: Request,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(req: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const auth = await requireWalletAuth();
   if (auth instanceof NextResponse) return auth;
@@ -62,10 +59,7 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  _req: Request,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function DELETE(_req: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const auth = await requireWalletAuth();
   if (auth instanceof NextResponse) return auth;

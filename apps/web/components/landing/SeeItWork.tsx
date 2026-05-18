@@ -96,9 +96,7 @@ function ActCompose() {
           <Avatar member={TEAM[0]!} size={28} />
           <div>
             <p className="text-xs font-semibold text-ink leading-tight">{TEAM[0]!.name}</p>
-            <p className="text-[10px] text-ink-subtle leading-tight">
-              {TEAM[0]!.role}
-            </p>
+            <p className="text-[10px] text-ink-subtle leading-tight">{TEAM[0]!.role}</p>
           </div>
         </div>
         <button
@@ -114,9 +112,9 @@ function ActCompose() {
       <div className="flex-1 px-5 py-5 space-y-3.5 overflow-hidden">
         <Eyebrow as="div">New payment</Eyebrow>
 
-        {/* Recipient field */}
+        {/* Recipient field — presentational mock, not a real form */}
         <div>
-          <label className="text-[11px] font-medium text-ink-subtle">To</label>
+          <span className="block text-[11px] font-medium text-ink-subtle">To</span>
           <div className="mt-1 flex items-center gap-2 rounded-lg border border-border/60 bg-bg/60 px-3 py-2.5">
             <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-pink-400 to-purple-600 text-white text-[10px] font-semibold">
               A
@@ -128,9 +126,9 @@ function ActCompose() {
           </div>
         </div>
 
-        {/* Amount field */}
+        {/* Amount field — presentational mock */}
         <div>
-          <label className="text-[11px] font-medium text-ink-subtle">Amount</label>
+          <span className="block text-[11px] font-medium text-ink-subtle">Amount</span>
           <div className="mt-1 flex items-center gap-2 rounded-lg border border-border/60 bg-bg/60 px-3 py-2.5">
             <span className="text-ink-subtle">$</span>
             <span className="font-display text-lg font-semibold text-ink num">5,000</span>
@@ -138,9 +136,9 @@ function ActCompose() {
           </div>
         </div>
 
-        {/* Memo */}
+        {/* Memo — presentational mock */}
         <div>
-          <label className="text-[11px] font-medium text-ink-subtle">Memo</label>
+          <span className="block text-[11px] font-medium text-ink-subtle">Memo</span>
           <div className="mt-1 rounded-lg border border-border/60 bg-bg/60 px-3 py-2">
             <span className="text-sm text-ink">June payroll</span>
           </div>
@@ -239,9 +237,7 @@ function ActApprove() {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] font-mono uppercase tracking-eyebrow text-ink-subtle">
-              memo
-            </p>
+            <p className="text-[10px] font-mono uppercase tracking-eyebrow text-ink-subtle">memo</p>
             <p className="text-sm text-ink leading-tight mt-0.5">June payroll</p>
           </div>
         </div>
@@ -334,9 +330,7 @@ function ActSent() {
           </div>
         </motion.div>
         <p className="font-display text-xl font-semibold text-ink">Sent privately</p>
-        <p className="mt-1 text-xs text-ink-muted">
-          $5,000 USDC reached alice.sol in 1.2 seconds
-        </p>
+        <p className="mt-1 text-xs text-ink-muted">$5,000 USDC reached alice.sol in 1.2 seconds</p>
       </div>
 
       {/* The two views */}
@@ -471,10 +465,7 @@ function ActAudit() {
                   )}
                 </div>
                 <span
-                  className={cn(
-                    "text-xs",
-                    s.allowed ? "text-ink" : "text-ink-subtle line-through",
-                  )}
+                  className={cn("text-xs", s.allowed ? "text-ink" : "text-ink-subtle line-through")}
                 >
                   {s.label}
                 </span>
@@ -563,9 +554,7 @@ function ActBearer() {
           <div className="rounded-lg border border-border/60 bg-bg/60 px-3 py-2.5 flex items-center gap-3 min-h-[58px]">
             <Wallet className="h-4 w-4 text-ink-subtle shrink-0" />
             {stage === "scan" ? (
-              <span className="text-sm text-ink-subtle italic">
-                Choose a wallet…
-              </span>
+              <span className="text-sm text-ink-subtle italic">Choose a wallet…</span>
             ) : (
               <motion.div
                 initial={{ opacity: 0, x: -6 }}
@@ -573,9 +562,7 @@ function ActBearer() {
                 transition={{ duration: 0.3 }}
                 className="min-w-0 flex-1"
               >
-                <p className="text-sm text-ink leading-tight truncate">
-                  marie-cpa.sol
-                </p>
+                <p className="text-sm text-ink leading-tight truncate">marie-cpa.sol</p>
                 <p className="text-[10px] text-ink-subtle leading-tight mt-0.5">
                   a fresh wallet, just for this payment
                 </p>
@@ -634,11 +621,36 @@ function ActBearer() {
    ──────────────────────────────────────────────────────────────────────── */
 
 const ACTS = [
-  { id: "compose", title: "Alex starts a payment", caption: "Same form your finance team already knows.", Component: ActCompose },
-  { id: "approve", title: "The team approves", caption: "Whatever your threshold is, 2-of-3 or 3-of-5, Aegis respects it.", Component: ActApprove },
-  { id: "sent", title: "Sent privately", caption: "The chain proves it happened. The details stay with you.", Component: ActSent },
-  { id: "audit", title: "Auditors get just what they need", caption: "Scoped, read-only, revocable. No spreadsheet exports.", Component: ActAudit },
-  { id: "bearer", title: "And the link no one else can issue", caption: "Bearer claim - recipient picks the wallet at scan time.", Component: ActBearer },
+  {
+    id: "compose",
+    title: "Alex starts a payment",
+    caption: "Same form your finance team already knows.",
+    Component: ActCompose,
+  },
+  {
+    id: "approve",
+    title: "The team approves",
+    caption: "Whatever your threshold is, 2-of-3 or 3-of-5, Aegis respects it.",
+    Component: ActApprove,
+  },
+  {
+    id: "sent",
+    title: "Sent privately",
+    caption: "The chain proves it happened. The details stay with you.",
+    Component: ActSent,
+  },
+  {
+    id: "audit",
+    title: "Auditors get just what they need",
+    caption: "Scoped, read-only, revocable. No spreadsheet exports.",
+    Component: ActAudit,
+  },
+  {
+    id: "bearer",
+    title: "And the link no one else can issue",
+    caption: "Bearer claim - recipient picks the wallet at scan time.",
+    Component: ActBearer,
+  },
 ] as const;
 
 const ACT_DURATION = 6500;
@@ -735,17 +747,17 @@ export function SeeItWork() {
         <ScrollReveal>
           <div className="mb-12 md:mb-16 grid md:grid-cols-12 gap-6 items-end">
             <div className="md:col-span-7">
-              <Eyebrow as="div" className="mb-3">See it work</Eyebrow>
+              <Eyebrow as="div" className="mb-3">
+                See it work
+              </Eyebrow>
               <h2 className="font-display text-display-sm font-bold text-ink leading-[1.05]">
-                One vote.{" "}
-                <span className="text-accent">Five steps. Zero leaks.</span>
+                One vote. <span className="text-accent">Five steps. Zero leaks.</span>
               </h2>
             </div>
             <div className="md:col-span-5">
               <p className="text-ink-muted leading-relaxed">
-                A treasury payment, end to end: proposed, approved, sent
-                privately, audited under scope, and the bearer claim that
-                only Aegis can issue. No code, no jargon.
+                A treasury payment, end to end: proposed, approved, sent privately, audited under
+                scope, and the bearer claim that only Aegis can issue. No code, no jargon.
               </p>
             </div>
           </div>
@@ -862,7 +874,6 @@ export function SeeItWork() {
                 ))}
               </div>
             </ScrollReveal>
-
           </div>
         </div>
       </div>

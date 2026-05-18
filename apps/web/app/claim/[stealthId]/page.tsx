@@ -458,7 +458,11 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
                     : "bg-signal-danger/10 text-signal-danger"
                 }`}
               >
-                {isClaimed ? <CheckCircle2 className="h-6 w-6" /> : <ShieldOff className="h-6 w-6" />}
+                {isClaimed ? (
+                  <CheckCircle2 className="h-6 w-6" />
+                ) : (
+                  <ShieldOff className="h-6 w-6" />
+                )}
               </span>
               <div className="text-eyebrow mt-5">Aegis · Private payment</div>
               <h1 className="mt-2 font-display text-2xl font-semibold text-ink">{copy.title}</h1>
@@ -551,91 +555,87 @@ export default function ClaimPage({ params }: { params: Promise<{ stealthId: str
         {/* Action zone — claimState is guaranteed `ready` here (resolved
          * states are intercepted by the privacy guard above). */}
         <div className="card-panel relative mt-6 overflow-hidden p-6 md:p-7">
-            <div className="flex items-baseline justify-between gap-4">
-              <div>
-                <div className="text-eyebrow">Claim funds</div>
-                <h2 className="mt-1 font-display text-xl font-semibold text-ink">
-                  Withdraw to your wallet
-                </h2>
+          <div className="flex items-baseline justify-between gap-4">
+            <div>
+              <div className="text-eyebrow">Claim funds</div>
+              <h2 className="mt-1 font-display text-xl font-semibold text-ink">
+                Withdraw to your wallet
+              </h2>
+            </div>
+          </div>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-ink-muted">
+            The proof and withdrawal happen in your browser. Keep this tab open until the receipt
+            confirms execution.
+          </p>
+
+          <div className="mt-5 space-y-4">
+            {!wallet.publicKey ? (
+              <div className="rounded-md border border-border-strong bg-surface-2 p-4 text-sm text-ink-muted">
+                <p className="font-medium text-ink">Connect your wallet to continue.</p>
+                <p className="mt-1 text-xs text-ink-subtle">
+                  Use the wallet menu in the page header to connect a Solana wallet.
+                </p>
               </div>
-            </div>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-ink-muted">
-              The proof and withdrawal happen in your browser. Keep this tab open until the receipt
-              confirms execution.
-            </p>
-
-            <div className="mt-5 space-y-4">
-              {!wallet.publicKey ? (
-                <div className="rounded-md border border-border-strong bg-surface-2 p-4 text-sm text-ink-muted">
-                  <p className="font-medium text-ink">Connect your wallet to continue.</p>
-                  <p className="mt-1 text-xs text-ink-subtle">
-                    Use the wallet menu in the page header to connect a Solana wallet.
-                  </p>
-                </div>
-              ) : invoice.mode === "bound" &&
-                invoice.recipientWallet !== wallet.publicKey.toBase58() ? (
-                <div className="rounded-md border border-signal-danger/30 bg-signal-danger/10 p-4 text-sm">
-                  <p className="font-medium text-signal-danger">Wrong wallet connected</p>
-                  <p className="mt-1 text-xs text-signal-danger/90">
-                    This invoice is bound to{" "}
-                    <span className="font-mono">
-                      {invoice.recipientWallet
-                        ? truncateAddress(invoice.recipientWallet)
-                        : "(unknown)"}
-                    </span>
-                    . Switch wallets and reconnect to claim.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {invoice.mode === "bearer" ? (
-                    <div className="rounded-md border border-signal-warn/30 bg-signal-warn/10 p-4 text-xs leading-5 text-signal-warn">
-                      <p className="font-medium">Bearer invoice</p>
-                      <p className="mt-1 text-signal-warn/90">
-                        Anyone holding this link can claim. Funds will withdraw to{" "}
-                        <span className="font-mono">
-                          {truncateAddress(wallet.publicKey.toBase58())}
-                        </span>
-                        — the wallet you have connected right now. Switch wallets first if you want a
-                        different destination.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 rounded-md border border-accent/30 bg-accent-soft px-3 py-2 text-xs font-medium text-accent">
-                      <CheckCircle2 className="h-4 w-4" />
-                      Correct wallet connected · proceed when ready
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="text-xs text-ink-subtle">
-                      Destination:&nbsp;
-                      <Address value={wallet.publicKey.toBase58()} chars={6} />
-                    </div>
-                    <Button
-                      onClick={handleClaim}
-                      disabled={claiming}
-                      className="w-full sm:w-auto"
-                    >
-                      {claiming ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Claiming…
-                        </>
-                      ) : (
-                        "Claim funds"
-                      )}
-                    </Button>
+            ) : invoice.mode === "bound" &&
+              invoice.recipientWallet !== wallet.publicKey.toBase58() ? (
+              <div className="rounded-md border border-signal-danger/30 bg-signal-danger/10 p-4 text-sm">
+                <p className="font-medium text-signal-danger">Wrong wallet connected</p>
+                <p className="mt-1 text-xs text-signal-danger/90">
+                  This invoice is bound to{" "}
+                  <span className="font-mono">
+                    {invoice.recipientWallet
+                      ? truncateAddress(invoice.recipientWallet)
+                      : "(unknown)"}
+                  </span>
+                  . Switch wallets and reconnect to claim.
+                </p>
+              </div>
+            ) : (
+              <>
+                {invoice.mode === "bearer" ? (
+                  <div className="rounded-md border border-signal-warn/30 bg-signal-warn/10 p-4 text-xs leading-5 text-signal-warn">
+                    <p className="font-medium">Bearer invoice</p>
+                    <p className="mt-1 text-signal-warn/90">
+                      Anyone holding this link can claim. Funds will withdraw to{" "}
+                      <span className="font-mono">
+                        {truncateAddress(wallet.publicKey.toBase58())}
+                      </span>
+                      — the wallet you have connected right now. Switch wallets first if you want a
+                      different destination.
+                    </p>
                   </div>
-                </>
-              )}
+                ) : (
+                  <div className="flex items-center gap-2 rounded-md border border-accent/30 bg-accent-soft px-3 py-2 text-xs font-medium text-accent">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Correct wallet connected · proceed when ready
+                  </div>
+                )}
 
-              {error ? (
-                <div className="rounded-md border border-signal-danger/30 bg-signal-danger/10 p-3 text-sm text-signal-danger">
-                  {error}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-xs text-ink-subtle">
+                    Destination:&nbsp;
+                    <Address value={wallet.publicKey.toBase58()} chars={6} />
+                  </div>
+                  <Button onClick={handleClaim} disabled={claiming} className="w-full sm:w-auto">
+                    {claiming ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Claiming…
+                      </>
+                    ) : (
+                      "Claim funds"
+                    )}
+                  </Button>
                 </div>
-              ) : null}
-            </div>
+              </>
+            )}
+
+            {error ? (
+              <div className="rounded-md border border-signal-danger/30 bg-signal-danger/10 p-3 text-sm text-signal-danger">
+                {error}
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
     </main>

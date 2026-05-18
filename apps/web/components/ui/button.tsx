@@ -21,10 +21,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
         "disabled:pointer-events-none disabled:opacity-50",
         "active:scale-[0.98]",
-        variant === "default" &&
-          "bg-accent text-accent-ink hover:bg-accent-hover shadow-raise-1",
-        variant === "secondary" &&
-          "bg-surface-2 text-ink hover:bg-surface-3 border border-border",
+        variant === "default" && "bg-accent text-accent-ink hover:bg-accent-hover shadow-raise-1",
+        variant === "secondary" && "bg-surface-2 text-ink hover:bg-surface-3 border border-border",
         variant === "outline" &&
           "border border-border-strong text-ink hover:bg-surface-2 bg-transparent",
         variant === "destructive" &&

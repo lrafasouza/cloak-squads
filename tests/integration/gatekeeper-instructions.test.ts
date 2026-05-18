@@ -21,8 +21,8 @@ import {
   encodeI64,
   encodeLicense,
   encodePubkey,
-  encodeU64,
   encodeU8,
+  encodeU64,
   expectTxFailure,
   fundedSystemAccount,
   licensePda,
@@ -386,8 +386,6 @@ async function issueLicense(
     [fixture.payer],
   );
 }
-
-
 
 async function main() {
   const context = (await startAnchor(ROOT, [], [])) as BankrunContext;

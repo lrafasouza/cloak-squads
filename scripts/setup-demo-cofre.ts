@@ -235,7 +235,9 @@ async function main() {
   const onChainOperator = new PublicKey(cofreAccount.data.subarray(40, 72));
   console.log(`On-chain operator: ${onChainOperator.toBase58()}`);
   if (!onChainOperator.equals(OPERATOR_PUBKEY)) {
-    throw new Error(`Operator mismatch! Expected ${OPERATOR_PUBKEY.toBase58()}, got ${onChainOperator.toBase58()}`);
+    throw new Error(
+      `Operator mismatch! Expected ${OPERATOR_PUBKEY.toBase58()}, got ${onChainOperator.toBase58()}`,
+    );
   }
 
   const summary = {

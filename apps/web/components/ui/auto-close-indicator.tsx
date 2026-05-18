@@ -1,8 +1,8 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import { Timer } from "lucide-react";
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
 
 interface AutoCloseIndicatorProps {
   durationMs: number;
@@ -55,10 +55,7 @@ export function AutoCloseIndicator({
 
   return (
     <div
-      className={cn(
-        "inline-flex items-center gap-1.5 text-xs text-ink-muted",
-        className,
-      )}
+      className={cn("inline-flex items-center gap-1.5 text-xs text-ink-muted", className)}
       title={`Auto-closing in ${remaining}s`}
     >
       <Timer className="h-3.5 w-3.5 animate-pulse" />

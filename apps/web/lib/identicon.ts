@@ -19,13 +19,21 @@ const PALETTE = [
 function hashSeed(seed: string): Uint8Array {
   const bytes = new TextEncoder().encode(seed);
   const result = new Uint8Array(32);
+  // Uint8Array indexed access returns `number` (not `number | undefined`) at
+  // runtime, but TS's noUncheckedIndexedAccess widens it. Use DataView-like
+  // accessors so the compiler stays happy without `!` everywhere.
+  const get = (i: number) => result[i] ?? 0;
+  const set = (i: number, v: number) => {
+    result[i] = v & 0xff;
+  };
   for (let i = 0; i < bytes.length; i++) {
-    result[i % 32]! ^= bytes[i]!;
-    result[(i + 1) % 32] = ((result[(i + 1) % 32]! + bytes[i]! * 31) & 0xff);
+    const b = bytes[i] ?? 0;
+    set(i % 32, get(i % 32) ^ b);
+    set((i + 1) % 32, get((i + 1) % 32) + b * 31);
   }
   for (let round = 0; round < 3; round++) {
     for (let i = 0; i < 32; i++) {
-      result[i] = ((result[i]! ^ result[(i + 7) % 32]! ^ (round * 17)) & 0xff);
+      set(i, get(i) ^ get((i + 7) % 32) ^ (round * 17));
     }
   }
   return result;
@@ -66,4 +74,3 @@ export function generateIdenticon(seed: string, size = 40): string {
 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
-

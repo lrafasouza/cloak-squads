@@ -31,9 +31,9 @@ function StealthNetwork() {
 
     const NODE_COUNT = 24;
     const CONNECT_DIST = 80;
-    const ACCENT = getComputedStyle(document.documentElement)
-      .getPropertyValue("--accent")
-      .trim() || "220 70% 50%";
+    const ACCENT =
+      getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() ||
+      "220 70% 50%";
 
     interface Node {
       x: number;
@@ -58,7 +58,7 @@ function StealthNetwork() {
       ([e]) => {
         visible = e?.isIntersecting ?? true;
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
     observer.observe(canvas);
 
@@ -130,8 +130,7 @@ function StealthNetwork() {
       <div
         className="absolute inset-0 -z-10 pointer-events-none opacity-[0.1] blur-[50px]"
         style={{
-          background:
-            "radial-gradient(ellipse at 50% 50%, hsl(var(--accent)), transparent 70%)",
+          background: "radial-gradient(ellipse at 50% 50%, hsl(var(--accent)), transparent 70%)",
         }}
       />
     </div>
@@ -242,7 +241,7 @@ export function CobeGlobe() {
           stopAnimation();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
     observer.observe(canvas);
 

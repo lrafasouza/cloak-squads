@@ -93,7 +93,13 @@ function parseArgs() {
   const argv = process.argv.slice(2);
   if (argv.length < 1) {
     throw new Error(
-      "Usage: pnpm tsx scripts/drain-leaked-demo-cofre.ts <DESTINATION_PUBKEY> [--buffer <lamports>]",
+      "Usage:\n" +
+        "  Dry-run (default — prints plan, no on-chain side effects):\n" +
+        "    pnpm tsx scripts/drain-leaked-demo-cofre.ts <DESTINATION_PUBKEY>\n" +
+        "  Execute (irreversible — moves funds on devnet):\n" +
+        "    pnpm tsx scripts/drain-leaked-demo-cofre.ts <DESTINATION_PUBKEY> --confirm\n" +
+        "  Optional flags:\n" +
+        "    --buffer <lamports>   leave this much in the vault (default 5_000_000)",
     );
   }
   const destination = new PublicKey(argv[0]!);
@@ -104,7 +110,15 @@ function parseArgs() {
     if (!value) throw new Error("--buffer requires a value (lamports)");
     buffer = BigInt(value);
   }
-  return { destination, buffer };
+  // Default to dry-run. Operator must opt in with --confirm to mutate on-chain
+  // state. `--dry-run` is accepted as an explicit synonym for the default.
+  const explicitDryRun = argv.includes("--dry-run");
+  const confirm = argv.includes("--confirm");
+  if (explicitDryRun && confirm) {
+    throw new Error("Pass either --dry-run or --confirm, not both.");
+  }
+  const dryRun = !confirm;
+  return { destination, buffer, dryRun };
 }
 
 async function confirm(connection: Connection, signature: string) {
@@ -119,7 +133,7 @@ async function main() {
     );
   }
 
-  const { destination, buffer } = parseArgs();
+  const { destination, buffer, dryRun } = parseArgs();
   const demo: DemoCofre2ofN = JSON.parse(fs.readFileSync(DEMO_FILE, "utf-8"));
 
   const multisigPda = new PublicKey(demo.multisig);
@@ -138,6 +152,10 @@ async function main() {
   const member2 = Keypair.fromSecretKey(Uint8Array.from(demo.memberSecrets[0]!));
 
   console.log("=== EMERGENCY DRAIN — leaked demo-cofre-2ofn ===");
+  console.log(
+    "Mode:          ",
+    dryRun ? "DRY-RUN (no on-chain writes)" : "EXECUTE (--confirm passed)",
+  );
   console.log("RPC:           ", RPC_URL);
   console.log("Multisig PDA:  ", multisigPda.toBase58(), "(decommissioned)");
   console.log("Vault PDA:     ", vaultPda.toBase58());
@@ -149,7 +167,9 @@ async function main() {
   const connection = new Connection(RPC_URL, "confirmed");
 
   const vaultBalance = BigInt(await connection.getBalance(vaultPda));
-  console.log(`\nVault balance: ${vaultBalance} lamports (${Number(vaultBalance) / LAMPORTS_PER_SOL} SOL)`);
+  console.log(
+    `\nVault balance: ${vaultBalance} lamports (${Number(vaultBalance) / LAMPORTS_PER_SOL} SOL)`,
+  );
 
   if (vaultBalance <= buffer) {
     console.log("Nothing to drain (balance <= buffer). Exiting.");
@@ -157,7 +177,9 @@ async function main() {
   }
 
   const drainAmount = vaultBalance - buffer;
-  console.log(`Drain amount:  ${drainAmount} lamports (${Number(drainAmount) / LAMPORTS_PER_SOL} SOL)`);
+  console.log(
+    `Drain amount:  ${drainAmount} lamports (${Number(drainAmount) / LAMPORTS_PER_SOL} SOL)`,
+  );
 
   const innerIx = SystemProgram.transfer({
     fromPubkey: vaultPda,
@@ -174,6 +196,22 @@ async function main() {
   const multisigAccount = await Multisig.fromAccountAddress(connection, multisigPda);
   const transactionIndex = BigInt(multisigAccount.transactionIndex.toString()) + 1n;
   console.log(`\nNext transactionIndex: ${transactionIndex}`);
+
+  if (dryRun) {
+    console.log("\n=== DRY-RUN — would now execute 5 on-chain steps ===");
+    console.log("[1] vaultTransactionCreate (transactionIndex =", transactionIndex.toString(), ")");
+    console.log("[2] proposalCreate");
+    console.log("[3] proposalApprove (creator)");
+    console.log("[4] proposalApprove (member 2 from exposed key)");
+    console.log("[5] vaultTransactionExecute");
+    console.log(
+      `\nTo actually drain ${drainAmount} lamports → ${destination.toBase58()}, re-run with --confirm:`,
+    );
+    console.log(
+      `  pnpm tsx scripts/drain-leaked-demo-cofre.ts ${destination.toBase58()} --confirm`,
+    );
+    return;
+  }
 
   console.log("\n[1] vaultTransactionCreate...");
   const createTxSig = await multisig.rpc.vaultTransactionCreate({

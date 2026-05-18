@@ -12,8 +12,8 @@
  * script always writes with the same key that production reads with.
  */
 
+import { createCipheriv, createHash, randomBytes } from "crypto";
 import { PrismaClient } from "@prisma/client";
-import { createHash, randomBytes, createCipheriv } from "crypto";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const dotenv = require("dotenv") as { config: (opts: { path: string }) => void };
 dotenv.config({ path: ".env.local" });
@@ -63,8 +63,7 @@ async function main() {
   let errors = 0;
 
   for (const row of rows) {
-    const needsUpdate =
-      needsEncryption(row.utxoPrivateKey) || needsEncryption(row.utxoBlinding);
+    const needsUpdate = needsEncryption(row.utxoPrivateKey) || needsEncryption(row.utxoBlinding);
 
     if (!needsUpdate) continue;
     toUpdate++;
@@ -76,7 +75,8 @@ async function main() {
 
     try {
       const data: { utxoPrivateKey?: string; utxoBlinding?: string } = {};
-      if (needsEncryption(row.utxoPrivateKey)) data.utxoPrivateKey = encryptField(row.utxoPrivateKey!);
+      if (needsEncryption(row.utxoPrivateKey))
+        data.utxoPrivateKey = encryptField(row.utxoPrivateKey!);
       if (needsEncryption(row.utxoBlinding)) data.utxoBlinding = encryptField(row.utxoBlinding!);
       await prisma.stealthInvoice.update({
         where: { id: row.id },
@@ -100,7 +100,9 @@ async function main() {
   if (errors > 0) process.exit(1);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-}).finally(() => prisma.$disconnect());
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());

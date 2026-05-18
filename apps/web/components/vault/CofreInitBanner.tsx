@@ -68,7 +68,9 @@ export function CofreInitBanner({ multisig }: { multisig: string }) {
       if (!cancelled) setBannerState("idle");
     }
     check();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [multisig, connection]);
 
   const handleBootstrap = useCallback(async () => {

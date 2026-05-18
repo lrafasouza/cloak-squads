@@ -93,21 +93,36 @@ export function QuickActionBar({ multisig }: QuickActionBarProps) {
 
           if (action.id === "receive") {
             return (
-              <button key={action.id} type="button" onClick={() => setReceiveOpen(true)} className={cardClass}>
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => setReceiveOpen(true)}
+                className={cardClass}
+              >
                 {inner}
               </button>
             );
           }
           if (action.id === "send") {
             return (
-              <button key={action.id} type="button" onClick={() => setSendOpen(true)} className={cardClass}>
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => setSendOpen(true)}
+                className={cardClass}
+              >
                 {inner}
               </button>
             );
           }
           if (action.id === "swap") {
             return (
-              <button key={action.id} type="button" onClick={() => setSwapOpen(true)} className={cardClass}>
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => setSwapOpen(true)}
+                className={cardClass}
+              >
                 {inner}
               </button>
             );

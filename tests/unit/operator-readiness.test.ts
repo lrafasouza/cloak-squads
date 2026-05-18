@@ -14,7 +14,9 @@ describe("operator execution readiness", () => {
   });
 
   test("explains that approved proposals still need vault execution", () => {
-    expect(operatorProposalStatusMessage("approved")).toContain("Execute the Squads vault transaction");
+    expect(operatorProposalStatusMessage("approved")).toContain(
+      "Execute the Squads vault transaction",
+    );
   });
 
   test("does not show a blocking message once the license has been issued", () => {

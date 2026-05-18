@@ -79,9 +79,9 @@ test("e2e full flow: 1 single + 3 batch licenses all consumed", async () => {
   }
 
   await runLicenseCycle(1, 100_000n); // F1 single
-  await runLicenseCycle(2, 50_000n);  // F2 batch tx 1
-  await runLicenseCycle(3, 75_000n);  // F2 batch tx 2
-  await runLicenseCycle(4, 25_000n);  // F2 batch tx 3
+  await runLicenseCycle(2, 50_000n); // F2 batch tx 1
+  await runLicenseCycle(3, 75_000n); // F2 batch tx 2
+  await runLicenseCycle(4, 25_000n); // F2 batch tx 3
 
   // Sanity: at least the bankrun context started and PDAs derive deterministically
   assert.ok(cofre);

@@ -70,9 +70,15 @@ const config: Config = {
         mono: ["var(--font-mono)", "Geist Mono", "ui-monospace", "Menlo", "monospace"],
       },
       fontSize: {
-        "display-sm": ["clamp(2.25rem, 4vw, 3rem)", { lineHeight: "1.05", letterSpacing: "-0.02em" }],
+        "display-sm": [
+          "clamp(2.25rem, 4vw, 3rem)",
+          { lineHeight: "1.05", letterSpacing: "-0.02em" },
+        ],
         display: ["clamp(3rem, 6vw, 4.75rem)", { lineHeight: "1.02", letterSpacing: "-0.03em" }],
-        "display-lg": ["clamp(3.75rem, 8vw, 6.5rem)", { lineHeight: "0.98", letterSpacing: "-0.035em" }],
+        "display-lg": [
+          "clamp(3.75rem, 8vw, 6.5rem)",
+          { lineHeight: "0.98", letterSpacing: "-0.035em" },
+        ],
       },
       letterSpacing: {
         eyebrow: "0.18em",
@@ -95,9 +101,11 @@ const config: Config = {
       boxShadow: {
         "raise-1": "0 1px 0 0 hsl(var(--border) / 1), 0 8px 24px -12px rgb(0 0 0 / 0.6)",
         "raise-2": "0 1px 0 0 hsl(var(--border) / 1), 0 18px 48px -20px rgb(0 0 0 / 0.7)",
-        "accent-glow": "0 0 0 1px hsl(var(--accent) / 0.35), 0 8px 32px -8px hsl(var(--accent) / 0.25)",
-        "accent-glow-md": "0 0 0 1px hsl(var(--accent) / 0.25), 0 16px 48px -12px hsl(var(--accent) / 0.2)",
-        "glass": "0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 0 hsl(var(--ink) / 0.04)",
+        "accent-glow":
+          "0 0 0 1px hsl(var(--accent) / 0.35), 0 8px 32px -8px hsl(var(--accent) / 0.25)",
+        "accent-glow-md":
+          "0 0 0 1px hsl(var(--accent) / 0.25), 0 16px 48px -12px hsl(var(--accent) / 0.2)",
+        glass: "0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 0 hsl(var(--ink) / 0.04)",
       },
       zIndex: {
         drawer: "50",
@@ -106,7 +114,7 @@ const config: Config = {
         cmdk: "80",
       },
       transitionTimingFunction: {
-        "aegis": "cubic-bezier(0.16, 1, 0.3, 1)",
+        aegis: "cubic-bezier(0.16, 1, 0.3, 1)",
       },
       keyframes: {
         "fade-in": {

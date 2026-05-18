@@ -248,12 +248,7 @@ export function viewDistributionPda(cofre: PublicKey) {
 
 export function squadsVaultPda(multisig: PublicKey, vaultIndex = 0) {
   return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("multisig"),
-      multisig.toBuffer(),
-      Buffer.from("vault"),
-      Buffer.from([vaultIndex]),
-    ],
+    [Buffer.from("multisig"), multisig.toBuffer(), Buffer.from("vault"), Buffer.from([vaultIndex])],
     SQUADS_HARNESS_PROGRAM_ID,
   );
 }
@@ -302,7 +297,9 @@ export async function expectTxFailure(
   // data never produce identical transaction signatures (bankrun dedups by tx hash
   // before the program runs, which would give "already processed" instead of the
   // expected program error). Floor at 400_000 so any realistic instruction has budget.
-  const bust = ComputeBudgetProgram.setComputeUnitLimit({ units: Math.floor(Math.random() * 600_000) + 400_000 });
+  const bust = ComputeBudgetProgram.setComputeUnitLimit({
+    units: Math.floor(Math.random() * 600_000) + 400_000,
+  });
   const tx = new Transaction().add(bust, ...ixs);
   tx.feePayer = context.payer.publicKey;
   tx.recentBlockhash = await latestBlockhash(context);

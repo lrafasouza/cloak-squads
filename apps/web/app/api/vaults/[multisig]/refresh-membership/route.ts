@@ -16,10 +16,7 @@ import { NextResponse } from "next/server";
  * (possibly being removed by the very proposal that just executed) before
  * forcing a refresh.
  */
-export async function POST(
-  _request: Request,
-  context: { params: Promise<{ multisig: string }> },
-) {
+export async function POST(_request: Request, context: { params: Promise<{ multisig: string }> }) {
   const { multisig } = await context.params;
 
   try {

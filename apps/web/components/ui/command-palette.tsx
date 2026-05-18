@@ -2,17 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Command } from "cmdk";
-import {
-  ArrowRight,
-  Home,
-  Plus,
-  Search,
-  Send,
-  Settings,
-  Shield,
-  Wallet,
-  X,
-} from "lucide-react";
+import { ArrowRight, Home, Plus, Search, Send, Settings, Shield, Wallet, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -98,7 +88,9 @@ export function CommandPalette() {
 
   return (
     <div className="fixed inset-0 z-cmdk flex items-start justify-center pt-[20vh] px-4">
-      {/* Backdrop */}
+      {/* Backdrop — click to dismiss. Keyboard equivalent is Escape, handled
+          by the Command component below. Pointer-only is acceptable. */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Escape key dismisses via Command */}
       <div
         className="absolute inset-0 bg-bg/80 backdrop-blur-sm transition-opacity"
         onClick={() => setOpen(false)}
@@ -147,9 +139,7 @@ export function CommandPalette() {
                     <Icon className="h-4 w-4 text-accent" strokeWidth={1.5} />
                   </div>
                   <span className="flex-1">{action.label}</span>
-                  {action.external && (
-                    <ArrowRight className="h-3.5 w-3.5 text-ink-subtle" />
-                  )}
+                  {action.external && <ArrowRight className="h-3.5 w-3.5 text-ink-subtle" />}
                   <kbd className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[10px] font-mono text-ink-subtle">
                     {action.shortcut}
                   </kbd>
@@ -161,8 +151,8 @@ export function CommandPalette() {
           <div className="mt-2 px-3 py-2">
             <p className="text-[10px] text-ink-subtle">
               Press{" "}
-              <kbd className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[10px]">Esc</kbd>{" "}
-              to close
+              <kbd className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[10px]">Esc</kbd> to
+              close
             </p>
           </div>
         </Command.List>

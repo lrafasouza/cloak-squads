@@ -34,9 +34,7 @@ function gatekeeperProgramId(programId?: PublicKey): PublicKey {
 }
 
 function squadsProgramId(programId?: PublicKey): PublicKey {
-  return (
-    programId ?? programIdFromEnv("NEXT_PUBLIC_SQUADS_PROGRAM_ID", DEFAULT_SQUADS_PROGRAM_ID)
-  );
+  return programId ?? programIdFromEnv("NEXT_PUBLIC_SQUADS_PROGRAM_ID", DEFAULT_SQUADS_PROGRAM_ID);
 }
 
 export function cofrePda(multisig: PublicKey, programId?: PublicKey): [PublicKey, number] {
@@ -64,7 +62,12 @@ export function squadsVaultPda(
   vaultIndex?: number,
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("multisig"), multisig.toBuffer(), Buffer.from("vault"), Buffer.from([vaultIndex ?? 0])],
+    [
+      Buffer.from("multisig"),
+      multisig.toBuffer(),
+      Buffer.from("vault"),
+      Buffer.from([vaultIndex ?? 0]),
+    ],
     squadsProgramId(programId),
   );
 }

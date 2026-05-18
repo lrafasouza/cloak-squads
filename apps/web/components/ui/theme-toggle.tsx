@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme, type Theme } from "@/components/providers/ThemeProvider";
+import { type Theme, useTheme } from "@/components/providers/ThemeProvider";
 import { cn } from "@/lib/utils";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

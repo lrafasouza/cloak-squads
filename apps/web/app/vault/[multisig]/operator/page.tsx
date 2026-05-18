@@ -2,12 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useTransactionProgress } from "@/components/ui/transaction-progress";
-import {
-  InlineAlert,
-  ProgressBar,
-  StatusPill,
-  WorkspacePage,
-} from "@/components/ui/workspace";
+import { InlineAlert, ProgressBar, StatusPill, WorkspacePage } from "@/components/ui/workspace";
 import {
   Check,
   ChevronRight,
@@ -39,17 +34,17 @@ import { publicEnv } from "@/lib/env";
 import { buildExecuteWithLicenseIxBrowser } from "@/lib/gatekeeper-instructions";
 import IDL from "@/lib/idl/cloak_gatekeeper.json";
 import {
-  type ExecutionHistoryItem,
-  markProposalExecuted,
-  readExecutionHistory,
-  writeExecutionHistory,
-} from "@/lib/operator-execution-history";
-import {
   type CloakDepositCache,
   type SerializedCloakDepositCache,
   deserializeCacheEntry,
   serializeCacheEntry,
 } from "@/lib/operator-deposit-cache";
+import {
+  type ExecutionHistoryItem,
+  markProposalExecuted,
+  readExecutionHistory,
+  writeExecutionHistory,
+} from "@/lib/operator-execution-history";
 import {
   type OperatorExecutionBlockReason,
   type OperatorLicenseStatus,
@@ -882,11 +877,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
       try {
         const recipientPk = new PublicKey(draft.recipient);
         if (!PublicKey.isOnCurve(recipientPk.toBuffer())) {
-          const msg =
-            `Cannot execute private send: recipient ${draft.recipient.slice(0, 4)}…${draft.recipient.slice(-4)} ` +
-            `is not an Ed25519 wallet (likely a vault PDA). Cloak's shielded pool can only deliver to standard ` +
-            `wallets. This proposal cannot be executed privately, so refund it (Refund button) and recreate as a ` +
-            `Public send for vault-to-vault transfers.`;
+          const msg = `Cannot execute private send: recipient ${draft.recipient.slice(0, 4)}…${draft.recipient.slice(-4)} is not an Ed25519 wallet (likely a vault PDA). Cloak's shielded pool can only deliver to standard wallets. This proposal cannot be executed privately, so refund it (Refund button) and recreate as a Public send for vault-to-vault transfers.`;
           if (!suppressProgress) {
             startTransaction({
               title: "Cannot execute private send",
@@ -1652,9 +1643,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   <span className="text-[10px] font-bold leading-none text-accent">✓</span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-eyebrow">
-                    Required operator
-                  </p>
+                  <p className="text-eyebrow">Required operator</p>
                   <p
                     className="mt-0.5 break-all font-mono text-xs text-ink"
                     title={registeredOperator}
@@ -1717,16 +1706,16 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               <Key className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-eyebrow">
-                Operator · Designated Signer
-              </p>
+              <p className="text-eyebrow">Operator · Designated Signer</p>
               <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink md:text-3xl">
                 {operatorMismatch
                   ? "View-only · not the registered operator"
                   : "You hold the vault key"}
               </h1>
               <p className="mt-1.5 font-mono text-xs tabular-nums text-ink-muted">
-                {registeredOperator ? truncateAddress(registeredOperator) : "No operator registered"}
+                {registeredOperator
+                  ? truncateAddress(registeredOperator)
+                  : "No operator registered"}
               </p>
             </div>
             <div className="flex items-center gap-1 self-start md:self-auto">
@@ -1741,15 +1730,15 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   Recent · {executionHistory.length}
                 </button>
               )}
-            <button
-              type="button"
-              onClick={() => setHelpOpen(true)}
-              className="text-eyebrow inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-aegis hover:bg-surface-2 hover:text-ink"
-              aria-label="How operator budget works"
-            >
-              <ChevronRight className="h-3 w-3" aria-hidden="true" />
-              How this works
-            </button>
+              <button
+                type="button"
+                onClick={() => setHelpOpen(true)}
+                className="text-eyebrow inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-aegis hover:bg-surface-2 hover:text-ink"
+                aria-label="How operator budget works"
+              >
+                <ChevronRight className="h-3 w-3" aria-hidden="true" />
+                How this works
+              </button>
             </div>
           </div>
         </section>
@@ -1775,12 +1764,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             </p>
           </div>
 
-          <div
-            className={cn(
-              "card-panel relative p-5",
-              hasDeficit && "border-signal-danger/30",
-            )}
-          >
+          <div className={cn("card-panel relative p-5", hasDeficit && "border-signal-danger/30")}>
             <div className="flex items-center gap-1.5 text-eyebrow">
               <ShieldCheck className="h-3 w-3" aria-hidden="true" />
               Value to release
@@ -1897,148 +1881,148 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                   <div>
                     <p className="text-eyebrow">Inbox · awaiting key</p>
                     <h2 className="mt-0.5 font-display text-lg font-semibold tracking-tight text-ink">
-                      {queueDrafts.length}{" "}
-                      {queueDrafts.length === 1 ? "license" : "licenses"} to release
+                      {queueDrafts.length} {queueDrafts.length === 1 ? "license" : "licenses"} to
+                      release
                     </h2>
                   </div>
                 </div>
                 <ul className="divide-y divide-border/50">
                   {queueDrafts.map((d) => {
-                  const isLoaded = Boolean(loadedDraft || payrollDraft);
-                  const isSelected = isLoaded && txIndex === d.transactionIndex;
-                  const isPayrollDraft = d.type === "payroll";
-                  const proposalStatus =
-                    (d as unknown as { proposalStatus?: string }).proposalStatus ?? "unknown";
-                  return (
-                    <li key={d.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Skip the round-trip if we're already on this draft.
-                          if (txIndex === d.transactionIndex && (loadedDraft || payrollDraft)) {
-                            return;
-                          }
-                          setTxIndex(d.transactionIndex);
-                          setError(null);
-                          setSignature(null);
-                          setExecutionSteps([]);
-                          // Surface the skeleton immediately so the operator
-                          // sees a deliberate "loading" state rather than the
-                          // previous draft's stale data while we fetch.
-                          setLoadedDraft(null);
-                          setPayrollDraft(null);
-                          setDraftLoading(true);
-                          void (async () => {
-                            try {
-                              const singleResponse = await fetchDraftWithFallback(
-                                `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
-                              );
-                              if (singleResponse.ok) {
-                                const draft = (await singleResponse.json()) as SingleDraft;
-                                setPayrollDraft(null);
-                                setLoadedDraft(draft);
-                                void checkOnChainStatus(d.transactionIndex, draft);
-                                return;
-                              }
-                              const payrollResponse = await fetchDraftWithFallback(
-                                `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
-                              );
-                              if (payrollResponse.ok) {
-                                const draft = (await payrollResponse.json()) as PayrollDraft;
-                                setLoadedDraft(null);
-                                setPayrollDraft(draft);
-                                setExecutionSteps(
-                                  draft.recipients.map((_, i) => ({
-                                    index: i,
-                                    status: "pending",
-                                  })),
-                                );
-                                void checkOnChainStatus(d.transactionIndex, draft);
-                                return;
-                              }
-                              setError(
-                                `No persisted draft found for proposal #${d.transactionIndex}.`,
-                              );
-                            } catch (caught) {
-                              setError(
-                                caught instanceof Error
-                                  ? caught.message
-                                  : "Could not load proposal draft.",
-                              );
-                            } finally {
-                              setDraftLoading(false);
+                    const isLoaded = Boolean(loadedDraft || payrollDraft);
+                    const isSelected = isLoaded && txIndex === d.transactionIndex;
+                    const isPayrollDraft = d.type === "payroll";
+                    const proposalStatus =
+                      (d as unknown as { proposalStatus?: string }).proposalStatus ?? "unknown";
+                    return (
+                      <li key={d.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Skip the round-trip if we're already on this draft.
+                            if (txIndex === d.transactionIndex && (loadedDraft || payrollDraft)) {
+                              return;
                             }
-                          })();
-                        }}
-                        className={cn(
-                          "group flex w-full items-center gap-3 px-4 py-3.5 text-left transition-aegis",
-                          isSelected
-                            ? "bg-accent-soft/40 ring-1 ring-inset ring-accent/30"
-                            : "hover:bg-surface-2",
-                        )}
-                      >
-                        <div
+                            setTxIndex(d.transactionIndex);
+                            setError(null);
+                            setSignature(null);
+                            setExecutionSteps([]);
+                            // Surface the skeleton immediately so the operator
+                            // sees a deliberate "loading" state rather than the
+                            // previous draft's stale data while we fetch.
+                            setLoadedDraft(null);
+                            setPayrollDraft(null);
+                            setDraftLoading(true);
+                            void (async () => {
+                              try {
+                                const singleResponse = await fetchDraftWithFallback(
+                                  `/api/proposals/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
+                                );
+                                if (singleResponse.ok) {
+                                  const draft = (await singleResponse.json()) as SingleDraft;
+                                  setPayrollDraft(null);
+                                  setLoadedDraft(draft);
+                                  void checkOnChainStatus(d.transactionIndex, draft);
+                                  return;
+                                }
+                                const payrollResponse = await fetchDraftWithFallback(
+                                  `/api/payrolls/${encodeURIComponent(multisig)}/${encodeURIComponent(d.transactionIndex)}`,
+                                );
+                                if (payrollResponse.ok) {
+                                  const draft = (await payrollResponse.json()) as PayrollDraft;
+                                  setLoadedDraft(null);
+                                  setPayrollDraft(draft);
+                                  setExecutionSteps(
+                                    draft.recipients.map((_, i) => ({
+                                      index: i,
+                                      status: "pending",
+                                    })),
+                                  );
+                                  void checkOnChainStatus(d.transactionIndex, draft);
+                                  return;
+                                }
+                                setError(
+                                  `No persisted draft found for proposal #${d.transactionIndex}.`,
+                                );
+                              } catch (caught) {
+                                setError(
+                                  caught instanceof Error
+                                    ? caught.message
+                                    : "Could not load proposal draft.",
+                                );
+                              } finally {
+                                setDraftLoading(false);
+                              }
+                            })();
+                          }}
                           className={cn(
-                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-aegis",
+                            "group flex w-full items-center gap-3 px-4 py-3.5 text-left transition-aegis",
                             isSelected
-                              ? "bg-accent text-accent-ink shadow-raise-1"
-                              : "bg-surface-2 text-ink-subtle group-hover:text-ink",
+                              ? "bg-accent-soft/40 ring-1 ring-inset ring-accent/30"
+                              : "hover:bg-surface-2",
                           )}
                         >
-                          {isPayrollDraft ? (
-                            <Users className="h-4 w-4" aria-hidden="true" />
-                          ) : (
-                            <Send className="h-4 w-4" aria-hidden="true" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <p className="truncate font-display text-base font-semibold tabular-nums tracking-tight text-ink">
-                              {formatRawAmount(
-                                isPayrollDraft ? (d.totalAmount ?? d.amount) : d.amount,
-                                d.invariants?.tokenMint ?? SOL_MINT,
-                              )}
-                            </p>
-                            <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-subtle">
-                              #{d.transactionIndex}
-                            </span>
-                          </div>
-                          <p className="mt-0.5 truncate font-mono text-xs text-ink-muted">
-                            {isPayrollDraft
-                              ? `${d.recipientCount ?? 0} recipients`
-                              : d.recipient
-                                ? truncateAddress(d.recipient)
-                                : "Transfer"}
-                          </p>
-                          <div className="mt-1.5 flex items-center gap-2">
-                            <span
-                              className={cn(
-                                "h-1.5 w-1.5 rounded-full",
-                                statusDot(proposalStatus),
-                              )}
-                            />
-                            <span className="text-[10px] uppercase tracking-eyebrow text-ink-subtle">
-                              {statusLabel(proposalStatus)}
-                            </span>
-                            {isPayrollDraft && (
-                              <span className="rounded-[3px] bg-accent-soft px-1 py-0.5 text-[9px] font-semibold uppercase tracking-eyebrow text-accent">
-                                Payroll
-                              </span>
+                          <div
+                            className={cn(
+                              "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-aegis",
+                              isSelected
+                                ? "bg-accent text-accent-ink shadow-raise-1"
+                                : "bg-surface-2 text-ink-subtle group-hover:text-ink",
+                            )}
+                          >
+                            {isPayrollDraft ? (
+                              <Users className="h-4 w-4" aria-hidden="true" />
+                            ) : (
+                              <Send className="h-4 w-4" aria-hidden="true" />
                             )}
                           </div>
-                        </div>
-                        <ChevronRight
-                          className={cn(
-                            "h-4 w-4 shrink-0 transition-aegis",
-                            isSelected
-                              ? "text-accent"
-                              : "text-ink-subtle group-hover:translate-x-0.5 group-hover:text-ink",
-                          )}
-                          aria-hidden="true"
-                        />
-                      </button>
-                    </li>
-                  );
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <p className="truncate font-display text-base font-semibold tabular-nums tracking-tight text-ink">
+                                {formatRawAmount(
+                                  isPayrollDraft ? (d.totalAmount ?? d.amount) : d.amount,
+                                  d.invariants?.tokenMint ?? SOL_MINT,
+                                )}
+                              </p>
+                              <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-subtle">
+                                #{d.transactionIndex}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 truncate font-mono text-xs text-ink-muted">
+                              {isPayrollDraft
+                                ? `${d.recipientCount ?? 0} recipients`
+                                : d.recipient
+                                  ? truncateAddress(d.recipient)
+                                  : "Transfer"}
+                            </p>
+                            <div className="mt-1.5 flex items-center gap-2">
+                              <span
+                                className={cn(
+                                  "h-1.5 w-1.5 rounded-full",
+                                  statusDot(proposalStatus),
+                                )}
+                              />
+                              <span className="text-[10px] uppercase tracking-eyebrow text-ink-subtle">
+                                {statusLabel(proposalStatus)}
+                              </span>
+                              {isPayrollDraft && (
+                                <span className="rounded-[3px] bg-accent-soft px-1 py-0.5 text-[9px] font-semibold uppercase tracking-eyebrow text-accent">
+                                  Payroll
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <ChevronRight
+                            className={cn(
+                              "h-4 w-4 shrink-0 transition-aegis",
+                              isSelected
+                                ? "text-accent"
+                                : "text-ink-subtle group-hover:translate-x-0.5 group-hover:text-ink",
+                            )}
+                            aria-hidden="true"
+                          />
+                        </button>
+                      </li>
+                    );
                   })}
                 </ul>
               </div>
@@ -2073,7 +2057,6 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                       <div className="h-3 w-36 shimmer-bg rounded" />
                       <div className="mt-3 space-y-2">
                         {Array.from({ length: 4 }).map((_, i) => (
-                          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows
                           <div key={i} className="flex items-center gap-2.5">
                             <div className="h-4 w-4 shrink-0 rounded-full shimmer-bg" />
                             <div className="h-3.5 flex-1 shimmer-bg rounded" />
@@ -2119,10 +2102,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                       <div>
                         <p className="text-eyebrow">Amount to release</p>
                         <p className="mt-1 font-display text-4xl font-semibold tabular-nums tracking-tight text-ink md:text-5xl">
-                          {formatRawAmount(
-                            loadedDraft.amount,
-                            loadedDraft.invariants.tokenMint,
-                          )}
+                          {formatRawAmount(loadedDraft.amount, loadedDraft.invariants.tokenMint)}
                         </p>
                       </div>
                     )}
@@ -2130,9 +2110,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                     {/* RECEIPT — single transfer */}
                     {loadedDraft && !isPayroll && (
                       <div className="rounded-list border border-border/60 bg-bg/40 px-4 py-3">
-                        <ReceiptRow label="To">
-                          {truncateAddress(loadedDraft.recipient)}
-                        </ReceiptRow>
+                        <ReceiptRow label="To">{truncateAddress(loadedDraft.recipient)}</ReceiptRow>
                         {decryptedMemo && (
                           <ReceiptRow label="Memo" mono={false}>
                             {decryptedMemo}
@@ -2166,10 +2144,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                             },
                             { label: "License ready to execute", passed: canExecute },
                           ].map((check) => (
-                            <li
-                              key={check.label}
-                              className="flex items-center gap-2.5 text-sm"
-                            >
+                            <li key={check.label} className="flex items-center gap-2.5 text-sm">
                               <span
                                 className={cn(
                                   "flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
@@ -2184,11 +2159,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                                   <XIcon className="h-2.5 w-2.5" strokeWidth={3} />
                                 )}
                               </span>
-                              <span
-                                className={cn(
-                                  check.passed ? "text-ink" : "text-ink-muted",
-                                )}
-                              >
+                              <span className={cn(check.passed ? "text-ink" : "text-ink-muted")}>
                                 {check.label}
                               </span>
                             </li>
@@ -2197,243 +2168,255 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
                       </div>
                     )}
 
-                {isPayroll && payrollDraft && (
-                  <div>
-                    <div className="overflow-x-auto rounded-md border border-border">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-border bg-bg text-left">
-                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                              #
-                            </th>
-                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                              Name
-                            </th>
-                            <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                              Amount
-                            </th>
-                            <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                              Status
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/70">
-                          {payrollDraft.recipients.map((r, i) => {
-                            const step = executionSteps[i];
-                            return (
-                              <tr key={r.id}>
-                                <td className="px-3 py-2 text-ink-muted">{i + 1}</td>
-                                <td className="px-3 py-2 text-ink">{r.name}</td>
-                                <td className="px-3 py-2 text-right font-mono tabular-nums text-ink">
-                                  {formatRawAmount(r.amount, r.invariants?.tokenMint ?? SOL_MINT)}
-                                </td>
-                                <td className="px-3 py-2">
-                                  {!step || step.status === "pending" ? (
-                                    <span className="text-ink-muted">Pending</span>
-                                  ) : step.status === "running" ? (
-                                    <span className="text-signal-warn">Running…</span>
-                                  ) : step.status === "success" ? (
-                                    <span className="text-accent">Done</span>
-                                  ) : (
-                                    <div>
-                                      <span className="text-signal-danger">Failed</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => retryFromStep(i)}
-                                        disabled={executing}
-                                        className="ml-2 text-xs text-accent hover:text-accent disabled:text-ink-subtle"
-                                      >
-                                        Retry
-                                      </button>
-                                    </div>
-                                  )}
-                                </td>
+                    {isPayroll && payrollDraft && (
+                      <div>
+                        <div className="overflow-x-auto rounded-md border border-border">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border bg-bg text-left">
+                                <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                                  #
+                                </th>
+                                <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                                  Name
+                                </th>
+                                <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                                  Amount
+                                </th>
+                                <th className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                                  Status
+                                </th>
                               </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/70">
+                              {payrollDraft.recipients.map((r, i) => {
+                                const step = executionSteps[i];
+                                return (
+                                  <tr key={r.id}>
+                                    <td className="px-3 py-2 text-ink-muted">{i + 1}</td>
+                                    <td className="px-3 py-2 text-ink">{r.name}</td>
+                                    <td className="px-3 py-2 text-right font-mono tabular-nums text-ink">
+                                      {formatRawAmount(
+                                        r.amount,
+                                        r.invariants?.tokenMint ?? SOL_MINT,
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      {!step || step.status === "pending" ? (
+                                        <span className="text-ink-muted">Pending</span>
+                                      ) : step.status === "running" ? (
+                                        <span className="text-signal-warn">Running…</span>
+                                      ) : step.status === "success" ? (
+                                        <span className="text-accent">Done</span>
+                                      ) : (
+                                        <div>
+                                          <span className="text-signal-danger">Failed</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => retryFromStep(i)}
+                                            disabled={executing}
+                                            className="ml-2 text-xs text-accent hover:text-accent disabled:text-ink-subtle"
+                                          >
+                                            Retry
+                                          </button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {executionSteps.length > 0 && (
+                          <div className="mt-4">
+                            <div className="flex items-center justify-between text-xs text-ink-muted">
+                              <span>Progress</span>
+                              <span>
+                                {successCount}/{payrollDraft.recipientCount}
+                              </span>
+                            </div>
+                            <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-2">
+                              <ProgressBar value={successCount} max={payrollDraft.recipientCount} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Execute form — hidden after successful single or payroll execution.
+                    Sign & Release is the brand-forward primary CTA: gold
+                    gradient + accent-glow on hover, Lock icon to reinforce
+                    that this is the shielded delivery step. */}
+                    {!signature && !payrollComplete && (
+                      <form onSubmit={execute} className="space-y-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <button
+                            type="submit"
+                            disabled={!canExecute}
+                            className={cn(
+                              "inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold transition-aegis",
+                              "bg-gradient-to-r from-accent to-accent-hover text-accent-ink shadow-raise-1 hover:shadow-accent-glow",
+                              "disabled:cursor-not-allowed disabled:opacity-50",
+                            )}
+                          >
+                            <ShieldCheck
+                              className="h-4 w-4"
+                              strokeWidth={2.25}
+                              aria-hidden="true"
+                            />
+                            {pending
+                              ? isPayroll
+                                ? "Executing batch…"
+                                : "Sealing license…"
+                              : isPayroll
+                                ? `Sign & release batch · ${payrollDraft?.recipientCount ?? 0}`
+                                : "Sign & release"}
+                          </button>
+                          {loadedDraft &&
+                            !isPayroll &&
+                            (licenseStatus === "active" || licenseStatus === "expired") && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                  setRefundError(null);
+                                  setRefundConfirmOpen(true);
+                                }}
+                                disabled={pending || refunding || !wallet.publicKey}
+                                title="Return vault-funded amount from operator back to the vault. Use only when the Cloak delivery cannot complete."
+                              >
+                                {refunding ? "Refunding…" : "Refund to vault"}
+                              </Button>
+                            )}
+                        </div>
+                        {refundError ? (
+                          <p className="text-xs text-signal-danger">{refundError}</p>
+                        ) : null}
+                        {!wallet.publicKey ? (
+                          <p className="text-xs text-signal-warn">
+                            Connect the registered operator wallet.
+                          </p>
+                        ) : null}
+                        {operatorMismatch && wallet.publicKey ? (
+                          <div className="text-xs text-signal-warn space-y-1">
+                            <p>Connected wallet is not the registered operator.</p>
+                            {registeredOperator ? (
+                              <p className="font-mono text-[11px] break-all text-ink-subtle">
+                                Operator: {registeredOperator}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
+                        {lowOperatorSol ? (
+                          <p className="text-xs text-signal-warn">Add SOL to cover network fees.</p>
+                        ) : null}
+                        {cofreMissing ? (
+                          <p className="text-xs text-signal-warn">
+                            Finish private vault setup first.
+                          </p>
+                        ) : null}
+                      </form>
+                    )}
+
+                    {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
+
+                    {/* Payroll complete — per-recipient explorer links */}
+                    {isPayroll && payrollComplete && executionSteps.some((s) => s.signature) && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-signal-positive">
+                          Payroll complete,{" "}
+                          {executionSteps.filter((s) => s.status === "success").length}/
+                          {executionSteps.length} transfers confirmed
+                        </p>
+                        {executionSteps
+                          .filter((s) => s.signature)
+                          .map((s) => {
+                            const recipient = payrollDraft?.recipients[s.index];
+                            return (
+                              <div
+                                key={s.index}
+                                className="flex flex-col gap-2 rounded-md border border-border bg-bg px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <dt className="text-sm text-ink-muted">
+                                  {recipient?.name ?? `Recipient ${s.index + 1}`}
+                                </dt>
+                                <dd className="flex items-center gap-2">
+                                  <code className="font-mono text-xs text-ink">
+                                    {truncateSignature(s.signature!)}
+                                  </code>
+                                  <a
+                                    href={transactionExplorerUrl(s.signature!)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-aegis hover:bg-accent-soft"
+                                  >
+                                    Explorer
+                                  </a>
+                                </dd>
+                              </div>
                             );
                           })}
-                        </tbody>
-                      </table>
-                    </div>
+                      </div>
+                    )}
 
-                    {executionSteps.length > 0 && (
-                      <div className="mt-4">
-                        <div className="flex items-center justify-between text-xs text-ink-muted">
-                          <span>Progress</span>
-                          <span>
-                            {successCount}/{payrollDraft.recipientCount}
-                          </span>
+                    {/* Latest confirmed transactions (single transfer) — calm
+                    success ribbon. Each signature gets a receipt-style row
+                    with eyebrow label, mono signature, and Explorer link. */}
+                    {!isPayroll && (cloakSignature || signature || withdrawSignature) && (
+                      <div className="rounded-list border border-accent/25 bg-accent-soft/30 px-4 py-3.5">
+                        <div className="mb-2.5 flex items-center gap-2">
+                          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-ink">
+                            <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
+                          </div>
+                          <p className="text-eyebrow text-accent">Released · Confirmed on chain</p>
                         </div>
-                        <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-2">
-                          <ProgressBar value={successCount} max={payrollDraft.recipientCount} />
+                        <div className="space-y-1.5">
+                          {[
+                            cloakSignature
+                              ? { label: "Cloak deposit", value: cloakSignature }
+                              : null,
+                            withdrawSignature
+                              ? { label: "Recipient delivery", value: withdrawSignature }
+                              : null,
+                            signature ? { label: "License consumption", value: signature } : null,
+                          ]
+                            .filter((item): item is { label: string; value: string } =>
+                              Boolean(item),
+                            )
+                            .map((item) => (
+                              <div
+                                key={item.label}
+                                className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <dt className="text-[11px] uppercase tracking-eyebrow text-ink-subtle">
+                                  {item.label}
+                                </dt>
+                                <dd className="flex items-center gap-2">
+                                  <code className="font-mono text-xs tabular-nums text-ink">
+                                    {truncateSignature(item.value)}
+                                  </code>
+                                  <a
+                                    href={transactionExplorerUrl(item.value)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="rounded-md px-2 py-1 text-[11px] font-semibold text-accent transition-aegis hover:bg-surface-2"
+                                  >
+                                    Explorer
+                                  </a>
+                                </dd>
+                              </div>
+                            ))}
                         </div>
                       </div>
                     )}
                   </div>
-                )}
-
-                {/* Execute form — hidden after successful single or payroll execution.
-                    Sign & Release is the brand-forward primary CTA: gold
-                    gradient + accent-glow on hover, Lock icon to reinforce
-                    that this is the shielded delivery step. */}
-                {!signature && !payrollComplete && (
-                  <form onSubmit={execute} className="space-y-3">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <button
-                        type="submit"
-                        disabled={!canExecute}
-                        className={cn(
-                          "inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold transition-aegis",
-                          "bg-gradient-to-r from-accent to-accent-hover text-accent-ink shadow-raise-1 hover:shadow-accent-glow",
-                          "disabled:cursor-not-allowed disabled:opacity-50",
-                        )}
-                      >
-                        <ShieldCheck className="h-4 w-4" strokeWidth={2.25} aria-hidden="true" />
-                        {pending
-                          ? isPayroll
-                            ? "Executing batch…"
-                            : "Sealing license…"
-                          : isPayroll
-                            ? `Sign & release batch · ${payrollDraft?.recipientCount ?? 0}`
-                            : "Sign & release"}
-                      </button>
-                      {loadedDraft &&
-                        !isPayroll &&
-                        (licenseStatus === "active" || licenseStatus === "expired") && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setRefundError(null);
-                              setRefundConfirmOpen(true);
-                            }}
-                            disabled={pending || refunding || !wallet.publicKey}
-                            title="Return vault-funded amount from operator back to the vault. Use only when the Cloak delivery cannot complete."
-                          >
-                            {refunding ? "Refunding…" : "Refund to vault"}
-                          </Button>
-                        )}
-                    </div>
-                    {refundError ? (
-                      <p className="text-xs text-signal-danger">{refundError}</p>
-                    ) : null}
-                    {!wallet.publicKey ? (
-                      <p className="text-xs text-signal-warn">
-                        Connect the registered operator wallet.
-                      </p>
-                    ) : null}
-                    {operatorMismatch && wallet.publicKey ? (
-                      <div className="text-xs text-signal-warn space-y-1">
-                        <p>Connected wallet is not the registered operator.</p>
-                        {registeredOperator ? (
-                          <p className="font-mono text-[11px] break-all text-ink-subtle">
-                            Operator: {registeredOperator}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    {lowOperatorSol ? (
-                      <p className="text-xs text-signal-warn">Add SOL to cover network fees.</p>
-                    ) : null}
-                    {cofreMissing ? (
-                      <p className="text-xs text-signal-warn">Finish private vault setup first.</p>
-                    ) : null}
-                  </form>
-                )}
-
-                {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
-
-                {/* Payroll complete — per-recipient explorer links */}
-                {isPayroll && payrollComplete && executionSteps.some((s) => s.signature) && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-signal-positive">
-                      Payroll complete,{" "}
-                      {executionSteps.filter((s) => s.status === "success").length}/
-                      {executionSteps.length} transfers confirmed
-                    </p>
-                    {executionSteps
-                      .filter((s) => s.signature)
-                      .map((s) => {
-                        const recipient = payrollDraft?.recipients[s.index];
-                        return (
-                          <div
-                            key={s.index}
-                            className="flex flex-col gap-2 rounded-md border border-border bg-bg px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-                          >
-                            <dt className="text-sm text-ink-muted">
-                              {recipient?.name ?? `Recipient ${s.index + 1}`}
-                            </dt>
-                            <dd className="flex items-center gap-2">
-                              <code className="font-mono text-xs text-ink">
-                                {truncateSignature(s.signature!)}
-                              </code>
-                              <a
-                                href={transactionExplorerUrl(s.signature!)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="rounded-md px-2 py-1 text-xs font-semibold text-accent transition-aegis hover:bg-accent-soft"
-                              >
-                                Explorer
-                              </a>
-                            </dd>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
-
-                {/* Latest confirmed transactions (single transfer) — calm
-                    success ribbon. Each signature gets a receipt-style row
-                    with eyebrow label, mono signature, and Explorer link. */}
-                {!isPayroll && (cloakSignature || signature || withdrawSignature) && (
-                  <div className="rounded-list border border-accent/25 bg-accent-soft/30 px-4 py-3.5">
-                    <div className="mb-2.5 flex items-center gap-2">
-                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-ink">
-                        <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
-                      </div>
-                      <p className="text-eyebrow text-accent">Released · Confirmed on chain</p>
-                    </div>
-                    <div className="space-y-1.5">
-                    {[
-                      cloakSignature ? { label: "Cloak deposit", value: cloakSignature } : null,
-                      withdrawSignature
-                        ? { label: "Recipient delivery", value: withdrawSignature }
-                        : null,
-                      signature ? { label: "License consumption", value: signature } : null,
-                    ]
-                      .filter((item): item is { label: string; value: string } => Boolean(item))
-                      .map((item) => (
-                        <div
-                          key={item.label}
-                          className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                          <dt className="text-[11px] uppercase tracking-eyebrow text-ink-subtle">
-                            {item.label}
-                          </dt>
-                          <dd className="flex items-center gap-2">
-                            <code className="font-mono text-xs tabular-nums text-ink">
-                              {truncateSignature(item.value)}
-                            </code>
-                            <a
-                              href={transactionExplorerUrl(item.value)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="rounded-md px-2 py-1 text-[11px] font-semibold text-accent transition-aegis hover:bg-surface-2"
-                            >
-                              Explorer
-                            </a>
-                          </dd>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+                </div>
               )}
             </div>
           </div>
         </div>
-
       </div>
 
       {/* Execution history — side sheet so the audit trail is one click
@@ -2451,10 +2434,9 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
               </div>
             </div>
             <SheetDescription className="mt-2">
-              {executionHistory.length}{" "}
-              {executionHistory.length === 1 ? "run" : "runs"} ·{" "}
-              {executionHistory.filter((e) => e.status === "success").length} sealed ·
-              browser-local audit trail.
+              {executionHistory.length} {executionHistory.length === 1 ? "run" : "runs"} ·{" "}
+              {executionHistory.filter((e) => e.status === "success").length} sealed · browser-local
+              audit trail.
             </SheetDescription>
           </SheetHeader>
 
@@ -2469,10 +2451,7 @@ function OperatorPageInner({ params }: { params: Promise<{ multisig: string }> }
             ) : (
               <ul className="card-list overflow-hidden divide-y divide-border/50">
                 {executionHistory.map((item) => (
-                  <li
-                    key={item.id}
-                    className="px-4 py-3.5 transition-aegis hover:bg-surface-2/50"
-                  >
+                  <li key={item.id} className="px-4 py-3.5 transition-aegis hover:bg-surface-2/50">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-mono text-xs tabular-nums text-ink-subtle">
                         #{item.transactionIndex}

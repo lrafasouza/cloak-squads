@@ -16,29 +16,29 @@
   /* ─── Heraldic Light (default for first paint when no preference) ─── */
   :root {
     /* Surfaces — warm cream paper, never pure white */
-    --bg: 38 30% 97%;             /* #FBF7F0 — warm off-white */
-    --surface: 38 35% 99%;        /* #FEFCF7 — paper bright */
-    --surface-2: 38 22% 95%;      /* #F2EEE5 — subtle wash */
-    --surface-3: 38 18% 91%;      /* #E9E3D6 — deeper wash */
-    --surface-content: 38 35% 99%;/* same as surface in light */
+    --bg: 38 30% 97%; /* #FBF7F0 — warm off-white */
+    --surface: 38 35% 99%; /* #FEFCF7 — paper bright */
+    --surface-2: 38 22% 95%; /* #F2EEE5 — subtle wash */
+    --surface-3: 38 18% 91%; /* #E9E3D6 — deeper wash */
+    --surface-content: 38 35% 99%; /* same as surface in light */
 
     /* Borders */
-    --border: 38 14% 85%;         /* #DCD5C5 */
-    --border-strong: 38 12% 70%;  /* #B5AC97 */
+    --border: 38 14% 85%; /* #DCD5C5 */
+    --border-strong: 38 12% 70%; /* #B5AC97 */
 
     /* Ink — deep navy-charcoal, the colour of vault-stamp ink */
-    --ink: 220 25% 12%;           /* #181D29 */
-    --ink-muted: 220 14% 32%;     /* #45495A */
-    --ink-subtle: 220 8% 50%;     /* #757A85 */
+    --ink: 220 25% 12%; /* #181D29 */
+    --ink-muted: 220 14% 32%; /* #45495A */
+    --ink-subtle: 220 8% 50%; /* #757A85 */
 
     /* Accent — Old Gold Leaf (darker than dark mode for AAA contrast) */
-    --accent: 30 55% 35%;         /* #8E6D26 */
-    --accent-hover: 30 55% 28%;   /* #74591E */
-    --accent-soft: 36 60% 91%;    /* #F5E9D2 */
-    --accent-ink: 38 35% 99%;     /* cream — text on accent fills */
+    --accent: 30 55% 35%; /* #8E6D26 */
+    --accent-hover: 30 55% 28%; /* #74591E */
+    --accent-soft: 36 60% 91%; /* #F5E9D2 */
+    --accent-ink: 38 35% 99%; /* cream — text on accent fills */
 
     /* Brass — lighter gold for active rails */
-    --brass: 30 65% 50%;          /* #C9914A */
+    --brass: 30 65% 50%; /* #C9914A */
 
     /* Inset highlight — subtle dark on top edge of light cards */
     --inset-highlight: 220 25% 12% / 0.04;
@@ -46,8 +46,8 @@
     /* Shimmer — separate tokens because surface-2 ↔ surface-3 in light
      * is too narrow a delta (4% L) to read as motion. Bumping surface-3
      * darker would affect 22+ unrelated usages, so we keep this isolated. */
-    --shimmer-from: 38 22% 95%;   /* same as surface-2 */
-    --shimmer-to: 38 16% 84%;     /* darker pass through, ~11% L delta */
+    --shimmer-from: 38 22% 95%; /* same as surface-2 */
+    --shimmer-to: 38 16% 84%; /* darker pass through, ~11% L delta */
 
     /* Signals — desaturated, contrast-safe on light */
     --signal-positive: 100 35% 30%; /* deep green */
@@ -68,29 +68,29 @@
   /* ─── Heraldic Dark ─── */
   .dark {
     /* Surfaces */
-    --bg: 220 13% 5%;             /* #0A0B0D */
-    --surface: 220 12% 9%;        /* #131519 */
-    --surface-2: 220 13% 12%;     /* #1B1E24 */
+    --bg: 220 13% 5%; /* #0A0B0D */
+    --surface: 220 12% 9%; /* #131519 */
+    --surface-2: 220 13% 12%; /* #1B1E24 */
     --surface-3: 220 13% 16%;
-    --surface-content: 220 12% 11%;/* between surface and surface-2 — main page content area */
+    --surface-content: 220 12% 11%; /* between surface and surface-2 — main page content area */
 
     /* Borders */
-    --border: 222 11% 17%;        /* #262932 */
+    --border: 222 11% 17%; /* #262932 */
     --border-strong: 222 11% 26%; /* #3A3F4A */
 
     /* Ink */
-    --ink: 240 5% 96%;            /* #F4F4F5 */
-    --ink-muted: 240 5% 65%;      /* #A1A1AA */
-    --ink-subtle: 240 5% 46%;     /* #71717A */
+    --ink: 240 5% 96%; /* #F4F4F5 */
+    --ink-muted: 240 5% 65%; /* #A1A1AA */
+    --ink-subtle: 240 5% 46%; /* #71717A */
 
     /* Accent — Burnished Gold */
-    --accent: 39 49% 60%;         /* #C9A86A */
-    --accent-hover: 39 56% 67%;   /* #D9B97A */
-    --accent-soft: 36 35% 16%;    /* #3A2F1A */
-    --accent-ink: 220 13% 5%;     /* dark text on accent fills */
+    --accent: 39 49% 60%; /* #C9A86A */
+    --accent-hover: 39 56% 67%; /* #D9B97A */
+    --accent-soft: 36 35% 16%; /* #3A2F1A */
+    --accent-ink: 220 13% 5%; /* dark text on accent fills */
 
     /* Brass — lighter gold for active rails */
-    --brass: 39 56% 67%;          /* same as accent-hover; reads as brass on dark */
+    --brass: 39 56% 67%; /* same as accent-hover; reads as brass on dark */
 
     /* Inset highlight — light on top edge of dark cards */
     --inset-highlight: 240 5% 96% / 0.04;
@@ -197,7 +197,7 @@
   }
 
   .inner-shadow {
-    box-shadow: inset 0 1px 2px 0 hsl(var(--ink) / 0.04), inset 0 2px 4px -1px rgba(0,0,0,0.3);
+    box-shadow: inset 0 1px 2px 0 hsl(var(--ink) / 0.04), inset 0 2px 4px -1px rgba(0, 0, 0, 0.3);
   }
 
   .glass {
@@ -250,10 +250,8 @@
 
   .card-hero {
     @apply relative overflow-hidden rounded-hero border border-border/70 bg-surface;
-    box-shadow:
-      0 1px 0 0 hsl(var(--inset-highlight)) inset,
-      0 1px 0 0 hsl(var(--border)),
-      0 18px 48px -20px rgb(0 0 0 / 0.6);
+    box-shadow: 0 1px 0 0 hsl(var(--inset-highlight)) inset, 0 1px 0 0 hsl(var(--border)), 0 18px
+      48px -20px rgb(0 0 0 / 0.6);
   }
 
   .card-panel {
@@ -306,8 +304,15 @@
 /* Privacy halo keyframes — pulled to top level so reduced-motion override
  * (see :root @media block) cleanly cancels the animation. */
 @keyframes halo-pulse {
-  0%, 100% { transform: scale(1);    opacity: 0.6; }
-  50%      { transform: scale(1.04); opacity: 0;   }
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 0;
+  }
 }
 
 /* Lenis smooth scroll requirement */
@@ -353,7 +358,7 @@ html.lenis body {
   background: hsl(var(--surface)) !important;
   border: 1px solid hsl(var(--border)) !important;
   border-radius: 12px !important;
-  box-shadow: 0 24px 48px rgba(0,0,0,0.45) !important;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45) !important;
   color: hsl(var(--ink)) !important;
 }
 .wallet-adapter-modal-title {
@@ -389,17 +394,27 @@ html.lenis body {
 }
 
 .anatomy-node {
-  transition: filter 350ms cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 350ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: filter 350ms cubic-bezier(0.16, 1, 0.3, 1), opacity 350ms
+    cubic-bezier(0.16, 1, 0.3, 1);
 }
-.anatomy-node[data-state="dim"] { opacity: 0.32; filter: saturate(0.4); }
-.anatomy-node[data-state="active"] { opacity: 1; filter: drop-shadow(0 0 18px hsl(var(--accent) / 0.45)); }
-.anatomy-node[data-state="done"] { opacity: 0.85; }
+.anatomy-node[data-state="dim"] {
+  opacity: 0.32;
+  filter: saturate(0.4);
+}
+.anatomy-node[data-state="active"] {
+  opacity: 1;
+  filter: drop-shadow(0 0 18px hsl(var(--accent) / 0.45));
+}
+.anatomy-node[data-state="done"] {
+  opacity: 0.85;
+}
 
 .anatomy-beam {
   stroke-dasharray: 6 6;
   animation: anatomy-beam-flow 1.2s linear infinite;
 }
 @keyframes anatomy-beam-flow {
-  to { stroke-dashoffset: -24; }
+  to {
+    stroke-dashoffset: -24;
+  }
 }

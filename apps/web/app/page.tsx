@@ -47,7 +47,9 @@ function HeroSection() {
               </span>
               <span className="whitespace-nowrap font-mono text-[9.5px] uppercase tracking-[0.08em] text-accent sm:text-[11px] sm:tracking-eyebrow">
                 <span className="sm:hidden">Squads · Cloak · Devnet</span>
-                <span className="hidden sm:inline">Built on Squads · Powered by Cloak · Devnet</span>
+                <span className="hidden sm:inline">
+                  Built on Squads · Powered by Cloak · Devnet
+                </span>
               </span>
             </div>
           </motion.div>
@@ -60,8 +62,7 @@ function HeroSection() {
             className="text-center"
           >
             <h1 className="font-display text-[2rem] leading-[1.08] tracking-tight sm:text-display font-bold text-ink">
-              Privacy Infrastructure{" "}
-              <span className="text-accent">for Every Solana Treasury</span>
+              Privacy Infrastructure <span className="text-accent">for Every Solana Treasury</span>
             </h1>
             <p className="mt-2 text-sm font-medium text-ink-subtle">
               Built on Squads · Powered by Cloak
@@ -76,8 +77,8 @@ function HeroSection() {
             className="text-center"
           >
             <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-ink-muted sm:text-lg md:text-xl">
-              Aegis turns approval-gated multisig payments into cryptographically
-              unlinkable, auditable transfers, without changing how your team already votes.
+              Aegis turns approval-gated multisig payments into cryptographically unlinkable,
+              auditable transfers, without changing how your team already votes.
             </p>
           </motion.div>
 
@@ -136,13 +137,13 @@ export default function HomePage() {
             className="absolute top-[10%] left-[15%] h-64 w-64 rounded-full opacity-[0.03] blur-[100px] hidden md:block"
             style={{ background: "hsl(var(--accent))" }}
             animate={{ x: [0, 40, 0], y: [0, -30, 0] }}
-            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 20, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
           />
           <motion.div
             className="absolute bottom-[20%] right-[10%] h-96 w-96 rounded-full opacity-[0.02] blur-[120px] hidden md:block"
             style={{ background: "hsl(var(--accent))" }}
             animate={{ x: [0, -50, 0], y: [0, 40, 0] }}
-            transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 25, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
           />
         </div>
 
@@ -167,7 +168,9 @@ export default function HomePage() {
           <div className="mx-auto max-w-7xl px-4 py-24 md:px-6 md:py-32">
             <ScrollReveal>
               <div className="mb-12 max-w-xl mx-auto text-center">
-                <Eyebrow as="div" className="mb-3">FAQ</Eyebrow>
+                <Eyebrow as="div" className="mb-3">
+                  FAQ
+                </Eyebrow>
                 <h2 className="font-display text-display-sm font-bold text-ink">
                   Common questions
                 </h2>

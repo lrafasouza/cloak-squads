@@ -44,10 +44,7 @@ export function Step1Details({
             </div>
 
             <div className="flex-1 min-w-0">
-              <label
-                htmlFor="vault-name"
-                className="mb-1.5 block text-sm font-medium text-ink"
-              >
+              <label htmlFor="vault-name" className="mb-1.5 block text-sm font-medium text-ink">
                 Vault name <span className="text-signal-danger">*</span>
               </label>
               <input

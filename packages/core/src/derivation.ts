@@ -23,7 +23,5 @@ export async function deriveOperatorCloakKeys(): Promise<never> {
 }
 
 export async function deriveSignerDecryptKeypair(): Promise<never> {
-  throw new Error(
-    "deriveSignerDecryptKeypair is not implemented — see comment in derivation.ts.",
-  );
+  throw new Error("deriveSignerDecryptKeypair is not implemented — see comment in derivation.ts.");
 }

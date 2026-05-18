@@ -4,10 +4,7 @@ import { requireVaultMember, verifyAuditLinkAccess } from "@/lib/vault-membershi
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ multisig: string }> },
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ multisig: string }> }) {
   const { multisig } = await params;
 
   try {

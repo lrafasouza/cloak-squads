@@ -1,12 +1,16 @@
 "use client";
 
+import {
+  type BrowserSquadsWallet,
+  assertBrowserSquadsWallet,
+  nextTransactionIndex,
+} from "@/lib/squads-sdk";
+import { simulateAndOptimize } from "@/lib/tx-optimization";
 import { translateOnchainError } from "@cloak-squads/core/onchain-error";
 import type { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { Transaction } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import BN from "bn.js";
-import { simulateAndOptimize } from "@/lib/tx-optimization";
-import { assertBrowserSquadsWallet, nextTransactionIndex, type BrowserSquadsWallet } from "@/lib/squads-sdk";
 
 export const Period = multisig.types.Period;
 export type Period = multisig.types.Period;

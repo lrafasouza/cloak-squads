@@ -1,10 +1,6 @@
 import { getCurrentCluster } from "@/lib/cluster";
 import { prisma } from "@/lib/prisma";
-import {
-  type ParseRejection,
-  type ParsedIncome,
-  parseIncome,
-} from "@/lib/vault-income-parser";
+import { type ParseRejection, type ParsedIncome, parseIncome } from "@/lib/vault-income-parser";
 import { squadsVaultPda } from "@cloak-squads/core/pda";
 import { Connection, type ParsedTransactionWithMeta, PublicKey } from "@solana/web3.js";
 

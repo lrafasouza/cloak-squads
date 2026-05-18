@@ -418,9 +418,7 @@ async function main() {
     );
     console.log("  Cloak deposit tx:", depositResult.signature);
     console.log("  Leaf index:", depositResult.commitmentIndices[0]);
-    const depositedCommitment = depositResult.outputCommitments[0]
-      ?.toString(16)
-      .padStart(64, "0");
+    const depositedCommitment = depositResult.outputCommitments[0]?.toString(16).padStart(64, "0");
     console.log(
       "  Commitment match:",
       depositedCommitment === Buffer.from(commitment).toString("hex"),
@@ -451,7 +449,9 @@ async function main() {
   console.log(`  Delivered:       ${delivered / LAMPORTS_PER_SOL} SOL`);
   console.log(`  Expected net:    ${expectedNet / LAMPORTS_PER_SOL} SOL`);
   if (delivered < expectedNet) {
-    throw new Error(`Recipient balance increased by ${delivered}, expected at least ${expectedNet}`);
+    throw new Error(
+      `Recipient balance increased by ${delivered}, expected at least ${expectedNet}`,
+    );
   }
 
   console.log("\n[6/6] execute_with_license (operator consumes)...");

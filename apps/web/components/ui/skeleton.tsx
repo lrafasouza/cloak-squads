@@ -12,7 +12,6 @@ export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
     <>
       {Array.from({ length: count }).map((_, i) => (
         <div
-          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholders have no identity — index is the only stable key
           key={i}
           ref={i === 0 ? ref : undefined}
           className={cn("shimmer-bg rounded-md", className)}

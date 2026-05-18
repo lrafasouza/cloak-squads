@@ -9,8 +9,16 @@ function encryptViewKeyForSigner(viewKey: Uint8Array, signerPublicKey: Uint8Arra
   return { ephemeralPublicKey: ephemeralKp.publicKey, encrypted, nonce };
 }
 
-function decryptViewKey(entry: { ephemeralPublicKey: Uint8Array; encrypted: Uint8Array; nonce: Uint8Array }, signerBoxKp: nacl.BoxKeyPair) {
-  const decrypted = nacl.box.open(entry.encrypted, entry.nonce, entry.ephemeralPublicKey, signerBoxKp.secretKey);
+function decryptViewKey(
+  entry: { ephemeralPublicKey: Uint8Array; encrypted: Uint8Array; nonce: Uint8Array },
+  signerBoxKp: nacl.BoxKeyPair,
+) {
+  const decrypted = nacl.box.open(
+    entry.encrypted,
+    entry.nonce,
+    entry.ephemeralPublicKey,
+    signerBoxKp.secretKey,
+  );
   if (!decrypted) throw new Error("failed to decrypt view key");
   return decrypted;
 }

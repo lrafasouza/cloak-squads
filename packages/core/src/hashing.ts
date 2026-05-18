@@ -1,7 +1,7 @@
-import { sha256 } from "@noble/hashes/sha256";
 import { blake3 } from "@noble/hashes/blake3";
-import { concatBytes, u64ToLeBytes, pubkeyToBytes, domainSeparator } from "./encoding";
-import type { PayloadInvariants, AuditDiversifierInput } from "./types";
+import { sha256 } from "@noble/hashes/sha256";
+import { concatBytes, domainSeparator, pubkeyToBytes, u64ToLeBytes } from "./encoding";
+import type { AuditDiversifierInput, PayloadInvariants } from "./types";
 
 export function computePayloadHash(inv: PayloadInvariants): Uint8Array {
   if (inv.nullifier.length !== 32) {

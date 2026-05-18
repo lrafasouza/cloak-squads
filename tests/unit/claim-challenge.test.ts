@@ -54,7 +54,7 @@ describe("createChallenge / checkChallenge", () => {
   test("tampered challengeId (sig part) returns null", async () => {
     const { createChallenge, checkChallenge } = await getChallenge();
     const { challengeId } = createChallenge("invoice-123");
-    const tampered = challengeId.slice(0, -4) + "XXXX";
+    const tampered = `${challengeId.slice(0, -4)}XXXX`;
     expect(checkChallenge("invoice-123", tampered)).toBeNull();
   });
 
@@ -117,9 +117,18 @@ describe("consumeChallenge with mocked Redis (one-time enforcement)", () => {
     process.env.REDIS_URL = "https://fake.upstash.io";
     process.env.REDIS_TOKEN = "test";
     vi.resetModules();
-    vi.doMock("@upstash/redis", () => ({ Redis: function () { return fakeRedis; } }));
+    // Must use `function` (not arrow) — the source does `new Redis(...)`, and
+    // arrow functions throw "is not a constructor" when called with `new`.
+    vi.doMock("@upstash/redis", () => ({
+      // biome-ignore lint/complexity/useArrowFunction: needed for `new Redis(...)` constructor call
+      Redis: function () {
+        return fakeRedis;
+      },
+    }));
 
-    const { createChallenge, consumeChallenge } = await import("../../apps/web/lib/claim-challenge");
+    const { createChallenge, consumeChallenge } = await import(
+      "../../apps/web/lib/claim-challenge"
+    );
     const { challengeId } = createChallenge("invoice-redis");
 
     const first = await consumeChallenge("invoice-redis", challengeId);

@@ -95,9 +95,7 @@ function ProposalRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-eyebrow">
-            {typeLabel}
-          </span>
+          <span className="text-eyebrow">{typeLabel}</span>
           <span className="font-mono text-[10px] text-ink-subtle">#{p.transactionIndex}</span>
           {sourceVaultName && (
             <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold text-accent">
@@ -161,9 +159,7 @@ function IncomeRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <span className="text-eyebrow">
-            Received
-          </span>
+          <span className="text-eyebrow">Received</span>
           {toLabel && (
             <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold text-accent">
               {toLabel}

@@ -175,8 +175,7 @@ export function SendModal({
   }, [destType, mode]);
 
   const amountStep = isSol ? "0.000000001" : "0.000001";
-  const amountMin =
-    mode === "private" && isSol ? "0.01" : isSol ? "0.000000001" : "0.000001";
+  const amountMin = mode === "private" && isSol ? "0.01" : isSol ? "0.000000001" : "0.000001";
   const amountPlaceholder = isSol ? "0.0" : "0.00";
 
   const belowPrivateMin = useMemo(() => {
@@ -640,9 +639,7 @@ export function SendModal({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent size="lg" watermark watermarkSize={260} watermarkOpacity={0.04}>
         <DialogHeader>
-          <p className="text-eyebrow">
-            {mode === "private" ? "Send · Shielded" : "Send · Public"}
-          </p>
+          <p className="text-eyebrow">{mode === "private" ? "Send · Shielded" : "Send · Public"}</p>
           <DialogTitle className="mt-0.5">
             {mode === "private" ? `${tokenLabel} via Cloak` : `${tokenLabel} transfer`}
           </DialogTitle>
@@ -657,11 +654,7 @@ export function SendModal({
           {/* ── Mode toggle — public ↔ shielded — the moat surface ── */}
           <div>
             <p className="text-eyebrow mb-2">Privacy</p>
-            <div
-              role="radiogroup"
-              aria-label="Privacy mode"
-              className="grid grid-cols-2 gap-1.5"
-            >
+            <div role="radiogroup" aria-label="Privacy mode" className="grid grid-cols-2 gap-1.5">
               {(["private", "public"] as const).map((m) => {
                 const privateDisabledForToken = m === "private" && !isSol;
                 const privateDisabledForDest = m === "private" && destType === "account";
@@ -855,9 +848,7 @@ export function SendModal({
                 disabled={pending || !selectedToken}
                 title="Use full balance"
               >
-                {selectedToken
-                  ? `${selectedToken.uiBalance} ${selectedToken.symbol} · MAX`
-                  : "—"}
+                {selectedToken ? `${selectedToken.uiBalance} ${selectedToken.symbol} · MAX` : "—"}
               </button>
             </div>
             <div className="flex items-center gap-3">
@@ -918,7 +909,11 @@ export function SendModal({
                   {memo.trim()}
                 </ReceiptRow>
               )}
-              <ReceiptRow label="Privacy" tone={mode === "private" ? "accent" : "muted"} mono={false}>
+              <ReceiptRow
+                label="Privacy"
+                tone={mode === "private" ? "accent" : "muted"}
+                mono={false}
+              >
                 {mode === "private" ? (
                   <span className="inline-flex items-center gap-1">
                     <Lock className="h-2.5 w-2.5" strokeWidth={2.25} />

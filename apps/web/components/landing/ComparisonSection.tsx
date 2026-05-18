@@ -14,8 +14,8 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import { ScrollReveal } from "./ScrollReveal";
 import { Eyebrow } from "../ui/aegis";
+import { ScrollReveal } from "./ScrollReveal";
 
 interface FeatureRow {
   id: string;
@@ -98,9 +98,7 @@ function ColumnHeader({ side }: { side: "squads" | "aegis" }) {
       <div
         className={cn(
           "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
-          isAegis
-            ? "bg-accent-soft border-accent/30"
-            : "bg-surface border-border"
+          isAegis ? "bg-accent-soft border-accent/30" : "bg-surface border-border",
         )}
       >
         {isAegis ? (
@@ -113,7 +111,7 @@ function ColumnHeader({ side }: { side: "squads" | "aegis" }) {
         <p
           className={cn(
             "text-sm font-semibold uppercase tracking-wider",
-            isAegis ? "text-accent" : "text-ink-subtle"
+            isAegis ? "text-accent" : "text-ink-subtle",
           )}
         >
           {isAegis ? "What Aegis adds on top" : "What Squads gives you"}
@@ -136,17 +134,10 @@ function RowItem({ feature, side }: { feature: FeatureRow; side: "squads" | "aeg
       <div
         className={cn(
           "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border mt-0.5",
-          isHighlight
-            ? "bg-accent-soft/60 border-accent/25"
-            : "bg-surface border-border"
+          isHighlight ? "bg-accent-soft/60 border-accent/25" : "bg-surface border-border",
         )}
       >
-        <Icon
-          className={cn(
-            "h-3.5 w-3.5",
-            isHighlight ? "text-accent" : "text-ink-subtle"
-          )}
-        />
+        <Icon className={cn("h-3.5 w-3.5", isHighlight ? "text-accent" : "text-ink-subtle")} />
       </div>
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle mb-0.5">
@@ -157,7 +148,7 @@ function RowItem({ feature, side }: { feature: FeatureRow; side: "squads" | "aeg
             <Check
               className={cn(
                 "h-3.5 w-3.5 shrink-0",
-                isHighlight ? "text-accent" : "text-ink-subtle/70"
+                isHighlight ? "text-accent" : "text-ink-subtle/70",
               )}
               strokeWidth={2.5}
             />
@@ -167,7 +158,7 @@ function RowItem({ feature, side }: { feature: FeatureRow; side: "squads" | "aeg
           <p
             className={cn(
               "text-sm leading-relaxed",
-              isHighlight ? "text-ink font-medium" : "text-ink-muted"
+              isHighlight ? "text-ink font-medium" : "text-ink-muted",
             )}
           >
             {isAegis ? feature.aegis : feature.squads}
@@ -194,10 +185,7 @@ function DesktopTable() {
             <motion.div
               key={feature.id}
               variants={rowVariants}
-              className={cn(
-                "px-5",
-                i !== features.length - 1 && "border-b border-border/50"
-              )}
+              className={cn("px-5", i !== features.length - 1 && "border-b border-border/50")}
             >
               <RowItem feature={feature} side="squads" />
             </motion.div>
@@ -215,7 +203,7 @@ function DesktopTable() {
               className={cn(
                 "px-5",
                 feature.highlight && "bg-accent/[0.02]",
-                i !== features.length - 1 && "border-b border-border/40"
+                i !== features.length - 1 && "border-b border-border/40",
               )}
             >
               <RowItem feature={feature} side="aegis" />
@@ -243,10 +231,7 @@ function MobileStack() {
             <motion.div
               key={feature.id}
               variants={rowVariants}
-              className={cn(
-                "px-4",
-                i !== features.length - 1 && "border-b border-border/50"
-              )}
+              className={cn("px-4", i !== features.length - 1 && "border-b border-border/50")}
             >
               <RowItem feature={feature} side="squads" />
             </motion.div>
@@ -264,7 +249,7 @@ function MobileStack() {
               className={cn(
                 "px-4",
                 feature.highlight && "bg-accent/[0.02]",
-                i !== features.length - 1 && "border-b border-border/40"
+                i !== features.length - 1 && "border-b border-border/40",
               )}
             >
               <RowItem feature={feature} side="aegis" />
@@ -283,8 +268,8 @@ function BottomLine() {
         <div className="h-px w-16 bg-border mx-auto mb-8" />
         <p className="text-sm text-ink-muted leading-relaxed">
           Aegis is built on top of Squads Protocol v4. We wrap your treasury with private execution,
-          payroll workflows, invoicing, and scoped audit, all while keeping
-          the same Squads approval layer that secures your vault.
+          payroll workflows, invoicing, and scoped audit, all while keeping the same Squads approval
+          layer that secures your vault.
         </p>
       </div>
     </ScrollReveal>
@@ -304,8 +289,8 @@ export function ComparisonSection() {
               Built on Squads. Extended for privacy.
             </h2>
             <p className="mt-4 text-ink-muted leading-relaxed">
-              Squads Protocol is the approval layer Aegis is built on. Aegis adds
-              privacy, payroll, invoicing, and scoped audit on top.
+              Squads Protocol is the approval layer Aegis is built on. Aegis adds privacy, payroll,
+              invoicing, and scoped audit on top.
             </p>
           </div>
         </ScrollReveal>

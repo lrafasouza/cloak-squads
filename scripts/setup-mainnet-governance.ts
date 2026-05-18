@@ -70,8 +70,7 @@ const TIME_LOCK_SECS = 86400; // 24h
 function loadKeypair(filePath: string): Keypair {
   if (!fs.existsSync(filePath)) {
     throw new Error(
-      `Keypair not found at ${filePath}. ` +
-        `For mainnet, create a dedicated deployer key (NOT your daily-driver wallet).`,
+      `Keypair not found at ${filePath}. For mainnet, create a dedicated deployer key (NOT your daily-driver wallet).`,
     );
   }
   return Keypair.fromSecretKey(
@@ -91,6 +90,13 @@ async function main() {
         "Use scripts/setup-governance-multisig.ts for devnet.",
     );
   }
+
+  // Default to dry-run. Operator must opt in with --confirm to actually
+  // create the multisig on mainnet. Creating one is mostly idempotent (a new
+  // createKey each run), but it costs rent + smoke-test SOL and points the
+  // upgrade authority migration at a NEW PDA — easy to misalign with the
+  // ROAD_TO_MAINNET runbook.
+  const dryRun = !process.argv.includes("--confirm");
 
   const ledgerPubkeyStr = process.env.AEGIS_LEDGER_PUBKEY;
   if (!ledgerPubkeyStr) {
@@ -123,9 +129,17 @@ async function main() {
   const [vaultPda] = multisig.getVaultPda({ multisigPda, index: 0 });
 
   console.log("\n=== F-501 MAINNET governance multisig (2-of-3) ===\n");
+  console.log(
+    "Mode:               ",
+    dryRun ? "DRY-RUN (no on-chain writes)" : "EXECUTE (--confirm passed)",
+  );
   console.log("RPC:                ", RPC_URL);
   console.log("Hot member (A):     ", hotKey.publicKey.toBase58(), "  (existing deployer key)");
-  console.log("Cold member (B):    ", coldKey.publicKey.toBase58(), "  (in-memory only — see below)");
+  console.log(
+    "Cold member (B):    ",
+    coldKey.publicKey.toBase58(),
+    "  (in-memory only — see below)",
+  );
   console.log("Hardware (C):       ", ledgerMember.toBase58(), "  (Ledger / external signer)");
   console.log("Multisig PDA:       ", multisigPda.toBase58());
   console.log("Vault[0] PDA:       ", vaultPda.toBase58(), "  <-- new upgrade authority");
@@ -145,8 +159,7 @@ async function main() {
   console.log(`Hot balance: ${hotBalance / LAMPORTS_PER_SOL} SOL`);
   if (hotBalance < 0.05 * LAMPORTS_PER_SOL) {
     throw new Error(
-      `Hot key needs at least 0.05 SOL for multisig creation rent + smoke test on mainnet. ` +
-        `Send funds to ${hotKey.publicKey.toBase58()} and re-run.`,
+      `Hot key needs at least 0.05 SOL for multisig creation rent + smoke test on mainnet. Send funds to ${hotKey.publicKey.toBase58()} and re-run.`,
     );
   }
 
@@ -159,6 +172,24 @@ async function main() {
   const [programConfigPda] = multisig.getProgramConfigPda({});
   const programConfig = await ProgramConfig.fromAccountAddress(connection, programConfigPda);
   const treasury = programConfig.treasury;
+
+  if (dryRun) {
+    console.log("\n=== DRY-RUN — would now execute 6 mainnet on-chain steps ===");
+    console.log("[1] multisigCreateV2 (2-of-3, 24h time-lock)");
+    console.log("[2] proposalCreate (smoke test — vault → hot, 1 lamport)");
+    console.log("[3] vaultTransactionCreate");
+    console.log("[4] proposalApprove (hot)");
+    console.log("[5] proposalApprove (cold)");
+    console.log("[6] vaultTransactionExecute");
+    console.log("\nThis costs real SOL (rent + 1 lamport smoke). After it succeeds, you must");
+    console.log("still run `solana program set-upgrade-authority` against vault[0]:");
+    console.log(`  ${vaultPda.toBase58()}`);
+    console.log("\nTo proceed, re-run with --confirm:");
+    console.log(
+      `  AEGIS_LEDGER_PUBKEY=${ledgerPubkeyStr} pnpm tsx scripts/setup-mainnet-governance.ts --confirm`,
+    );
+    return;
+  }
 
   console.log("[1/6] multisigCreateV2 (2-of-3, 24h time-lock)...");
   const createSig = await multisig.rpc.multisigCreateV2({
@@ -289,12 +320,10 @@ async function main() {
   console.log("  3. Migrate the gatekeeper upgrade authority (one-shot, signed by");
   console.log("     the CURRENT upgrade authority on mainnet — NOT the new vault PDA):");
   console.log();
-  console.log(
-    `       solana program set-upgrade-authority ${GATEKEEPER_PROGRAM_ID} \\`,
-  );
+  console.log(`       solana program set-upgrade-authority ${GATEKEEPER_PROGRAM_ID} \\`);
   console.log(`         --new-upgrade-authority ${vaultPda.toBase58()} \\`);
   console.log("         --skip-new-upgrade-authority-signer-check \\");
-  console.log(`         --keypair <path-to-current-mainnet-upgrade-authority> \\`);
+  console.log("         --keypair <path-to-current-mainnet-upgrade-authority> \\");
   console.log(`         --url ${RPC_URL}`);
   console.log();
   console.log("  4. Verify:");
@@ -305,11 +334,11 @@ async function main() {
   console.log();
   console.log("  5. Update docs/security/governance.md with the new mainnet authority.");
   console.log();
-  console.log("MULTISIG_ADDRESS=" + multisigPda.toBase58());
-  console.log("VAULT_ADDRESS=" + vaultPda.toBase58());
-  console.log("LEDGER_MEMBER=" + ledgerMember.toBase58());
-  console.log("HOT_MEMBER=" + hotKey.publicKey.toBase58());
-  console.log("COLD_MEMBER=" + coldKey.publicKey.toBase58());
+  console.log(`MULTISIG_ADDRESS=${multisigPda.toBase58()}`);
+  console.log(`VAULT_ADDRESS=${vaultPda.toBase58()}`);
+  console.log(`LEDGER_MEMBER=${ledgerMember.toBase58()}`);
+  console.log(`HOT_MEMBER=${hotKey.publicKey.toBase58()}`);
+  console.log(`COLD_MEMBER=${coldKey.publicKey.toBase58()}`);
 }
 
 main().catch((err) => {

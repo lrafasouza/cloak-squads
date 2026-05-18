@@ -177,10 +177,7 @@ export async function createVaultProposal(params: {
       const matchedIndex = probedVaults.findIndex((v) => v.equals(key.pubkey));
       if (matchedIndex >= 0 && matchedIndex !== sourceVaultIndex) {
         throw new Error(
-          `vaultIndex mismatch: createVaultProposal received vaultIndex=${sourceVaultIndex} ` +
-            `but an inner instruction marks vault[${matchedIndex}] as signer. ` +
-            `Pass the same vaultIndex to both the ix builder (e.g. buildIssueLicenseIxBrowser) ` +
-            `and createVaultProposal.`,
+          `vaultIndex mismatch: createVaultProposal received vaultIndex=${sourceVaultIndex} but an inner instruction marks vault[${matchedIndex}] as signer. Pass the same vaultIndex to both the ix builder (e.g. buildIssueLicenseIxBrowser) and createVaultProposal.`,
         );
       }
     }
@@ -326,9 +323,7 @@ export async function createBatchIssueLicenseProposal(params: {
       const matchedIndex = probedVaults.findIndex((v) => v.equals(key.pubkey));
       if (matchedIndex >= 0 && matchedIndex !== sourceVaultIndex) {
         throw new Error(
-          `vaultIndex mismatch in batch: createBatchIssueLicenseProposal received ` +
-            `vaultIndex=${sourceVaultIndex} but an issue_license ix marks vault[${matchedIndex}] as signer. ` +
-            `Pass the same vaultIndex to buildIssueLicenseIxBrowser and this function.`,
+          `vaultIndex mismatch in batch: createBatchIssueLicenseProposal received vaultIndex=${sourceVaultIndex} but an issue_license ix marks vault[${matchedIndex}] as signer. Pass the same vaultIndex to buildIssueLicenseIxBrowser and this function.`,
         );
       }
     }

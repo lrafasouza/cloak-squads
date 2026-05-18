@@ -39,6 +39,7 @@ pub fn handler(
         cofre: license.cofre,
         payload_hash,
         expires_at,
+        vault_index,
     });
 
     Ok(())

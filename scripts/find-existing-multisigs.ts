@@ -1,6 +1,6 @@
 /**
  * Script para encontrar multisigs existentes no devnet
- * 
+ *
  * Uso: npx tsx scripts/find-existing-multisigs.ts [WALLET_ADDRESS]
  */
 
@@ -11,7 +11,7 @@ const RPC_URL = "https://api.devnet.solana.com";
 
 async function main() {
   const targetWallet = process.argv[2];
-  
+
   if (!targetWallet) {
     console.log("Usage: npx tsx scripts/find-existing-multisigs.ts [YOUR_WALLET_ADDRESS]");
     console.log("\nExample multisigs on devnet (may or may not exist):");
@@ -22,20 +22,20 @@ async function main() {
   }
 
   console.log(`Scanning devnet for multisigs where ${targetWallet} is a member...\n`);
-  
+
   const connection = new Connection(RPC_URL, "confirmed");
   const owner = new PublicKey(targetWallet);
-  
+
   try {
     const accounts = await connection.getProgramAccounts(multisig.PROGRAM_ID);
     console.log(`Total accounts found: ${accounts.length}`);
-    
+
     let found = 0;
     for (const { pubkey, account } of accounts.slice(0, 100)) {
       try {
         const [decoded] = multisig.accounts.Multisig.fromAccountInfo(account);
         const isMember = decoded.members.some((m) => m.key.equals(owner));
-        
+
         if (isMember) {
           found++;
           console.log(`\n✅ Multisig #${found}:`);
@@ -48,7 +48,7 @@ async function main() {
         // Skip invalid accounts
       }
     }
-    
+
     if (found === 0) {
       console.log("\n❌ No multisigs found where you're a member.");
       console.log("\nTo create one, run:");

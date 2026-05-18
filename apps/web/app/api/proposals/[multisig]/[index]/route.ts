@@ -77,7 +77,9 @@ export async function PATCH(
   const hdrs = await headers();
   const raw = hdrs.get("x-forwarded-for") ?? hdrs.get("x-real-ip") ?? "unknown";
   const ip = (raw.split(",")[0] ?? raw).trim();
-  if (!(await checkRateLimitAsync(rateLimitBucket(ip, "proposals-archive", auth.publicKey), "write"))) {
+  if (
+    !(await checkRateLimitAsync(rateLimitBucket(ip, "proposals-archive", auth.publicKey), "write"))
+  ) {
     return NextResponse.json({ error: "Rate limited" }, { status: 429 });
   }
 

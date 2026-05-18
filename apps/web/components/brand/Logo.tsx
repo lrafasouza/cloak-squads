@@ -37,11 +37,7 @@ export function Logo({ variant = "full", className, href = "/", size = "md" }: L
       {variant !== "wordmark" && (
         <span
           aria-hidden={variant === "monogram" ? undefined : true}
-          className={cn(
-            "font-garamond font-semibold leading-none",
-            "text-accent",
-            s.mono,
-          )}
+          className={cn("font-garamond font-semibold leading-none", "text-accent", s.mono)}
           style={{ letterSpacing: "-0.02em" }}
         >
           Æ
@@ -49,11 +45,7 @@ export function Logo({ variant = "full", className, href = "/", size = "md" }: L
       )}
       {variant !== "monogram" && (
         <span
-          className={cn(
-            "font-garamond font-semibold leading-none",
-            "text-ink",
-            s.word,
-          )}
+          className={cn("font-garamond font-semibold leading-none", "text-ink", s.word)}
           style={{ letterSpacing: "-0.005em" }}
         >
           Aegis

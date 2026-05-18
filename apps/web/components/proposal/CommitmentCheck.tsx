@@ -81,9 +81,7 @@ export function CommitmentCheck({
       <dl className="mt-4 grid gap-3 text-sm">
         <div>
           <dt className="text-ink-muted">On-chain</dt>
-          <dd className="mt-1 font-mono text-ink">
-            {truncateBase58(claim.onChainCommitment)}
-          </dd>
+          <dd className="mt-1 font-mono text-ink">{truncateBase58(claim.onChainCommitment)}</dd>
         </div>
         <div>
           <dt className="text-ink-muted">Local recompute</dt>

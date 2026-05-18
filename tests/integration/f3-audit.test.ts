@@ -49,15 +49,7 @@ function filterAuditData(
 }
 
 function exportAuditToCSV(transactions: FilteredAuditTransaction[]): string {
-  const headers = [
-    "timestamp",
-    "type",
-    "subtype",
-    "amount",
-    "nullifier",
-    "status",
-    "vaultIndex",
-  ];
+  const headers = ["timestamp", "type", "subtype", "amount", "nullifier", "status", "vaultIndex"];
   const rows = transactions.map((tx) => ({
     timestamp: new Date(tx.timestamp).toISOString(),
     type: tx.type,

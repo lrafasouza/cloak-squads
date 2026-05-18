@@ -1,6 +1,6 @@
 import { checkRateLimitAsync, rateLimitBucket } from "@/lib/rate-limit";
-import { requireVaultMember } from "@/lib/vault-membership";
 import { inspectVaultIncomeSync, readVaultIncome, syncVaultIncome } from "@/lib/vault-income-sync";
+import { requireVaultMember } from "@/lib/vault-membership";
 import { PublicKey } from "@solana/web3.js";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";

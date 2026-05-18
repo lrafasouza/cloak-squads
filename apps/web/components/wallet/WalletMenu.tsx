@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme, type Theme } from "@/components/providers/ThemeProvider";
+import { type Theme, useTheme } from "@/components/providers/ThemeProvider";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ClientWalletButton } from "@/components/wallet/ClientWalletButton";
 import { publicEnv } from "@/lib/env";

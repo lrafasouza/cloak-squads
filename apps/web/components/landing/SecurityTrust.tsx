@@ -92,9 +92,8 @@ export function SecurityTrust() {
 
           <ScrollReveal delay={0.1} className="lg:col-span-5">
             <p className="text-base md:text-lg text-ink-muted leading-relaxed">
-              A privacy product is only as strong as the threats it survives.
-              Four scenarios, four answers - no marketing language, no
-              hand-waving.
+              A privacy product is only as strong as the threats it survives. Four scenarios, four
+              answers - no marketing language, no hand-waving.
             </p>
           </ScrollReveal>
         </div>
@@ -114,8 +113,7 @@ export function SecurityTrust() {
             <span>Open-source program</span>
             <span className="text-ink-subtle/30">·</span>
             <span>
-              Devnet · v0 →{" "}
-              <span className="text-accent">External audit</span> → Mainnet
+              Devnet · v0 → <span className="text-accent">External audit</span> → Mainnet
             </span>
           </div>
         </ScrollReveal>
